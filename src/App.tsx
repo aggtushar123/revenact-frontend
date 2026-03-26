@@ -8,7 +8,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<DashboardLayout />}>
-          <Route index element={<Navigate to="/organizations/list" replace />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
           
           <Route path="dashboard" element={
             <div className="w-full h-full border-2 border-dashed border-gray-200/60 rounded-xl flex items-center justify-center bg-white/50 backdrop-blur-sm">
