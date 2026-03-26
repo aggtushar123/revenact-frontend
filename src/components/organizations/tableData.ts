@@ -1,4 +1,3 @@
-import React from 'react';
 
 export type ColumnId =
   | 'organization' | 'velarisId' | 'owner' | 'lifecycleStage' | 'health' | 'pulse'
