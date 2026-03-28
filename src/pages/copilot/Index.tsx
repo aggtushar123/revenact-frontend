@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { HomeView } from './HomeView';
 import { ChatView } from './ChatView';
 import { CopilotSidebar } from './CopilotSidebar';
+import { CockpitView } from './CockpitView';
 
 export function CopilotIndex() {
   const [view, setView] = useState<'home' | 'chat' | 'empty-chat'>('home');
@@ -76,10 +77,8 @@ export function CopilotIndex() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center p-6 bg-transparent">
-            <div className="w-full h-full max-w-[800px] border border-gray-200 shadow-[0px_4px_24px_rgba(0,0,0,0.04)] bg-white rounded-[20px] flex items-center justify-center">
-               <p className="text-gray-400 font-medium tracking-wide">Cockpit Blank Card</p>
-            </div>
+          <div className="flex-1 overflow-hidden bg-[#fafafa] p-6 pt-5">
+            <CockpitView />
           </div>
         )}
       </div>
