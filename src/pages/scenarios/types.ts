@@ -1,17 +1,12 @@
-import type { Node } from '@xyflow/react';
-
-export interface ScenarioNodeData {
-  label: string;
+export type ScenarioNodeData = {
   action: string;
-  [key: string]: any; // Allow for extensibility while maintaining a base structure
-}
+  label: string;
+};
 
-export type ScenarioNode = Node<ScenarioNodeData>;
+export type ScenarioNodeType = 'entry' | 'operator' | 'action';
 
-export interface EditNodeDetail {
+export interface ScenarioNodeDetail {
   id: string;
   data: ScenarioNodeData;
-  type: 'entry' | 'operator' | 'action';
+  type: ScenarioNodeType;
 }
-
-export type EditNodeEvent = CustomEvent<EditNodeDetail>;

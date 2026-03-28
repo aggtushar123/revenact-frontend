@@ -51,7 +51,7 @@ const NodeContainer = ({ header, color, icon, isSelected, data, onDelete, onEdit
   </div>
 );
 
-export const EntryNode = memo(({ id, data, selected }: NodeProps<any>) => {
+export const EntryNode = memo(({ id, data, selected }: NodeProps) => {
   const { setNodes, setEdges } = useReactFlow();
   const onDelete = () => {
     setNodes((nds) => nds.filter((n) => n.id !== id));
@@ -64,6 +64,8 @@ export const EntryNode = memo(({ id, data, selected }: NodeProps<any>) => {
     window.dispatchEvent(event);
   };
   
+  const nodeData = data as ScenarioNodeData;
+  
   return (
     <>
       <Handle type="target" position={Position.Top} className="!opacity-0" />
@@ -72,7 +74,7 @@ export const EntryNode = memo(({ id, data, selected }: NodeProps<any>) => {
         color="#14b8a6" 
         icon={<Zap className="w-4 h-4" />} 
         isSelected={!!selected}
-        data={data}
+        data={nodeData}
         onDelete={onDelete}
         onEdit={onEdit}
       />
@@ -87,7 +89,7 @@ export const EntryNode = memo(({ id, data, selected }: NodeProps<any>) => {
   );
 });
 
-export const OperatorNode = memo(({ id, data, selected }: NodeProps<any>) => {
+export const OperatorNode = memo(({ id, data, selected }: NodeProps) => {
   const { setNodes, setEdges } = useReactFlow();
   const onDelete = () => {
     setNodes((nds) => nds.filter((n) => n.id !== id));
@@ -99,7 +101,8 @@ export const OperatorNode = memo(({ id, data, selected }: NodeProps<any>) => {
     window.dispatchEvent(event);
   };
 
-  const isCondition = data.action === 'Condition';
+  const nodeData = data as ScenarioNodeData;
+  const isCondition = nodeData.action === 'Condition';
   return (
     <>
       <Handle type="target" position={Position.Top} className="!w-2 !h-2 !bg-[#8b5cf6] !-top-1 !z-50" />
@@ -108,7 +111,7 @@ export const OperatorNode = memo(({ id, data, selected }: NodeProps<any>) => {
         color="#8b5cf6" 
         icon={isCondition ? <Split className="w-4 h-4" /> : <Filter className="w-4 h-4" />} 
         isSelected={!!selected}
-        data={data}
+        data={nodeData}
         onDelete={onDelete}
         onEdit={onEdit}
       />
@@ -147,7 +150,7 @@ export const OperatorNode = memo(({ id, data, selected }: NodeProps<any>) => {
   );
 });
 
-export const ActionNode = memo(({ id, data, selected }: NodeProps<any>) => {
+export const ActionNode = memo(({ id, data, selected }: NodeProps) => {
   const { setNodes, setEdges } = useReactFlow();
   const onDelete = () => {
     setNodes((nds) => nds.filter((n) => n.id !== id));
@@ -159,6 +162,8 @@ export const ActionNode = memo(({ id, data, selected }: NodeProps<any>) => {
     window.dispatchEvent(event);
   };
 
+  const nodeData = data as ScenarioNodeData;
+
   return (
     <>
       <Handle type="target" position={Position.Top} className="!w-2 !h-2 !bg-[#3b82f6] !-top-1 !z-50" />
@@ -167,7 +172,7 @@ export const ActionNode = memo(({ id, data, selected }: NodeProps<any>) => {
         color="#3b82f6" 
         icon={<Mail className="w-4 h-4" />} 
         isSelected={!!selected}
-        data={data}
+        data={nodeData}
         onDelete={onDelete}
         onEdit={onEdit}
       />
@@ -181,5 +186,3 @@ export const ActionNode = memo(({ id, data, selected }: NodeProps<any>) => {
     </>
   );
 });
-
-// nodeTypes moved to CreateScenario.tsx to avoid Fast Refresh warning

@@ -13,12 +13,12 @@ import {
 import type { Connection, Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { 
-  EntryNode, 
-  OperatorNode, 
-  ActionNode 
-} from './CustomNodes';
+import { EntryNode, OperatorNode, ActionNode } from './CustomNodes';
 import { CustomEdge } from './CustomEdge';
+import { BuilderSidebar } from './BuilderSidebar';
+import { ScenarioHeader } from './ScenarioHeader';
+import { EditNodePane } from './EditNodePane';
+import type { ScenarioNodeDetail, ScenarioNodeData } from './types';
 
 const nodeTypes = {
   entry: EntryNode,
@@ -26,34 +26,33 @@ const nodeTypes = {
   action: ActionNode,
 };
 
-import { BuilderSidebar } from './BuilderSidebar';
-import { ScenarioHeader } from './ScenarioHeader';
-import { EditNodePane } from './EditNodePane';
-import type { EditNodeDetail, EditNodeEvent } from './types';
-
 const edgeTypes = {
   interactive: CustomEdge,
 };
 
-const initialNodes: Node[] = [];
+const initialNodes: Node<ScenarioNodeData>[] = [];
 const initialEdges: Edge[] = [];
 
-let id = 10;
-const getId = () => `node_${id++}`;
+let idIncrement = 10;
+const getId = () => `node_${idIncrement++}`;
 
 function Flow() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+  
+  // Let type inference handle the generic if possible, or use Node<ScenarioNodeData>
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node<ScenarioNodeData>>(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>(initialEdges);
   const [isLocked, setIsLocked] = useState(false);
-  const [editingNode, setEditingNode] = useState<EditNodeDetail | null>(null);
+  const [editingNode, setEditingNode] = useState<ScenarioNodeDetail | null>(null);
   const { screenToFlowPosition, zoomIn, zoomOut, fitView } = useReactFlow();
 
   // Listen for edit events from custom nodes
   useEffect(() => {
-    const handleEdit = (e: Event) => {
-      const editEvent = e as EditNodeEvent;
-      setEditingNode(editEvent.detail);
+    const handleEdit = (event: Event) => {
+      const customEvent = event as CustomEvent<ScenarioNodeDetail>;
+      if (customEvent.detail) {
+        setEditingNode(customEvent.detail);
+      }
     };
     window.addEventListener('edit-node', handleEdit);
     return () => window.removeEventListener('edit-node', handleEdit);
@@ -86,7 +85,7 @@ function Flow() {
         y: event.clientY,
       });
 
-      const newNode: Node = {
+      const newNode: Node<ScenarioNodeData> = {
         id: getId(),
         type,
         position,
@@ -108,7 +107,7 @@ function Flow() {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
-        nodeTypes={nodeTypes as any}
+        nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         fitView
         nodesDraggable={!isLocked}
