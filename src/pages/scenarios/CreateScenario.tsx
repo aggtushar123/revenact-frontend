@@ -13,11 +13,23 @@ import {
 import type { Connection, Edge, Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-import { nodeTypes } from './CustomNodes';
+import { 
+  EntryNode, 
+  OperatorNode, 
+  ActionNode 
+} from './CustomNodes';
 import { CustomEdge } from './CustomEdge';
+
+const nodeTypes = {
+  entry: EntryNode,
+  operator: OperatorNode,
+  action: ActionNode,
+};
+
 import { BuilderSidebar } from './BuilderSidebar';
 import { ScenarioHeader } from './ScenarioHeader';
 import { EditNodePane } from './EditNodePane';
+import type { EditNodeDetail, EditNodeEvent } from './types';
 
 const edgeTypes = {
   interactive: CustomEdge,
@@ -34,13 +46,14 @@ function Flow() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [isLocked, setIsLocked] = useState(false);
-  const [editingNode, setEditingNode] = useState<any>(null);
+  const [editingNode, setEditingNode] = useState<EditNodeDetail | null>(null);
   const { screenToFlowPosition, zoomIn, zoomOut, fitView } = useReactFlow();
 
   // Listen for edit events from custom nodes
   useEffect(() => {
-    const handleEdit = (e: any) => {
-      setEditingNode(e.detail);
+    const handleEdit = (e: Event) => {
+      const editEvent = e as EditNodeEvent;
+      setEditingNode(editEvent.detail);
     };
     window.addEventListener('edit-node', handleEdit);
     return () => window.removeEventListener('edit-node', handleEdit);
@@ -95,7 +108,7 @@ function Flow() {
         onConnect={onConnect}
         onDrop={onDrop}
         onDragOver={onDragOver}
-        nodeTypes={nodeTypes}
+        nodeTypes={nodeTypes as any}
         edgeTypes={edgeTypes}
         fitView
         nodesDraggable={!isLocked}

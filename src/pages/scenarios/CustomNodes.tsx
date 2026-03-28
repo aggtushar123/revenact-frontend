@@ -5,9 +5,10 @@ import {
   Zap, Split, Filter, 
   Mail, Trash2, Edit2
 } from 'lucide-react';
+import type { ScenarioNodeData } from './types';
 
 // Common node container
-const NodeContainer = ({ header, color, icon, isSelected, data, onDelete, onEdit }: { header: string, color: string, icon: React.ReactNode, isSelected: boolean, data: any, onDelete?: () => void, onEdit?: () => void }) => (
+const NodeContainer = ({ header, color, icon, isSelected, data, onDelete, onEdit }: { header: string, color: string, icon: React.ReactNode, isSelected: boolean, data: ScenarioNodeData, onDelete?: () => void, onEdit?: () => void }) => (
   <div className={`group relative min-w-[280px] bg-white rounded-lg shadow-sm border transition-all ${
     isSelected ? 'ring-2 ring-blue-500' : 'border-gray-200'
   }`} style={{ borderColor: isSelected ? undefined : color }}>
@@ -50,7 +51,7 @@ const NodeContainer = ({ header, color, icon, isSelected, data, onDelete, onEdit
   </div>
 );
 
-export const EntryNode = memo(({ id, data, selected }: NodeProps) => {
+export const EntryNode = memo(({ id, data, selected }: NodeProps<any>) => {
   const { setNodes, setEdges } = useReactFlow();
   const onDelete = () => {
     setNodes((nds) => nds.filter((n) => n.id !== id));
@@ -86,7 +87,7 @@ export const EntryNode = memo(({ id, data, selected }: NodeProps) => {
   );
 });
 
-export const OperatorNode = memo(({ id, data, selected }: NodeProps) => {
+export const OperatorNode = memo(({ id, data, selected }: NodeProps<any>) => {
   const { setNodes, setEdges } = useReactFlow();
   const onDelete = () => {
     setNodes((nds) => nds.filter((n) => n.id !== id));
@@ -146,7 +147,7 @@ export const OperatorNode = memo(({ id, data, selected }: NodeProps) => {
   );
 });
 
-export const ActionNode = memo(({ id, data, selected }: NodeProps) => {
+export const ActionNode = memo(({ id, data, selected }: NodeProps<any>) => {
   const { setNodes, setEdges } = useReactFlow();
   const onDelete = () => {
     setNodes((nds) => nds.filter((n) => n.id !== id));
@@ -181,8 +182,4 @@ export const ActionNode = memo(({ id, data, selected }: NodeProps) => {
   );
 });
 
-export const nodeTypes = {
-  entry: EntryNode,
-  operator: OperatorNode,
-  action: ActionNode,
-};
+// nodeTypes moved to CreateScenario.tsx to avoid Fast Refresh warning

@@ -1,7 +1,8 @@
+import type { EditNodeDetail } from './types';
 import { X, Info, ChevronDown, Filter, Settings, Trash2 } from 'lucide-react';
 
 interface EditNodePaneProps {
-  node: any;
+  node: EditNodeDetail | null;
   isOpen: boolean;
   onClose: () => void;
   onSave: () => void;

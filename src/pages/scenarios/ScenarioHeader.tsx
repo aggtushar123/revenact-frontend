@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronDown, Save, ArrowLeft } from 'lucide-react';
+import { useState } from 'react';
+import { ChevronLeft, ChevronDown } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 export function ScenarioHeader() {
@@ -26,7 +26,7 @@ export function ScenarioHeader() {
                   name="applyTo" 
                   className="hidden" 
                   checked={applyTo === option}
-                  onChange={() => setApplyTo(option as any)}
+                  onChange={() => setApplyTo(option as 'Organizations' | 'Accounts' | 'Contacts')}
                 />
                 <div className={`w-4 h-4 rounded-full border flex items-center justify-center transition-all ${
                   applyTo === option ? 'border-blue-500' : 'border-gray-200 group-hover:border-gray-300'
