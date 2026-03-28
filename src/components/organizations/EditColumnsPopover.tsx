@@ -25,8 +25,13 @@ export function EditColumnsPopover({ allColumns, visibleColumns, setVisibleColum
     if (isVisible) {
       setVisibleColumns(prev => prev.filter(colId => colId !== id));
     } else {
-      // Add back at the end
-      setVisibleColumns(prev => [...prev, id]);
+      setVisibleColumns(prev => {
+        const newCols = [...prev, id];
+        newCols.sort((a, b) => {
+          return allColumns.findIndex(c => c.id === a) - allColumns.findIndex(c => c.id === b);
+        });
+        return newCols;
+      });
     }
   };
 
@@ -84,11 +89,11 @@ export function EditColumnsPopover({ allColumns, visibleColumns, setVisibleColum
                   </span>
                   
                   {isVisible ? (
-                    <button onClick={() => toggleColumn(col.id, true)} className="p-1 hover:bg-red-50 text-red-300 hover:text-red-500 rounded transition-colors shrink-0">
+                    <button type="button" onClick={() => toggleColumn(col.id, true)} className="p-1 hover:bg-red-50 text-red-300 hover:text-red-500 rounded transition-colors shrink-0">
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   ) : (
-                    <button onClick={() => toggleColumn(col.id, false)} className="p-1 hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 rounded transition-colors shrink-0">
+                    <button type="button" onClick={() => toggleColumn(col.id, false)} className="p-1 hover:bg-indigo-100 text-gray-400 hover:text-indigo-600 rounded transition-colors shrink-0">
                       {isSystem ? <Settings className="w-3.5 h-3.5" /> : <div className="text-lg leading-none font-medium mb-[2px]">+</div>}
                     </button>
                   )}
