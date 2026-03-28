@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Sparkles, ArrowUp, ChevronRight } from 'lucide-react';
 
 export function HomeView({ 
@@ -9,6 +10,15 @@ export function HomeView({
   selectedSkill?: string | null,
   onSelectSkill?: (skill: string | null) => void
 }) {
+  useEffect(() => {
+    if (selectedSkill) {
+      // Adding a small delay ensures layout is complete before scrolling
+      setTimeout(() => {
+        document.getElementById('active-skill-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 10);
+    }
+  }, [selectedSkill]);
+
   return (
     <div className="flex-1 h-full overflow-y-auto custom-scrollbar bg-white flex flex-col relative pb-32 w-full max-w-[900px] mx-auto">
       <div className="flex-1 flex flex-col items-center justify-center w-full px-8 pt-16 pb-12">
@@ -26,7 +36,7 @@ export function HomeView({
 
         {/* Input Box OR Skill Card */}
         {selectedSkill ? (
-          <div className="w-full max-w-[700px] bg-white border border-[#d3cef6] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col overflow-hidden relative">
+          <div id="active-skill-card" className="w-full max-w-[700px] bg-white border border-[#d3cef6] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col overflow-hidden relative">
             <div className="p-5 pb-4">
               <div className="flex items-center gap-2 mb-4">
                 <span className="bg-[#f4effc] text-gray-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-[#e1d5f8]">Built-in Skill</span>
