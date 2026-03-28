@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { List } from './pages/organizations/List';
 import { Board } from './pages/organizations/Board';
+import { CopilotIndex } from './pages/copilot/Index';
 
 function App() {
   return (
@@ -21,6 +22,8 @@ function App() {
             <Route path="list" element={<List />} />
             <Route path="board" element={<Board />} />
           </Route>
+
+          <Route path="copilot" element={<CopilotIndex />} />
           
         </Route>
       </Routes>
