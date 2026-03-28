@@ -7,6 +7,7 @@ export function Navbar() {
   const navigate = useNavigate();
   const isOrganizations = location.pathname.startsWith('/organizations');
   const isCopilot = location.pathname === '/copilot';
+  const isSettings = location.pathname.startsWith('/settings');
 
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -61,6 +62,34 @@ export function Navbar() {
               >
                 Board
               </NavLink>
+            </nav>
+          </>
+        ) : isSettings ? (
+          <>
+            <div className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 py-1.5 px-2 -ml-2 rounded-md transition-colors">
+              <h1 className="text-[17px] font-bold text-gray-800 tracking-tight">Settings</h1>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-600 stroke-[2.5px] mt-[1px]" />
+            </div>
+            
+            <nav className="flex items-center gap-6 h-full mt-0.5 ml-2 overflow-x-auto scrollbar-none max-w-[60vw]">
+              {[
+                { name: 'Data', path: '/settings/data' },
+                { name: 'Currency', path: '/settings/currency' },
+                { name: 'Entity Uploads', path: '/settings/entity-uploads' },
+                { name: 'Webhooks', path: '/settings/webhooks' },
+                { name: 'Activities', path: '/settings/activities' },
+                { name: 'Global Presets', path: '/settings/global-presets' },
+                { name: 'Connect Widget', path: '/settings/connect-widget' },
+                { name: 'AI Agent', path: '/settings/ai-agent' }
+              ].map((tab) => (
+                <NavLink 
+                  key={tab.path}
+                  to={tab.path}
+                  className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13.5px] px-1 pt-1 transition-all whitespace-nowrap ${isActive ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+                >
+                  {tab.name}
+                </NavLink>
+              ))}
             </nav>
           </>
         ) : (

@@ -4,6 +4,8 @@ import { List } from './pages/organizations/List';
 import { Board } from './pages/organizations/Board';
 import { CopilotIndex } from './pages/copilot/Index';
 import { CreateScenario } from './pages/scenarios/CreateScenario';
+import { SettingsPage } from './pages/settings/SettingsPage';
+import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
 
 function App() {
   return (
@@ -26,6 +28,18 @@ function App() {
 
           <Route path="copilot" element={<CopilotIndex />} />
           <Route path="scenarios/create" element={<CreateScenario />} />
+          
+          <Route path="settings">
+            <Route index element={<Navigate to="data" replace />} />
+            <Route path="data" element={<SettingsPage />} />
+            <Route path="currency" element={<SettingPlaceholder title="Currency" />} />
+            <Route path="entity-uploads" element={<SettingPlaceholder title="Entity Uploads" />} />
+            <Route path="webhooks" element={<SettingPlaceholder title="Webhooks" />} />
+            <Route path="activities" element={<SettingPlaceholder title="Activities" />} />
+            <Route path="global-presets" element={<SettingPlaceholder title="Global Presets" />} />
+            <Route path="connect-widget" element={<SettingPlaceholder title="Connect Widget" />} />
+            <Route path="ai-agent" element={<SettingPlaceholder title="AI Agent" />} />
+          </Route>
           
         </Route>
       </Routes>
