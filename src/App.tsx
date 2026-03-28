@@ -3,6 +3,7 @@ import { DashboardLayout } from './layouts/DashboardLayout';
 import { List } from './pages/organizations/List';
 import { Board } from './pages/organizations/Board';
 import { CopilotIndex } from './pages/copilot/Index';
+import { CreateScenario } from './pages/scenarios/CreateScenario';
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           </Route>
 
           <Route path="copilot" element={<CopilotIndex />} />
+          <Route path="scenarios/create" element={<CreateScenario />} />
           
         </Route>
       </Routes>
