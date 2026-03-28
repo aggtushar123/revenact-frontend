@@ -1,6 +1,14 @@
-import { Sparkles, ArrowUp } from 'lucide-react';
+import { Sparkles, ArrowUp, ChevronRight } from 'lucide-react';
 
-export function HomeView({ onSendPrompt }: { onSendPrompt: (p: string) => void }) {
+export function HomeView({ 
+  onSendPrompt, 
+  selectedSkill, 
+  onSelectSkill 
+}: { 
+  onSendPrompt: (p: string) => void,
+  selectedSkill?: string | null,
+  onSelectSkill?: (skill: string | null) => void
+}) {
   return (
     <div className="flex-1 h-full overflow-y-auto custom-scrollbar bg-white flex flex-col relative pb-32 w-full max-w-[900px] mx-auto">
       <div className="flex-1 flex flex-col items-center justify-center w-full px-8 pt-16 pb-12">
@@ -16,22 +24,71 @@ export function HomeView({ onSendPrompt }: { onSendPrompt: (p: string) => void }
           I help you spot risk, growth, and what needs attention across your accounts fast
         </p>
 
-        {/* Input Box */}
-        <div className="w-full max-w-[700px] relative">
-          <div className="absolute -inset-[3px] rounded-xl bg-gradient-to-r from-indigo-200/60 to-purple-200/60 blur-sm"></div>
-          <div className="relative bg-white border-2 border-[#d3cef6] rounded-xl flex items-end min-h-[104px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] focus-within:ring-4 focus-within:ring-indigo-500/10 transition-shadow">
-            <textarea
-              className="w-full h-full min-h-[96px] bg-transparent resize-none outline-none border-none p-4 text-[15px] placeholder:text-gray-300 placeholder:italic text-gray-700 font-medium"
-              placeholder="Type '{' to add variables, like {Account} and {Organization}"
-            />
-            <button
-              onClick={() => onSendPrompt("test")}
-              className="absolute right-3.5 bottom-3.5 w-[26px] h-[26px] bg-[#f1f1f4] hover:bg-[#8b5cf6] hover:text-white rounded-full flex items-center justify-center text-white shadow-sm transition-all cursor-pointer group"
-            >
-              <ArrowUp className="w-[14px] h-[14px] stroke-[3.5px] text-gray-400 group-hover:text-white" />
-            </button>
+        {/* Input Box OR Skill Card */}
+        {selectedSkill ? (
+          <div className="w-full max-w-[700px] bg-white border border-[#d3cef6] rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.03)] flex flex-col overflow-hidden relative">
+            <div className="p-5 pb-4">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="bg-[#f4effc] text-gray-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-[#e1d5f8]">Built-in Skill</span>
+                <h3 className="text-[15px] font-bold text-gray-800 tracking-tight">{selectedSkill}</h3>
+              </div>
+              <div className="flex items-center gap-1.5 text-indigo-600 text-[13px] font-bold cursor-pointer group mb-4">
+                <ChevronRight className="w-3.5 h-3.5 group-hover:text-indigo-800" />
+                Parameters
+              </div>
+              
+              <div className="text-[13.5px] text-gray-700 font-medium leading-[1.6]">
+                 <p className="mb-4">Create a high-level strategy for de-risking and renewing <span className="text-[#fb7185] bg-rose-50 border border-rose-100 px-1.5 py-0.5 rounded">account</span> that I can share with our internal team.</p>
+                 <p className="mb-4">Include the following sections:</p>
+                 <p className="mb-1">1) Who's involved in this strategy?</p>
+                 <ul className="text-gray-600 mb-4 space-y-1">
+                   <li>- Name of CSM/TAM (Account Owner):</li>
+                   <li>- Name of CSE, Customer Solutions Expert, if they were a part of any conversations, engagements, or meetings with any contact from this account. If yes, list them. If no, omit.</li>
+                 </ul>
+                 <p className="mb-1">2) Strategic Assessment</p>
+                 <ul className="text-gray-600 space-y-1">
+                   <li>- What is the account's ARR?</li>
+                   <li>- Renewal Date (True Renewal Date)?</li>
+                   <li>- Are they on Auto-Renew? If so, what is their Opt-Out date and/or Renewal Notice Period (Days)?</li>
+                   <li>- What is their use case? (From call/meeting and engagement summaries)</li>
+                   <li>- Root Cause Analysis: Why is the account actually at risk? Not symptoms, but underlying strategic misalignment. Use any pre-analysis, usage data, call/meeting transcripts, and email threads for context.</li>
+                   <li>- Strategy: What is our path? No tactics; just 2-3 high level bullet points, MAX.</li>
+                   <li>- Success Criteria: How will we know if the strategy is working?</li>
+                 </ul>
+              </div>
+            </div>
+            <div className="bg-white border-t border-gray-100 p-4 flex justify-end gap-3">
+              <button 
+                onClick={() => onSelectSkill?.(null)}
+                className="px-4 py-1.5 text-[13px] font-bold text-gray-700 hover:bg-gray-50 border border-gray-200 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                disabled
+                className="px-4 py-1.5 text-[13px] font-bold text-gray-400 bg-gray-50 border border-gray-200 rounded-md cursor-not-allowed"
+              >
+                Run
+              </button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="w-full max-w-[700px] relative">
+            <div className="absolute -inset-[3px] rounded-xl bg-gradient-to-r from-indigo-200/60 to-purple-200/60 blur-sm"></div>
+            <div className="relative bg-white border-2 border-[#d3cef6] rounded-xl flex items-end min-h-[104px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] focus-within:ring-4 focus-within:ring-indigo-500/10 transition-shadow">
+              <textarea
+                className="w-full h-full min-h-[96px] bg-transparent resize-none outline-none border-none p-4 text-[15px] placeholder:text-gray-300 placeholder:italic text-gray-700 font-medium"
+                placeholder="Type '{' to add variables, like {Account} and {Organization}"
+              />
+              <button
+                onClick={() => onSendPrompt("test")}
+                className="absolute right-3.5 bottom-3.5 w-[26px] h-[26px] bg-[#f1f1f4] hover:bg-[#8b5cf6] hover:text-white rounded-full flex items-center justify-center text-white shadow-sm transition-all cursor-pointer group"
+              >
+                <ArrowUp className="w-[14px] h-[14px] stroke-[3.5px] text-gray-400 group-hover:text-white" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Built-in Skills */}
         <div className="w-full max-w-[740px] mt-16 flex flex-col gap-4">
@@ -52,12 +109,12 @@ export function HomeView({ onSendPrompt }: { onSendPrompt: (p: string) => void }
           <div id="section-account" className="text-[14px] font-bold text-gray-500 mb-1.5 mt-2">Account</div>
 
           <div className="grid grid-cols-4 gap-4">
-            <SkillCard title="Internal Business Review" desc="Internal Business Review" />
-            <SkillCard title="Quick Start Brief" desc="Pulls together a compact, high-signal account overview to rapidl..." />
-            <SkillCard title="Overview of strategy to de-ris..." desc="Provides root cause analysis of the risk on an account and a hig..." />
-            <SkillCard title="Prep weekly customer sync" desc="Creates a brief that consolidates open items, clarifies ownership..." />
-            <SkillCard title="One liner update" desc="Compact summary of the recent activity on an account" />
-            <SkillCard title="Onboarding Status Report" desc="Provides a clear, fast-to-digest view of onboarding progress,..." />
+            <SkillCard title="Internal Business Review" desc="Internal Business Review" onClick={() => onSelectSkill?.("Internal Business Review")} />
+            <SkillCard title="Quick Start Brief" desc="Pulls together a compact, high-signal account overview to rapidl..." onClick={() => onSelectSkill?.("Quick Start Brief")} />
+            <SkillCard title="Overview of strategy to de-ris..." desc="Provides root cause analysis of the risk on an account and a hig..." onClick={() => onSelectSkill?.("Overview of strategy to de-risk")} />
+            <SkillCard title="Prep weekly customer sync" desc="Creates a brief that consolidates open items, clarifies ownership..." onClick={() => onSelectSkill?.("Prep weekly customer sync")} />
+            <SkillCard title="One liner update" desc="Compact summary of the recent activity on an account" onClick={() => onSelectSkill?.("One liner update")} />
+            <SkillCard title="Onboarding Status Report" desc="Provides a clear, fast-to-digest view of onboarding progress,..." onClick={() => onSelectSkill?.("Onboarding Status Report")} />
           </div>
 
           <div id="section-csm" className="text-[14px] font-bold text-gray-500 mb-1.5 mt-6">CSM</div>
@@ -68,6 +125,7 @@ export function HomeView({ onSendPrompt }: { onSendPrompt: (p: string) => void }
               desc="Identifies high-impact interactions between CSM and customers..."
               icon={<svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5 stroke-current stroke-2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>}
               iconBg="bg-orange-50 text-orange-500"
+              onClick={() => onSelectSkill?.("CSM performance review")}
             />
           </div>
 
@@ -79,6 +137,7 @@ export function HomeView({ onSendPrompt }: { onSendPrompt: (p: string) => void }
               desc="Reviews the top accounts by MRR that are currently onboarding"
               icon={<svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5 stroke-current stroke-2"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"></path></svg>}
               iconBg="bg-[#f0f4ff] text-[#3b82f6]"
+              onClick={() => onSelectSkill?.("Onboarding Accounts Status...")}
             />
           </div>
 
@@ -90,12 +149,14 @@ export function HomeView({ onSendPrompt }: { onSendPrompt: (p: string) => void }
               desc="Retrieve and analyze all feature requests and product feedback..."
               icon={<svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5 stroke-current stroke-2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>}
               iconBg="bg-[#ecfdf5] text-[#10b981]"
+              onClick={() => onSelectSkill?.("Deep dive on product...")}
             />
             <SkillCard 
               title="Features most requested by..."
               desc="Analyze and surface the most frequently requested product..."
               icon={<svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5 stroke-current stroke-2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>}
               iconBg="bg-[#ecfdf5] text-[#10b981]"
+              onClick={() => onSelectSkill?.("Features most requested by...")}
             />
           </div>
         </div>
@@ -104,9 +165,9 @@ export function HomeView({ onSendPrompt }: { onSendPrompt: (p: string) => void }
   )
 }
 
-function SkillCard({ title, desc, icon, iconBg }: { title?: string, desc?: string, icon?: React.ReactNode, iconBg?: string }) {
+function SkillCard({ title, desc, icon, iconBg, onClick }: { title?: string, desc?: string, icon?: React.ReactNode, iconBg?: string, onClick?: () => void }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-xl p-4.5 pt-4 pb-5 shadow-[0px_4px_16px_rgba(0,0,0,0.02)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:border-indigo-100 transition-all cursor-pointer flex flex-col gap-3 min-h-[145px]">
+    <div onClick={onClick} className="bg-white border border-gray-100 rounded-xl p-4.5 pt-4 pb-5 shadow-[0px_4px_16px_rgba(0,0,0,0.02)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.06)] hover:border-indigo-100 transition-all cursor-pointer flex flex-col gap-3 min-h-[145px]">
       <div className={`w-[26px] h-[26px] rounded-[5px] flex items-center justify-center mb-auto shadow-sm ${iconBg || "bg-[#f4effc] text-[#8b5cf6]"}`}>
         {icon || <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5 stroke-current stroke-2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>}
       </div>

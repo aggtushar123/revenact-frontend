@@ -115,8 +115,8 @@ export function Navbar() {
         </div>
         
         {/* User avatar */}
-        <div className="w-[28px] h-[28px] rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-[10px] ml-1 cursor-pointer select-none ring-[1.5px] ring-white shadow-sm">
-          TA
+        <div className="w-[28px] h-[28px] rounded-full bg-indigo-500 flex items-center justify-center ml-1 cursor-pointer select-none ring-[1.5px] ring-white shadow-sm overflow-hidden">
+          <svg viewBox="0 0 24 24" fill="none" className="w-[18px] h-[18px] stroke-white stroke-2 mt-1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
         </div>
       </div>
     </header>

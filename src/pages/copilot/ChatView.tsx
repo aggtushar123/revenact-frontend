@@ -1,14 +1,15 @@
 import { ArrowUp, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
 
-export function ChatView({ onSendPrompt }: { onSendPrompt: (p: string) => void }) {
+export function ChatView({ onSendPrompt, isEmpty }: { onSendPrompt: (p: string) => void, isEmpty?: boolean }) {
   return (
     <div className="flex-1 h-full flex flex-col bg-white relative">
       <div className="flex-1 overflow-y-auto px-6 py-10 w-full mx-auto pb-[180px] custom-scrollbar selection:bg-indigo-100">
 
         {/* Mock Conversation Output wrapper */}
-        <div className="flex flex-col gap-8 w-full max-w-[840px] mx-auto pl-6">
+        {!isEmpty && (
+          <div className="flex flex-col gap-8 w-full max-w-[840px] mx-auto pl-6">
 
-          <div className="flex flex-col gap-5 border-l-2 border-[#e1daff] pl-[26px] py-1">
+            <div className="flex flex-col gap-5 border-l-2 border-[#e1daff] pl-[26px] py-1">
 
             <div className="flex flex-col">
               <h3 className="text-[17px] font-bold text-gray-800 tracking-tight leading-tight">Medium-Term <span className="text-gray-600">(90 Days)</span></h3>
@@ -41,6 +42,7 @@ export function ChatView({ onSendPrompt }: { onSendPrompt: (p: string) => void }
           </div>
 
         </div>
+        )}
       </div>
 
       {/* Absolute Bottom Input */}
