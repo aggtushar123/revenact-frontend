@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { 
   LayoutGrid, MessageSquare, Network, Layers, Users, 
-  Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit
+  Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
+  Columns, PenTool, Box, CircleDot, HeartPulse, UserCog, Plug
 } from 'lucide-react';
 
 export function Sidebar() {
@@ -89,6 +90,23 @@ export function Sidebar() {
         <NavItem to="/projects" icon={<GitCommit className="w-[18px] h-[18px]" />} label="Project Management" isExpanded={isExpanded} />
         <NavItem to="/scenarios" icon={<GitBranch className="w-[18px] h-[18px]" />} label="Scenarios" isExpanded={isExpanded} />
         <NavItem to="/surveys" icon={<List className="w-[18px] h-[18px]" />} label="Surveys" isExpanded={isExpanded} />
+        <NavItem to="/campaigns" icon={<Columns className="w-[18px] h-[18px]" />} label="Campaigns" isExpanded={isExpanded} />
+        <NavItem to="/canvas" icon={<PenTool className="w-[18px] h-[18px]" />} label="Canvas" isExpanded={isExpanded} />
+
+        {/* SETUP Section */}
+        {isExpanded ? (
+          <div className="text-[10px] font-bold text-gray-400/80 mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
+            SETUP <div className="h-px bg-gray-100 flex-1 ml-1 mr-2"></div>
+          </div>
+        ) : (
+          <div className="h-px bg-gray-100 mt-4 mb-2 mx-2"></div>
+        )}
+
+        <NavItem to="/settings" icon={<Box className="w-[18px] h-[18px]" />} label="Settings" isExpanded={isExpanded} />
+        <NavItem to="/lifecycle" icon={<CircleDot className="w-[18px] h-[18px]" />} label="Lifecycle" isExpanded={isExpanded} />
+        <NavItem to="/health" icon={<HeartPulse className="w-[18px] h-[18px]" />} label="Health" isExpanded={isExpanded} />
+        <NavItem to="/users" icon={<UserCog className="w-[18px] h-[18px]" />} label="Users" isExpanded={isExpanded} />
+        <NavItem to="/integrations" icon={<Plug className="w-[18px] h-[18px]" />} label="Integrations" isExpanded={isExpanded} />
 
       </div>
 
