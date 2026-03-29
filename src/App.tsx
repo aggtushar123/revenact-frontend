@@ -41,6 +41,12 @@ function App() {
             <Route path="ai-agent" element={<SettingPlaceholder title="AI Agent" />} />
           </Route>
           
+          {/* Catch-all route to avoid losing layout on unimplemented tabs */}
+          <Route path="*" element={
+            <div className="w-full h-full border-2 border-dashed border-gray-200/60 rounded-xl flex items-center justify-center bg-white/50 backdrop-blur-sm">
+              <p className="text-gray-400 font-medium tracking-wide">Under Construction</p>
+            </div>
+          } />
         </Route>
       </Routes>
     </BrowserRouter>
