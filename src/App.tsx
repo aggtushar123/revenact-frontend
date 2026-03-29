@@ -6,6 +6,7 @@ import { CopilotIndex } from './pages/copilot/Index';
 import { CreateScenario } from './pages/scenarios/CreateScenario';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
+import { Integrations } from './pages/integrations/Integrations';
 
 function App() {
   return (
@@ -40,6 +41,8 @@ function App() {
             <Route path="connect-widget" element={<SettingPlaceholder title="Connect Widget" />} />
             <Route path="ai-agent" element={<SettingPlaceholder title="AI Agent" />} />
           </Route>
+          
+          <Route path="integrations" element={<Integrations />} />
           
           {/* Catch-all route to avoid losing layout on unimplemented tabs */}
           <Route path="*" element={
