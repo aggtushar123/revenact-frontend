@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MoreHorizontal, Link as LinkIcon, ArrowDownUp, PlusCircle, Calculator, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { HealthPopover } from './HealthPopover';
 import { CsatPopover } from './CsatPopover';
@@ -8,6 +9,7 @@ import { ALL_COLUMNS, DEFAULT_VISIBLE_COLUMNS, TABLE_DATA } from './tableData';
 import type { ColumnId } from './tableData';
 
 export function OrganizationsTable() {
+  const navigate = useNavigate();
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [showEditColumns, setShowEditColumns] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -266,7 +268,12 @@ export function OrganizationsTable() {
                     <div className="w-6 h-6 flex items-center justify-center p-0.5 overflow-hidden shrink-0">
                       <img src={r.logo} alt={r.org} className="w-full h-full object-contain mix-blend-multiply" onError={(e) => { e.currentTarget.style.display='none' }} />
                     </div>
-                    <span className="font-bold text-gray-800 tracking-tight">{r.org}</span>
+                    <span 
+                      className="font-bold text-gray-800 tracking-tight cursor-pointer hover:text-indigo-600 hover:underline transition-colors"
+                      onClick={() => navigate(`/organizations/${r.id}`)}
+                    >
+                      {r.org}
+                    </span>
                     <LinkIcon className="w-3.5 h-3.5 text-gray-400 ml-1 hover:text-indigo-500 cursor-pointer shrink-0" />
                   </div>
                 </td>

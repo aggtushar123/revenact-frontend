@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { List } from './pages/organizations/List';
 import { Board } from './pages/organizations/Board';
+import { Details as OrganizationsDetails } from './pages/organizations/Details';
 import { CopilotIndex } from './pages/copilot/Index';
 import { CreateScenario } from './pages/scenarios/CreateScenario';
 import { SettingsPage } from './pages/settings/SettingsPage';
@@ -25,6 +26,7 @@ function App() {
             <Route index element={<Navigate to="list" replace />} />
             <Route path="list" element={<List />} />
             <Route path="board" element={<Board />} />
+            <Route path=":id" element={<OrganizationsDetails />} />
           </Route>
 
           <Route path="copilot" element={<CopilotIndex />} />

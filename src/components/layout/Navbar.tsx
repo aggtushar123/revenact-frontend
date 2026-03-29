@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, Search, PlusCircle, HelpCircle, Bell, RotateCw, MessageSquare } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { TABLE_DATA } from '../organizations/tableData';
+import { ChevronLeft, ChevronDown, Search, PlusCircle, HelpCircle, Bell, RotateCw, MessageSquare } from 'lucide-react';
 
 export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
+  
+  // Detect organization details path
+  const orgDetailMatch = location.pathname.match(/\/organizations\/(\d+)/);
+  const orgId = orgDetailMatch ? parseInt(orgDetailMatch[1], 10) : null;
+  const organization = orgId ? TABLE_DATA.find(o => o.id === orgId) : null;
+
   const isOrganizations = location.pathname.startsWith('/organizations');
   const isCopilot = location.pathname === '/copilot';
   const isSettings = location.pathname.startsWith('/settings');
@@ -41,6 +48,21 @@ export function Navbar() {
           <div className="flex flex-col">
             <span className="text-[12.5px] font-medium text-gray-500 tracking-wide mt-1">{formattedDate}</span>
             <h1 className="text-[20px] font-bold text-gray-900 tracking-tight leading-tight -mt-0.5">{greeting}, Daniel</h1>
+          </div>
+        ) : organization ? (
+          <div className="flex items-center gap-4">
+             <button 
+                onClick={() => navigate('/organizations/list')}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              
+              <div className="w-[34px] h-[34px] flex items-center justify-center p-0.5 bg-white rounded-full border border-gray-100 shadow-[0_1px_2px_rgba(0,0,0,0.05)] overflow-hidden">
+                <img src={organization.logo} alt={organization.org} className="w-full h-full object-contain mix-blend-multiply" />
+              </div>
+              
+              <h1 className="text-[18px] font-bold text-gray-900 tracking-tight">{organization.org}</h1>
           </div>
         ) : isOrganizations ? (
           <>
