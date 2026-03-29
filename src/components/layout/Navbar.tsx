@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { TABLE_DATA } from '../organizations/tableData';
-import { ChevronLeft, ChevronDown, Search, PlusCircle, HelpCircle, Bell, RotateCw, MessageSquare } from 'lucide-react';
+import { ACCOUNTS_DATA } from '../organizations/accountsData';
+import { 
+  ChevronLeft, 
+  ChevronDown, 
+  Search, 
+  PlusCircle, 
+  HelpCircle, 
+  Bell, 
+  MessageSquare,
+  Sparkles
+} from 'lucide-react';
 
 export function Navbar() {
   const location = useLocation();
@@ -11,6 +21,11 @@ export function Navbar() {
   const orgDetailMatch = location.pathname.match(/\/organizations\/(\d+)/);
   const orgId = orgDetailMatch ? parseInt(orgDetailMatch[1], 10) : null;
   const organization = orgId ? TABLE_DATA.find(o => o.id === orgId) : null;
+
+  // Detect account details path
+  const accountMatch = location.pathname.match(/\/accounts\/([^/]+)/);
+  const accountId = accountMatch ? accountMatch[1] : null;
+  const account = accountId ? ACCOUNTS_DATA.find(a => a.id === accountId) : null;
 
   const isOrganizations = location.pathname.startsWith('/organizations');
   const isCopilot = location.pathname === '/copilot';
@@ -42,27 +57,48 @@ export function Navbar() {
   else if (hour < 18) greeting = 'Good Afternoon';
 
   return (
-    <header className="h-[64px] border-b border-gray-200 bg-white flex items-center justify-between px-6 shrink-0 z-10 transition-all duration-300">
+    <header className="h-[64px] border-b border-gray-100 bg-white flex items-center justify-between px-6 shrink-0 z-20 transition-all duration-300 shadow-sm">
       <div className="flex items-center gap-8 h-full">
         {isCopilot ? (
           <div className="flex flex-col">
             <span className="text-[12.5px] font-medium text-gray-500 tracking-wide mt-1">{formattedDate}</span>
             <h1 className="text-[20px] font-bold text-gray-900 tracking-tight leading-tight -mt-0.5">{greeting}, Daniel</h1>
           </div>
-        ) : organization ? (
+        ) : account ? (
           <div className="flex items-center gap-4">
              <button 
-                onClick={() => navigate('/organizations/list')}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors text-gray-400 hover:text-gray-600"
+                onClick={() => navigate(-1)}
+                className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors text-gray-400 hover:text-indigo-600 border border-transparent hover:border-gray-100"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               
-              <div className="w-[34px] h-[34px] flex items-center justify-center p-0.5 bg-white rounded-full border border-gray-100 shadow-[0_1px_2px_rgba(0,0,0,0.05)] overflow-hidden">
-                <img src={organization.logo} alt={organization.org} className="w-full h-full object-contain mix-blend-multiply" />
+              <div className="flex items-center gap-3">
+                 <div className="w-[36px] h-[36px] flex items-center justify-center p-1 bg-white rounded-full border border-gray-100 shadow-sm overflow-hidden shrink-0">
+                    <img src={account.logo} alt={account.name} className="w-full h-full object-contain" />
+                 </div>
+                 <div className="flex items-center gap-3">
+                    <h1 className="text-[16px] font-bold text-gray-900 tracking-tight uppercase whitespace-nowrap">{account.name}</h1>
+                    <div className="w-px h-3.5 bg-gray-200" />
+                    <span className="text-[13.5px] font-bold text-gray-400 tracking-widest uppercase truncate max-w-[140px]">{account.orgName}</span>
+                 </div>
               </div>
+          </div>
+        ) : organization ? (
+          <div className="flex items-center gap-4">
+             <button 
+                onClick={() => navigate('/organizations/list')}
+                className="p-1.5 hover:bg-gray-50 rounded-lg transition-colors text-gray-400 hover:text-indigo-600 border border-transparent hover:border-gray-100"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
               
-              <h1 className="text-[18px] font-bold text-gray-900 tracking-tight">{organization.org}</h1>
+              <div className="flex items-center gap-3">
+                 <div className="w-[36px] h-[36px] flex items-center justify-center p-1 bg-white rounded-full border border-gray-100 shadow-sm overflow-hidden shrink-0">
+                    <img src={organization.logo} alt={organization.org} className="w-full h-full object-contain mix-blend-multiply" />
+                 </div>
+                 <h1 className="text-[16px] font-bold text-gray-900 tracking-tight uppercase">{organization.org}</h1>
+              </div>
           </div>
         ) : isOrganizations ? (
           <>
@@ -125,51 +161,39 @@ export function Navbar() {
       
       <div className="flex items-center gap-4">
         {/* Right side actions */}
-        {!isCopilot && (
-          <button 
-            onClick={() => navigate('/copilot')}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-gray-200 hover:bg-indigo-50 text-gray-700 text-[13px] font-semibold transition-all shadow-sm"
-          >
-            <svg viewBox="0 0 24 24" className="w-[14px] h-[14px] text-[#fb7185] fill-current"><path d="M12 2L9 9l-7 3 7 3 3 7 3-7 7-3-7-3z"/></svg>
-            <span className="mt-[1px]">AI Copilot</span>
-          </button>
-        )}
+        <button 
+          onClick={() => navigate('/copilot')}
+          className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-[#ff5f6d] to-[#ffc371] text-white text-[12px] font-bold shadow-md shadow-orange-100 hover:scale-105 transition-all transform active:scale-95 border border-white/20"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span className="mt-[1px]">AI Copilot</span>
+        </button>
         
-        <div className="flex items-center gap-[6px] text-gray-500 ml-1">
-          {isCopilot && (
-            <button className="p-1.5 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors relative">
-              <RotateCw className="w-5 h-5 stroke-[1.5px]" />
-            </button>
-          )}
-          <button className="p-1.5 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors relative">
-            <Search className="w-5 h-5 stroke-[1.5px]" />
-          </button>
-          <button className="p-1.5 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors relative">
-            <PlusCircle className="w-5 h-5 stroke-[1.5px]" />
-          </button>
-          <button className="p-1.5 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors relative">
-             <HelpCircle className="w-5 h-5 stroke-[1.5px]" />
-          </button>
-          {isCopilot && (
-            <button className="p-1.5 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors relative">
-               <MessageSquare className="w-5 h-5 stroke-[1.5px]" />
-            </button>
-          )}
-          <button className="p-1.5 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors relative">
-            <Bell className="w-5 h-5 stroke-[1.5px]" />
-            {isCopilot ? (
-              <span className="absolute top-[2px] right-[2px] min-w-[14px] h-[14px] bg-[#5850ec] text-white flex items-center justify-center text-[8px] font-bold rounded-full px-0.5 border border-white">27</span>
-            ) : (
-              <span className="absolute top-[8px] right-[8px] w-2 h-2 bg-indigo-500 border-2 border-white rounded-full"></span>
-            )}
-          </button>
+        <div className="flex items-center gap-1.5 text-gray-400 ml-1">
+          <IconButton icon={<Search className="w-4 h-4" />} />
+          <IconButton icon={<PlusCircle className="w-4 h-4" />} />
+          <IconButton icon={<HelpCircle className="w-4 h-4" />} />
+          <IconButton icon={<MessageSquare className="w-4 h-4" />} />
+          
+          <div className="relative">
+             <IconButton icon={<Bell className="w-4 h-4" />} />
+             <span className="absolute -top-1 -right-0.5 min-w-[15px] h-[15px] bg-indigo-600 text-white flex items-center justify-center text-[9px] font-bold rounded-full px-0.5 border-2 border-white shadow-sm">25</span>
+          </div>
         </div>
         
         {/* User avatar */}
-        <div className="w-[28px] h-[28px] rounded-full bg-indigo-500 flex items-center justify-center ml-1 cursor-pointer select-none ring-[1.5px] ring-white shadow-sm overflow-hidden">
-          <svg viewBox="0 0 24 24" fill="none" className="w-[18px] h-[18px] stroke-white stroke-2 mt-1.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <div className="w-[30px] h-[30px] rounded-full bg-indigo-100 flex items-center justify-center ml-1 cursor-pointer select-none ring-2 ring-white shadow-sm overflow-hidden">
+           <img src="https://i.pravatar.cc/150?u=Daniel" alt="User" className="w-full h-full object-cover" />
         </div>
       </div>
     </header>
+  );
+}
+
+function IconButton({ icon }: { icon: React.ReactNode }) {
+  return (
+    <button className="p-1.5 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all border border-transparent hover:border-gray-100">
+      {icon}
+    </button>
   );
 }
