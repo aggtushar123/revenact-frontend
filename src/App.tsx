@@ -9,6 +9,7 @@ import { CreateScenario } from './pages/scenarios/CreateScenario';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
 import { Integrations } from './pages/integrations/Integrations';
+import { List as ContactsList } from './pages/contacts/List';
 
 function App() {
   return (
@@ -48,6 +49,11 @@ function App() {
           </Route>
           
           <Route path="integrations" element={<Integrations />} />
+          
+          <Route path="contacts">
+            <Route index element={<Navigate to="list" replace />} />
+            <Route path="list" element={<ContactsList />} />
+          </Route>
           
           {/* Catch-all route to avoid losing layout on unimplemented tabs */}
           <Route path="*" element={
