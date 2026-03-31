@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   LayoutGrid, MessageSquare, Network, Layers, Users, 
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
-  Columns, PenTool, Box, CircleDot, HeartPulse, UserCog, Plug
+  Columns, PenTool, Box, CircleDot, HeartPulse, UserCog, Plug, LogOut
 } from 'lucide-react';
+import { useAppSelector, useAppDispatch } from '../../hooks';
+import { logout } from '../../features/auth/authSlice';
 
 export function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const location = useLocation();
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const user = useAppSelector((state) => state.auth.user);
 
   const isOrgsActive = location.pathname.includes('/organizations');
 
@@ -111,17 +116,28 @@ export function Sidebar() {
       </div>
 
       {/* User Footer */}
-      <div className={`mt-auto border-t border-gray-100 p-4 flex ${isExpanded ? 'items-center gap-3' : 'justify-center'} cursor-pointer hover:bg-gray-50 transition-colors shrink-0`}>
-        <img 
-           src="https://i.pravatar.cc/150?u=daniel" 
-           alt="Daniel Trial Test" 
-           className="w-[34px] h-[34px] rounded-full object-cover shrink-0 shadow-sm"
-        />
+      <div className={`mt-auto border-t border-gray-100 shrink-0`}>
+        <div className={`p-4 flex ${isExpanded ? 'items-center gap-3' : 'justify-center'} cursor-pointer hover:bg-gray-50 transition-colors`}>
+          <img 
+             src={user?.avatar || 'https://i.pravatar.cc/150?u=default'} 
+             alt={user?.name || 'User'} 
+             className="w-[34px] h-[34px] rounded-full object-cover shrink-0 shadow-sm"
+          />
+          {isExpanded && (
+            <div className="flex flex-col overflow-hidden justify-center flex-1">
+              <span className="text-[13px] font-bold text-gray-800 truncate leading-tight mt-0.5">{user?.name || 'User'}</span>
+              <span className="text-[11px] text-gray-500 truncate leading-tight">{user?.email || 'My Workspace'}</span>
+            </div>
+          )}
+        </div>
         {isExpanded && (
-          <div className="flex flex-col overflow-hidden justify-center">
-            <span className="text-[13px] font-bold text-gray-800 truncate leading-tight mt-0.5">Daniel Trial Test</span>
-            <span className="text-[11px] text-gray-500 truncate leading-tight">My Workspace</span>
-          </div>
+          <button
+            onClick={() => { dispatch(logout()); navigate('/login'); }}
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] font-medium text-gray-500 hover:text-red-600 hover:bg-red-50/60 transition-all border-t border-gray-100 cursor-pointer"
+          >
+            <LogOut className="w-[15px] h-[15px]" />
+            Sign out
+          </button>
         )}
       </div>
 

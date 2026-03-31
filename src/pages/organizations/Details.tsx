@@ -1,26 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MessageSquare, RefreshCw, MoreHorizontal, Sparkles, Globe, Mail, Phone, MapPin, Pencil, ChevronUp, Search, Maximize2, ChevronLeft, Plus, Filter, Layout, FileText, Zap, CheckCircle, ExternalLink, Download } from 'lucide-react';
+import { MessageSquare, RefreshCw, MoreHorizontal, Sparkles, Globe, Mail, Phone, MapPin, Pencil, ChevronUp, Search, Maximize2, ChevronLeft, ChevronRight, Plus, Filter, Layout, FileText, Zap, CheckCircle, ExternalLink, Download, X } from 'lucide-react';
 import { TABLE_DATA } from '../../components/organizations/tableData';
+import type { OrgRow } from '../../components/organizations/tableData';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
+import type { AccountRow } from '../../components/organizations/accountsData';
 import { CONTACTS_DATA } from '../../components/organizations/contactsData';
-
-// --- Types ---
-interface Organization {
-  id: number;
-  org: string;
-  logo: string;
-  owner: string;
-  avatar: string;
-  stage: string;
-  health: { val: number; clr: string };
-  pulse: number[];
-  reason: string;
-  nps: string;
-  joined: string;
-  domain: string;
-  nameAddress: string;
-}
 
 interface Activity {
   id: number;
@@ -35,9 +20,11 @@ interface Activity {
 export function Details() {
   const { id } = useParams<{ id: string }>();
   const orgId = parseInt(id || '1', 10);
-  const organization = (TABLE_DATA.find(o => o.id === orgId) || TABLE_DATA[0]) as unknown as Organization;
+  const organization = TABLE_DATA.find(o => o.id === orgId) || TABLE_DATA[0];
 
   const [activeTab, setActiveTab] = useState('General');
+  const [isPinnedOpen, setIsPinnedOpen] = useState(true);
+  const [isAttrModalOpen, setIsAttrModalOpen] = useState(false);
 
   const tabs = [
     { name: 'General', count: null },
@@ -97,13 +84,66 @@ export function Details() {
           <div className="flex flex-col w-full h-full gap-6 max-w-7xl mx-auto">
             <MetricsBanner organization={organization} />
             <div className="flex gap-6 w-full h-[calc(100vh-280px)] overflow-hidden">
-               <div className="w-[320px] flex flex-col h-full bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden shrink-0">
-                  <PinnedAttributes organization={organization} />
-               </div>
+               {/* Collapsed toggle */}
+               {!isPinnedOpen && (
+                 <div className="flex flex-col items-center pt-3 shrink-0">
+                   <button
+                     onClick={() => setIsPinnedOpen(true)}
+                     className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-400 hover:text-indigo-600 hover:border-indigo-200 transition-all"
+                     title="Expand panel"
+                   >
+                     <ChevronRight className="w-4 h-4" />
+                   </button>
+                 </div>
+               )}
+               {/* Pinned Attributes Panel */}
+               {isPinnedOpen && (
+                 <div className="w-[320px] flex flex-col h-full bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden shrink-0 transition-all">
+                   <PinnedAttributes organization={organization} onCollapse={() => setIsPinnedOpen(false)} onExpand={() => setIsAttrModalOpen(true)} />
+                 </div>
+               )}
                <div className="flex-1 h-full overflow-hidden bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
                   <ActivityFeed organization={organization} />
                </div>
             </div>
+
+            {/* Full Attributes Modal */}
+            {isAttrModalOpen && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setIsAttrModalOpen(false)}>
+                <div className="absolute inset-0 bg-black/30" style={{ backdropFilter: 'blur(4px)' }} />
+                <div
+                  className="relative w-full max-w-2xl max-h-[80vh] bg-white rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Modal header */}
+                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+                    <h2 className="text-[16px] font-bold text-gray-900">All Attributes — {organization.org}</h2>
+                    <button onClick={() => setIsAttrModalOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all">
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {/* Modal content */}
+                  <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-5">
+                      <AttrModalItem label="Velaris ID" value={organization.id.toString()} />
+                      <AttrModalItem label="Organization Name" value={organization.org} />
+                      <AttrModalItem label="Health Score" value={organization.health.val.toString()} dotColor={organization.health.clr} />
+                      <AttrModalItem label="Lifecycle Stage" value={organization.stage} />
+                      <AttrModalItem label="AI Pulse Score" value={organization.aiScore} />
+                      <AttrModalItem label="AI Pulse Reason" value={organization.reason} />
+                      <AttrModalItem label="NPS Value" value={organization.npsValue.toString()} />
+                      <AttrModalItem label="CSAT" value={organization.csat} />
+                      <AttrModalItem label="Domain" value={organization.domain} />
+                      <AttrModalItem label="Location" value={organization.nameAddress} />
+                      <AttrModalItem label="Owner" value={organization.owner} />
+                      <AttrModalItem label="Next Renewal" value={organization.renewal} />
+                      <AttrModalItem label="MRR" value={`$${organization.mrr.toLocaleString()}`} />
+                      <AttrModalItem label="ARR" value={`$${organization.arr.toLocaleString()}`} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         {activeTab === 'Accounts' && <AccountsTab orgId={orgId} />}
@@ -121,83 +161,130 @@ export function Details() {
 
 // --- Sub-Components ---
 
-function MetricsBanner({ organization }: { organization: Organization }) {
+function MetricsBanner({ organization }: { organization: OrgRow }) {
+  const npsSign = organization.npsValue > 0 ? '+' : '';
+  const csatNum = parseFloat(organization.csat);
+  const csatPct = !isNaN(csatNum) ? csatNum : 0;
+
+  // Health ring color
+  const healthVal = organization.health.val;
+  const healthColor = healthVal >= 7 ? '#00a699' : healthVal >= 4 ? '#ffbb00' : '#fa5c5c';
+  const healthPct = (healthVal / 10) * 100;
+
+  // CSM pulse text & color
+  const csmPulseText = healthVal >= 7 ? 'Very Satisfied' : healthVal >= 4 ? 'Neutral' : 'High Risk';
+  const csmPulseColor = healthVal >= 7 ? 'text-[#00a699]' : healthVal >= 4 ? 'text-[#ffbb00]' : 'text-[#fa5c5c]';
+
+  // NPS breakdown
+  const promoters = organization.npsValue > 0 ? 1 : 0;
+  const passives = organization.npsValue === 0 ? 1 : 0;
+  const detractors = organization.npsValue < 0 ? 1 : 0;
+
+  // CSAT ring color
+  const csatColor = csatPct >= 70 ? '#00a699' : csatPct >= 40 ? '#ffbb00' : '#fa5c5c';
+
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.05)] flex overflow-hidden divide-x divide-gray-50 relative group">
-      <div className="px-6 py-2.5 flex flex-col gap-0.5 min-w-[140px]">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Health Score</span>
-        <div className="flex items-center gap-2">
-           <span className={`w-2 h-2 rounded-full ${organization.health.clr} shadow-sm shadow-green-200`}></span>
-           <span className="text-[16px] font-bold text-gray-900">{organization.health.val}</span>
+    <div className="flex items-stretch w-full gap-4">
+      {/* Card 1 — Health Score */}
+      <div
+        className="flex-1 rounded-xl border border-gray-200/80 bg-white/70 shadow-sm px-5 py-4 flex items-center gap-5"
+        style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+      >
+        {/* Circular ring */}
+        <div className="relative shrink-0" style={{ width: 72, height: 72 }}>
+          <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke={healthColor} strokeWidth="2.5"
+              strokeDasharray={`${healthPct} ${100 - healthPct}`} strokeLinecap="round"
+              style={{ transition: 'stroke-dasharray 0.6s ease' }} />
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-[10px] font-bold text-gray-400 uppercase leading-none">Health</span>
+            <span className="text-[10px] font-bold text-gray-400 uppercase leading-none">Score</span>
+          </div>
+        </div>
+        {/* Text info */}
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <span className="text-[28px] font-bold text-gray-900 leading-none tracking-tight">{healthVal}</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Lifecycle Stage</span>
+            <span className="text-[13px] font-bold text-gray-800 truncate">{organization.stage}</span>
+          </div>
         </div>
       </div>
 
-      <div className="px-6 py-2.5 flex flex-col gap-0.5 min-w-[170px]">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Lifecycle Stage</span>
-        <span className="text-[14px] font-bold text-gray-900">{organization.stage}</span>
-      </div>
+      {/* Card 2 — CSM Pulse + NPS + Renewal */}
+      <div
+        className="flex-[1.6] rounded-xl border border-gray-200/80 bg-white/70 shadow-sm px-5 py-4 flex items-center gap-6"
+        style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+      >
+        {/* CSM Pulse */}
+        <div className="flex flex-col gap-0.5 min-w-[100px]">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CSM Pulse</span>
+          <span className={`text-[14px] font-bold ${csmPulseColor}`}>{csmPulseText}</span>
+        </div>
 
-      <div className="px-6 py-2.5 flex flex-col gap-0.5 min-w-[160px]">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CSM Pulse</span>
-        <div className="flex items-center gap-2">
-           <span className="w-2 h-2 bg-[#00a699] rounded-[2px] shadow-sm"></span>
-           <span className="text-[14px] font-bold text-[#00a699]">Very Satisfied</span>
+        <div className="w-px h-12 bg-gray-200/70 shrink-0" />
+
+        {/* NPS */}
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">NPS</span>
+            <span className="text-[28px] font-light text-gray-800 leading-none tracking-tight">{npsSign}{organization.npsValue}</span>
+          </div>
+          <div className="flex flex-col gap-0.5 text-[10px] font-bold">
+            <div className="flex items-center gap-2 text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-sm bg-[#00a699]" />
+              <span className="w-16">Promoters</span>
+              <span className="text-gray-900 text-[11px]">{promoters}</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-sm bg-[#ffbb00]" />
+              <span className="w-16">Passives</span>
+              <span className="text-gray-900 text-[11px]">{passives}</span>
+            </div>
+            <div className="flex items-center gap-2 text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-sm bg-[#fa5c5c]" />
+              <span className="w-16">Detractors</span>
+              <span className="text-gray-900 text-[11px]">{detractors}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="w-px h-12 bg-gray-200/70 shrink-0" />
+
+        {/* Next Renewal Date */}
+        <div className="flex flex-col gap-0.5 min-w-[100px]">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Next Renewal Date</span>
+          <span className="text-[14px] font-bold text-gray-900 leading-tight">{organization.renewal}</span>
         </div>
       </div>
 
-      <div className="px-6 py-2.5 flex flex-col min-w-[180px]">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Next Renewal Date</span>
-        <div className="flex flex-col -gap-0.5">
-          <span className="text-[14px] font-bold text-[#fa5c5c] leading-tight">02 Mar 2026</span>
-          <span className="text-[10px] font-medium text-gray-400">2 days ago</span>
+      {/* Card 3 — CSAT Score */}
+      <div
+        className="flex-1 rounded-xl border border-gray-200/80 bg-white/70 shadow-sm px-5 py-4 flex items-center gap-5"
+        style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+      >
+        {/* Text */}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CSAT Score</span>
+          <span className="text-[28px] font-bold text-gray-900 leading-none tracking-tight">{organization.csat}</span>
         </div>
-      </div>
-
-      <div className="px-6 py-2.5 flex flex-col gap-0.5 flex-1 min-w-[240px]">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">NPS</span>
-        <div className="flex items-end gap-6 h-full">
-           <span className="text-[28px] font-bold text-gray-900 leading-none">{organization.nps}</span>
-           <div className="flex flex-col gap-0.5 text-[10px] font-bold pb-0.5">
-             <div className="flex items-center gap-2 text-gray-500">
-               <span className="w-1.5 h-1.5 rounded-full bg-[#00a699]"></span>
-               <span className="w-16 text-nowrap">Promoters</span>
-               <span className="ml-auto text-gray-900 text-[11px]">10</span>
-             </div>
-             <div className="flex items-center gap-2 text-gray-500">
-               <span className="w-1.5 h-1.5 rounded-full bg-[#ffbb00]"></span>
-               <span className="w-16 text-nowrap">Passives</span>
-               <span className="ml-auto text-gray-900 text-[11px]">0</span>
-             </div>
-             <div className="flex items-center gap-2 text-gray-500">
-               <span className="w-1.5 h-1.5 rounded-full bg-[#fa5c5c]"></span>
-               <span className="w-16 text-nowrap">Detractors</span>
-               <span className="ml-auto text-gray-900 text-[11px]">0</span>
-             </div>
-           </div>
-        </div>
-      </div>
-
-      <div className="px-6 py-2.5 flex flex-col gap-0.5 min-w-[160px] relative">
-        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CSAT Score</span>
-        <div className="flex items-center gap-4 mt-0.5">
-           <span className="text-[18px] font-bold text-gray-900 leading-none">100%</span>
-           <div className="w-7 h-7 rounded-full border-[2.5px] border-[#087383] border-t-transparent animate-spin-slow"></div>
-        </div>
-        
-        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex flex-col gap-1.5">
-           <div className="p-1 bg-gray-50 rounded-full hover:bg-gray-100 cursor-pointer shadow-sm border border-gray-100 transition-colors text-gray-400">
-              <ChevronUp className="w-3 h-3" />
-           </div>
-           <div className="p-1 bg-white rounded-full hover:bg-gray-100 cursor-pointer shadow-sm border border-gray-100 transition-colors text-gray-400">
-              <Pencil className="w-3 h-3" />
-           </div>
+        {/* Large donut ring */}
+        <div className="relative ml-auto shrink-0" style={{ width: 72, height: 72 }}>
+          <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke={csatColor} strokeWidth="2.5"
+              strokeDasharray={`${csatPct} ${100 - csatPct}`} strokeLinecap="round"
+              style={{ transition: 'stroke-dasharray 0.6s ease' }} />
+          </svg>
         </div>
       </div>
     </div>
   );
 }
 
-function PinnedAttributes({ organization }: { organization: Organization }) {
+function PinnedAttributes({ organization, onCollapse, onExpand }: { organization: OrgRow; onCollapse?: () => void; onExpand?: () => void }) {
   const [activeSubTab, setActiveSubTab] = useState('Pinned Attributes');
   
   return (
@@ -217,8 +304,8 @@ function PinnedAttributes({ organization }: { organization: Organization }) {
         </div>
         
         <div className="flex items-center gap-2 pb-2">
-           <Maximize2 className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-600" />
-           <ChevronLeft className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-600" />
+           <Maximize2 className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" onClick={onExpand} />
+           <ChevronLeft className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" onClick={onCollapse} />
         </div>
       </div>
 
@@ -293,7 +380,7 @@ function AttributeItem({ label, value, isTruncated = false, showDot = false, dot
   );
 }
 
-function ActivityFeed({ organization }: { organization: Organization }) {
+function ActivityFeed({ organization }: { organization: OrgRow }) {
   const [activeSubTab, setActiveSubTab] = useState('Activity Feed');
   const [filter, setFilter] = useState('All');
 
@@ -397,7 +484,7 @@ function ActivityFeed({ organization }: { organization: Organization }) {
   );
 }
 
-function ActivityCard({ activity, organization }: { activity: Activity, organization: Organization }) {
+function ActivityCard({ activity, organization }: { activity: Activity, organization: OrgRow }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden p-5 flex flex-col gap-4 relative group">
       <div className="flex items-start justify-between">
@@ -431,126 +518,12 @@ function AccountsTab({ orgId }: { orgId: number }) {
   const accounts = ACCOUNTS_DATA.filter(a => a.orgId === orgId);
 
   return (
-    <div className="flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar p-6 pt-2">
-      {/* Accounts High-Fidelity Metrics Banner */}
-      <div className="max-w-7xl w-full mx-auto grid grid-cols-1 xl:grid-cols-5 gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm shrink-0">
-        
-        {/* Health Card */}
-        <div className="flex flex-col gap-2 border-r border-gray-50 pr-4 relative">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">Health</h4>
-            <MetricToggle />
-          </div>
-          <div className="flex items-center justify-between mt-0.5">
-            <div className="flex flex-col gap-1">
-              <HealthStatusItem label="Good" count="2" color="bg-emerald-500" />
-              <HealthStatusItem label="Average" count="0" color="bg-amber-400" />
-              <HealthStatusItem label="Poor" count="0" color="bg-rose-500" />
-            </div>
-            <div className="relative w-12 h-12 flex items-center justify-center mr-1">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="5" fill="transparent" className="text-gray-50" />
-                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="5" fill="transparent" strokeDasharray="125.6" strokeDashoffset="0" className="text-teal-400" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* NPS Card */}
-        <div className="flex flex-col gap-2 border-r border-gray-50 pr-4 px-4">
-          <h4 className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">NPS</h4>
-          <div className="flex items-center justify-between mt-0.5">
-            <span className="text-[28px] font-bold text-gray-900 leading-none">+100</span>
-            <div className="flex flex-col gap-1 flex-1 ml-4">
-              <div className="flex items-center justify-between text-[10px] font-bold">
-                <div className="flex items-center gap-1.5 text-gray-500">
-                  <div className="w-1.5 h-1.5 rounded-sm bg-emerald-400" />
-                  <span>Promoters</span>
-                </div>
-                <span className="text-gray-900 text-[11px]">10</span>
-              </div>
-              <div className="flex items-center justify-between text-[10px] font-bold">
-                <div className="flex items-center gap-1.5 text-gray-500">
-                  <div className="w-1.5 h-1.5 rounded-sm bg-amber-400" />
-                  <span>Passives</span>
-                </div>
-                <span className="text-gray-900 text-[11px]">0</span>
-              </div>
-              <div className="flex items-center justify-between text-[10px] font-bold">
-                <div className="flex items-center gap-1.5 text-gray-500">
-                  <div className="w-1.5 h-1.5 rounded-sm bg-rose-400" />
-                  <span>Detractors</span>
-                </div>
-                <span className="text-gray-900 text-[11px]">0</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* CSAT Score Card */}
-        <div className="flex flex-col gap-4 border-r border-gray-50 pr-4 px-4 relative">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">CSAT Score</h4>
-          </div>
-          <div className="flex items-center justify-center h-full gap-4">
-            <span className="text-[20px] font-bold text-gray-900">100%</span>
-            <div className="relative w-12 h-12 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="5" fill="transparent" className="text-gray-50" />
-                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="5" fill="transparent" strokeDasharray="125.6" strokeDashoffset="0" className="text-[#087383]" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        {/* Lifecycle Stages Card */}
-        <div className="flex flex-col gap-4 border-r border-gray-50 pr-4 px-4 relative">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">Lifecycle Stages</h4>
-            <MetricToggle />
-          </div>
-          <div className="flex items-end justify-center gap-4 h-full pb-1">
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-2.5 h-10 bg-indigo-500/20 rounded-t-sm relative">
-                <div className="absolute bottom-0 w-full h-8 bg-indigo-500 rounded-t-sm" />
-              </div>
-              <span className="text-[8px] font-bold text-gray-400 uppercase">ON KI</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-2.5 h-10 bg-indigo-500/20 rounded-t-sm relative">
-                <div className="absolute bottom-0 w-full h-4 bg-indigo-500/40 rounded-t-sm" />
-              </div>
-              <span className="text-[8px] font-bold text-gray-400 uppercase">AD LI</span>
-            </div>
-            <div className="flex flex-col items-center gap-1">
-              <div className="w-2.5 h-10 bg-indigo-500/20 rounded-t-sm relative">
-                <div className="absolute bottom-0 w-full h-10 bg-indigo-500 rounded-t-sm" />
-              </div>
-              <span className="text-[8px] font-bold text-gray-400 uppercase">HY</span>
-            </div>
-          </div>
-        </div>
-
-        {/* CSM Card */}
-        <div className="flex flex-col gap-4 pl-4 relative group">
-          <div className="flex items-center justify-between">
-            <h4 className="text-[12px] font-bold text-gray-500 uppercase tracking-wider">CSM</h4>
-            <Pencil className="w-3 h-3 text-gray-300 cursor-pointer hover:text-indigo-500 transition-colors" />
-          </div>
-          <div className="flex items-center justify-center h-full">
-            <div className="relative w-12 h-12 flex items-center justify-center">
-              <svg className="w-full h-full transform -rotate-90">
-                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="5" fill="transparent" className="text-gray-50" />
-                <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="5" fill="transparent" strokeDasharray="125.6" strokeDashoffset="30" className="text-teal-400" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-      </div>
+    <div className="flex flex-col w-full h-full gap-6 max-w-7xl mx-auto">
+      {/* Accounts Dynamic Metrics Banner */}
+      <AccountsMetricsBanner accounts={accounts} />
 
       {/* Sub-Accounts Table Section */}
-      <div className="max-w-7xl w-full mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
+      <div className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
         <div className="p-4 border-b border-gray-50 bg-white flex items-center justify-between gap-4">
            <div className="relative flex-1 max-w-2xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -834,24 +807,237 @@ function InfoCard({ icon, label, value }: { icon: React.ReactNode, label: string
     </div>
   );
 }
-function HealthStatusItem({ label, count, color }: { label: string, count: string, color: string }) {
+function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
+  const [healthTab, setHealthTab] = useState<'COUNT' | 'MRR' | 'ARR'>('COUNT');
+  const [lifecycleTab, setLifecycleTab] = useState<'COUNT' | 'MRR' | 'ARR'>('COUNT');
+
+  const health = useMemo(() => {
+    let good = 0, average = 0, poor = 0;
+    let goodMrr = 0, avgMrr = 0, poorMrr = 0;
+    let goodArr = 0, avgArr = 0, poorArr = 0;
+    for (const a of accounts) {
+      if (a.healthCategory === 'good') { good++; goodMrr += a.mrr; goodArr += a.arr; }
+      else if (a.healthCategory === 'average') { average++; avgMrr += a.mrr; avgArr += a.arr; }
+      else { poor++; poorMrr += a.mrr; poorArr += a.arr; }
+    }
+    return { good, average, poor, goodMrr, avgMrr, poorMrr, goodArr, avgArr, poorArr };
+  }, [accounts]);
+
+  const nps = useMemo(() => {
+    let promoters = 0, passives = 0, detractors = 0;
+    for (const a of accounts) {
+      if (a.npsValue > 0) promoters++;
+      else if (a.npsValue === 0) passives++;
+      else detractors++;
+    }
+    const total = accounts.length;
+    const score = total > 0 ? Math.round(((promoters - detractors) / total) * 100) : 0;
+    return { promoters, passives, detractors, score };
+  }, [accounts]);
+
+  const avgCsat = useMemo(() => {
+    if (accounts.length === 0) return 0;
+    return Math.round(accounts.reduce((s, a) => s + a.csatValue, 0) / accounts.length);
+  }, [accounts]);
+
+  // Lifecycle stages aggregation
+  const lifecycle = useMemo(() => {
+    const stages: Record<string, { count: number; mrr: number; arr: number }> = {};
+    for (const a of accounts) {
+      // Extract short stage name (e.g., "Live (Enterprise)" -> "LI")
+      const fullStage = a.lifecycleStage || 'Unknown';
+      const abbr = fullStage.substring(0, 2).toUpperCase();
+      if (!stages[abbr]) stages[abbr] = { count: 0, mrr: 0, arr: 0 };
+      stages[abbr].count++;
+      stages[abbr].mrr += a.mrr;
+      stages[abbr].arr += a.arr;
+    }
+    return stages;
+  }, [accounts]);
+
+  // CSM pulse aggregation
+  const csmScore = useMemo(() => {
+    if (accounts.length === 0) return 0;
+    const totalPulse = accounts.reduce((s, a) => {
+      const active = a.pulse.filter(v => v === 1).length;
+      return s + (active / a.pulse.length) * 100;
+    }, 0);
+    return Math.round(totalPulse / accounts.length);
+  }, [accounts]);
+
+  // Health values based on selected tab
+  const healthValues = useMemo(() => {
+    if (healthTab === 'MRR') return { good: `$${(health.goodMrr / 1000).toFixed(1)}k`, avg: `$${(health.avgMrr / 1000).toFixed(1)}k`, poor: `$${(health.poorMrr / 1000).toFixed(1)}k` };
+    if (healthTab === 'ARR') return { good: `$${(health.goodArr / 1000).toFixed(1)}k`, avg: `$${(health.avgArr / 1000).toFixed(1)}k`, poor: `$${(health.poorArr / 1000).toFixed(1)}k` };
+    return { good: health.good.toString(), avg: health.average.toString(), poor: health.poor.toString() };
+  }, [health, healthTab]);
+
+  const healthTotal = health.good + health.average + health.poor;
+  const donutSegments = [
+    { pct: healthTotal > 0 ? (health.good / healthTotal) * 100 : 0, color: '#00a699' },
+    { pct: healthTotal > 0 ? (health.average / healthTotal) * 100 : 0, color: '#ffbb00' },
+    { pct: healthTotal > 0 ? (health.poor / healthTotal) * 100 : 0, color: '#fa5c5c' },
+  ];
+
+  let cumulativeOffset = 0;
+
+  const csatColor = avgCsat >= 70 ? '#00a699' : avgCsat >= 40 ? '#ffbb00' : '#fa5c5c';
+  const csmColor = csmScore >= 70 ? '#00a699' : csmScore >= 40 ? '#ffbb00' : '#fa5c5c';
+
+  // Lifecycle bar chart max value
+  const lifecycleEntries = Object.entries(lifecycle);
+  const maxLifecycleVal = Math.max(...lifecycleEntries.map(([, v]) => 
+    lifecycleTab === 'MRR' ? v.mrr : lifecycleTab === 'ARR' ? v.arr : v.count
+  ), 1);
+
+  const tabBtnClass = (active: boolean) =>
+    `px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer ${active ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-600'}`;
+
   return (
-    <div className="flex items-center gap-2">
-      <div className={`w-1.5 h-1.5 rounded-sm ${color} shrink-0`} />
-      <div className="flex items-center gap-2 min-w-[70px]">
-        <span className="text-[10px] font-bold text-gray-400">{label}</span>
-        <span className="text-[12px] font-bold text-gray-900 ml-auto">{count}</span>
+    <div
+      className="w-full flex items-stretch rounded-xl border border-gray-200/80 bg-white/70 shadow-sm shrink-0"
+      style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+    >
+      {/* Health */}
+      <div className="px-4 py-3 flex flex-col gap-1 min-w-[180px]">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-gray-700">Health</span>
+          <div className="flex gap-0.5">
+            {(['COUNT', 'MRR', 'ARR'] as const).map(t => (
+              <button key={t} onClick={() => setHealthTab(t)} className={tabBtnClass(healthTab === t)}>{t}</button>
+            ))}
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00a699]" /> Good
+              <span className="text-gray-900 text-[11px] ml-auto pl-3">{healthValues.good}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#ffbb00]" /> Average
+              <span className="text-gray-900 text-[11px] ml-auto pl-3">{healthValues.avg}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#fa5c5c]" /> Poor
+              <span className="text-gray-900 text-[11px] ml-auto pl-3">{healthValues.poor}</span>
+            </div>
+          </div>
+          <svg viewBox="0 0 36 36" className="-rotate-90 shrink-0" style={{ width: 44, height: 44 }}>
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
+            {donutSegments.map((seg, i) => {
+              const path = (
+                <circle key={i} cx="18" cy="18" r="15.9155" fill="none" stroke={seg.color} strokeWidth="2.5"
+                  strokeDasharray={`${seg.pct} ${100 - seg.pct}`} strokeDashoffset={-cumulativeOffset}
+                  strokeLinecap="round" style={{ transition: 'all 0.5s ease' }} />
+              );
+              cumulativeOffset += seg.pct;
+              return path;
+            })}
+          </svg>
+        </div>
+      </div>
+
+      <div className="w-px bg-gray-200/60 my-3" />
+
+      {/* NPS */}
+      <div className="px-4 py-3 flex flex-col gap-1 min-w-[180px]">
+        <span className="text-[11px] font-bold text-gray-700">NPS</span>
+        <div className="flex items-center gap-4">
+          <span className="text-[28px] font-light text-gray-800 leading-none tracking-tight">
+            {nps.score > 0 ? '+' : ''}{nps.score}
+          </span>
+          <div className="flex flex-col gap-0.5 text-[10px] font-bold">
+            <div className="flex items-center gap-1.5 text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00a699]" />
+              <span className="w-16">Promoters</span>
+              <span className="text-gray-900 text-[11px]">{nps.promoters}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#ffbb00]" />
+              <span className="w-16">Passives</span>
+              <span className="text-gray-900 text-[11px]">{nps.passives}</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-gray-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#fa5c5c]" />
+              <span className="w-16">Detractors</span>
+              <span className="text-gray-900 text-[11px]">{nps.detractors}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-px bg-gray-200/60 my-3" />
+
+      {/* CSAT Score */}
+      <div className="px-4 py-3 flex flex-col gap-1 min-w-[120px]">
+        <span className="text-[11px] font-bold text-gray-700">CSAT Score</span>
+        <div className="flex items-center gap-3 mt-0.5">
+          <span className="text-[22px] font-bold text-gray-900 leading-none">{avgCsat}%</span>
+          <div className="relative shrink-0" style={{ width: 40, height: 40 }}>
+            <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+              <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
+              <circle cx="18" cy="18" r="15.9155" fill="none" stroke={csatColor} strokeWidth="2.5"
+                strokeDasharray={`${avgCsat} ${100 - avgCsat}`} strokeLinecap="round"
+                style={{ transition: 'all 0.5s ease' }} />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div className="w-px bg-gray-200/60 my-3" />
+
+      {/* Lifecycle Stages */}
+      <div className="px-4 py-3 flex flex-col gap-1 flex-1 min-w-[160px]">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-gray-700">Lifecycle Stages</span>
+          <div className="flex gap-0.5">
+            {(['COUNT', 'MRR', 'ARR'] as const).map(t => (
+              <button key={t} onClick={() => setLifecycleTab(t)} className={tabBtnClass(lifecycleTab === t)}>{t}</button>
+            ))}
+          </div>
+        </div>
+        {/* Bar chart */}
+        <div className="flex items-end gap-1.5 h-[40px] mt-0.5">
+          {lifecycleEntries.map(([stage, data]) => {
+            const val = lifecycleTab === 'MRR' ? data.mrr : lifecycleTab === 'ARR' ? data.arr : data.count;
+            const heightPct = maxLifecycleVal > 0 ? (val / maxLifecycleVal) * 100 : 0;
+            return (
+              <div key={stage} className="flex flex-col items-center gap-0.5 flex-1">
+                <div className="w-full max-w-[18px] rounded-t-sm bg-indigo-500 transition-all" style={{ height: `${Math.max(heightPct * 0.36, 2)}px` }} />
+                <span className="text-[7px] font-bold text-gray-400 uppercase">{stage}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="w-px bg-gray-200/60 my-3" />
+
+      {/* CSM */}
+      <div className="px-4 py-3 flex flex-col gap-1 min-w-[70px] items-center">
+        <span className="text-[11px] font-bold text-gray-700">CSM</span>
+        <div className="relative shrink-0 mt-0.5" style={{ width: 40, height: 40 }}>
+          <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke={csmColor} strokeWidth="2.5"
+              strokeDasharray={`${csmScore} ${100 - csmScore}`} strokeLinecap="round"
+              style={{ transition: 'all 0.5s ease' }} />
+          </svg>
+        </div>
       </div>
     </div>
   );
 }
 
-function MetricToggle() {
+function AttrModalItem({ label, value, dotColor }: { label: string; value: string; dotColor?: string }) {
   return (
-    <div className="flex items-center bg-gray-50 p-0.5 rounded border border-gray-100 flex-none self-start">
-      <span className="px-1.5 py-0.5 text-[8px] font-extrabold text-indigo-600 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] rounded-[2px] cursor-pointer">COUNT</span>
-      <span className="px-1.5 py-0.5 text-[8px] font-extrabold text-gray-300 cursor-pointer hover:text-gray-400">MRR</span>
-      <span className="px-1.5 py-0.5 text-[8px] font-extrabold text-gray-300 cursor-pointer hover:text-gray-400">ARR</span>
+    <div className="flex flex-col gap-1">
+      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+      <div className="flex items-center gap-2">
+        {dotColor && <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />}
+        <span className="text-[14px] font-semibold text-gray-800">{value}</span>
+      </div>
     </div>
   );
 }
