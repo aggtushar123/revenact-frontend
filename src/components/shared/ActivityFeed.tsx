@@ -3,11 +3,14 @@ import { Search, Plus, Filter, Sparkles, Layout, FileText, Zap, Globe, MapPin, M
 import React from 'react';
 import {
   EmailsTab,
+  EmailThreadPanel,
   TasksTab,
   NotesTab,
   TicketsTab,
   CalendarEventsTab,
   ActivitiesTab,
+  CallSenseTab,
+  HeadlinesTab,
 } from '../organizations/activity';
 
 // ── Data sources ─────────────────────────────────────────────────────────────
@@ -34,6 +37,7 @@ import {
 
 // Re-export from activityData so tabs can still import from there
 import * as orgActivityData from '../organizations/activityData';
+import type { EmailItem } from '../organizations/activityData';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -112,6 +116,7 @@ function restoreOrgData() {
 export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor = 'bg-teal-400' }: ActivityFeedProps) {
   const [activeSubTab, setActiveSubTab] = useState('Activity Feed');
   const [filter, setFilter] = useState('All');
+  const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
 
   // Resolve numeric ID for tab components.
   // For accounts, inject mock data and use the numeric stub.
@@ -145,10 +150,11 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
         </div>
       </div>
 
-      <div className="flex flex-col flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden">
         {activeSubTab === 'Activity Feed' ? (
           <>
-            {/* Filter Toolbar */}
+            <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300 relative bg-white z-0">
+              {/* Filter Toolbar */}
             <div className="p-4 flex flex-col gap-4 border-b border-gray-50 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
@@ -190,7 +196,7 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
               {(filter === 'All' || filter === 'Activities') && (
                 <ActivitiesTab entityId={resolvedId} healthColor={healthColor} />
               )}
-              {filter === 'Emails' && <EmailsTab entityId={resolvedId} />}
+              {filter === 'Emails' && <EmailsTab entityId={resolvedId} selectedEmail={selectedEmail} onSelectEmail={setSelectedEmail} />}
               {filter === 'Tasks' && <TasksTab entityId={resolvedId} />}
               {filter === 'Notes' && <NotesTab entityId={resolvedId} />}
               {filter === 'Tickets' && <TicketsTab entityId={resolvedId} />}
@@ -205,6 +211,24 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
                 </div>
               )}
             </div>
+            </div>
+            
+            {/* Slide-in panel area */}
+            {selectedEmail && (
+              <div 
+                className="w-[420px] shrink-0 bg-white h-full shadow-[0_0_20px_rgba(0,0,0,0.05)] z-10 border-l border-gray-100 relative"
+                style={{ animation: 'slideInRight 0.3s cubic-bezier(0.4,0,0.2,1)' }}
+              >
+                <EmailThreadPanel email={selectedEmail} onClose={() => setSelectedEmail(null)} />
+              </div>
+            )}
+            {/* Slide-in animation */}
+            <style>{`
+              @keyframes slideInRight {
+                from { transform: translateX(100%); opacity: 0; }
+                to   { transform: translateX(0);   opacity: 1; }
+              }
+            `}</style>
           </>
         ) : activeSubTab === 'Overview' ? (
           <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-gray-50/20">
@@ -215,6 +239,10 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
               <InfoCard icon={<Phone className="w-4 h-4" />} label="Phone" value={overviewInfo?.phone ?? '—'} />
             </div>
           </div>
+        ) : activeSubTab === 'Headlines' ? (
+          <HeadlinesTab entityId={resolvedId} />
+        ) : activeSubTab === 'CallSense' ? (
+          <CallSenseTab entityId={resolvedId} />
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 py-10 opacity-30">
             <Layout className="w-12 h-12 text-gray-400 mb-2" />

@@ -1,22 +1,23 @@
-import { AlertTriangle, MoreHorizontal } from 'lucide-react';
+import { AlertTriangle, MoreHorizontal, Ticket as TicketIcon, Circle, Flag, Settings, CornerUpLeft } from 'lucide-react';
 import { TICKETS_DATA, type TicketItem } from '../activityData';
 
-const statusStyle: Record<string, { bg: string; text: string; label: string }> = {
-  'open': { bg: 'bg-red-50', text: 'text-red-600', label: 'Open' },
-  'in-progress': { bg: 'bg-amber-50', text: 'text-amber-600', label: 'In Progress' },
-  'resolved': { bg: 'bg-teal-50', text: 'text-teal-600', label: 'Resolved' },
-  'closed': { bg: 'bg-gray-100', text: 'text-gray-500', label: 'Closed' },
-};
-
-const priorityStyle: Record<string, { bg: string; text: string; border: string }> = {
-  'critical': { bg: 'bg-red-50', text: 'text-red-500', border: 'border-red-100' },
-  'high': { bg: 'bg-orange-50', text: 'text-orange-500', border: 'border-orange-100' },
-  'medium': { bg: 'bg-amber-50', text: 'text-amber-500', border: 'border-amber-100' },
-  'low': { bg: 'bg-blue-50', text: 'text-blue-400', border: 'border-blue-100' },
-};
+// Helper to get initials
+function getInitials(name: string) {
+  return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+}
 
 export function TicketsTab({ entityId }: { entityId: number | string }) {
   const tickets = TICKETS_DATA.filter(t => t.orgId == entityId);
+
+  const grouped = tickets.reduce<Record<string, TicketItem[]>>((acc, ticket) => {
+    if (!acc[ticket.group]) acc[ticket.group] = [];
+    acc[ticket.group].push(ticket);
+    return acc;
+  }, {});
+
+  const sortedGroups = Object.entries(grouped).sort(
+    (a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime()
+  );
 
   if (tickets.length === 0) {
     return (
@@ -28,35 +29,92 @@ export function TicketsTab({ entityId }: { entityId: number | string }) {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar">
-      {tickets.map(ticket => (
-        <TicketCard key={ticket.id} ticket={ticket} />
+    <div className="flex-1 overflow-y-auto custom-scrollbar relative px-8 py-6 bg-[#FAFAFA]/40 font-sans">
+      {/* Global Timeline Vertical Line */}
+      <div className="absolute left-[44px] top-6 bottom-0 w-px bg-[#C3C6EF] z-0"></div>
+
+      {sortedGroups.map(([group, items]) => (
+        <div key={group} className="relative z-10 mb-8">
+          {/* Group Date Pill */}
+          <div className="mb-6 inline-block bg-[#F8F9FA] rounded-full px-4 py-1.5 text-[11.5px] font-bold text-gray-500 border border-gray-200/50 shadow-[0_1px_2px_rgba(0,0,0,0.02)] relative z-10 transition-colors">
+            {group}
+          </div>
+          
+          <div className="flex flex-col gap-6">
+            {items.map((ticket) => (
+              <TicketCard key={ticket.id} ticket={ticket} />
+            ))}
+          </div>
+        </div>
       ))}
     </div>
   );
 }
 
 function TicketCard({ ticket }: { ticket: TicketItem }) {
-  const st = statusStyle[ticket.status] || statusStyle.open;
-  const pr = priorityStyle[ticket.priority] || priorityStyle.medium;
+  // Determine assignee color arbitrarily based on first letter for variety
+  const initial = getInitials(ticket.assignee);
+  const isYellow = initial.includes('N');
+  const avatarBg = isYellow ? 'bg-amber-400' : 'bg-indigo-400';
+
+  // Determine ticket status badge color (mocked visually mapped to the screenshot)
+  const isResolved = ticket.status === 'resolved' || ticket.status === 'closed';
+  const statusBg = isResolved ? 'bg-[#7E8299]' : 'bg-[#38BDF8]';
 
   return (
-    <div className="px-6 py-4 border-b border-gray-50 hover:bg-indigo-50/20 transition-colors cursor-pointer group">
-      <div className="flex items-start justify-between mb-1.5">
-        <div className="flex items-center gap-3">
-          <span className="text-[11px] font-mono font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">{ticket.ticketId}</span>
-          <h4 className="text-[14px] font-semibold text-gray-900 group-hover:text-indigo-700 transition-colors">{ticket.title}</h4>
-        </div>
-        <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600">
-          <MoreHorizontal className="w-4 h-4" />
-        </button>
+    <div className="relative flex items-start gap-5 z-10 group">
+      {/* Timeline Squircle Icon */}
+      <div className="w-[24px] h-[24px] rounded-md bg-[#F4F5FB] border border-[#C3C6EF] text-[#6D72D6] flex items-center justify-center shrink-0 mt-5 relative z-10 shadow-sm">
+        <TicketIcon className="w-3.5 h-3.5" />
       </div>
-      <p className="text-[12.5px] text-gray-500 leading-relaxed mb-2.5 pl-[70px] line-clamp-1">{ticket.description}</p>
-      <div className="flex items-center gap-3 pl-[70px]">
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${st.bg} ${st.text}`}>{st.label}</span>
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${pr.bg} ${pr.text} ${pr.border}`}>{ticket.priority}</span>
-        <span className="text-[11px] text-gray-400">{ticket.assignee}</span>
-        <span className="text-[11px] text-gray-400 ml-auto">{ticket.date}</span>
+
+      {/* Main card content */}
+      <div className="flex-1 bg-white border border-gray-200/80 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200">
+        <div className="flex items-center justify-between mb-3.5">
+          <div className="flex items-center gap-2">
+            <div className={`w-[22px] h-[22px] rounded-full ${avatarBg} text-white flex items-center justify-center text-[10px] font-bold`}>
+              {initial}
+            </div>
+            <span className="text-[12.5px] font-bold text-[#475569]">{ticket.assignee}</span>
+            <div className="w-[18px] h-[18px] bg-black text-white rounded-[4px] flex items-center justify-center font-bold text-[10px] ml-1 opacity-80">
+              Z
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-[12px] font-bold text-[#64748B]">{ticket.date}</span>
+            <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600 ml-1">
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        <h4 className="text-[14.5px] font-extrabold text-[#334155] mb-4 leading-snug group-hover:text-indigo-600 transition-colors">
+          {ticket.title} <span className="text-[#6D72D6] font-bold text-[13px] ml-1">#{ticket.ticketId.replace('TKT-', '')}</span>
+        </h4>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <div className={`w-[26px] h-[26px] rounded-[6px] ${statusBg} text-white flex items-center justify-center`}>
+              <Circle className="w-3.5 h-3.5" />
+            </div>
+            <div className="w-[26px] h-[26px] rounded-[6px] border border-gray-100 bg-gray-50 text-[#38BDF8] flex items-center justify-center">
+              <Flag className="w-3.5 h-3.5" />
+            </div>
+            <div className="w-[26px] h-[26px] rounded-[6px] border border-gray-100 bg-gray-50 text-gray-400 flex items-center justify-center">
+              <Settings className="w-3.5 h-3.5" />
+            </div>
+            <div className="h-[26px] px-2 rounded-[6px] border border-gray-100 bg-gray-50 text-gray-500 flex items-center gap-1">
+              <CornerUpLeft className="w-3 h-3" />
+              <span className="text-[11px] font-semibold">0</span>
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+             <span className="text-[11.5px] font-bold text-[#6D72D6] cursor-pointer hover:underline">
+               1 Links
+             </span>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MoreHorizontal, Sparkles, Link2, Eye, MessageCircle, X, ChevronDown, Reply, Forward, Star, Paperclip, ExternalLink } from 'lucide-react';
+import { MoreHorizontal, Sparkles, Link2, Eye, MessageCircle, X, ChevronDown, Reply, Forward, Star, Paperclip, ExternalLink, Smile } from 'lucide-react';
 import { EMAILS_DATA, type EmailItem } from '../activityData';
 
 // ── Email Thread Panel ────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ function buildThread(email: EmailItem): ThreadMessage[] {
   ];
 }
 
-function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose: () => void }) {
+export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose: () => void }) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set([1, 2]));
   const thread = buildThread(email);
 
@@ -56,23 +56,16 @@ function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose: () =>
 
   return (
     <>
-      {/* Backdrop (subtle) */}
-      <div
-        className="absolute inset-0 z-20"
-        onClick={onClose}
-        style={{ background: 'transparent' }}
-      />
 
       {/* Panel */}
       <div
-        className="absolute top-0 right-0 h-full z-30 flex flex-col bg-white border-l border-gray-100 shadow-2xl"
-        style={{ width: '420px', animation: 'slideInRight 0.22s cubic-bezier(0.4,0,0.2,1)' }}
+        className="h-full flex flex-col bg-white"
         onClick={e => e.stopPropagation()}
       >
         {/* Panel Header */}
         <div className="px-5 py-4 border-b border-gray-100 shrink-0">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[15px] font-bold text-gray-900">Email Thread</h2>
+            <h2 className="text-[14px] font-extrabold text-[#6D72D6]">Email Thread</h2>
             <button
               onClick={onClose}
               className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all"
@@ -88,12 +81,11 @@ function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose: () =>
             </h3>
             <div className="flex items-center gap-1 shrink-0">
               {email.links > 0 && (
-                <span className="flex items-center gap-1 text-[12px] font-bold text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
-                  <Link2 className="w-3 h-3" />
+                <span className="flex items-center gap-1 text-[11.5px] font-bold text-indigo-400 bg-transparent px-1 cursor-pointer">
                   {email.links} Links
+                  <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
                 </span>
               )}
-              <ChevronDown className="w-3.5 h-3.5 text-gray-400 ml-1" />
             </div>
           </div>
         </div>
@@ -108,7 +100,7 @@ function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose: () =>
               <div key={msg.id} className={`border-b border-gray-50 ${isLast ? 'border-b-0' : ''}`}>
                 {/* Message header — always visible */}
                 <div
-                  className="px-5 pt-4 pb-2 flex items-start justify-between cursor-pointer hover:bg-gray-50/60 transition-colors"
+                  className="px-5 pt-4 pb-1 flex items-start justify-between cursor-pointer transition-colors"
                   onClick={() => toggleExpand(msg.id)}
                 >
                   <div className="flex items-center gap-3">
@@ -141,14 +133,14 @@ function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose: () =>
                 {isExpanded && (
                   <div className="px-5 pb-5">
                     {/* Emoji reaction row */}
-                    <div className="flex justify-end mb-3">
-                      <div className="w-7 h-7 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-[14px] cursor-pointer hover:scale-110 transition-transform">
-                        😊
-                      </div>
+                    <div className="flex justify-end mb-2">
+                       <div className="w-6 h-6 rounded-full border border-teal-200 bg-teal-50 flex items-center justify-center text-teal-500 cursor-pointer">
+                         <Smile className="w-3.5 h-3.5" />
+                       </div>
                     </div>
 
                     {/* Body text */}
-                    <div className="text-[13px] text-gray-700 leading-relaxed whitespace-pre-line pl-11">
+                    <div className="text-[12.5px] text-gray-600 leading-[1.6] whitespace-pre-line pl-11">
                       {msg.body}
                     </div>
 
@@ -172,43 +164,49 @@ function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose: () =>
                     <p className="text-[12px] text-gray-400 truncate">{msg.body.split('\n')[0]}</p>
                   </div>
                 )}
+
+                {/* If there's another message in the thread, render the connecting line and circle */}
+                {idx < thread.length - 1 && (
+                  <div className="relative flex items-center py-4">
+                     {/* Horizontal line extending through the circle */}
+                     <div className="absolute left-6 right-6 h-px bg-gray-100"></div>
+                     <div className="relative left-[22px] w-8 h-8 bg-white border border-gray-200 shadow-sm rounded-full flex items-center justify-center text-[12px] font-bold text-gray-500 z-10">
+                        1
+                     </div>
+                  </div>
+                )}
               </div>
             );
           })}
 
-          {/* Thread count badge */}
-          <div className="flex items-center justify-center py-4">
-            <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-[12px] font-bold text-gray-500 cursor-pointer hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition-all">
-              {thread.length}
-            </div>
-          </div>
+
         </div>
 
         {/* Quick Reply Composer */}
-        <div className="border-t border-gray-100 p-4 shrink-0 bg-gray-50/30">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="px-4 py-2.5 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-[12px] font-bold text-gray-400 uppercase tracking-wider">Reply to</span>
-              <span className="text-[12.5px] font-semibold text-gray-700">{email.senderName}</span>
+        <div className="border-t border-gray-100 p-3 shrink-0 bg-gray-50/30">
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div className="px-3 py-1.5 border-b border-gray-100 flex items-center gap-2">
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Reply to</span>
+              <span className="text-[12px] font-semibold text-gray-700">{email.senderName}</span>
             </div>
             <textarea
               placeholder="Write a reply..."
-              rows={3}
-              className="w-full px-4 py-3 text-[13px] text-gray-700 placeholder:text-gray-400 resize-none focus:outline-none bg-transparent"
+              rows={1}
+              className="w-full px-3 py-2 text-[13px] text-gray-700 placeholder:text-gray-400 resize-none focus:outline-none bg-transparent min-h-[36px]"
             />
-            <div className="px-4 py-2.5 border-t border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
-                  <Paperclip className="w-4 h-4" />
+            <div className="px-3 py-1.5 border-t border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-1">
+                <button className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+                  <Paperclip className="w-3.5 h-3.5" />
                 </button>
-                <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
-                  <Star className="w-4 h-4" />
+                <button className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+                  <Star className="w-3.5 h-3.5" />
                 </button>
-                <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
-                  <ExternalLink className="w-4 h-4" />
+                <button className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+                  <ExternalLink className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <button className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[12px] font-bold transition-all shadow-sm active:scale-95">
+              <button className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-sm active:scale-95">
                 Send
               </button>
             </div>
@@ -221,8 +219,18 @@ function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose: () =>
 
 // ── EmailsTab ─────────────────────────────────────────────────────────────────
 
-export function EmailsTab({ entityId }: { entityId: number | string }) {
-  const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
+export function EmailsTab({ 
+  entityId, 
+  selectedEmail, 
+  onSelectEmail 
+}: { 
+  entityId: number | string;
+  selectedEmail?: EmailItem | null;
+  onSelectEmail?: (email: EmailItem | null) => void;
+}) {
+  const [localSelected, setLocalSelected] = useState<EmailItem | null>(null);
+  const currentSelectedEmail = selectedEmail !== undefined ? selectedEmail : localSelected;
+  const handleSelectEmail = onSelectEmail || setLocalSelected;
   const emails = EMAILS_DATA.filter(e => e.orgId == entityId);
 
   // Group by date
@@ -256,28 +264,13 @@ export function EmailsTab({ entityId }: { entityId: number | string }) {
             <EmailCard
               key={email.id}
               email={email}
-              isSelected={selectedEmail?.id === email.id}
-              onClick={() => setSelectedEmail(prev => prev?.id === email.id ? null : email)}
+              isSelected={currentSelectedEmail?.id === email.id}
+              onClick={() => handleSelectEmail(currentSelectedEmail?.id === email.id ? null : email)}
             />
           ))}
         </div>
       ))}
 
-      {/* Slide-in thread panel */}
-      {selectedEmail && (
-        <EmailThreadPanel
-          email={selectedEmail}
-          onClose={() => setSelectedEmail(null)}
-        />
-      )}
-
-      {/* Slide-in animation */}
-      <style>{`
-        @keyframes slideInRight {
-          from { transform: translateX(100%); opacity: 0; }
-          to   { transform: translateX(0);   opacity: 1; }
-        }
-      `}</style>
     </div>
   );
 }
