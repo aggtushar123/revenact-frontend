@@ -40,7 +40,7 @@ export function Details() {
     <div className="flex flex-col h-full w-full bg-[#fcfdfe]">
       {/* Tabs Navigation */}
       <nav className="px-6 bg-white border-b border-gray-100 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-8 h-12 overflow-x-auto no-scrollbar whitespace-nowrap">
+        <div className="flex items-center gap-8 h-10 overflow-x-auto no-scrollbar whitespace-nowrap">
           {tabs.map(tab => (
             <button
               key={tab.name}
@@ -79,11 +79,11 @@ export function Details() {
       </nav>
 
       {/* Tab Content */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8f9fc]/50 p-6">
+      <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8f9fc]/50 p-4">
         {activeTab === 'General' && (
-          <div className="flex flex-col w-full h-full gap-6 max-w-7xl mx-auto">
+          <div className="flex flex-col w-full h-full gap-4 max-w-7xl mx-auto">
             <MetricsBanner organization={organization} />
-            <div className="flex gap-6 w-full h-[calc(100vh-280px)] overflow-hidden">
+            <div className="flex gap-4 w-full h-[calc(100vh-260px)] overflow-hidden">
                {/* Collapsed toggle */}
                {!isPinnedOpen && (
                  <div className="flex flex-col items-center pt-3 shrink-0">
@@ -518,7 +518,7 @@ function AccountsTab({ orgId }: { orgId: number }) {
   const accounts = ACCOUNTS_DATA.filter(a => a.orgId === orgId);
 
   return (
-    <div className="flex flex-col w-full h-full gap-6 max-w-7xl mx-auto">
+    <div className="flex flex-col w-full h-full gap-4 max-w-7xl mx-auto">
       {/* Accounts Dynamic Metrics Banner */}
       <AccountsMetricsBanner accounts={accounts} />
 
@@ -808,19 +808,23 @@ function InfoCard({ icon, label, value }: { icon: React.ReactNode, label: string
   );
 }
 function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
-  const [healthTab, setHealthTab] = useState<'COUNT' | 'MRR' | 'ARR'>('COUNT');
-  const [lifecycleTab, setLifecycleTab] = useState<'COUNT' | 'MRR' | 'ARR'>('COUNT');
+  type MetricTab = 'count' | 'mrr' | 'arr';
+  const [healthTab, setHealthTab] = useState<MetricTab>('count');
+  const [lifecycleTab, setLifecycleTab] = useState<MetricTab>('count');
 
   const health = useMemo(() => {
-    let good = 0, average = 0, poor = 0;
-    let goodMrr = 0, avgMrr = 0, poorMrr = 0;
-    let goodArr = 0, avgArr = 0, poorArr = 0;
+    const buckets = {
+      good: { count: 0, mrr: 0, arr: 0 },
+      average: { count: 0, mrr: 0, arr: 0 },
+      poor: { count: 0, mrr: 0, arr: 0 },
+    };
     for (const a of accounts) {
-      if (a.healthCategory === 'good') { good++; goodMrr += a.mrr; goodArr += a.arr; }
-      else if (a.healthCategory === 'average') { average++; avgMrr += a.mrr; avgArr += a.arr; }
-      else { poor++; poorMrr += a.mrr; poorArr += a.arr; }
+      const cat = a.healthCategory;
+      buckets[cat].count++;
+      buckets[cat].mrr += a.mrr;
+      buckets[cat].arr += a.arr;
     }
-    return { good, average, poor, goodMrr, avgMrr, poorMrr, goodArr, avgArr, poorArr };
+    return buckets;
   }, [accounts]);
 
   const nps = useMemo(() => {
@@ -840,19 +844,37 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
     return Math.round(accounts.reduce((s, a) => s + a.csatValue, 0) / accounts.length);
   }, [accounts]);
 
-  // Lifecycle stages aggregation
+  // Lifecycle stages — use proper categories matching the org list MetricsPanel
+  type LifecycleKey = 'onboarding' | 'kickoff' | 'adoption' | 'live' | 'renewal' | 'expansion' | 'churn' | 'other';
+  const lifecycleLabels: Record<LifecycleKey, string> = {
+    onboarding: 'ON', kickoff: 'KI', adoption: 'AD', live: 'LI',
+    renewal: 'RE', expansion: 'EX', churn: 'CH', other: 'OT',
+  };
+  const lifecycleColors: Record<LifecycleKey, string> = {
+    onboarding: '#6366f1', kickoff: '#818cf8', adoption: '#a78bfa',
+    live: '#00a699', renewal: '#f59e0b', expansion: '#10b981',
+    churn: '#ef4444', other: '#94a3b8',
+  };
+  const allStages: LifecycleKey[] = ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'expansion', 'churn', 'other'];
+
   const lifecycle = useMemo(() => {
-    const stages: Record<string, { count: number; mrr: number; arr: number }> = {};
+    const buckets: Record<LifecycleKey, { count: number; mrr: number; arr: number }> = {} as any;
+    for (const s of allStages) buckets[s] = { count: 0, mrr: 0, arr: 0 };
     for (const a of accounts) {
-      // Extract short stage name (e.g., "Live (Enterprise)" -> "LI")
-      const fullStage = a.lifecycleStage || 'Unknown';
-      const abbr = fullStage.substring(0, 2).toUpperCase();
-      if (!stages[abbr]) stages[abbr] = { count: 0, mrr: 0, arr: 0 };
-      stages[abbr].count++;
-      stages[abbr].mrr += a.mrr;
-      stages[abbr].arr += a.arr;
+      const stage = a.lifecycleStage?.toLowerCase() || '';
+      let key: LifecycleKey = 'other';
+      if (stage.startsWith('onboarding')) key = 'onboarding';
+      else if (stage.startsWith('kickoff')) key = 'kickoff';
+      else if (stage.startsWith('adoption')) key = 'adoption';
+      else if (stage.startsWith('live')) key = 'live';
+      else if (stage.startsWith('renewal')) key = 'renewal';
+      else if (stage.startsWith('expansion')) key = 'expansion';
+      else if (stage.startsWith('churn')) key = 'churn';
+      buckets[key].count++;
+      buckets[key].mrr += a.mrr;
+      buckets[key].arr += a.arr;
     }
-    return stages;
+    return buckets;
   }, [accounts]);
 
   // CSM pulse aggregation
@@ -865,165 +887,192 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
     return Math.round(totalPulse / accounts.length);
   }, [accounts]);
 
-  // Health values based on selected tab
-  const healthValues = useMemo(() => {
-    if (healthTab === 'MRR') return { good: `$${(health.goodMrr / 1000).toFixed(1)}k`, avg: `$${(health.avgMrr / 1000).toFixed(1)}k`, poor: `$${(health.poorMrr / 1000).toFixed(1)}k` };
-    if (healthTab === 'ARR') return { good: `$${(health.goodArr / 1000).toFixed(1)}k`, avg: `$${(health.avgArr / 1000).toFixed(1)}k`, poor: `$${(health.poorArr / 1000).toFixed(1)}k` };
-    return { good: health.good.toString(), avg: health.average.toString(), poor: health.poor.toString() };
-  }, [health, healthTab]);
+  // Format currency helper — same as MetricsPanel
+  const fmtCur = (val: number) => {
+    if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`;
+    if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}K`;
+    return `$${val}`;
+  };
 
-  const healthTotal = health.good + health.average + health.poor;
-  const donutSegments = [
-    { pct: healthTotal > 0 ? (health.good / healthTotal) * 100 : 0, color: '#00a699' },
-    { pct: healthTotal > 0 ? (health.average / healthTotal) * 100 : 0, color: '#ffbb00' },
-    { pct: healthTotal > 0 ? (health.poor / healthTotal) * 100 : 0, color: '#fa5c5c' },
+  const getHealthVal = (cat: 'good' | 'average' | 'poor') => {
+    const val = health[cat][healthTab];
+    return healthTab === 'count' ? val.toString() : fmtCur(val);
+  };
+
+  // Health donut
+  const healthDonutData = [
+    { value: health.good[healthTab], color: '#00a699' },
+    { value: health.average[healthTab], color: '#ffbb00' },
+    { value: health.poor[healthTab], color: '#fa5c5c' },
   ];
 
-  let cumulativeOffset = 0;
+  // Lifecycle donut
+  const lifecycleDonutData = allStages
+    .filter(s => lifecycle[s][lifecycleTab] > 0)
+    .map(s => ({ value: lifecycle[s][lifecycleTab], color: lifecycleColors[s] }));
 
   const csatColor = avgCsat >= 70 ? '#00a699' : avgCsat >= 40 ? '#ffbb00' : '#fa5c5c';
   const csmColor = csmScore >= 70 ? '#00a699' : csmScore >= 40 ? '#ffbb00' : '#fa5c5c';
 
-  // Lifecycle bar chart max value
-  const lifecycleEntries = Object.entries(lifecycle);
-  const maxLifecycleVal = Math.max(...lifecycleEntries.map(([, v]) => 
-    lifecycleTab === 'MRR' ? v.mrr : lifecycleTab === 'ARR' ? v.arr : v.count
-  ), 1);
+  // Donut renderer — same as MetricsPanel DonutChart
+  const renderDonut = (segments: { value: number; color: string }[], size: number) => {
+    const total = segments.reduce((s, seg) => s + seg.value, 0);
+    if (total === 0) {
+      return (
+        <svg viewBox="0 0 36 36" style={{ width: size, height: size }}>
+          <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#e5e7eb" strokeWidth="3.5" />
+        </svg>
+      );
+    }
+    let offset = 0;
+    return (
+      <svg viewBox="0 0 36 36" style={{ width: size, height: size }}>
+        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="3.5" />
+        {segments.map((seg, i) => {
+          const pct = (seg.value / total) * 100;
+          const el = (
+            <circle key={i} cx="18" cy="18" r="15.9155" fill="none"
+              stroke={seg.color} strokeWidth="3.5"
+              strokeDasharray={`${pct} ${100 - pct}`} strokeDashoffset={-offset}
+              strokeLinecap="butt"
+              style={{ transition: 'stroke-dasharray 0.5s ease, stroke-dashoffset 0.5s ease' }} />
+          );
+          offset += pct;
+          return el;
+        })}
+      </svg>
+    );
+  };
 
-  const tabBtnClass = (active: boolean) =>
-    `px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider rounded transition-all cursor-pointer ${active ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-gray-600'}`;
+  // TabPill — same as MetricsPanel TabPill
+  const TabPill = ({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void }) => (
+    <button onClick={onClick}
+      className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-all duration-200 ${
+        isActive ? 'text-indigo-600 bg-indigo-50 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+      }`}
+    >{label}</button>
+  );
+
+  // MetricItem — same as MetricsPanel MetricItem
+  const MItem = ({ color, label, formatted }: { color: string; label: string; formatted: string }) => (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-1.5 text-[12px] text-gray-500 mb-0.5">
+        <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: color }} /> {label}
+      </div>
+      <span className="text-xl font-bold text-gray-900 leading-tight">{formatted}</span>
+    </div>
+  );
 
   return (
     <div
-      className="w-full flex items-stretch rounded-xl border border-gray-200/80 bg-white/70 shadow-sm shrink-0"
+      className="flex items-stretch w-full h-[110px] font-sans rounded-xl border border-gray-200/80 bg-white/70 shadow-sm"
       style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
     >
-      {/* Health */}
-      <div className="px-4 py-3 flex flex-col gap-1 min-w-[180px]">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-gray-700">Health</span>
-          <div className="flex gap-0.5">
-            {(['COUNT', 'MRR', 'ARR'] as const).map(t => (
-              <button key={t} onClick={() => setHealthTab(t)} className={tabBtnClass(healthTab === t)}>{t}</button>
-            ))}
+      {/* Health Section */}
+      <div className="flex flex-col flex-1 px-5 py-4">
+        <div className="flex items-center gap-3 mb-3">
+          <span className="text-[13px] font-semibold text-gray-800 tracking-wide">Health</span>
+          <div className="flex items-center gap-0.5">
+            <TabPill label="COUNT" isActive={healthTab === 'count'} onClick={() => setHealthTab('count')} />
+            <TabPill label="MRR" isActive={healthTab === 'mrr'} onClick={() => setHealthTab('mrr')} />
+            <TabPill label="ARR" isActive={healthTab === 'arr'} onClick={() => setHealthTab('arr')} />
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00a699]" /> Good
-              <span className="text-gray-900 text-[11px] ml-auto pl-3">{healthValues.good}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#ffbb00]" /> Average
-              <span className="text-gray-900 text-[11px] ml-auto pl-3">{healthValues.avg}</span>
-            </div>
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#fa5c5c]" /> Poor
-              <span className="text-gray-900 text-[11px] ml-auto pl-3">{healthValues.poor}</span>
-            </div>
+        <div className="flex items-center gap-5">
+          <div className="flex gap-5">
+            <MItem color="#00a699" label="Good" formatted={getHealthVal('good')} />
+            <MItem color="#ffbb00" label="Average" formatted={getHealthVal('average')} />
+            <MItem color="#fa5c5c" label="Poor" formatted={getHealthVal('poor')} />
           </div>
-          <svg viewBox="0 0 36 36" className="-rotate-90 shrink-0" style={{ width: 44, height: 44 }}>
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
-            {donutSegments.map((seg, i) => {
-              const path = (
-                <circle key={i} cx="18" cy="18" r="15.9155" fill="none" stroke={seg.color} strokeWidth="2.5"
-                  strokeDasharray={`${seg.pct} ${100 - seg.pct}`} strokeDashoffset={-cumulativeOffset}
-                  strokeLinecap="round" style={{ transition: 'all 0.5s ease' }} />
-              );
-              cumulativeOffset += seg.pct;
-              return path;
-            })}
-          </svg>
+          <div className="ml-2">
+            {renderDonut(healthDonutData, 44)}
+          </div>
         </div>
       </div>
 
-      <div className="w-px bg-gray-200/60 my-3" />
+      <div className="w-px bg-gray-200/70 my-3" />
 
-      {/* NPS */}
-      <div className="px-4 py-3 flex flex-col gap-1 min-w-[180px]">
-        <span className="text-[11px] font-bold text-gray-700">NPS</span>
-        <div className="flex items-center gap-4">
-          <span className="text-[28px] font-light text-gray-800 leading-none tracking-tight">
+      {/* NPS Section */}
+      <div className="flex flex-col flex-1 px-5 py-4">
+        <div className="mb-2 text-[13px] font-semibold text-gray-800 tracking-wide">NPS</div>
+        <div className="flex items-center gap-5 mt-0.5">
+          <span className="text-[38px] font-light text-gray-800 leading-none tracking-tight">
             {nps.score > 0 ? '+' : ''}{nps.score}
           </span>
-          <div className="flex flex-col gap-0.5 text-[10px] font-bold">
-            <div className="flex items-center gap-1.5 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00a699]" />
-              <span className="w-16">Promoters</span>
-              <span className="text-gray-900 text-[11px]">{nps.promoters}</span>
+          <div className="flex flex-col text-[12px] text-gray-600 font-medium gap-1">
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-[#00a699]" /> Promoters</div>
+              <span className="font-semibold text-gray-800 ml-4">{nps.promoters}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#ffbb00]" />
-              <span className="w-16">Passives</span>
-              <span className="text-gray-900 text-[11px]">{nps.passives}</span>
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-[#ffbb00]" /> Passives</div>
+              <span className="font-semibold text-gray-800 ml-4">{nps.passives}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#fa5c5c]" />
-              <span className="w-16">Detractors</span>
-              <span className="text-gray-900 text-[11px]">{nps.detractors}</span>
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-[#fa5c5c]" /> Detractors</div>
+              <span className="font-semibold text-gray-800 ml-4">{nps.detractors}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="w-px bg-gray-200/60 my-3" />
+      <div className="w-px bg-gray-200/70 my-3" />
 
       {/* CSAT Score */}
-      <div className="px-4 py-3 flex flex-col gap-1 min-w-[120px]">
-        <span className="text-[11px] font-bold text-gray-700">CSAT Score</span>
+      <div className="flex flex-col px-5 py-4 min-w-[120px]">
+        <div className="mb-2 text-[13px] font-semibold text-gray-800 tracking-wide">CSAT Score</div>
         <div className="flex items-center gap-3 mt-0.5">
-          <span className="text-[22px] font-bold text-gray-900 leading-none">{avgCsat}%</span>
-          <div className="relative shrink-0" style={{ width: 40, height: 40 }}>
-            <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-              <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
-              <circle cx="18" cy="18" r="15.9155" fill="none" stroke={csatColor} strokeWidth="2.5"
-                strokeDasharray={`${avgCsat} ${100 - avgCsat}`} strokeLinecap="round"
-                style={{ transition: 'all 0.5s ease' }} />
-            </svg>
-          </div>
+          <span className="text-xl font-bold text-gray-900 leading-tight">{avgCsat}%</span>
+          {renderDonut([{ value: avgCsat, color: csatColor }, { value: 100 - avgCsat, color: '#e5e7eb' }], 40)}
         </div>
       </div>
 
-      <div className="w-px bg-gray-200/60 my-3" />
+      <div className="w-px bg-gray-200/70 my-3" />
 
-      {/* Lifecycle Stages */}
-      <div className="px-4 py-3 flex flex-col gap-1 flex-1 min-w-[160px]">
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-bold text-gray-700">Lifecycle Stages</span>
-          <div className="flex gap-0.5">
-            {(['COUNT', 'MRR', 'ARR'] as const).map(t => (
-              <button key={t} onClick={() => setLifecycleTab(t)} className={tabBtnClass(lifecycleTab === t)}>{t}</button>
-            ))}
+      {/* Lifecycle Stages Section */}
+      <div className="flex flex-col flex-1 px-5 py-4">
+        <div className="flex items-center gap-3 mb-3">
+          <span className="text-[13px] font-semibold text-gray-800 tracking-wide">Lifecycle Stages</span>
+          <div className="flex items-center gap-0.5">
+            <TabPill label="COUNT" isActive={lifecycleTab === 'count'} onClick={() => setLifecycleTab('count')} />
+            <TabPill label="MRR" isActive={lifecycleTab === 'mrr'} onClick={() => setLifecycleTab('mrr')} />
+            <TabPill label="ARR" isActive={lifecycleTab === 'arr'} onClick={() => setLifecycleTab('arr')} />
           </div>
         </div>
-        {/* Bar chart */}
-        <div className="flex items-end gap-1.5 h-[40px] mt-0.5">
-          {lifecycleEntries.map(([stage, data]) => {
-            const val = lifecycleTab === 'MRR' ? data.mrr : lifecycleTab === 'ARR' ? data.arr : data.count;
-            const heightPct = maxLifecycleVal > 0 ? (val / maxLifecycleVal) * 100 : 0;
-            return (
-              <div key={stage} className="flex flex-col items-center gap-0.5 flex-1">
-                <div className="w-full max-w-[18px] rounded-t-sm bg-indigo-500 transition-all" style={{ height: `${Math.max(heightPct * 0.36, 2)}px` }} />
-                <span className="text-[7px] font-bold text-gray-400 uppercase">{stage}</span>
-              </div>
-            );
-          })}
+        <div className="flex items-center gap-4">
+          {/* Bar chart */}
+          <div className="flex flex-col w-[200px]">
+            <div className="flex items-end gap-[3px] h-8 w-full border-b border-gray-200 pb-0.5">
+              {allStages.map(stage => {
+                const val = lifecycle[stage][lifecycleTab];
+                const maxVal = Math.max(...allStages.map(s => lifecycle[s][lifecycleTab]));
+                const heightPct = maxVal > 0 ? Math.max((val / maxVal) * 100, val > 0 ? 8 : 3) : 3;
+                return (
+                  <div key={stage} className="flex-1 rounded-t-[2px] transition-all duration-300"
+                    style={{ height: `${heightPct}%`, backgroundColor: val > 0 ? lifecycleColors[stage] : '#e5e7eb' }}
+                    title={`${stage}: ${lifecycleTab === 'count' ? val : fmtCur(val)}`}
+                  />
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-between text-[8px] font-bold text-gray-400 mt-1 uppercase w-full">
+              {allStages.map(s => (
+                <span key={s} className="flex-1 text-center">{lifecycleLabels[s]}</span>
+              ))}
+            </div>
+          </div>
+          {/* Donut */}
+          {renderDonut(lifecycleDonutData, 40)}
         </div>
       </div>
 
-      <div className="w-px bg-gray-200/60 my-3" />
+      <div className="w-px bg-gray-200/70 my-3" />
 
       {/* CSM */}
-      <div className="px-4 py-3 flex flex-col gap-1 min-w-[70px] items-center">
-        <span className="text-[11px] font-bold text-gray-700">CSM</span>
-        <div className="relative shrink-0 mt-0.5" style={{ width: 40, height: 40 }}>
-          <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke={csmColor} strokeWidth="2.5"
-              strokeDasharray={`${csmScore} ${100 - csmScore}`} strokeLinecap="round"
-              style={{ transition: 'all 0.5s ease' }} />
-          </svg>
+      <div className="flex flex-col px-5 py-4 min-w-[80px] items-center">
+        <div className="mb-2 text-[13px] font-semibold text-gray-800 tracking-wide">CSM</div>
+        <div className="mt-0.5">
+          {renderDonut([{ value: csmScore, color: csmColor }, { value: 100 - csmScore, color: '#e5e7eb' }], 44)}
         </div>
       </div>
     </div>

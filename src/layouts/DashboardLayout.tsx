@@ -11,7 +11,7 @@ export function DashboardLayout() {
       <Sidebar />
       <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden bg-gray-50/50">
         {!isScenarios && <Navbar />}
-        <main className={`flex-1 overflow-hidden h-full flex flex-col ${isScenarios ? 'p-0' : 'p-4 md:p-6 lg:p-8'}`}>
+        <main className={`flex-1 overflow-hidden h-full flex flex-col ${isScenarios ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
           <Outlet />
         </main>
       </div>
