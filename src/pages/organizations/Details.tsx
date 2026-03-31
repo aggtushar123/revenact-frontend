@@ -6,15 +6,9 @@ import type { OrgRow } from '../../components/organizations/tableData';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { CONTACTS_DATA } from '../../components/organizations/contactsData';
+import { EmailsTab, TasksTab, NotesTab, TicketsTab, CalendarEventsTab, ActivitiesTab } from '../../components/organizations/activity';
 
-interface Activity {
-  id: number;
-  type: string;
-  date: string;
-  group: string;
-  links: number;
-  watchers: number;
-}
+
 
 // --- Main Component ---
 export function Details() {
@@ -392,13 +386,15 @@ function ActivityFeed({ organization }: { organization: OrgRow }) {
     { name: 'CallSense', icon: <Zap className="w-3.5 h-3.5" /> },
   ];
 
-  const activities: Activity[] = [
-    { id: 1, type: 'Value Reinforcement', date: 'Mar 5th', group: '05 Mar 2026', links: 1, watchers: 1 },
-    { id: 2, type: 'Enablement or Re-Training', date: 'Mar 5th', group: '05 Mar 2026', links: 1, watchers: 0 },
+  const filterItems = [
+    'All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 
+    'Calendar Events', 'Pulse', 'Conversations', 'Velaris Support', 
+    'Surveys', 'Slack'
   ];
 
   return (
     <div className="flex flex-col h-full">
+      {/* Sub tabs (Activity Feed, Headlines, etc) */}
       <div className="px-4 pt-3 flex items-center justify-between border-b border-gray-100 flex-wrap shrink-0">
         <div className="flex gap-5">
           {tabs.map(tab => (
@@ -418,11 +414,16 @@ function ActivityFeed({ organization }: { organization: OrgRow }) {
       <div className="flex flex-col flex-1 overflow-hidden">
         {activeSubTab === 'Activity Feed' ? (
           <>
+            {/* Filter Toolbar */}
             <div className="p-4 flex flex-col gap-4 border-b border-gray-50 shrink-0">
                <div className="flex items-center gap-3">
                   <div className="relative flex-1">
                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                     <input type="text" placeholder="Search activities..." className="w-full pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-indigo-500/20 placeholder:text-gray-400" />
+                     <input 
+                        type="text" 
+                        placeholder={`Search ${filter.toLowerCase()}...`} 
+                        className="w-full pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-indigo-500/20 placeholder:text-gray-400" 
+                     />
                   </div>
                   <button className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[13px] font-bold transition-all shadow-sm">
                      <Plus className="w-4 h-4" />
@@ -432,12 +433,18 @@ function ActivityFeed({ organization }: { organization: OrgRow }) {
                      <Filter className="w-4 h-4" />
                   </button>
                </div>
+               
+               {/* Activity Filters */}
                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar whitespace-nowrap">
-                  {['All', 'Activities', 'Emails', 'Tasks', 'Notes'].map(item => (
+                  {filterItems.map(item => (
                     <button 
                       key={item}
                       onClick={() => setFilter(item)}
-                      className={`px-3 py-1 rounded-full text-[12px] font-bold transition-all border ${filter === item ? 'bg-indigo-50 border-indigo-100 text-indigo-700' : 'bg-white border-transparent text-gray-500 hover:bg-gray-50'}`}
+                      className={`px-3 py-1 rounded-full text-[12px] font-bold transition-all border ${
+                        filter === item 
+                        ? 'bg-indigo-50 border-indigo-100 text-indigo-700' 
+                        : 'bg-white border-transparent text-gray-500 hover:bg-gray-50'
+                      }`}
                     >
                       {item}
                     </button>
@@ -445,28 +452,27 @@ function ActivityFeed({ organization }: { organization: OrgRow }) {
                </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-gray-50/20">
-               <div className="flex flex-col gap-8 relative">
-                  <div className="absolute left-[13px] top-10 bottom-4 w-0.5 bg-indigo-100" />
-                  <div className="flex flex-col gap-4">
-                     <div className="flex items-center gap-3">
-                        <div className="w-[28px] h-[28px] rounded-full bg-white border border-indigo-50 flex items-center justify-center shrink-0 z-10">
-                           <div className="w-3 h-3 border-2 border-indigo-200 rounded-md" />
-                        </div>
-                        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{activities[0].group}</span>
-                     </div>
-                     <div className="flex flex-col gap-4 ml-[13px] pl-[15px]">
-                        {activities.map(activity => (
-                          <ActivityCard key={activity.id} activity={activity} organization={organization} />
-                        ))}
-                     </div>
-                  </div>
-               </div>
+            {/* Tab Components Mapping */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              {filter === 'All' && <ActivitiesTab orgId={organization.id} organization={organization} />}
+              {filter === 'Activities' && <ActivitiesTab orgId={organization.id} organization={organization} />}
+              {filter === 'Emails' && <EmailsTab orgId={organization.id} />}
+              {filter === 'Tasks' && <TasksTab orgId={organization.id} />}
+              {filter === 'Notes' && <NotesTab orgId={organization.id} />}
+              {filter === 'Tickets' && <TicketsTab orgId={organization.id} />}
+              {filter === 'Calendar Events' && <CalendarEventsTab orgId={organization.id} />}
+              
+              {!['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events'].includes(filter) && (
+                <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-30">
+                  <Layout className="w-12 h-12 text-gray-400 mb-2" />
+                  <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{filter} coming soon</span>
+                </div>
+              )}
             </div>
           </>
         ) : activeSubTab === 'Overview' ? (
-          <div className="p-8 flex flex-col gap-6">
-            <div className="grid grid-cols-2 gap-4">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-gray-50/20">
+            <div className="grid grid-cols-2 gap-4 max-w-4xl">
                <InfoCard icon={<Globe className="w-4 h-4" />} label="Domain" value={organization.domain} />
                <InfoCard icon={<MapPin className="w-4 h-4" />} label="Location" value={organization.nameAddress} />
                <InfoCard icon={<Mail className="w-4 h-4" />} label="Email" value={`contact@${organization.domain}`} />
@@ -479,35 +485,6 @@ function ActivityFeed({ organization }: { organization: OrgRow }) {
             <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{activeSubTab} coming soon</span>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function ActivityCard({ activity, organization }: { activity: Activity, organization: OrgRow }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden p-5 flex flex-col gap-4 relative group">
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-6 h-6 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100">
-            <CheckCircle className="w-3.5 h-3.5" />
-          </div>
-          <div className="flex items-center gap-2">
-            <h4 className="font-bold text-gray-900 text-[14px]">{activity.type}</h4>
-            <ExternalLink className="w-3 h-3 text-gray-300" />
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-[11.5px] font-bold text-gray-400 pr-5">{activity.date}</span>
-          <MoreHorizontal className="w-4 h-4 text-gray-400 cursor-pointer" />
-        </div>
-      </div>
-      <div className="flex items-center gap-4 pl-9">
-         <div className={`w-3 h-3 rounded-full ${organization.health.clr}`} />
-         <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-400 px-2 py-0.5 bg-indigo-50/50 rounded-md border border-indigo-100">
-            <Sparkles className="w-3 h-3" />
-            Pulse
-         </div>
       </div>
     </div>
   );

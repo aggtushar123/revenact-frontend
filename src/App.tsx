@@ -16,7 +16,7 @@ import { useAppSelector } from './hooks';
 
 function RootRedirect() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />;
+  return <Navigate to={isAuthenticated ? '/organizations/list' : '/login'} replace />;
 }
 
 function App() {

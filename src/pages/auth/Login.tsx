@@ -22,7 +22,7 @@ export function Login() {
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
-      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
+      const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/organizations/list';
       navigate(from, { replace: true });
     }
   }, [isAuthenticated, navigate, location.state]);
