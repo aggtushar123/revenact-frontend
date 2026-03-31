@@ -1,8 +1,8 @@
 ---
-description: Full repository architecture, module map, and data flow reference for the Velaris SaaS app
+description: Full repository architecture, module map, and data flow reference for the Revenact SaaS app
 ---
 
-# Velaris SaaS — Repository Architecture & Flow
+# Revenact SaaS — Repository Architecture & Flow
 
 ## Tech Stack
 
@@ -135,9 +135,9 @@ Redux Store
 ```
 
 **Persistence keys in localStorage:**
-- `velaris_access_token`
-- `velaris_refresh_token`
-- `velaris_user`
+- `revenact_access_token`
+- `revenact_refresh_token`
+- `revenact_user`
 
 ---
 
@@ -150,7 +150,7 @@ Redux Store
 | `authSlice.ts` | Redux slice — `login` async thunk, `logout` action, localStorage hydration |
 | `loginSchema.ts` | Zod schema: email (required) + password (min 8 chars) |
 
-Dummy credentials: `admin@velaris.io / password123`, `demo@velaris.io / demo1234`
+Dummy credentials: `admin@revenact.io / password123`, `demo@revenact.io / demo1234`
 
 ---
 

@@ -1,6 +1,6 @@
 
 export type ColumnId =
-  | 'organization' | 'velarisId' | 'owner' | 'lifecycleStage' | 'health' | 'pulse'
+  | 'organization' | 'revenactId' | 'owner' | 'lifecycleStage' | 'health' | 'pulse'
   | 'aiPulseScore' | 'aiPulseReason' | 'nps' | 'csatScore' | 'joinedDate' | 'renewalDate'
   | 'arrAccount' | 'arrHQ' | 'implFee' | 'tcv' | 'tcvRenewal' | 'contractStart' | 'contractEnd'
   | 'productsUtilized' | 'topSourceChannel' | 'totalContractedSeats' | 'totalActiveSeats'
@@ -68,7 +68,7 @@ export interface OrgRow {
 
 export const ALL_COLUMNS: ColumnDef[] = [
   { id: 'organization', label: 'Organization', isCompulsory: true },
-  { id: 'velarisId', label: 'Velaris ID' },
+  { id: 'revenactId', label: 'Revenact ID' },
   { id: 'owner', label: 'Owner' },
   { id: 'lifecycleStage', label: 'Lifecycle Stage' },
   { id: 'health', label: 'Health' },
@@ -104,7 +104,7 @@ export const ALL_COLUMNS: ColumnDef[] = [
 ];
 
 export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
-  'organization', 'velarisId', 'owner', 'lifecycleStage', 'health', 'pulse',
+  'organization', 'revenactId', 'owner', 'lifecycleStage', 'health', 'pulse',
   'aiPulseScore', 'aiPulseReason', 'nps', 'csatScore', 'joinedDate', 'renewalDate',
   'arrAccount', 'arrHQ', 'implFee', 'tcv', 'tcvRenewal', 'contractStart', 'contractEnd',
   'productsUtilized', 'topSourceChannel', 'totalContractedSeats', 'totalActiveSeats',

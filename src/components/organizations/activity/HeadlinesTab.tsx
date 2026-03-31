@@ -31,7 +31,7 @@ const HEADLINES_DATA: HeadlineItem[] = [
     orgId: 1,
     title: 'Apple EMEA Retail Operations Renewal and Expansion',
     status: 'Open',
-    content: "Comprehensive renewal process for Apple's EMEA Retail Operations showing exceptional account health with 96% utilization and strong expansion interest. Daniel from Velaris coordinated renewal documentation and expansion modeling for Product B and Integrations Module, while Priya and Leo from Apple consolidated usage trends and conducted internal reviews. The account demonstrates consistent positive metrics with £135K ARR, 91 health score, and teams actively advocating for broader rollouts. Renewal positioned for success with meaningful growth opportunities identified.",
+    content: "Comprehensive renewal process for Apple's EMEA Retail Operations showing exceptional account health with 96% utilization and strong expansion interest. Daniel from Revenact coordinated renewal documentation and expansion modeling for Product B and Integrations Module, while Priya and Leo from Apple consolidated usage trends and conducted internal reviews. The account demonstrates consistent positive metrics with £135K ARR, 91 health score, and teams actively advocating for broader rollouts. Renewal positioned for success with meaningful growth opportunities identified.",
     startDate: '20 Nov 2025',
     endDate: '21 Jan 2026',
     group: 'January'

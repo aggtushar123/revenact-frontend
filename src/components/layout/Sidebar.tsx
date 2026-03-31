@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import logoImg from '../../assets/logo.png';
 import { 
   LayoutGrid, MessageSquare, Network, Layers, Users, 
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
@@ -28,18 +29,13 @@ export function Sidebar() {
       {/* Header section with Logo and Pin */}
       <div className={`flex items-center h-[60px] px-4 ${isExpanded ? 'justify-between' : 'justify-center'} border-b border-transparent shrink-0 mt-2`}>
         <div className="flex items-center gap-2.5 overflow-hidden cursor-pointer">
-          {/* Velaris Logo Mock */}
-          <div className="w-7 h-7 shrink-0 flex items-center justify-center relative">
-            <svg viewBox="0 0 24 24" fill="none" className="w-full h-full">
-              <path d="M12 22L2 6H22L12 22Z" fill="#3B82F6" opacity="0.9" />
-              <path d="M2 6L12 12L22 6Z" fill="#EF4444" opacity="0.9" />
-              <path d="M2 6L12 12V22L2 6Z" fill="#8B5CF6" opacity="0.8" />
-            </svg>
-          </div>
-          {isExpanded && (
-            <span className="font-semibold text-[22px] tracking-tight text-[#111827]">
-              velaris
-            </span>
+          {/* Revenact Logo */}
+          {isExpanded ? (
+            <img src={logoImg} alt="Revenact" className="h-[34px] w-auto object-contain -ml-1 mix-blend-multiply" />
+          ) : (
+            <div className="w-7 h-7 shrink-0 bg-[#593d80] rounded-[7px] shadow-sm flex items-center justify-center text-white font-extrabold text-[15px] tracking-tighter mix-blend-multiply">
+              R
+            </div>
           )}
         </div>
       </div>

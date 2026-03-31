@@ -135,7 +135,7 @@ export function Details() {
                   {/* Modal content */}
                   <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
                     <div className="grid grid-cols-2 gap-x-8 gap-y-5">
-                      <AttrModalItem label="Velaris ID" value={organization.id.toString()} />
+                      <AttrModalItem label="Revenact ID" value={organization.id.toString()} />
                       <AttrModalItem label="Organization Name" value={organization.org} />
                       <AttrModalItem label="Health Score" value={organization.health.val.toString()} dotColor={organization.health.clr} />
                       <AttrModalItem label="Lifecycle Stage" value={organization.stage} />
@@ -297,7 +297,7 @@ function MetricsBanner({ organization }: { organization: OrgRow }) {
 // ── Org attribute builder ─────────────────────────────────────────────────────
 function buildOrgAttributes(organization: OrgRow): AttributeDef[] {
   return [
-    { label: 'Velaris ID', value: organization.id.toString() },
+    { label: 'Revenact ID', value: organization.id.toString() },
     { label: 'AI Pulse-Reason', value: organization.reason, type: 'truncated' },
     { label: 'Lifecycle Stage *', value: organization.stage },
     { label: 'Pulse', value: '', type: 'pulse' },
@@ -322,7 +322,7 @@ function AccountsTab({ orgId }: { orgId: number }) {
         <div className="p-4 border-b border-gray-50 bg-white flex items-center justify-between gap-4">
            <div className="relative flex-1 max-w-2xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Search by name, Velaris ID or External ID" className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-[13px] font-medium shadow-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 placeholder:text-gray-400 transition-all" />
+              <input type="text" placeholder="Search by name, Revenact ID or External ID" className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-[13px] font-medium shadow-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 placeholder:text-gray-400 transition-all" />
            </div>
            
            <div className="flex items-center gap-2">
@@ -352,7 +352,7 @@ function AccountsTab({ orgId }: { orgId: number }) {
                  <tr className="bg-gray-50/50 border-b border-gray-100">
                     <th className="p-4 w-10"><input type="checkbox" className="rounded border-gray-300 text-indigo-600" /></th>
                     <HeaderCell label="Account" />
-                    <HeaderCell label="Velaris ID" />
+                    <HeaderCell label="Revenact ID" />
                     <HeaderCell label="Pulse" />
                     <HeaderCell label="AI Pulse-Reason" />
                     <HeaderCell label="AI Pulse-Score" />
@@ -380,7 +380,7 @@ function AccountsTab({ orgId }: { orgId: number }) {
                            </div>
                         </div>
                      </td>
-                     <td className="p-4 text-[13px] font-bold text-gray-600">{acc.velarisId}</td>
+                     <td className="p-4 text-[13px] font-bold text-gray-600">{acc.revenactId}</td>
                      <td className="p-4">
                         <div className="flex items-center gap-1">
                            {acc.pulse.map((val: number, i: number) => (

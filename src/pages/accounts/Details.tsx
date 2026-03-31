@@ -33,7 +33,7 @@ export function AccountDetails() {
 
   // Build the pinned attributes for this account
   const accountAttributes: AttributeDef[] = [
-    { label: 'Velaris ID', value: account.velarisId.toString() },
+    { label: 'Revenact ID', value: account.revenactId.toString() },
     { label: 'Account Name', value: account.name },
     { label: 'AI Pulse-Score', value: account.aiPulseScore, type: 'truncated' },
     { label: 'AI Pulse-Reason', value: account.aiPulseReason, type: 'truncated' },

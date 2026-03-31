@@ -10,8 +10,8 @@ The app uses a client-side authentication system with Redux Toolkit for state ma
 ## Dummy Credentials
 | Email | Password |
 |---|---|
-| `admin@velaris.io` | `password123` |
-| `demo@velaris.io` | `demo1234` |
+| `admin@revenact.io` | `password123` |
+| `demo@revenact.io` | `demo1234` |
 
 ## Login Flow
 
@@ -26,9 +26,9 @@ The app uses a client-side authentication system with Redux Toolkit for state ma
 ## Session Persistence
 
 - On app load, `authSlice` hydrates from `localStorage` keys:
-  - `velaris_access_token`
-  - `velaris_refresh_token`
-  - `velaris_user`
+  - `revenact_access_token`
+  - `revenact_refresh_token`
+  - `revenact_user`
 - If all three exist, user is auto-authenticated (no re-login needed)
 
 ## Logout Flow
@@ -56,10 +56,10 @@ Edit `DUMMY_USERS` in `src/features/auth/authSlice.ts`:
 
 ```ts
 const DUMMY_USERS = {
-  'newemail@velaris.io': {
+  'newemail@revenact.io': {
     password: 'newpassword',
     user: {
-      email: 'newemail@velaris.io',
+      email: 'newemail@revenact.io',
       name: 'New User',
       avatar: 'https://i.pravatar.cc/150?u=newuser',
     },

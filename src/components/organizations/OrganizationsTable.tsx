@@ -81,7 +81,7 @@ export function OrganizationsTable() {
 
   const renderCell = (colId: ColumnId, r: typeof TABLE_DATA[0]) => {
     switch (colId) {
-      case 'velarisId':
+      case 'revenactId':
         return <td key={colId} className="px-6 py-4 bg-[#f8f9fc] group-hover:bg-[#f1f3f6] border-b border-[#f1f3f5] border-l border-r text-right pr-6 transition-colors font-medium text-gray-700">{r.id}</td>;
       case 'owner':
         return (
@@ -223,7 +223,7 @@ export function OrganizationsTable() {
                 if (!colDef) return null;
 
                 return (
-                  <th key={colDef.id} className={`px-6 py-4 font-bold border-b border-gray-100 ${colDef.id === 'velarisId' ? 'bg-[#f8f9fc] border-l border-r border-[#f1f3f5]' : ''}`}>
+                  <th key={colDef.id} className={`px-6 py-4 font-bold border-b border-gray-100 ${colDef.id === 'revenactId' ? 'bg-[#f8f9fc] border-l border-r border-[#f1f3f5]' : ''}`}>
                     <div className="flex items-center gap-2">
                       <span className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">{colDef.label}</span>
                       {colDef.isCalc && <Calculator className="w-[14px] h-[14px] text-gray-400 shrink-0" />}

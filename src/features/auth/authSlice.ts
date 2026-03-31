@@ -24,18 +24,18 @@ interface LoginPayload {
 
 // --- Dummy credentials database ---
 const DUMMY_USERS: Record<string, { password: string; user: User }> = {
-  'admin@velaris.io': {
+  'admin@revenact.io': {
     password: 'password123',
     user: {
-      email: 'admin@velaris.io',
+      email: 'admin@revenact.io',
       name: 'Daniel Trial Test',
       avatar: 'https://i.pravatar.cc/150?u=daniel',
     },
   },
-  'demo@velaris.io': {
+  'demo@revenact.io': {
     password: 'demo1234',
     user: {
-      email: 'demo@velaris.io',
+      email: 'demo@revenact.io',
       name: 'Demo User',
       avatar: 'https://i.pravatar.cc/150?u=demo',
     },
@@ -52,9 +52,9 @@ function generateDummyToken(prefix: string): string {
 // --- Hydrate from localStorage ---
 function loadPersistedState(): Partial<AuthState> {
   try {
-    const accessToken = localStorage.getItem('velaris_access_token');
-    const refreshToken = localStorage.getItem('velaris_refresh_token');
-    const userJson = localStorage.getItem('velaris_user');
+    const accessToken = localStorage.getItem('revenact_access_token');
+    const refreshToken = localStorage.getItem('revenact_refresh_token');
+    const userJson = localStorage.getItem('revenact_user');
     if (accessToken && refreshToken && userJson) {
       return {
         accessToken,
@@ -70,15 +70,15 @@ function loadPersistedState(): Partial<AuthState> {
 }
 
 function persistAuth(payload: LoginPayload) {
-  localStorage.setItem('velaris_access_token', payload.accessToken);
-  localStorage.setItem('velaris_refresh_token', payload.refreshToken);
-  localStorage.setItem('velaris_user', JSON.stringify(payload.user));
+  localStorage.setItem('revenact_access_token', payload.accessToken);
+  localStorage.setItem('revenact_refresh_token', payload.refreshToken);
+  localStorage.setItem('revenact_user', JSON.stringify(payload.user));
 }
 
 function clearPersistedAuth() {
-  localStorage.removeItem('velaris_access_token');
-  localStorage.removeItem('velaris_refresh_token');
-  localStorage.removeItem('velaris_user');
+  localStorage.removeItem('revenact_access_token');
+  localStorage.removeItem('revenact_refresh_token');
+  localStorage.removeItem('revenact_user');
 }
 
 // --- Initial state ---
@@ -164,7 +164,7 @@ const authSlice = createSlice({
       // Refresh session
       .addCase(refreshSession.fulfilled, (state, action) => {
         state.accessToken = action.payload.accessToken;
-        localStorage.setItem('velaris_access_token', action.payload.accessToken);
+        localStorage.setItem('revenact_access_token', action.payload.accessToken);
       })
       .addCase(refreshSession.rejected, (state) => {
         // Refresh failed — force logout

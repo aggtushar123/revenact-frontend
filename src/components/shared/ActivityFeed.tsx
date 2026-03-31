@@ -67,7 +67,7 @@ const FEED_TABS = [
 
 const FILTER_ITEMS = [
   'All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets',
-  'Calendar Events', 'Pulse', 'Conversations', 'Velaris Support',
+  'Calendar Events', 'Pulse', 'Conversations', 'Revenact Support',
   'Surveys', 'Slack',
 ];
 

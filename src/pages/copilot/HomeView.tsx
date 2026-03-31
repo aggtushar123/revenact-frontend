@@ -27,7 +27,7 @@ export function HomeView({
             <Sparkles className="w-[18px] h-[18px]" />
           </div>
           <h2 className="text-[28px] font-bold text-gray-900 tracking-tight leading-none">
-            Hi, I'm <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-600">your Velaris Copilot</span>.
+            Hi, I'm <span className="text-transparent bg-clip-text bg-gradient-to-r from-rose-500 via-purple-500 to-indigo-600">your Revenact Copilot</span>.
           </h2>
         </div>
         <p className="text-gray-400 font-medium text-[13px] mb-[64px] tracking-wide">
