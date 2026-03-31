@@ -1,9 +1,8 @@
 import { CheckCircle, ExternalLink, MoreHorizontal, Sparkles, Eye, Link2 } from 'lucide-react';
 import { ACTIVITIES_DATA, type ActivityItem } from '../activityData';
-import type { OrgRow } from '../tableData';
 
-export function ActivitiesTab({ orgId, organization }: { orgId: number; organization: OrgRow }) {
-  const activities = ACTIVITIES_DATA.filter(a => a.orgId === orgId);
+export function ActivitiesTab({ entityId, healthColor = 'bg-teal-400' }: { entityId: number | string; healthColor?: string }) {
+  const activities = ACTIVITIES_DATA.filter(a => a.orgId == entityId);
 
   const grouped = activities.reduce<Record<string, ActivityItem[]>>((acc, act) => {
     if (!acc[act.group]) acc[act.group] = [];
@@ -38,7 +37,7 @@ export function ActivitiesTab({ orgId, organization }: { orgId: number; organiza
             </div>
             <div className="flex flex-col gap-4 ml-[13px] pl-[15px]">
               {items.map(activity => (
-                <ActivityCard key={activity.id} activity={activity} organization={organization} />
+                <ActivityCard key={activity.id} activity={activity} healthColor={healthColor} />
               ))}
             </div>
           </div>
@@ -48,7 +47,7 @@ export function ActivitiesTab({ orgId, organization }: { orgId: number; organiza
   );
 }
 
-function ActivityCard({ activity, organization }: { activity: ActivityItem; organization: OrgRow }) {
+function ActivityCard({ activity, healthColor }: { activity: ActivityItem; healthColor: string }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden p-5 flex flex-col gap-4 relative group cursor-pointer hover:border-indigo-100 transition-all">
       <div className="flex items-start justify-between">
@@ -67,7 +66,7 @@ function ActivityCard({ activity, organization }: { activity: ActivityItem; orga
         </div>
       </div>
       <div className="flex items-center gap-4 pl-9">
-        <div className={`w-3 h-3 rounded-full ${organization.health.clr}`} />
+        <div className={`w-3 h-3 rounded-full ${healthColor}`} />
         <div className="flex items-center gap-1 text-[11px] font-bold text-indigo-400 px-2 py-0.5 bg-indigo-50/50 rounded-md border border-indigo-100">
           <Sparkles className="w-3 h-3" />
           Pulse

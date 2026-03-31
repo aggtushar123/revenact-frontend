@@ -15,8 +15,8 @@ const priorityStyle: Record<string, { bg: string; text: string; border: string }
   'low': { bg: 'bg-blue-50', text: 'text-blue-400', border: 'border-blue-100' },
 };
 
-export function TicketsTab({ orgId }: { orgId: number }) {
-  const tickets = TICKETS_DATA.filter(t => t.orgId === orgId);
+export function TicketsTab({ entityId }: { entityId: number | string }) {
+  const tickets = TICKETS_DATA.filter(t => t.orgId == entityId);
 
   if (tickets.length === 0) {
     return (

@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import type { ReactNode } from 'react';
 import { Edit2 } from 'lucide-react';
 import { TABLE_DATA } from './tableData';
 import type { HealthCategory, LifecycleCategory } from './tableData';
@@ -16,27 +17,25 @@ function DonutChart({ segments, size = 44 }: { segments: { value: number; color:
     );
   }
 
-  let cumulativeOffset = 0;
-  const paths = segments.map((seg, i) => {
+  const paths = segments.reduce<ReactNode[]>((acc, seg, i) => {
     const pct = (seg.value / total) * 100;
-    const dasharray = `${pct} ${100 - pct}`;
-    const dashoffset = -cumulativeOffset;
-    cumulativeOffset += pct;
-
-    return (
+    const prevPct = segments.slice(0, i).reduce((s, sg) => s + (sg.value / total) * 100, 0);
+    const dashoffset = -prevPct;
+    acc.push(
       <circle
         key={i}
         cx="18" cy="18" r="15.9155"
         fill="none"
         stroke={seg.color}
         strokeWidth="3.5"
-        strokeDasharray={dasharray}
+        strokeDasharray={`${pct} ${100 - pct}`}
         strokeDashoffset={dashoffset}
         strokeLinecap="butt"
         style={{ transition: 'stroke-dasharray 0.5s ease, stroke-dashoffset 0.5s ease' }}
       />
     );
-  });
+    return acc;
+  }, []);
 
   return (
     <svg viewBox="0 0 36 36" style={{ width: size, height: size }}>
@@ -123,10 +122,7 @@ export function MetricsPanel() {
   // --- Computed Lifecycle ---
   const lifecycleMetrics = useMemo(() => {
     const stages: LifecycleCategory[] = ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'expansion', 'churn', 'other'];
-    const buckets: Record<LifecycleCategory, { count: number; mrr: number; arr: number }> = {} as any;
-    for (const s of stages) {
-      buckets[s] = { count: 0, mrr: 0, arr: 0 };
-    }
+    const buckets = Object.fromEntries(stages.map(s => [s, { count: 0, mrr: 0, arr: 0 }])) as Record<LifecycleCategory, { count: number; mrr: number; arr: number }>;
     for (const row of TABLE_DATA) {
       const cat = row.lifecycleCategory;
       if (buckets[cat]) {

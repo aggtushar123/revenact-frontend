@@ -1,12 +1,13 @@
 import React, { useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MessageSquare, RefreshCw, MoreHorizontal, Sparkles, Globe, Mail, Phone, MapPin, Pencil, ChevronUp, Search, Maximize2, ChevronLeft, ChevronRight, Plus, Filter, Layout, FileText, Zap, CheckCircle, ExternalLink, Download, X } from 'lucide-react';
+import { MessageSquare, RefreshCw, MoreHorizontal, CheckCircle, Globe, Mail, Phone, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, Sparkles, ExternalLink, Download, X } from 'lucide-react';
 import { TABLE_DATA } from '../../components/organizations/tableData';
 import type { OrgRow } from '../../components/organizations/tableData';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { CONTACTS_DATA } from '../../components/organizations/contactsData';
-import { EmailsTab, TasksTab, NotesTab, TicketsTab, CalendarEventsTab, ActivitiesTab } from '../../components/organizations/activity';
+import { ActivityFeed, PinnedAttributes } from '../../components/shared';
+import type { AttributeDef } from '../../components/shared';
 
 
 
@@ -93,11 +94,26 @@ export function Details() {
                {/* Pinned Attributes Panel */}
                {isPinnedOpen && (
                  <div className="w-[320px] flex flex-col h-full bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden shrink-0 transition-all">
-                   <PinnedAttributes organization={organization} onCollapse={() => setIsPinnedOpen(false)} onExpand={() => setIsAttrModalOpen(true)} />
+                   <PinnedAttributes
+                     entityName={organization.org}
+                     attributes={buildOrgAttributes(organization)}
+                     onCollapse={() => setIsPinnedOpen(false)}
+                     onExpand={() => setIsAttrModalOpen(true)}
+                   />
                  </div>
                )}
                <div className="flex-1 h-full overflow-hidden bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
-                  <ActivityFeed organization={organization} />
+                 <ActivityFeed
+                   entityId={organization.id}
+                   entityType="organization"
+                   healthColor={organization.health.clr}
+                   overviewInfo={{
+                     domain: organization.domain,
+                     location: organization.nameAddress,
+                     email: `contact@${organization.domain}`,
+                     phone: '+1 (555) 000-0000',
+                   }}
+                 />
                </div>
             </div>
 
@@ -278,217 +294,19 @@ function MetricsBanner({ organization }: { organization: OrgRow }) {
   );
 }
 
-function PinnedAttributes({ organization, onCollapse, onExpand }: { organization: OrgRow; onCollapse?: () => void; onExpand?: () => void }) {
-  const [activeSubTab, setActiveSubTab] = useState('Pinned Attributes');
-  
-  return (
-    <div className="flex flex-col h-full bg-white">
-      <div className="px-4 pt-2 border-b border-gray-100 flex items-center justify-between shrink-0">
-        <div className="flex gap-4">
-          {['Pinned Attributes', 'Summary'].map(tab => (
-            <button 
-              key={tab}
-              onClick={() => setActiveSubTab(tab)}
-              className={`pb-2.5 text-[13px] font-semibold transition-all relative ${activeSubTab === tab ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              {tab}
-              {activeSubTab === tab && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />}
-            </button>
-          ))}
-        </div>
-        
-        <div className="flex items-center gap-2 pb-2">
-           <Maximize2 className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" onClick={onExpand} />
-           <ChevronLeft className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-600 transition-colors" onClick={onCollapse} />
-        </div>
-      </div>
-
-      <div className="p-4 flex flex-col gap-4 overflow-y-auto custom-scrollbar flex-1">
-         {activeSubTab === 'Pinned Attributes' ? (
-           <>
-             <div className="flex items-center justify-between text-[12px]">
-                <button className="text-indigo-600 font-semibold hover:underline">View All</button>
-                <Pencil className="w-3.5 h-3.5 text-gray-400 cursor-pointer hover:text-gray-600" />
-             </div>
-             
-             <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
-                <input 
-                  type="text" 
-                  placeholder="Search Attributes"
-                  className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-indigo-500/30 transition-all placeholder:text-gray-400"
-                />
-             </div>
-             
-             <div className="flex flex-col gap-4 py-2">
-                <AttributeItem label="Velaris ID" value={organization.id.toString()} />
-                <AttributeItem label="AI Pulse-Reason" value={organization.reason} isTruncated />
-                <AttributeItem label="Lifecycle Stage *" value={organization.stage} />
-                
-                <div className="flex flex-col gap-1.5 pt-1">
-                   <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Pulse</span>
-                   <div className="flex items-center gap-1.5">
-                      {[1,2,3,4,5].map(i => (
-                        <div key={i} className="w-2.5 h-2.5 rounded-full bg-[#00a699] shadow-sm" />
-                      ))}
-                   </div>
-                </div>
-
-                <div className="flex flex-col gap-2 pt-1">
-                   <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Owners</span>
-                   <div className="flex items-center gap-3 group/owner cursor-pointer">
-                      <div className="w-8 h-8 rounded-full bg-gray-100 border border-gray-200 flex items-center justify-center text-[11px] font-bold text-gray-500 uppercase overflow-hidden">
-                         {organization.avatar}
-                      </div>
-                      <span className="text-[13px] font-semibold text-gray-700 group-hover/owner:text-indigo-600 transition-colors uppercase">{organization.owner}</span>
-                      <div className="ml-auto w-5 h-5 flex items-center justify-center rounded-md text-red-400">
-                         <Mail className="w-3.5 h-3.5" />
-                      </div>
-                   </div>
-                </div>
-
-                <AttributeItem label="Health" value={organization.health.val.toString()} showDot dotColor={organization.health.clr} />
-             </div>
-           </>
-         ) : (
-           <div className="py-10 text-center">
-              <p className="text-sm text-gray-400 font-bold uppercase tracking-widest">No summary available</p>
-           </div>
-         )}
-      </div>
-    </div>
-  );
-}
-
-function AttributeItem({ label, value, isTruncated = false, showDot = false, dotColor = '' }: { label: string, value: string, isTruncated?: boolean, showDot?: boolean, dotColor?: string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
-      <div className="flex items-center gap-2">
-        {showDot && <div className={`w-2 h-2 rounded-full ${dotColor}`} />}
-        <span className={`text-[13.5px] font-semibold text-gray-900 ${isTruncated ? 'line-clamp-2 leading-relaxed' : ''}`}>
-          {value}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function ActivityFeed({ organization }: { organization: OrgRow }) {
-  const [activeSubTab, setActiveSubTab] = useState('Activity Feed');
-  const [filter, setFilter] = useState('All');
-
-  const tabs = [
-    { name: 'Activity Feed', icon: null },
-    { name: 'Headlines', icon: <Sparkles className="w-3.5 h-3.5" /> },
-    { name: 'Overview', icon: <Layout className="w-3.5 h-3.5" /> },
-    { name: 'Files', icon: <FileText className="w-3.5 h-3.5" /> },
-    { name: 'CallSense', icon: <Zap className="w-3.5 h-3.5" /> },
+// ── Org attribute builder ─────────────────────────────────────────────────────
+function buildOrgAttributes(organization: OrgRow): AttributeDef[] {
+  return [
+    { label: 'Velaris ID', value: organization.id.toString() },
+    { label: 'AI Pulse-Reason', value: organization.reason, type: 'truncated' },
+    { label: 'Lifecycle Stage *', value: organization.stage },
+    { label: 'Pulse', value: '', type: 'pulse' },
+    { label: 'Owners', value: organization.owner, type: 'owner', ownerAvatar: organization.avatar },
+    { label: 'Health', value: organization.health.val.toString(), type: 'dot', dotColor: organization.health.clr },
   ];
-
-  const filterItems = [
-    'All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 
-    'Calendar Events', 'Pulse', 'Conversations', 'Velaris Support', 
-    'Surveys', 'Slack'
-  ];
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Sub tabs (Activity Feed, Headlines, etc) */}
-      <div className="px-4 pt-3 flex items-center justify-between border-b border-gray-100 flex-wrap shrink-0">
-        <div className="flex gap-5">
-          {tabs.map(tab => (
-            <button 
-              key={tab.name}
-              onClick={() => setActiveSubTab(tab.name)}
-              className={`flex items-center gap-1.5 pb-2.5 text-[13px] font-semibold transition-all relative ${activeSubTab === tab.name ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              {tab.icon && tab.icon}
-              {tab.name}
-              {activeSubTab === tab.name && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {activeSubTab === 'Activity Feed' ? (
-          <>
-            {/* Filter Toolbar */}
-            <div className="p-4 flex flex-col gap-4 border-b border-gray-50 shrink-0">
-               <div className="flex items-center gap-3">
-                  <div className="relative flex-1">
-                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                     <input 
-                        type="text" 
-                        placeholder={`Search ${filter.toLowerCase()}...`} 
-                        className="w-full pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-indigo-500/20 placeholder:text-gray-400" 
-                     />
-                  </div>
-                  <button className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[13px] font-bold transition-all shadow-sm">
-                     <Plus className="w-4 h-4" />
-                     Add Action
-                  </button>
-                  <button className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50">
-                     <Filter className="w-4 h-4" />
-                  </button>
-               </div>
-               
-               {/* Activity Filters */}
-               <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar whitespace-nowrap">
-                  {filterItems.map(item => (
-                    <button 
-                      key={item}
-                      onClick={() => setFilter(item)}
-                      className={`px-3 py-1 rounded-full text-[12px] font-bold transition-all border ${
-                        filter === item 
-                        ? 'bg-indigo-50 border-indigo-100 text-indigo-700' 
-                        : 'bg-white border-transparent text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-               </div>
-            </div>
-
-            {/* Tab Components Mapping */}
-            <div className="flex-1 overflow-hidden flex flex-col">
-              {filter === 'All' && <ActivitiesTab orgId={organization.id} organization={organization} />}
-              {filter === 'Activities' && <ActivitiesTab orgId={organization.id} organization={organization} />}
-              {filter === 'Emails' && <EmailsTab orgId={organization.id} />}
-              {filter === 'Tasks' && <TasksTab orgId={organization.id} />}
-              {filter === 'Notes' && <NotesTab orgId={organization.id} />}
-              {filter === 'Tickets' && <TicketsTab orgId={organization.id} />}
-              {filter === 'Calendar Events' && <CalendarEventsTab orgId={organization.id} />}
-              
-              {!['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events'].includes(filter) && (
-                <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-30">
-                  <Layout className="w-12 h-12 text-gray-400 mb-2" />
-                  <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{filter} coming soon</span>
-                </div>
-              )}
-            </div>
-          </>
-        ) : activeSubTab === 'Overview' ? (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-gray-50/20">
-            <div className="grid grid-cols-2 gap-4 max-w-4xl">
-               <InfoCard icon={<Globe className="w-4 h-4" />} label="Domain" value={organization.domain} />
-               <InfoCard icon={<MapPin className="w-4 h-4" />} label="Location" value={organization.nameAddress} />
-               <InfoCard icon={<Mail className="w-4 h-4" />} label="Email" value={`contact@${organization.domain}`} />
-               <InfoCard icon={<Phone className="w-4 h-4" />} label="Phone" value="+1 (555) 000-0000" />
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center flex-1 py-10 opacity-30">
-            <Layout className="w-12 h-12 text-gray-400 mb-2" />
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{activeSubTab} coming soon</span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
 }
+
+
 
 function AccountsTab({ orgId }: { orgId: number }) {
   const navigate = useNavigate();
@@ -771,19 +589,7 @@ function IconButton({ icon, minimal = false }: { icon: React.ReactNode, minimal?
   );
 }
 
-function InfoCard({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {
-  return (
-    <div className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
-      <div className="p-2 bg-indigo-50/50 rounded-lg text-indigo-600">
-        {icon}
-      </div>
-      <div>
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
-        <p className="text-sm font-bold text-gray-900">{value}</p>
-      </div>
-    </div>
-  );
-}
+
 function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
   type MetricTab = 'count' | 'mrr' | 'arr';
   const [healthTab, setHealthTab] = useState<MetricTab>('count');
@@ -835,8 +641,9 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
   const allStages: LifecycleKey[] = ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'expansion', 'churn', 'other'];
 
   const lifecycle = useMemo(() => {
-    const buckets: Record<LifecycleKey, { count: number; mrr: number; arr: number }> = {} as any;
-    for (const s of allStages) buckets[s] = { count: 0, mrr: 0, arr: 0 };
+    const buckets = Object.fromEntries(
+      allStages.map(s => [s, { count: 0, mrr: 0, arr: 0 }])
+    ) as Record<LifecycleKey, { count: number; mrr: number; arr: number }>;
     for (const a of accounts) {
       const stage = a.lifecycleStage?.toLowerCase() || '';
       let key: LifecycleKey = 'other';
@@ -852,6 +659,7 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
       buckets[key].arr += a.arr;
     }
     return buckets;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accounts]);
 
   // CSM pulse aggregation
@@ -921,24 +729,6 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
     );
   };
 
-  // TabPill — same as MetricsPanel TabPill
-  const TabPill = ({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void }) => (
-    <button onClick={onClick}
-      className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-all duration-200 ${
-        isActive ? 'text-indigo-600 bg-indigo-50 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
-      }`}
-    >{label}</button>
-  );
-
-  // MetricItem — same as MetricsPanel MetricItem
-  const MItem = ({ color, label, formatted }: { color: string; label: string; formatted: string }) => (
-    <div className="flex flex-col">
-      <div className="flex items-center gap-1.5 text-[12px] text-gray-500 mb-0.5">
-        <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: color }} /> {label}
-      </div>
-      <span className="text-xl font-bold text-gray-900 leading-tight">{formatted}</span>
-    </div>
-  );
 
   return (
     <div
@@ -1064,6 +854,31 @@ function AttrModalItem({ label, value, dotColor }: { label: string; value: strin
         {dotColor && <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />}
         <span className="text-[14px] font-semibold text-gray-800">{value}</span>
       </div>
+    </div>
+  );
+}
+
+// ── Shared helper components (hoisted to module level) ─────────────────────────────
+function TabPill({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-all duration-200 ${
+        isActive ? 'text-indigo-600 bg-indigo-50 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function MItem({ color, label, formatted }: { color: string; label: string; formatted: string }) {
+  return (
+    <div className="flex flex-col">
+      <div className="flex items-center gap-1.5 text-[12px] text-gray-500 mb-0.5">
+        <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: color }} /> {label}
+      </div>
+      <span className="text-xl font-bold text-gray-900 leading-tight">{formatted}</span>
     </div>
   );
 }

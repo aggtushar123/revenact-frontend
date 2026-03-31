@@ -13,8 +13,8 @@ const statusConfig: Record<TaskItem['status'], { icon: typeof Clock; color: stri
   'completed': { icon: CheckCircle, color: 'text-teal-500', label: 'Completed' },
 };
 
-export function TasksTab({ orgId }: { orgId: number }) {
-  const tasks = TASKS_DATA.filter(t => t.orgId === orgId);
+export function TasksTab({ entityId }: { entityId: number | string }) {
+  const tasks = TASKS_DATA.filter(t => t.orgId == entityId);
 
   const grouped = tasks.reduce<Record<string, TaskItem[]>>((acc, task) => {
     if (!acc[task.group]) acc[task.group] = [];

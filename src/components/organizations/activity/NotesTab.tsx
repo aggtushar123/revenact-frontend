@@ -1,8 +1,8 @@
 import { FileText, MoreHorizontal, Tag } from 'lucide-react';
 import { NOTES_DATA, type NoteItem } from '../activityData';
 
-export function NotesTab({ orgId }: { orgId: number }) {
-  const notes = NOTES_DATA.filter(n => n.orgId === orgId);
+export function NotesTab({ entityId }: { entityId: number | string }) {
+  const notes = NOTES_DATA.filter(n => n.orgId == entityId);
 
   const grouped = notes.reduce<Record<string, NoteItem[]>>((acc, note) => {
     if (!acc[note.group]) acc[note.group] = [];

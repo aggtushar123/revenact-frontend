@@ -1,15 +1,17 @@
 import { Calendar, Clock, Users, MoreHorizontal, Phone, BarChart2, Monitor } from 'lucide-react';
 import { CALENDAR_EVENTS_DATA, type CalendarEventItem } from '../activityData';
 
-const typeConfig: Record<string, { icon: any; color: string; bg: string; border: string }> = {
+import type { LucideIcon } from 'lucide-react';
+
+const typeConfig: Record<string, { icon: LucideIcon; color: string; bg: string; border: string }> = {
   meeting: { icon: Users, color: 'text-indigo-500', bg: 'bg-indigo-50', border: 'border-indigo-100' },
   call: { icon: Phone, color: 'text-teal-500', bg: 'bg-teal-50', border: 'border-teal-100' },
   review: { icon: BarChart2, color: 'text-purple-500', bg: 'bg-purple-50', border: 'border-purple-100' },
   demo: { icon: Monitor, color: 'text-amber-500', bg: 'bg-amber-50', border: 'border-amber-100' },
 };
 
-export function CalendarEventsTab({ orgId }: { orgId: number }) {
-  const events = CALENDAR_EVENTS_DATA.filter(e => e.orgId === orgId);
+export function CalendarEventsTab({ entityId }: { entityId: number | string }) {
+  const events = CALENDAR_EVENTS_DATA.filter(e => e.orgId == entityId);
 
   const grouped = events.reduce<Record<string, CalendarEventItem[]>>((acc, ev) => {
     if (!acc[ev.group]) acc[ev.group] = [];
