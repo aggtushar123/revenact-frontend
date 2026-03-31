@@ -11,6 +11,7 @@ import {
   ActivitiesTab,
   CallSenseTab,
   HeadlinesTab,
+  SlackTab,
 } from '../organizations/activity';
 
 // ── Data sources ─────────────────────────────────────────────────────────────
@@ -71,7 +72,7 @@ const FILTER_ITEMS = [
   'Surveys', 'Slack',
 ];
 
-const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events'];
+const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events', 'Slack'];
 
 // ── Data injection helper ─────────────────────────────────────────────────────
 // For the account entity type, we temporarily swap the data in the shared
@@ -201,6 +202,7 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
               {filter === 'Notes' && <NotesTab entityId={resolvedId} />}
               {filter === 'Tickets' && <TicketsTab entityId={resolvedId} />}
               {filter === 'Calendar Events' && <CalendarEventsTab entityId={resolvedId} />}
+              {filter === 'Slack' && <SlackTab entityId={resolvedId} />}
 
               {!IMPLEMENTED_FILTERS.includes(filter) && (
                 <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-30">

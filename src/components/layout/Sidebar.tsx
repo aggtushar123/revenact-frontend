@@ -26,14 +26,14 @@ export function Sidebar() {
         isExpanded ? 'w-[240px] shadow-xl md:shadow-none' : 'w-[68px]'
       }`}
     >
-      {/* Header section with Logo and Pin */}
-      <div className={`flex items-center h-[60px] px-4 ${isExpanded ? 'justify-between' : 'justify-center'} border-b border-transparent shrink-0 mt-2`}>
-        <div className="flex items-center gap-2.5 overflow-hidden cursor-pointer">
+      {/* Header section with Logo */}
+      <div className={`flex items-center h-[60px] px-5 ${isExpanded ? 'justify-start' : 'justify-center'} border-b border-transparent shrink-0 mt-3 mb-8`}>
+        <div className="flex items-center cursor-pointer w-full">
           {/* Revenact Logo */}
           {isExpanded ? (
-            <img src={logoImg} alt="Revenact" className="h-[34px] w-auto object-contain -ml-1 mix-blend-multiply" />
+            <img src={logoImg} alt="Revenact" className="w-[160px] max-w-full h-auto object-contain mix-blend-multiply" />
           ) : (
-            <div className="w-7 h-7 shrink-0 bg-[#593d80] rounded-[7px] shadow-sm flex items-center justify-center text-white font-extrabold text-[15px] tracking-tighter mix-blend-multiply">
+            <div className="w-7 h-7 shrink-0 bg-[#593d80] rounded-[7px] shadow-sm flex items-center justify-center text-white font-extrabold text-[15px] tracking-tighter mix-blend-multiply mx-auto">
               R
             </div>
           )}
