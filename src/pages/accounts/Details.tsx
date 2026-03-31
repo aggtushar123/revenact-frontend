@@ -89,7 +89,7 @@ export function AccountDetails() {
       {/* Content */}
       <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8f9fc]/50">
         {activeTab === 'General' ? (
-          <div className="flex flex-col gap-4 max-w-7xl mx-auto w-full px-4 pt-5 pb-6 h-full">
+          <div className="flex flex-col gap-4 w-full px-3 pt-4 pb-4 h-full">
             {/* Metrics Banner */}
             <AccountMetricsBanner account={account} />
 

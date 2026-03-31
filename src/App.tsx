@@ -12,6 +12,7 @@ import { SettingsPage } from './pages/settings/SettingsPage';
 import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
 import { Integrations } from './pages/integrations/Integrations';
 import { List as ContactsList } from './pages/contacts/List';
+import { PipelinesPage } from './pages/pipelines/PipelinesPage';
 import { useAppSelector } from './hooks';
 
 function RootRedirect() {
@@ -69,6 +70,12 @@ function App() {
           <Route path="contacts">
             <Route index element={<Navigate to="list" replace />} />
             <Route path="list" element={<ContactsList />} />
+          </Route>
+
+          <Route path="pipelines">
+            <Route index element={<Navigate to="board" replace />} />
+            <Route path="list" element={<PipelinesPage view="list" />} />
+            <Route path="board" element={<PipelinesPage view="board" />} />
           </Route>
           
           {/* Catch-all route to avoid losing layout on unimplemented tabs */}

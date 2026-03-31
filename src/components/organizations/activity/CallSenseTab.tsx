@@ -409,11 +409,72 @@ function CallSensePanel({
                 </a>
               </div>
 
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-2">
                 <label className="text-[12.5px] font-bold text-gray-500">Brief</label>
-                <span className="text-[13px] font-medium text-gray-800 pl-0.5 min-h-6">-</span>
+                <div className="pl-0.5 flex flex-col gap-3 text-[13px] text-gray-700 leading-[1.7]">
+
+                  <div>
+                    <p className="font-bold text-gray-800 mb-1">Onboarding Email Strategy</p>
+                    <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-gray-600 font-medium">
+                      <li>Discuss sending onboarding emails for customers at their one-year anniversary, focusing on contracts with account creation.</li>
+                      <li>Confirm onboarding emails will only be sent for new account contracts, not existing long-term customers.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="font-bold text-gray-800 mb-1">Bridge Integration Technical Details</p>
+                    <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-gray-600 font-medium">
+                      <li>Recommended using ChatGPT and developer documentation for Bridge integration questions.</li>
+                      <li>Web hooks can be triggered based on specific object updates and selected attributes.</li>
+                      <li>In Velaris bridge, flows must be tested before publication.</li>
+                      <li>Contract creation in Velaris triggered when sales moves deal to recorded stage in HubSpot.</li>
+                      <li>Update API requests require authorization headers and JSON body with object properties.</li>
+                      <li>Single option attributes can be updated using picklist value name or ID.</li>
+                      <li>Aswin recommends adding validations when building flows, such as checking if an object is not archived before updating.</li>
+                      <li>Simple steps in Bridge can be done without using code, but complex logic may require JavaScript.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="font-bold text-gray-800 mb-1">Action Items and Assignments</p>
+                    <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-gray-600 font-medium">
+                      <li>Aswin to check and potentially share Bridge API documentation link.</li>
+                      <li>Aswin to investigate creating a technical account with administrator rights for API activities.</li>
+                      <li>Create separate folder for Doctena and Velaris workflows to prevent accidental modifications.</li>
+                      <li>Create separate web hook for each flow, providing descriptive name and optional description.</li>
+                      <li>Philippe suggests Maria review team feedback to identify fields that could benefit from default values.</li>
+                      <li>Aswin offers ongoing support via Slack for any questions during workflow development.</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <p className="font-bold text-gray-800 mb-1">Contract and Lifecycle Management</p>
+                    <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-gray-600 font-medium">
+                      <li>Contracts in Velaris linked to Accounts and Organizations, mapping to Deals in HubSpot.</li>
+                      <li>Velaris team to explore possible HubSpot contract sync enhancements based on team feedback.</li>
+                    </ul>
+                  </div>
+
+                </div>
               </div>
             </div>
+              {/* View Comments */}
+              <div className="border border-gray-100 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => toggleAcc('comments')}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                >
+                  {openAccordions.comments
+                    ? <ChevronDown className="w-3.5 h-3.5 text-gray-500" strokeWidth={2.5} />
+                    : <ChevronRight className="w-3.5 h-3.5 text-gray-500" strokeWidth={2.5} />}
+                  <span className="text-[12.5px] font-bold text-gray-600">View Comments</span>
+                </button>
+                {openAccordions.comments && (
+                  <div className="px-4 py-3 text-[12.5px] text-gray-500 font-medium border-t border-gray-100">
+                    No comments yet.
+                  </div>
+                )}
+              </div>
 
           </div>
         ) : (
@@ -534,15 +595,29 @@ function CallSensePanel({
               )}
             </div>
 
-            {/* Signals Accordion (Only shows easily if expanded, but matching UI) */}
+            {/* Signals Accordion */}
             <div className="border border-[#E5E7EB] rounded-lg overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all">
               <div onClick={() => toggleAcc('signals')} className={`px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-gray-50/50 transition-colors ${openAccordions.signals ? 'bg-[#F8F9FA]/50 border-b border-[#E5E7EB]' : ''}`}>
                 {openAccordions.signals ? <ChevronDown className="w-3.5 h-3.5 text-[#6D72D6]" strokeWidth={3} /> : <ChevronRight className="w-3.5 h-3.5 text-[#6D72D6]" strokeWidth={3} />}
                 <span className="text-[13px] font-bold text-[#6D72D6] select-none">Signals</span>
               </div>
               {openAccordions.signals && (
-                <div className="p-5 bg-white flex flex-col items-center justify-center opacity-50 py-10">
-                  <span className="text-[12px] font-semibold text-gray-500">No signals found.</span>
+                <div className="bg-white divide-y divide-gray-100">
+                  <div className="px-5 py-4 flex flex-col gap-2">
+                    <p className="text-[13px] font-bold text-gray-800">High User Adoption and Platform Integration</p>
+                    <span className="self-start px-2.5 py-0.5 rounded border border-emerald-300 text-emerald-600 text-[11.5px] font-semibold bg-emerald-50">Opportunity</span>
+                    <p className="text-[12.5px] leading-[1.75] text-gray-600 font-medium">EMEA Retail account shows strong adoption metrics with 290 out of 360 licenses actively used (80%+ utilization). The platform has become part of their standard operating rhythm rather than an extra tool, with weekly logins consistently above 55% and managers directly reviewing dashboards instead of exporting data. This indicates deep integration into their workflows and high user engagement.</p>
+                  </div>
+                  <div className="px-5 py-4 flex flex-col gap-2">
+                    <p className="text-[13px] font-bold text-gray-800">Positive Sentiment Shift and Reduced Complaints</p>
+                    <span className="self-start px-2.5 py-0.5 rounded border border-emerald-300 text-emerald-600 text-[11.5px] font-semibold bg-emerald-50">Opportunity</span>
+                    <p className="text-[12.5px] leading-[1.75] text-gray-600 font-medium">Customer reports a clear positive shift in sentiment with fewer complaints and more feedback focused on extracting additional value from the platform. Teams are comfortable with workflows, particularly for weekly performance tracking and regional reporting. This represents strong customer satisfaction and potential for advocacy.</p>
+                  </div>
+                  <div className="px-5 py-4 flex flex-col gap-2">
+                    <p className="text-[13px] font-bold text-gray-800">Renewal Risk – Upcoming Contract Expiry</p>
+                    <span className="self-start px-2.5 py-0.5 rounded border border-red-200 text-red-500 text-[11.5px] font-semibold bg-red-50">Risk</span>
+                    <p className="text-[12.5px] leading-[1.75] text-gray-600 font-medium">The current contract is approaching its renewal window. While account health is strong, no formal renewal discussions have been initiated. Delay in outreach could allow competing vendors to engage the customer first. Proactive renewal timeline communication is recommended.</p>
+                  </div>
                 </div>
               )}
             </div>

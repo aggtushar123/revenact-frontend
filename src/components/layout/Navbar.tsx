@@ -30,6 +30,7 @@ export function Navbar() {
   const isOrganizations = location.pathname.startsWith('/organizations');
   const isCopilot = location.pathname === '/copilot';
   const isSettings = location.pathname.startsWith('/settings');
+  const isPipelines = location.pathname.startsWith('/pipelines');
 
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -116,6 +117,28 @@ export function Navbar() {
               </NavLink>
               <NavLink 
                 to="/organizations/board" 
+                className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-indigo-500 text-indigo-500 opacity-90' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+              >
+                Board
+              </NavLink>
+            </nav>
+          </>
+        ) : isPipelines ? (
+          <>
+            <div className="flex items-center gap-1.5 cursor-pointer hover:bg-gray-50 py-1.5 px-2 -ml-2 rounded-md transition-colors">
+              <h1 className="text-[17px] font-bold text-gray-800 tracking-tight">Pipelines</h1>
+              <ChevronDown className="w-3.5 h-3.5 text-gray-600 stroke-[2.5px] mt-[1px]" />
+            </div>
+
+            <nav className="flex items-center gap-8 h-full mt-0.5 ml-2">
+              <NavLink
+                to="/pipelines/list"
+                className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-indigo-500 text-indigo-500 opacity-90' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
+              >
+                List
+              </NavLink>
+              <NavLink
+                to="/pipelines/board"
                 className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-indigo-500 text-indigo-500 opacity-90' : 'border-transparent text-gray-500 hover:text-gray-800'}`}
               >
                 Board
