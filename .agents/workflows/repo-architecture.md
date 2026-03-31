@@ -40,6 +40,7 @@ react-ts-app/
 │   ├── components/           ← Reusable UI components
 │   │   ├── auth/             ← ProtectedRoute guard
 │   │   ├── layout/           ← Sidebar, Navbar
+│   │   ├── shared/           ← Multi-domain components (ActivityFeed, PinnedAttributes, Summary)
 │   │   ├── contacts/         ← ContactsTable, ActionBar, MetricsPanel
 │   │   └── organizations/    ← Rich org domain components (see below)
 │   └── pages/                ← Route-level page components
@@ -174,21 +175,27 @@ Renders `<OrganizationsTable />` — a feature-rich data table.
 #### Board View (`pages/organizations/Board.tsx`)
 Currently a stub placeholder.
 
-#### Details View (`pages/organizations/Details.tsx`) (56 KB — largest file)
+#### Details View (`pages/organizations/Details.tsx`) (40 KB)
 Full organization detail page. Contains:
 - **Header**: Org name, avatar, health badge, action buttons
 - **Tabs**: Overview | Activity | Contacts | Accounts | NPS | CSAT | Custom Attributes
+- **Shared Dashboard Panels** (imported from `components/shared/`):
+  - `PinnedAttributes.tsx` — localized attribute editing panel
+  - `Summary.tsx` — empty state info widget
+  - `ActivityFeed.tsx` — dynamic tabbed feed engine
 - **MetricsPanel**: KPI cards (ARR, health, renewal, NPS, CSAT)
-- **Activity sub-tabs** (rendered via dedicated components from `activity/`):
-  - `EmailsTab` — email thread list
+- **Activity sub-tabs** (rendered via ActivityFeed using dedicated components from `activity/`):
+  - `EmailsTab` + `EmailThreadPanel` — side-by-side thread view
   - `TasksTab` — task cards with priority/status
-  - `NotesTab` — note cards
-  - `TicketsTab` — support ticket list
+  - `NotesTab` — custom timeline squircle view
+  - `TicketsTab` — timeline view with dynamic avatars/brands
   - `CalendarEventsTab` — upcoming events
   - `ActivitiesTab` — general activity log
+  - `CallSenseTab` — dynamic call transcripts feed
+  - `HeadlinesTab` — AI-generated summary cards & reports
 
 Data sources:
-- `activityData.ts` (12 KB) — activity feed mock data
+- `activityData.ts` (12 KB) — activity feed mock data for orgs
 - `contactsData.ts` (2 KB) — contacts for the org
 - `accountsData.ts` (10 KB) — linked accounts data
 
@@ -197,7 +204,10 @@ Data sources:
 ### 3. Accounts (`pages/accounts/Details.tsx`) (16 KB)
 
 Account-level detail page navigated to from org details.
-- Mirrors org details structure with its own metric panels
+- Fully implemented pixel-perfect dashboard parity with Organizations.
+- Uses localized `AccountMetricsPanel` for stakeholder diagnostics.
+- Recycles `PinnedAttributes` and `ActivityFeed` from `shared/` layer.
+- Dynamically injects `ACCOUNT_ID_MAP` and `accountActivityData.ts` into the global data arrays at render-time to simulate account-specific endpoints without duplicating the Activity sub-components.
 
 ---
 
@@ -269,10 +279,12 @@ App.tsx
   │     ├── Sidebar (dispatches logout, reads auth.user)
   │     └── Navbar
   │
-  ├── pages/organizations/Details.tsx
-  │     ├── components/organizations/MetricsPanel
-  │     ├── components/organizations/activity/*Tab (x6)
-  │     └── (accountsData, activityData, contactsData)
+  ├── pages/organizations/Details.tsx & pages/accounts/Details.tsx
+  │     ├── components/organizations/MetricsPanel (or AccountMetricsPanel)
+  │     ├── components/shared/PinnedAttributes
+  │     ├── components/shared/ActivityFeed
+  │     │     └── components/organizations/activity/*Tab (Emails, Notes, CallSense, etc. x8)
+  │     └── (accountsData, accountActivityData, activityData)
   │
   ├── pages/organizations/List.tsx
   │     └── components/organizations/OrganizationsTable
