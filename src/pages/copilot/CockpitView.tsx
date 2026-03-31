@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { ChevronDown, ClipboardList, Flag, CheckCircle2 } from 'lucide-react';
+import { useSelector } from 'react-redux';
+import { type RootState } from '../../store';
 
 export function CockpitView() {
   const [taskTab, setTaskTab] = useState<'upcoming' | 'overdue'>('overdue');
+  const allTasks = useSelector((state: RootState) => state.tasks.tasks);
 
-  const tasks = [
-    { id: 'TASK-210', title: 'Next-Term Success Plan', org: 'Apple Inc', type: 'org', priority: 'Normal', status: 'Planned', date: 'Feb 2, 2026' },
-    { id: 'TASK-226', title: 'Commercial Discussion', org: 'Apple EMEA', type: 'account', priority: 'High', status: 'Planned', date: 'Feb 2, 2026' },
-    { id: 'TASK-196', title: 'Platform Configuration', org: 'Apple Inc', type: 'org', priority: 'High', status: 'Planned', date: 'Feb 9, 2026' },
-    { id: 'TASK-230', title: 'Gap Closure Actions', org: 'Apple EMEA', type: 'account', priority: 'Normal', status: 'Planned', date: 'Feb 9, 2026' },
-    { id: 'TASK-236', title: 'Advanced workflow optimization', org: 'Apple EMEA', type: 'account', priority: 'Normal', status: 'Open', date: 'Feb 14, 2026' },
-    { id: 'TASK-237', title: 'Advanced workflow optimization', org: 'Apple Inc', type: 'org', priority: 'Normal', status: 'Open', date: 'Feb 20, 2026' },
-  ];
+  // Filter tasks based on simple mock logic
+  // Just show all open tasks as 'upcoming' to demonstrate addition working
+  const upcomingTasks = allTasks.filter(t => t.status === 'Open');
+  const overdueTasks = allTasks.filter(t => t.status === 'Planned');
+  const tasks = taskTab === 'upcoming' ? upcomingTasks : overdueTasks;
 
   return (
     <div className="w-full flex flex-col gap-5 h-full">
@@ -144,18 +144,18 @@ export function CockpitView() {
             onClick={() => setTaskTab('upcoming')}
             className={`pb-3.5 text-[12.5px] tracking-tight font-bold cursor-pointer border-b-2 transition-colors relative top-[1px] ${taskTab === 'upcoming' ? 'text-[#5c4ce3] border-[#5c4ce3]' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
           >
-            Upcoming (0)
+            Upcoming ({upcomingTasks.length})
           </div>
           <div 
             onClick={() => setTaskTab('overdue')}
             className={`pb-3.5 text-[12.5px] tracking-tight font-bold cursor-pointer border-b-2 transition-colors relative top-[1px] ${taskTab === 'overdue' ? 'text-[#5c4ce3] border-[#5c4ce3]' : 'text-gray-400 border-transparent hover:text-gray-600'}`}
           >
-            Overdue (16)
+            Overdue ({overdueTasks.length})
           </div>
         </div>
 
         {/* Tab Content */}
-        {taskTab === 'upcoming' ? (
+        {tasks.length === 0 ? (
           <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center justify-center p-16 pb-20 pt-20">
             {/* SVG Illustration Placeholder matching the style */}
             <svg width="240" height="160" viewBox="0 0 240 160" fill="none" xmlns="http://www.w3.org/2000/svg">

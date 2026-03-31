@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { Search, Filter, Info, X, Archive, Phone, Sparkles, MoreHorizontal, Maximize2, Minimize2, Star, ChevronDown, Calendar, Info as InfoIcon, PlayCircle, MoreVertical, ChevronRight, Link2 } from 'lucide-react';
+import { Search, Filter, Info, X, Archive, Phone, Sparkles, MoreHorizontal, Maximize2, Minimize2, Star, ChevronDown, Calendar, Info as InfoIcon, PlayCircle, MoreVertical, ChevronRight, Link2, Globe } from 'lucide-react';
+import { useDispatch } from 'react-redux';
+import { addTask } from '../../../features/tasks/tasksSlice';
 
 export interface CallSenseItem {
   id: number;
@@ -276,6 +278,7 @@ function CallSensePanel({
   });
   
   const [selectedActions, setSelectedActions] = useState<number[]>([]);
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   const toggleAcc = (key: string) => {
     setOpenAccordions(prev => ({ ...prev, [key]: !prev[key] }));
@@ -459,11 +462,16 @@ function CallSensePanel({
                     </label>
                   )}
                   <button 
-                    onClick={(e) => e.stopPropagation()}
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      if (selectedActions.length > 0) {
+                        setShowCreateModal(true);
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded-md text-[11px] font-extrabold tracking-wide uppercase transition-all border ${
                       selectedActions.length > 0 
-                        ? 'bg-[#6D72D6] text-white border-[#6D72D6] shadow-sm' 
-                        : 'bg-gray-50 text-gray-400 border-gray-100'
+                        ? 'bg-[#6D72D6] text-white border-[#6D72D6] shadow-sm hover:brightness-110' 
+                        : 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed'
                     }`}
                   >
                     Create Tasks ({selectedActions.length})
@@ -559,6 +567,103 @@ function CallSensePanel({
       <div className="p-3 border-t border-gray-100 bg-gray-50/50 mt-auto shrink-0 cursor-pointer hover:bg-gray-100/50 transition-colors flex items-center gap-2">
          <ChevronRight className="w-4 h-4 text-gray-500" />
          <span className="text-[13px] font-bold text-gray-700">View Comments</span>
+      </div>
+
+      <CreateTasksModal 
+        isOpen={showCreateModal} 
+        onClose={() => setShowCreateModal(false)}
+        actions={AI_ACTIONS.filter(a => selectedActions.includes(a.id))}
+        onSuccess={() => {
+          setShowCreateModal(false);
+          setSelectedActions([]);
+          setOpenAccordions(prev => ({ ...prev, actions: false }));
+        }}
+      />
+    </div>
+  );
+}
+
+function CreateTasksModal({ 
+  isOpen, 
+  onClose, 
+  actions,
+  onSuccess
+}: { 
+  isOpen: boolean; 
+  onClose: () => void;
+  actions: typeof AI_ACTIONS;
+  onSuccess: () => void;
+}) {
+  const dispatch = useDispatch();
+  if (!isOpen) return null;
+
+  const handleCreate = () => {
+    actions.forEach(action => {
+      dispatch(addTask({
+        title: action.title,
+        org: 'Apple EMEA', // Mocked matching the current context visually
+        type: 'account',
+        priority: 'Normal',
+        status: 'Open',
+        date: '7 Mar 2026'
+      }));
+    });
+    onSuccess();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-gray-900/40 flex items-center justify-center p-4 backdrop-blur-sm shadow-2xl transition-all" style={{ animation: 'fadeIn 0.2s ease-out' }}>
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[900px] flex flex-col overflow-hidden" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-[15px] font-bold text-gray-800 tracking-tight">Create Tasks from Actions</h3>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-md transition-colors"><X className="w-4 h-4 text-gray-500" /></button>
+        </div>
+        
+        <div className="p-6 bg-gray-50/50 flex flex-col gap-4">
+          <div className="flex w-full text-[12.5px] font-bold text-gray-700 mb-1 px-1 tracking-tight">
+             <div className="flex-[2.5]">Task Name</div>
+             <div className="flex-[1.5]">Assignee</div>
+             <div className="flex-[1.2]">Due Date</div>
+             <div className="flex-[1.2]">Activity Type</div>
+          </div>
+          
+          {actions.map(action => (
+            <div key={action.id} className="flex w-full gap-3 h-[42px]">
+               <div className="flex-[2.5] bg-white border border-gray-200 rounded-md text-[13px] px-3 flex items-center shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                 <span className="truncate text-gray-700 font-medium">{action.title}</span>
+               </div>
+               
+               <div className="flex-[1.5] bg-white border border-gray-200 rounded-md text-[13px] px-3 flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer hover:border-indigo-300 transition-colors">
+                 <div className="flex items-center gap-2">
+                   <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-[10px] font-bold overflow-hidden">
+                     <span className="font-bold -ml-[0.5px]">DT</span>
+                   </div>
+                   <span className="text-gray-700 font-medium tracking-tight mt-0.5">Daniel Trial Test</span>
+                 </div>
+                 <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+               </div>
+
+               <div className="flex-[1.2] bg-white border border-gray-200 rounded-md text-[13px] px-3 flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer hover:border-indigo-300 transition-colors">
+                 <span className="text-gray-700 font-medium">7 Mar 2026</span>
+                 <Calendar className="w-4 h-4 text-gray-400" />
+               </div>
+
+               <div className="flex-[1.2] bg-white border border-gray-200 rounded-md text-[13px] px-3 flex items-center shadow-[0_1px_2px_rgba(0,0,0,0.02)] gap-2 cursor-pointer hover:border-indigo-300 transition-colors">
+                 <Globe className="w-4 h-4 text-gray-400 stroke-[2px]" />
+                 <span className="text-gray-700 font-medium mt-[1px]">General</span>
+               </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-white">
+          <button onClick={onClose} className="px-5 py-2 border border-gray-200 rounded-md text-[13px] font-bold text-gray-500 hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button onClick={handleCreate} className="px-5 py-2 bg-indigo-500 rounded-md text-[13px] font-bold text-white hover:bg-indigo-600 transition-colors shadow-[0px_2px_4px_rgba(99,102,241,0.2)]">
+            Create
+          </button>
+        </div>
       </div>
     </div>
   );
