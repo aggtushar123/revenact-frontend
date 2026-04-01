@@ -1,20 +1,17 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const data = [
-  { name: 'Negative', value: 300, color: '#ea580c' }, // Orange
-  { name: 'Neutral', value: 590, color: '#facc15' },  // Yellow
-  { name: 'Positive', value: 1200, color: '#22c55e' }, // Green
+  { name: 'Product & Growth', value: 57, percent: 41, color: '#6366f1' }, // Indigo/Purple
+  { name: 'Support & Operations', value: 39, percent: 28, color: '#f59e0b' }, // Amber
+  { name: 'Customer Success', value: 42, percent: 30, color: '#38bdf8' }, // Sky Blue
 ];
 
-export function ActivitySentimentDonut() {
-  const total = data.reduce((sum, item) => sum + item.value, 0);
-
-  // Format total using compact notation, e.g., 2090 -> 2.09K
-  const formattedTotal = total >= 1000 ? `${(total / 1000).toFixed(2)}K` : total.toString();
+export function ActivitiesByAIAreaDonut() {
+  const total = 138;
 
   return (
     <div className="w-full h-full p-6 flex flex-col relative">
-      <h3 className="text-[14px] font-bold text-gray-800 mb-4">Activities By Sentiment</h3>
+      <h3 className="text-[14px] font-bold text-gray-800 mb-4">Activities By AI Area (Common Taxonomy)</h3>
       <div className="flex-1 min-h-[300px] relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -35,7 +32,8 @@ export function ActivitySentimentDonut() {
                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
-                const formattedValue = value >= 1000 ? `${(value / 1000).toFixed(1)}K` : `${(value / 1000).toFixed(1)}K`; // 300 -> 0.3K
+                const dataPoint = data.find(d => d.name === name);
+                const displayPercent = dataPoint ? dataPoint.percent : (percent * 100).toFixed(0);
 
                 return (
                   <text
@@ -50,7 +48,7 @@ export function ActivitySentimentDonut() {
                       {name}
                     </tspan>
                     <tspan x={x} dy="1.4em">
-                      {`${formattedValue} (${(percent * 100).toFixed(0)}%)`}
+                      {`${value} (${displayPercent}%)`}
                     </tspan>
                   </text>
                 );
@@ -69,7 +67,7 @@ export function ActivitySentimentDonut() {
         </ResponsiveContainer>
         {/* Center Text */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-2xl font-semibold text-gray-800 tracking-tight">{formattedTotal}</span>
+          <span className="text-2xl font-semibold text-gray-800 tracking-tight">{total}</span>
         </div>
       </div>
     </div>

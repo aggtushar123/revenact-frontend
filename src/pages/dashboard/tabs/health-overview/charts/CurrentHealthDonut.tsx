@@ -51,8 +51,8 @@ export function CurrentHealthDonut({ data, activeFilter, onSegmentClick }: Curre
               data={chartData}
               cx="50%"
               cy="50%"
-              innerRadius={70}
-              outerRadius={95}
+              innerRadius={45}
+              outerRadius={60}
               paddingAngle={2}
               dataKey="value"
               stroke="none"
@@ -65,7 +65,7 @@ export function CurrentHealthDonut({ data, activeFilter, onSegmentClick }: Curre
               }}
               label={({ name, percent = 0, value, cx, cy, midAngle = 0, outerRadius = 0 }) => {
                 const RADIAN = Math.PI / 180;
-                const radius = outerRadius + 20;
+                const radius = outerRadius + 15;
                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
                 

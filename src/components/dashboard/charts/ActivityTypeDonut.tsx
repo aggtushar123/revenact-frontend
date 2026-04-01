@@ -19,14 +19,14 @@ export function ActivityTypeDonut() {
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={90}
-              outerRadius={120}
+              innerRadius={45}
+              outerRadius={60}
               paddingAngle={1}
               dataKey="value"
               stroke="none"
               label={({ name, percent = 0, value, cx, cy, midAngle = 0, outerRadius = 0 }) => {
                 const RADIAN = Math.PI / 180;
-                const radius = outerRadius + 25;
+                const radius = outerRadius + 15;
                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
                 return (
@@ -54,9 +54,7 @@ export function ActivityTypeDonut() {
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-center mt-2">
-            <span className="text-4xl font-normal text-gray-800 tracking-tight">{total.toLocaleString()}</span>
-          </div>
+          <span className="text-2xl font-semibold text-gray-800 tracking-tight">{total.toLocaleString()}</span>
         </div>
       </div>
     </div>

@@ -17,8 +17,8 @@ export function StatusDonut() {
               data={STATUS_DATA}
               cx="50%"
               cy="50%"
-              innerRadius="65%"
-              outerRadius="85%"
+              innerRadius={45}
+              outerRadius={60}
               startAngle={90}
               endAngle={-270}
               paddingAngle={1}
@@ -28,7 +28,7 @@ export function StatusDonut() {
               label={(props: any) => {
                 const { cx, cy, midAngle, outerRadius, value, name } = props;
                 const RADIAN = Math.PI / 180;
-                const radius = outerRadius + 25;
+                const radius = outerRadius + 15;
                 const x = Number(cx) + radius * Math.cos(-Number(midAngle) * RADIAN);
                 const y = Number(cy) + radius * Math.sin(-Number(midAngle) * RADIAN);
                 

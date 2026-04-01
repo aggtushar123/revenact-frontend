@@ -2,6 +2,9 @@ import { ActivityTypeDonut } from '../../../../components/dashboard/charts/Activ
 import { ActivitySentimentDonut } from '../../../../components/dashboard/charts/ActivitySentimentDonut';
 import { ActivityDetailedTable } from '../../../../components/dashboard/charts/ActivityDetailedTable';
 import { SentimentOverTimeLine } from '../../../../components/dashboard/charts/SentimentOverTimeLine';
+import { ActivitiesByAIAreaDonut } from '../../../../components/dashboard/charts/ActivitiesByAIAreaDonut';
+import { ActivitiesByAICategoryBar } from '../../../../components/dashboard/charts/ActivitiesByAICategoryBar';
+import { ActivitiesByAISubCategoryBar } from '../../../../components/dashboard/charts/ActivitiesByAISubCategoryBar';
 
 export function ControlsView() {
   return (
@@ -27,6 +30,22 @@ export function ControlsView() {
         {/* Bottom Right: Sentiment Over Time Line Chart */}
         <div className="xl:flex-1 bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden flex flex-col">
           <SentimentOverTimeLine />
+        </div>
+      </div>
+
+      {/* Third Row: AI Area Donut (1/3) + AI Category Bar (1/3) + AI Sub Category Bar (1/3) */}
+      <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px]">
+        {/* Left: Activities By AI Area Donut */}
+        <div className="xl:w-1/3 bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-indigo-500">
+          <ActivitiesByAIAreaDonut />
+        </div>
+        {/* Middle: Activities By AI Category Bar */}
+        <div className="xl:w-1/3 bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-indigo-500">
+          <ActivitiesByAICategoryBar />
+        </div>
+        {/* Right: Activities By AI Sub Category Bar */}
+        <div className="xl:w-1/3 bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-indigo-500">
+          <ActivitiesByAISubCategoryBar />
         </div>
       </div>
     </div>
