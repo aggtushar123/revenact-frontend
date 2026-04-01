@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Filter, Info, X, Archive, Phone, Sparkles, MoreHorizontal, Maximize2, Minimize2, Star, ChevronDown, Calendar, Info as InfoIcon, PlayCircle, MoreVertical, ChevronRight, Link2, Globe } from 'lucide-react';
+import { Search, Filter, Info, X, Archive, Phone, Sparkles, MoreHorizontal, Maximize2, Minimize2, Star, ChevronDown, Calendar, Info as InfoIcon, PlayCircle, MoreVertical, ChevronRight, Link2, Globe, Copy, Mail } from 'lucide-react';
 import { useDispatch } from 'react-redux';
 import { addTask } from '../../../features/tasks/tasksSlice';
 
@@ -589,8 +589,52 @@ function CallSensePanel({
                 <span className="text-[13px] font-bold text-[#6D72D6] select-none">Follow Up Message</span>
               </div>
               {openAccordions.followup && (
-                <div className="p-5 bg-white flex flex-col items-center justify-center opacity-50 py-10">
-                  <span className="text-[12px] font-semibold text-gray-500">No follow up message available.</span>
+                <div className="p-6 bg-white flex flex-col gap-6">
+                  <div className="flex flex-col gap-5 text-[12.5px] leading-[1.65] text-gray-700 font-medium">
+                    <p>Hi there,</p>
+                    <p>Thank you for taking the time to meet with me today for our EMEA Retail account renewal check-in. It was great to hear about the positive momentum your team has built with the platform.</p>
+                    
+                    <div className="flex flex-col gap-3">
+                       <p className="font-extrabold text-gray-800 tracking-tight text-[13px]">Key Highlights from Our Discussion:</p>
+                       <div className="flex flex-col gap-1.5">
+                          <p><span className="font-bold text-gray-800">Strong User Adoption:</span> Your team has achieved impressive adoption metrics with 290 out of 360 licenses actively used regularly - that's over 80% utilization, which represents significant improvement from previous periods.</p>
+                          <p><span className="font-bold text-gray-800">Platform Integration:</span> It's encouraging to see that your teams have become comfortable with the platform workflows, particularly for weekly performance tracking and regional reporting. The platform has truly become part of your standard operating rhythm.</p>
+                          <p><span className="font-bold text-gray-800">Improved Engagement:</span> Your weekly logins consistently above 55% and the shift to managers reviewing dashboards directly within the platform (rather than exporting data) shows deeper platform engagement.</p>
+                          <p><span className="font-bold text-gray-800">Account Health:</span> Your account health score has improved significantly, and I appreciate that your feedback is now focused on extracting more value rather than addressing issues - this is a great indicator of platform maturity.</p>
+                          <p><span className="font-bold text-gray-800">Support Performance:</span> The minimal support tickets and reasonable response times demonstrate the stability you've achieved with the platform.</p>
+                       </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                       <p className="font-extrabold text-gray-800 tracking-tight text-[13px]">Next Steps & Actions:</p>
+                       <div className="flex flex-col gap-1.5">
+                          <p><span className="font-bold text-gray-800">Advanced Workflow Optimization:</span> I'll explore opportunities to fine-tune your advanced workflows to help extract even more value from the platform, building on your current strong adoption patterns.</p>
+                          <p><span className="font-bold text-gray-800">Renewal Planning:</span> I'll follow up with a detailed renewal timeline and optional optimization ideas to ensure a smooth renewal process.</p>
+                          <p><span className="font-bold text-gray-800">Ongoing Benchmarks:</span> I'll continue sharing performance benchmarks so you can track your progress and maintain this positive trajectory.</p>
+                       </div>
+                    </div>
+                    
+                    <p>Based on our conversation, I'm confident that your renewal should proceed smoothly given the strong performance and positive sentiment. I'll be in touch soon with the renewal timeline and optimization recommendations we discussed.</p>
+                    
+                    <p>Please don't hesitate to reach out if you have any questions or need anything in the meantime.</p>
+                    
+                    <div className="flex flex-col pt-1 line-clamp-2 gap-[1px]">
+                      <p>Best regards,</p>
+                      <p>Sarah Lee</p>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-3 mt-2 border-t border-gray-100 pt-6">
+                    <button className="flex items-center justify-center gap-2 bg-[#6D72D6] hover:bg-[#5b60c4] text-white px-5 py-2.5 rounded-lg text-[13px] font-bold shadow-sm transition-colors">
+                      <Copy className="w-4 h-4 mb-[1px]" />
+                      Copy to Clipboard
+                    </button>
+                    <button className="flex items-center justify-center gap-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 px-5 py-2.5 rounded-lg text-[13px] font-bold shadow-sm transition-colors">
+                      <Mail className="w-4 h-4 text-gray-400 mb-[1px]" />
+                      Send Email
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -629,8 +673,38 @@ function CallSensePanel({
                 <span className="text-[13px] font-bold text-[#6D72D6] select-none">Topics</span>
               </div>
               {openAccordions.topics && (
-                <div className="p-5 bg-white flex flex-col items-center justify-center opacity-50 py-10">
-                  <span className="text-[12px] font-semibold text-gray-500">No topics analyzed yet.</span>
+                <div className="p-5 bg-white flex flex-col gap-4">
+                  
+                  <div className="border border-gray-100 rounded-lg p-5 flex flex-col gap-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                    <h4 className="text-[13.5px] font-extrabold text-gray-800 tracking-tight">Introductions and Participant Roles</h4>
+                    <span className="w-fit px-2.5 py-1 text-[11.5px] font-semibold text-[#0ea5e9] bg-[#e0f2fe] border border-[#bae6fd] rounded shadow-sm">
+                      Introductions
+                    </span>
+                    <p className="text-[12.5px] leading-[1.65] text-gray-600 font-medium">
+                      Each participant shared their name, company, and areas of focus. Sarah (Cloudfinity) leads CSM efforts in enterprise, Leo (Axora) supports mid-market SaaS, and Priya (Orbio) recently launched a CSM pod model to learn best practices.
+                    </p>
+                  </div>
+
+                  <div className="border border-gray-100 rounded-lg p-5 flex flex-col gap-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                    <h4 className="text-[13.5px] font-extrabold text-gray-800 tracking-tight">Customer Onboarding Feedback and Retention Challenges</h4>
+                    <span className="w-fit px-2.5 py-1 text-[11.5px] font-semibold text-[#0ea5e9] bg-[#e0f2fe] border border-[#bae6fd] rounded shadow-sm">
+                      Customer Challenges
+                    </span>
+                    <p className="text-[12.5px] leading-[1.65] text-gray-600 font-medium">
+                      Participants discussed key customer retention issues identified via surveys and feedback. Churn risk was highlighted, especially relating to onboarding gaps. Solutions in place included piloting 'warm handoff' processes from Sales to CSMs, introducing kickoff checklists, and implementing 30-day QBRs, which collectively contributed to increased NPS scores.
+                    </p>
+                  </div>
+
+                  <div className="border border-gray-100 rounded-lg p-5 flex flex-col gap-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                    <h4 className="text-[13.5px] font-extrabold text-gray-800 tracking-tight">Onboarding and Success Metrics Alignment</h4>
+                    <span className="w-fit px-2.5 py-1 text-[11.5px] font-semibold text-[#0ea5e9] bg-[#e0f2fe] border border-[#bae6fd] rounded shadow-sm">
+                      Metrics Discussion / KPI Alignment
+                    </span>
+                    <p className="text-[12.5px] leading-[1.65] text-gray-600 font-medium">
+                      The teams shared specific metrics used to define onboarding success, such as aiming for full activation by day 21 and achieving task completion in the first month of customer engagement. Recent improvements in NPS were attributed to these standardized metrics.
+                    </p>
+                  </div>
+
                 </div>
               )}
             </div>

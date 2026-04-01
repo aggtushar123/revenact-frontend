@@ -1,8 +1,8 @@
 ---
-description: Full repository architecture, module map, and data flow reference for the Revenact SaaS app
+description: Full repository architecture, module map, and data flow reference for the Velaris SaaS app
 ---
 
-# Revenact SaaS — Repository Architecture & Flow
+# Velaris SaaS — Repository Architecture & Flow
 
 ## Tech Stack
 
@@ -15,6 +15,7 @@ description: Full repository architecture, module map, and data flow reference f
 | Form Validation | Zod |
 | Icons | Lucide React |
 | Flow Builder | @xyflow/react (React Flow) |
+| Charts | Recharts |
 | Build Tool | Vite v8 |
 
 ---
@@ -23,35 +24,39 @@ description: Full repository architecture, module map, and data flow reference f
 
 ```
 react-ts-app/
-├── .agents/workflows/        ← Workflow knowledge files
+├── .agents/workflows/          ← Workflow knowledge files
 ├── src/
-│   ├── App.tsx               ← Route definitions (root)
-│   ├── main.tsx              ← React entry point, Redux Provider
-│   ├── store.ts              ← Redux store (auth + counter reducers)
-│   ├── hooks.ts              ← Typed useAppSelector / useAppDispatch
-│   ├── index.css             ← Global base styles
-│   ├── App.css               ← App-level utility styles
-│   ├── assets/               ← Static assets
-│   ├── features/             ← Redux slices & business logic
-│   │   ├── auth/             ← Auth state, thunks, Zod schema
-│   │   └── counter/          ← Legacy counter slice
-│   ├── layouts/              ← Shell layouts
+│   ├── App.tsx                 ← Route definitions (root)
+│   ├── main.tsx                ← React entry point, Redux Provider
+│   ├── store.ts                ← Redux store (auth + tasks reducers)
+│   ├── hooks.ts                ← Typed useAppSelector / useAppDispatch
+│   ├── index.css               ← Global base styles
+│   ├── App.css                 ← App-level utility styles
+│   ├── assets/                 ← Static assets
+│   ├── features/               ← Redux slices & business logic
+│   │   ├── auth/               ← Auth state, thunks, Zod schema
+│   │   ├── tasks/              ← Tasks slice (create task from CallSense AI actions)
+│   │   └── counter/            ← Legacy counter slice (unused)
+│   ├── layouts/                ← Shell layouts
 │   │   └── DashboardLayout.tsx
-│   ├── components/           ← Reusable UI components
-│   │   ├── auth/             ← ProtectedRoute guard
-│   │   ├── layout/           ← Sidebar, Navbar
-│   │   ├── shared/           ← Multi-domain components (ActivityFeed, PinnedAttributes, Summary)
-│   │   ├── contacts/         ← ContactsTable, ActionBar, MetricsPanel
-│   │   └── organizations/    ← Rich org domain components (see below)
-│   └── pages/                ← Route-level page components
-│       ├── auth/             ← Login page
-│       ├── organizations/    ← List, Board, Details (org detail view)
-│       ├── accounts/         ← Account Details page
-│       ├── contacts/         ← Contacts list
-│       ├── copilot/          ← AI Copilot module (multi-view)
-│       ├── scenarios/        ← Visual scenario builder
-│       ├── settings/         ← Settings module (data, currency, etc.)
-│       └── integrations/     ← Integrations catalogue page
+│   ├── components/             ← Reusable UI components
+│   │   ├── auth/               ← ProtectedRoute guard
+│   │   ├── layout/             ← Sidebar, Navbar
+│   │   ├── shared/             ← Multi-domain components (ActivityFeed, PinnedAttributes, Summary)
+│   │   ├── contacts/           ← ContactsTable, ActionBar, MetricsPanel
+│   │   ├── dashboard/charts/   ← Shared Recharts chart components (AI Trending)
+│   │   └── organizations/      ← Rich org domain components (see below)
+│   └── pages/                  ← Route-level page components
+│       ├── auth/               ← Login page
+│       ├── organizations/      ← List, Board, Details (org detail view)
+│       ├── accounts/           ← Account Details page
+│       ├── contacts/           ← Contacts list
+│       ├── copilot/            ← AI Copilot module (Home, Chat, Cockpit)
+│       ├── scenarios/          ← Visual scenario builder (React Flow)
+│       ├── settings/           ← Settings module (data, currency, etc.)
+│       ├── integrations/       ← Integrations catalogue page
+│       ├── pipelines/          ← Pipelines board + list view
+│       └── dashboard/          ← Analytics dashboards (Health, Ticket, AI Trending)
 ├── index.html
 ├── package.json
 ├── vite.config.ts
@@ -64,33 +69,45 @@ react-ts-app/
 ## Route Map (`src/App.tsx`)
 
 ```
-/                          → Redirects to /organizations/list (if authed) or /login
-/login                     → [PUBLIC] Login page (no layout)
+/                              → Redirects to /dashboard (if authed) or /login
+/login                         → [PUBLIC] Login page (no layout)
 
 /  (DashboardLayout + ProtectedRoute)
-├── dashboard              → Placeholder dashboard view
+├── dashboard/
+│   ├── advance/               → AdvanceDashboard shell (tab container)
+│   │   ├── health/            → HealthOverviewContainer
+│   │   │   └── controls       → Health ControlsView (charts + table)
+│   │   ├── ticket/            → TicketOverviewContainer
+│   │   │   └── controls       → Ticket ControlsView (charts)
+│   │   └── ai-trending/       → AITrendingTopics shell
+│   │       └── controls       → AI Trending ControlsView (donut+bar charts)
+│   └── custom/                → Placeholder ("Custom Dashboard Beta")
 ├── organizations/
-│   ├── (index)            → Redirects to /organizations/list
-│   ├── list               → OrganizationsTable (main list view)
-│   ├── board              → Board view (stub)
-│   └── :id               → Organization Details page (full detail)
-├── accounts/:id           → Account Details page
-├── copilot                → Copilot AI module
-├── scenarios/create       → Visual scenario flow builder
+│   ├── (index)                → Redirects to /organizations/list
+│   ├── list                   → OrganizationsTable (main list view)
+│   ├── board                  → Board view (stub)
+│   └── :id                    → Organization Details page (full detail)
+├── accounts/:id               → Account Details page
+├── copilot                    → Copilot AI module (Home / Chat / Cockpit)
+├── scenarios/create           → Visual scenario flow builder
 ├── settings/
-│   ├── (index)            → Redirects to /settings/data
-│   ├── data               → SettingsPage (attributes table)
-│   ├── currency           → Placeholder
-│   ├── entity-uploads     → Placeholder
-│   ├── webhooks           → Placeholder
-│   ├── activities         → Placeholder
-│   ├── global-presets     → Placeholder
-│   ├── connect-widget     → Placeholder
-│   └── ai-agent           → Placeholder
-├── integrations           → Integrations catalogue
-└── contacts/
-    ├── (index)            → Redirects to /contacts/list
-    └── list               → ContactsList
+│   ├── (index)                → Redirects to /settings/data
+│   ├── data                   → SettingsPage (attributes table)
+│   ├── currency               → Placeholder
+│   ├── entity-uploads         → Placeholder
+│   ├── webhooks               → Placeholder
+│   ├── activities             → Placeholder
+│   ├── global-presets         → Placeholder
+│   ├── connect-widget         → Placeholder
+│   └── ai-agent               → Placeholder
+├── integrations               → Integrations catalogue
+├── contacts/
+│   ├── (index)                → Redirects to /contacts/list
+│   └── list                   → ContactsList
+└── pipelines/
+    ├── (index)                → Redirects to /pipelines/board
+    ├── list                   → Pipelines list view
+    └── board                  → Pipelines kanban board (drag-and-drop)
 ```
 
 ---
@@ -106,17 +123,19 @@ main.tsx
                     └── / → <ProtectedRoute>
                               └── <DashboardLayout>
                                     ├── <Sidebar />      ← collapsible, hover-expand
-                                    ├── <Navbar />       ← hidden on /scenarios
+                                    ├── <Navbar />       ← hidden on /scenarios route
                                     └── <Outlet />       ← page content rendered here
 ```
 
-**Sidebar sections:**
+**Sidebar sections (left nav):**
 - **Top**: Dashboard, Communications
 - **ENTITIES**: Organizations, Accounts, Contacts, Pipelines
 - **CUSTOM OBJECTS**: SFDC Opportunity, Product Feedbacks
 - **TOOLS**: Segments, Project Management, Scenarios, Surveys, Campaigns, Canvas
 - **SETUP**: Settings, Lifecycle, Health, Users, Integrations
 - **Footer**: User avatar + name + Sign out button
+
+> Note: The `DashboardLayout` hides the `<Navbar />` and removes padding on the `/scenarios` route to give the builder a full-canvas feel.
 
 ---
 
@@ -131,7 +150,10 @@ Redux Store
 │   ├── refreshToken: string | null
 │   └── status: 'idle' | 'loading' | 'failed'
 │
-└── counter (counterSlice)  ← Legacy, likely unused
+├── tasks (tasksSlice)
+│   └── tasks: Task[]          ← Created from CallSense AI action items
+│
+└── counter (counterSlice)     ← Legacy, unused
 ```
 
 **Persistence keys in localStorage:**
@@ -154,7 +176,50 @@ Dummy credentials: `admin@revenact.io / password123`, `demo@revenact.io / demo12
 
 ---
 
-### 2. Organizations (`pages/organizations/` + `components/organizations/`)
+### 2. Dashboard (`pages/dashboard/`)
+
+Three-tab analytics dashboard with live chart interactivity.
+
+#### Health Overview (`tabs/health-overview/`)
+Main dashboard showing portfolio health across all accounts.
+
+**Charts rendered in `ControlsView.tsx`:**
+| Component | What it shows |
+|---|---|
+| `CurrentHealthDonut` | Donut with clickable segments — filters the entire dashboard |
+| `HealthByOwnerStackedBar` | Health status breakdown per CSM |
+| `AccountsLastTouchLine` | Line chart: accounts by last touch date |
+| `CSMPulseBar` | CSM activity pulse horizontal bar |
+| `AIPulseBar` | AI-scored pulse ratings |
+| `AccountsByRenewalDateBar` | Renewal date distribution bar chart |
+| `AccountHealthByRecruiters` | Sub-table: health by recruiter |
+| `HealthChangeOverTimeStacked` | Stacked bar showing health shifts over time |
+| `AccountHealthDetailTable` | Detailed filterable account table |
+
+> **Key interaction**: Clicking a donut segment sets `activeFilter` (health status), which propagates via `filteredData` prop to ALL child charts simultaneously.
+
+Data: `mockData.ts` — 20 mock org rows with health status, CSM, ARR, renewal date.
+
+#### Ticket Overview (`tabs/ticket-overview/`)
+Charts: `StatusDonut`, `PriorityDonut`, `AssigneesStackedBar`, `OriginBar`, `SentimentLineChart`, `KPIGrid`
+
+#### AI Trending Topics (`tabs/ai-trending/`)
+Analytics on AI topic distribution across account activity.
+
+**Charts rendered (3 rows):**
+| Row | Components |
+|---|---|
+| Row 1 | `ActivityTypeDonut` (1/3) + `ActivityDetailedTable` (2/3) |
+| Row 2 | `ActivitySentimentDonut` (1/3) + `SentimentOverTimeLine` (2/3) |
+| Row 3 | `ActivitiesByAIAreaDonut` + `ActivitiesByAICategoryBar` + `ActivitiesByAISubCategoryBar` |
+
+> All 6 donut charts use standardized `innerRadius={45}` / `outerRadius={60}` to prevent label clipping.
+
+Chart components live in `src/components/dashboard/charts/`.
+
+---
+
+### 3. Organizations (`pages/organizations/` + `components/organizations/`)
 
 The richest domain in the app. Three views:
 
@@ -162,111 +227,199 @@ The richest domain in the app. Three views:
 Renders `<OrganizationsTable />` — a feature-rich data table.
 
 **`components/organizations/OrganizationsTable.tsx`** (18 KB)
-- Displays org rows with health scores, ARR, renewal date, NPS, etc.
-- Sub-components used:
-  - `ActionBar.tsx` — search, filters, column toggle
-  - `EditColumnsPopover.tsx` — drag-to-reorder column visibility
-  - `HealthPopover.tsx` — health score breakdown popover
-  - `CsatPopover.tsx` — CSAT score popover
-  - `RowActionsPopover.tsx` — per-row action menu
-  - `MetricsPanel.tsx` — aggregate metric cards at top
-- Data source: `tableData.ts` (22 KB, mock data)
+- Displays org rows with health scores, ARR, NPS, CSAT, renewal date, pulse dots, AI pulse score
+- Paginated (5 rows/page), column visibility toggleable via `EditColumnsPopover`
+- Hoverable popovers: `HealthPopover`, `CsatPopover`, reason tooltip
+- Per-row action menu via `RowActionsPopover`
+- Aggregate KPI cards via `MetricsPanel`
+- Data source: `tableData.ts` (22 KB, mock data for 10+ orgs)
 
 #### Board View (`pages/organizations/Board.tsx`)
 Currently a stub placeholder.
 
-#### Details View (`pages/organizations/Details.tsx`) (40 KB)
+#### Details View (`pages/organizations/Details.tsx`)
 Full organization detail page. Contains:
 - **Header**: Org name, avatar, health badge, action buttons
+- **Metrics Banner**: KPI cards (ARR, health, renewal, NPS, CSAT, MRR)
 - **Tabs**: Overview | Activity | Contacts | Accounts | NPS | CSAT | Custom Attributes
-- **Shared Dashboard Panels** (imported from `components/shared/`):
-  - `PinnedAttributes.tsx` — localized attribute editing panel
-  - `Summary.tsx` — empty state info widget
-  - `ActivityFeed.tsx` — dynamic tabbed feed engine
-- **MetricsPanel**: KPI cards (ARR, health, renewal, NPS, CSAT)
-- **Activity sub-tabs** (rendered via ActivityFeed using dedicated components from `activity/`):
-  - `EmailsTab` + `EmailThreadPanel` — side-by-side thread view
-  - `TasksTab` — task cards with priority/status
-  - `NotesTab` — custom timeline squircle view
-  - `TicketsTab` — timeline view with dynamic avatars/brands
-  - `CalendarEventsTab` — upcoming events
-  - `ActivitiesTab` — general activity log
-  - `CallSenseTab` — dynamic call transcripts feed
-  - `HeadlinesTab` — AI-generated summary cards & reports
+- **Pinned Attributes**: Localized attribute editing panel (via `shared/PinnedAttributes`)
+- **Activity Feed**: Tabbed feed engine (via `shared/ActivityFeed`)
+
+**Activity Feed sub-tabs:**
+
+| Tab | Component | What it shows |
+|---|---|---|
+| Emails | `EmailsTab` + `EmailThreadPanel` | Threaded email list with collapsible messages + Reply composer |
+| Tasks | `TasksTab` | Task cards with priority and status badges |
+| Notes | `NotesTab` | Timeline-style note cards |
+| Tickets | `TicketsTab` | Ticket timeline with brand avatars |
+| Calendar | `CalendarEventsTab` | Upcoming calendar events |
+| Activities | `ActivitiesTab` | General activity log |
+| Call Sense | `CallSenseTab` | AI call transcript feed with slide-in panel |
+| Headlines | `HeadlinesTab` | AI-generated summary cards and reports |
+| Slack | `SlackTab` | Slack thread cards with AI items panel |
+
+**CallSense panel AI items accordions:**
+- **Summary** — AI-generated TLDR of the call
+- **Actions** — checkbox items, can create Tasks via Redux dispatch
+- **Follow Up Message** — full AI-drafted email with Copy/Send Email buttons
+- **Signals** — opportunities and risks identified in the call
+- **Topics** — categorized discussion topics with badges and summaries
 
 Data sources:
-- `activityData.ts` (12 KB) — activity feed mock data for orgs
-- `contactsData.ts` (2 KB) — contacts for the org
+- `activityData.ts` (12 KB) — activity + email + notes mock data
+- `contactsData.ts` (2 KB) — contacts per org
 - `accountsData.ts` (10 KB) — linked accounts data
+- `accountActivityData.ts` (6 KB) — activity data scoped to accounts
 
 ---
 
-### 3. Accounts (`pages/accounts/Details.tsx`) (16 KB)
+### 4. Accounts (`pages/accounts/Details.tsx`)
 
-Account-level detail page navigated to from org details.
-- Fully implemented pixel-perfect dashboard parity with Organizations.
-- Uses localized `AccountMetricsPanel` for stakeholder diagnostics.
-- Recycles `PinnedAttributes` and `ActivityFeed` from `shared/` layer.
-- Dynamically injects `ACCOUNT_ID_MAP` and `accountActivityData.ts` into the global data arrays at render-time to simulate account-specific endpoints without duplicating the Activity sub-components.
+Account-level detail page linked from Org Details.
+- Same layout as Organizations Details but scoped to a single account
+- Uses `AccountMetricsPanel` for stakeholder diagnostics (Health, NPS, CSAT, Renewal)
+- Recycles `PinnedAttributes` and `ActivityFeed` from `shared/`
+- Injects `ACCOUNT_ID_MAP` and `accountActivityData` at runtime for account-scoped feed data
 
 ---
 
-### 4. Contacts (`pages/contacts/List.tsx`)
+### 5. Contacts (`pages/contacts/List.tsx`)
 
 Simple contacts list view.
 
 **`components/contacts/`:**
 - `ContactsTable.tsx` — contacts data grid
 - `ActionBar.tsx` — search and filters
-- `MetricsPanel.tsx` — contact metrics
+- `MetricsPanel.tsx` — contact count metrics
 
 ---
 
-### 5. Copilot (`pages/copilot/`)
+### 6. Copilot (`pages/copilot/`)
 
-Multi-view AI assistant module with:
-- `Index.tsx` — entry/shell with view routing
-- `HomeView.tsx` (13 KB) — Copilot home/dashboard
-- `ChatView.tsx` (5 KB) — conversation chat interface
-- `CockpitView.tsx` (14 KB) — analytics cockpit
-- `CopilotSidebar.tsx` (6 KB) — side navigation for copilot sections
+The Copilot is the AI intelligence layer of the platform — a conversational interface that has access to all cross-account data (calls, emails, tickets, Slack, CRM) and can answer complex CS questions in natural language.
+
+| File | Role |
+|---|---|
+| `Index.tsx` | Entry/shell — manages view routing between Home / Chat / Cockpit |
+| `HomeView.tsx` (13 KB) | Copilot landing page + Built-in Skills library |
+| `ChatView.tsx` (5 KB) | Conversational AI response view |
+| `CockpitView.tsx` (14 KB) | Deep analytics cockpit with charts |
+| `CopilotSidebar.tsx` (6 KB) | Left sidebar — New Chat, Built-in Skills list, Chat History |
+
+#### Layout Structure
+
+```
+CopilotIndex
+├── CopilotSidebar (left, collapsible)      ← Built-in Skills + Chat History
+└── Main content area
+      ├── Top tab bar: [Copilot] [Cockpit]
+      ├── HomeView                          ← Prompt input + Skills grid (no active chat)
+      └── ChatView                         ← AI response + floating prompt input
+```
+
+#### Built-in Skills
+
+Pre-built AI workflows a CSM can run with one click. Scoped into four categories:
+
+| Category | Skills |
+|---|---|
+| **Account** | Internal Business Review, Quick Start Brief, Overview of strategy to de-risk, Prep weekly customer sync, One liner update, Onboarding Status Report |
+| **CSM** | CSM performance review |
+| **Portfolio** | Onboarding Accounts Status |
+| **Product** | Deep dive on product feedback, Features most requested by… |
+
+Clicking a skill card expands it inline on the home view, showing the full pre-filled prompt template with `{Account}` / `{Organization}` variables highlighted in pink. The user can review then run it.
+
+#### Key Copilot Capabilities (per screenshots from production Velaris app)
+
+- **Cross-channel synthesis**: Copilot reads from calls (Call Sense), emails, tickets, and Slack threads across all accounts
+- **Account-by-account deep dives**: "Why are these accounts at risk?" → returns per-account analysis with ARR, utilization %, NPS, verbatim customer quotes with channel attribution
+- **Chat history persistence**: Prior conversations shown in sidebar (e.g. "Apple QBR Deck with Tables", "Focus Accounts for Risk and Growth", "Top 5 MRR Accounts Onboarding")
+- **Variable input syntax**: Type `/` in the input box to add `{Account}` or `{Organization}` variables that scope the analysis
+- **Response feedback**: Copy, thumbs up, thumbs down on every response
+
+#### Current Implementation State
+
+- **HomeView**: Fully implemented — greeting, prompt input, Built-in Skills grid (4 categories, 10 skills), skill card expand/collapse
+- **ChatView**: Partially implemented — renders a static mock conversation output; input box is functional but doesn't connect to a real AI endpoint
+- **CopilotSidebar**: Fully implemented — collapsible, shows Built-in Skills list + Chat History items (mock data matching production)
+- **CockpitView**: Separate analytics view — implemented with charts/tables
+- **Skill "Run" action**: Currently disabled (`disabled` button) — backend integration pending
 
 ---
 
-### 6. Scenarios (`pages/scenarios/`)
+### 7. Scenarios (`pages/scenarios/`)
 
 Visual automation/workflow builder powered by **@xyflow/react** (React Flow).
 
 | File | Role |
 |---|---|
-| `CreateScenario.tsx` (6 KB) | Main canvas page, manages node/edge state |
-| `CustomNodes.tsx` (6 KB) | Custom node renderers for triggers, actions, etc. |
-| `CustomEdge.tsx` (2 KB) | Custom animated edge renderer |
-| `BuilderSidebar.tsx` (4 KB) | Drag-and-drop node palette |
-| `EditNodePane.tsx` (7 KB) | Right-side panel to configure selected node |
-| `ScenarioHeader.tsx` (3 KB) | Top bar with save/publish actions |
-| `types.ts` | TypeScript types for nodes/edges |
+| `CreateScenario.tsx` | Main canvas page — manages node/edge state, drag-drop |
+| `CustomNodes.tsx` | Custom node renderers (EntryNode, OperatorNode, ActionNode) |
+| `CustomEdge.tsx` | Custom animated edge renderer with delete button |
+| `BuilderSidebar.tsx` | Drag-and-drop node palette |
+| `EditNodePane.tsx` | Right-side slide-in panel for configuring selected node |
+| `ScenarioHeader.tsx` | Top bar with scenario name, save/publish actions |
+| `types.ts` | TypeScript types: `ScenarioNodeData`, `ScenarioNodeDetail` |
 
-Note: The `DashboardLayout` hides the `<Navbar />` and removes padding on the `/scenarios` route to give the builder a full-canvas feel.
+**BuilderSidebar node palette:**
+| Section | Nodes |
+|---|---|
+| Triggers | Run Now, Schedule, On Event |
+| Operators | Wait, Conditional Wait, Condition, Filter, End |
+| Actions | Assign Playbook, Create Task, Set Attribute, Send Email, Slack Message, Create Pipeline, MS Teams, Send Survey, Churn Entity |
+
+**EditNodePane configured actions (as of latest build):**
+
+| Node Label | Configuration Available |
+|---|---|
+| Send Email | Email service provider selector (multi-step tabs) |
+| On Event | Tabbed (Trigger setup / Re-entry criteria) + 3 radio triggers + conditional attribute expansion |
+| ↳ Change of attribute value | Attribute name selector, "Organization Enters" sub-radios |
+| ↳ Based on specified value change | "If value changes from" + "to" multi-select dropdowns with Done button |
+| Other nodes | Basic label/node details (placeholder) |
+
+**On Event trigger logic:**
+```
+selectedEventTrigger state (default: '')
+    ├── 'new_entity'    → Creation of new entity (no sub-form)
+    ├── 'attribute'     → Change of attribute value
+    │       └── selectedOrgEnters state (default: '')
+    │               ├── 'value_change'      → On Value Change (no sub-form)
+    │               ├── 'specified_change'  → shows "from/to" dropdowns
+    │               │       └── isToDropdownOpen → animated dropdown with Done button
+    │               └── 'percent_change'    → % change of value (no sub-form)
+    └── 'status'        → Change of Entity Status (no sub-form)
+```
 
 ---
 
-### 7. Settings (`pages/settings/`)
+### 8. Settings (`pages/settings/`)
 
 Multi-tab settings module:
 
 | File | Role |
 |---|---|
-| `SettingsPage.tsx` (3.4 KB) | Main page — tabs + active sub-route shell |
-| `AttributesTable.tsx` (9.5 KB) | Data attributes management table |
+| `SettingsPage.tsx` | Main page — tabs + active sub-route shell |
+| `AttributesTable.tsx` (9.5 KB) | Data attributes management table (add/edit/delete) |
 | `GlobalConfigSidebar.tsx` (3.8 KB) | Global configuration right panel |
 | `SettingPlaceholder.tsx` | Generic stub for unimplemented settings tabs |
 
 ---
 
-### 8. Integrations (`pages/integrations/Integrations.tsx`) (13 KB)
+### 9. Integrations (`pages/integrations/Integrations.tsx`)
 
-Integration catalogue with cards for connecting external tools.
+Integration catalogue with cards for connecting external tools (HubSpot, Salesforce, Slack, etc.)
+
+---
+
+### 10. Pipelines (`pages/pipelines/PipelinesPage.tsx`)
+
+Dual-view (list + kanban board) pipeline management module:
+- Drag-and-drop cards between pipeline stages
+- KPI metrics at top
+- Toggle between list and board views
 
 ---
 
@@ -279,34 +432,34 @@ App.tsx
   │     ├── Sidebar (dispatches logout, reads auth.user)
   │     └── Navbar
   │
+  ├── pages/dashboard/AdvanceDashboard.tsx
+  │     ├── HealthOverviewContainer → health-overview/ControlsView → charts/*
+  │     ├── TicketOverviewContainer → ticket-overview/ControlsView → charts/*
+  │     └── AITrendingTopics → ai-trending/ControlsView → components/dashboard/charts/*
+  │
   ├── pages/organizations/Details.tsx & pages/accounts/Details.tsx
   │     ├── components/organizations/MetricsPanel (or AccountMetricsPanel)
   │     ├── components/shared/PinnedAttributes
   │     ├── components/shared/ActivityFeed
-  │     │     └── components/organizations/activity/*Tab (Emails, Notes, CallSense, etc. x8)
-  │     └── (accountsData, accountActivityData, activityData)
+  │     │     └── components/organizations/activity/*Tab (x9)
+  │     │           └── CallSenseTab → features/tasks/tasksSlice (dispatch addTask)
+  │     └── (activityData, accountsData, accountActivityData)
   │
   ├── pages/organizations/List.tsx
   │     └── components/organizations/OrganizationsTable
-  │           ├── ActionBar
-  │           ├── EditColumnsPopover
-  │           ├── HealthPopover
-  │           ├── CsatPopover
-  │           ├── RowActionsPopover
+  │           ├── ActionBar, EditColumnsPopover, HealthPopover, CsatPopover, RowActionsPopover
   │           └── MetricsPanel
   │
   ├── pages/copilot/Index.tsx
-  │     ├── HomeView
-  │     ├── ChatView
-  │     ├── CockpitView
+  │     ├── HomeView, ChatView, CockpitView
   │     └── CopilotSidebar
   │
   └── pages/scenarios/CreateScenario.tsx
         ├── BuilderSidebar
         ├── ScenarioHeader
-        ├── CustomNodes
+        ├── CustomNodes (EntryNode, OperatorNode, ActionNode)
         ├── CustomEdge
-        └── EditNodePane
+        └── EditNodePane (reads/dispatches local state for On Event form)
 ```
 
 ---
@@ -321,19 +474,35 @@ App.tsx
 
 ---
 
+## Adding a New Activity Tab — Checklist
+
+1. Create `src/components/organizations/activity/MyTab.tsx` — follows `{ entityId }` prop pattern
+2. Export it from `src/components/organizations/activity/index.ts`
+3. Register it in `src/components/shared/ActivityFeed.tsx` in the `TABS` array and the `renderContent()` switch
+
+---
+
+## Adding a New Chart to a Dashboard — Checklist
+
+1. Create the chart in `src/components/dashboard/charts/` or `src/pages/dashboard/tabs/<section>/charts/`
+2. Use **Recharts** with standardized donut params: `innerRadius={45}` `outerRadius={60}` to prevent label clipping
+3. Import and place it in the appropriate `ControlsView.tsx`
+
+---
+
 ## Known Stubs / Not Yet Implemented
 
 | Route | Status |
 |---|---|
-| `/dashboard` | Placeholder div |
-| `/organizations/board` | Placeholder (`Board.tsx` is 296 bytes) |
+| `/organizations/board` | Stub (`Board.tsx` is 296 bytes) |
 | `/communications` | No route defined |
 | `/accounts` (list) | No list route, only `/accounts/:id` |
-| `/pipelines` | No route defined |
 | `/sfdc`, `/feedbacks` | No route defined |
 | `/segments`, `/projects`, `/surveys`, `/campaigns`, `/canvas` | No route defined |
 | `/lifecycle`, `/health`, `/users` | No route defined |
-| `/settings/currency` ... `/settings/ai-agent` | Stub `SettingPlaceholder` |
+| `/settings/currency` … `/settings/ai-agent` | Stub `SettingPlaceholder` |
+| `/dashboard/advance/*` (non-controls sub-routes) | `PlaceholderView` |
+| `/dashboard/custom` | Placeholder div |
 
 ---
 
@@ -346,14 +515,15 @@ User Action
 React Component (page/component)
     │
     ├── Local state (useState) for UI-only state
+    │       Examples: activeFilter (health donut), selectedCall (CallSense),
+    │                 selectedEventTrigger (EditNodePane), openAccordions, etc.
     │
-    ├── Redux dispatch() → authSlice thunk
-    │       └── Mock async delay (800ms)
-    │               └── Match against DUMMY_USERS
-    │                       └── Set state + persist to localStorage
+    ├── Redux dispatch()
+    │       ├── authSlice → login/logout + localStorage persistence
+    │       └── tasksSlice → addTask (triggered from CallSense AI actions)
     │
-    └── Mock data files (*.ts) for table/list data
+    └── Mock data files (*.ts) for table/list/chart data
             └── Imported directly — no API calls
 ```
 
-> **Note:** This app currently has no real backend. All data is statically imported from mock data files (`tableData.ts`, `activityData.ts`, etc.). The only "async" operation is the simulated login delay in `authSlice.ts`.
+> **Note:** This app has no real backend. All data is statically imported from mock data files (`tableData.ts`, `activityData.ts`, etc.). The only "async" operation is the simulated login delay in `authSlice.ts`.
