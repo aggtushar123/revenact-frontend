@@ -25,7 +25,7 @@ import { ControlsView as TicketControlsView } from './pages/dashboard/tabs/ticke
 
 function RootRedirect() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  return <Navigate to={isAuthenticated ? '/organizations/list' : '/login'} replace />;
+  return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />;
 }
 
 function App() {
@@ -46,7 +46,7 @@ function App() {
           <Route path="dashboard">
             <Route index element={<Navigate to="advance" replace />} />
             <Route path="advance" element={<AdvanceDashboard />}>
-              <Route index element={<Navigate to="ai-trending" replace />} />
+              <Route index element={<Navigate to="health" replace />} />
               <Route path="ai-trending" element={<AITrendingTopics />}>
                 <Route index element={<Navigate to="controls" replace />} />
                 <Route path="controls" element={<ControlsView />} />

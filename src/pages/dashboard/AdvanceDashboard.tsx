@@ -4,7 +4,7 @@ export function AdvanceDashboard() {
   const location = useLocation();
 
   if (location.pathname === '/dashboard/advance') {
-    return <Navigate to="ai-trending" replace />;
+    return <Navigate to="health" replace />;
   }
 
   const tabs = [
