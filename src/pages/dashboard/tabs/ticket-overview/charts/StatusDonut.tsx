@@ -24,6 +24,7 @@ export function StatusDonut() {
               paddingAngle={1}
               dataKey="value"
               stroke="none"
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               label={(props: any) => {
                 const { cx, cy, midAngle, outerRadius, value, name } = props;
                 const RADIAN = Math.PI / 180;
@@ -56,6 +57,7 @@ export function StatusDonut() {
             </Pie>
             <Tooltip 
                contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+               // eslint-disable-next-line @typescript-eslint/no-explicit-any
                formatter={(value: any) => [value, 'Count']}
             />
           </PieChart>
