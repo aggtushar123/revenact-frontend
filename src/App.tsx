@@ -14,6 +14,12 @@ import { Integrations } from './pages/integrations/Integrations';
 import { List as ContactsList } from './pages/contacts/List';
 import { PipelinesPage } from './pages/pipelines/PipelinesPage';
 import { useAppSelector } from './hooks';
+import { AdvanceDashboard } from './pages/dashboard/AdvanceDashboard';
+import { AITrendingTopics } from './pages/dashboard/tabs/AITrendingTopics';
+import { ControlsView } from './pages/dashboard/tabs/ai-trending/ControlsView';
+import { PlaceholderView } from './pages/dashboard/tabs/ai-trending/PlaceholderView';
+import { HealthOverviewContainer } from './pages/dashboard/tabs/HealthOverviewContainer';
+import { ControlsView as HealthControlsView } from './pages/dashboard/tabs/health-overview/ControlsView';
 
 function RootRedirect() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -35,11 +41,33 @@ function App() {
         }>
           <Route index element={<RootRedirect />} />
           
-          <Route path="dashboard" element={
-            <div className="w-full h-full border-2 border-dashed border-gray-200/60 rounded-xl flex items-center justify-center bg-white/50 backdrop-blur-sm">
-              <p className="text-gray-400 font-medium tracking-wide">Main Dashboard</p>
-            </div>
-          } />
+          <Route path="dashboard">
+            <Route index element={<Navigate to="advance" replace />} />
+            <Route path="advance" element={<AdvanceDashboard />}>
+              <Route index element={<Navigate to="ai-trending" replace />} />
+              <Route path="ai-trending" element={<AITrendingTopics />}>
+                <Route index element={<Navigate to="controls" replace />} />
+                <Route path="controls" element={<ControlsView />} />
+                <Route path="*" element={<PlaceholderView />} />
+              </Route>
+              <Route path="health" element={<HealthOverviewContainer />}>
+                <Route index element={<Navigate to="controls" replace />} />
+                <Route path="controls" element={<HealthControlsView />} />
+                <Route path="*" element={<PlaceholderView />} />
+              </Route>
+              {/* Fallback for other tabs */}
+              <Route path="*" element={
+                <div className="w-full h-full border-2 border-dashed border-gray-200/60 rounded-xl flex items-center justify-center bg-white/50 backdrop-blur-sm">
+                  <p className="text-gray-400 font-medium tracking-wide">Tab under development</p>
+                </div>
+              } />
+            </Route>
+            <Route path="custom" element={
+              <div className="w-full h-full border-2 border-dashed border-gray-200/60 rounded-xl flex items-center justify-center bg-white/50 backdrop-blur-sm m-4 p-8">
+                <p className="text-gray-400 font-medium tracking-wide">Custom Dashboard (Beta) Coming Soon...</p>
+              </div>
+            } />
+          </Route>
           
           <Route path="organizations">
             <Route index element={<Navigate to="list" replace />} />

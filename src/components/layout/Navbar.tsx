@@ -31,6 +31,7 @@ export function Navbar() {
   const isCopilot = location.pathname === '/copilot';
   const isSettings = location.pathname.startsWith('/settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
+  const isDashboard = location.pathname.startsWith('/dashboard');
 
   const [currentDate, setCurrentDate] = useState(new Date());
 
@@ -173,6 +174,26 @@ export function Navbar() {
               ))}
             </nav>
           </>
+        ) : isDashboard ? (
+          <div className="flex items-center gap-4 h-full">
+            <h1 className="text-[17px] font-bold text-gray-800 tracking-tight">Dashboard</h1>
+            
+            <div className="flex items-center p-1 rounded-lg">
+              <NavLink
+                to="/dashboard/advance"
+                className={({ isActive }) => `text-[13px] font-bold px-3 py-1.5 rounded-md transition-colors ${isActive ? 'text-indigo-600 bg-indigo-50/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] border border-indigo-100/50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+              >
+                Advance Dashboards
+              </NavLink>
+              <NavLink
+                to="/dashboard/custom"
+                className={({ isActive }) => `text-[13px] font-bold px-3 py-1.5 flex items-center gap-2 rounded-md transition-colors ${isActive ? 'text-indigo-600 bg-indigo-50/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] border border-indigo-100/50' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+              >
+                Custom Dashboard
+                <span className="text-[9px] uppercase font-bold tracking-widest bg-red-100 text-red-600 px-1 py-0.5 rounded shadow-sm">beta</span>
+              </NavLink>
+            </div>
+          </div>
         ) : (
           <div className="flex items-center gap-2 py-1.5 px-2 -ml-2 rounded-md">
             <h1 className="text-[17px] font-bold text-gray-800 tracking-tight capitalize">
