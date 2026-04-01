@@ -1,24 +1,18 @@
-import { NavLink, Outlet, Navigate, useLocation } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 
-export function HealthOverviewContainer() {
-  const location = useLocation();
-
-  if (location.pathname === '/dashboard/advance/health') {
-    return <Navigate to="controls" replace />;
-  }
-
+export function TicketOverviewContainer() {
   const subtabs = [
     { label: 'Controls', path: 'controls' },
-    { label: 'Renewal Date', suffix: 'All', path: 'renewal-date' },
+    { label: 'Ticket Date', suffix: 'All', path: 'ticket-date' },
     { label: 'Primary Owner', suffix: 'All', path: 'primary-owner' },
-    { label: 'Lifecycle Stage', suffix: 'All', path: 'lifecycle-stage' },
+    { label: 'Ticket Priority', suffix: 'All', path: 'ticket-priority' },
     { label: 'Account', suffix: 'All', path: 'account' },
   ];
 
   return (
     <div className="flex flex-col h-full w-full">
-      {/* Sub-navigation bar mimicking former filter bar */}
-      <div className="flex items-center px-4 bg-white border-b border-gray-100 shrink-0 overflow-x-auto scrollbar-none shadow-[0_2px_4px_rgba(0,0,0,0.01)] mb-4 rounded-lg">
+      {/* Sub-navigation bar mimicking Health Overview */}
+      <div className="flex items-center px-4 bg-white border-b border-gray-100 shrink-0 overflow-x-auto scrollbar-none shadow-[0_2px_4px_rgba(0,0,0,0.01)] mb-4 rounded-lg mt-1">
         <div className="flex items-center min-w-max h-[40px]">
           {subtabs.map((tab, idx) => (
             <div key={tab.path} className="flex items-center h-full">
@@ -45,7 +39,6 @@ export function HealthOverviewContainer() {
         </div>
       </div>
 
-      {/* Renders ControlsView or PlaceholderView for Health */}
       <div className="flex-1 w-full h-full">
         <Outlet />
       </div>
