@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Sparkles, ArrowUp, ChevronRight } from 'lucide-react';
 
 export function HomeView({ 
@@ -10,6 +10,8 @@ export function HomeView({
   selectedSkill?: string | null,
   onSelectSkill?: (skill: string | null) => void
 }) {
+  const [inputText, setInputText] = useState("");
+
   useEffect(() => {
     if (selectedSkill) {
       // Adding a small delay ensures layout is complete before scrolling
@@ -88,10 +90,18 @@ export function HomeView({
             <div className="relative bg-white border-2 border-[#d3cef6] rounded-xl flex items-end min-h-[104px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] focus-within:ring-4 focus-within:ring-indigo-500/10 transition-shadow">
               <textarea
                 className="w-full h-full min-h-[96px] bg-transparent resize-none outline-none border-none p-4 text-[15px] placeholder:text-gray-300 placeholder:italic text-gray-700 font-medium"
-                placeholder="Type '{' to add variables, like {Account} and {Organization}"
+                placeholder="Type '/' to add variables, like {Account} and {Organization}"
+                value={inputText}
+                onChange={e => setInputText(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (inputText.trim()) onSendPrompt(inputText);
+                  }
+                }}
               />
               <button
-                onClick={() => onSendPrompt("test")}
+                onClick={() => { if (inputText.trim()) onSendPrompt(inputText); }}
                 className="absolute right-3.5 bottom-3.5 w-[26px] h-[26px] bg-[#f1f1f4] hover:bg-[#8b5cf6] hover:text-white rounded-full flex items-center justify-center text-white shadow-sm transition-all cursor-pointer group"
               >
                 <ArrowUp className="w-[14px] h-[14px] stroke-[3.5px] text-gray-400 group-hover:text-white" />

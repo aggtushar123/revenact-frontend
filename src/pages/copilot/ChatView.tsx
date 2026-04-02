@@ -1,8 +1,12 @@
-import { ArrowUp, Copy, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowUp, Copy, ThumbsUp, ThumbsDown, Sparkles } from 'lucide-react';
 
+const FIRST_QUESTION = "What accounts should the team be focusing to get ahead of any risks and to expand them?";
 const USER_QUESTION = "But why are these accounts are at risk and what is the impact? It would be helpful if you're able to share some insights from calls, emails & tickets - highlighting customer quotes and what channel they came from.";
 
-export function ChatView({ onSendPrompt, isEmpty }: { onSendPrompt: (p: string) => void, isEmpty?: boolean }) {
+export function ChatView({ onSendPrompt, isEmpty, chatStep = 2, isGenerating, pendingPrompt }: { onSendPrompt: (p: string) => void, isEmpty?: boolean, chatStep?: number, isGenerating?: boolean, pendingPrompt?: string | null }) {
+  const [inputText, setInputText] = useState("");
+
   return (
     <div className="flex-1 h-full flex flex-col bg-white relative">
       <div className="flex-1 overflow-y-auto px-6 py-8 w-full mx-auto pb-[180px] custom-scrollbar selection:bg-indigo-100">
@@ -10,8 +14,154 @@ export function ChatView({ onSendPrompt, isEmpty }: { onSendPrompt: (p: string) 
         {!isEmpty && (
           <div className="flex flex-col gap-10 w-full max-w-[860px] mx-auto">
 
-            {/* User Question Bubble */}
-            <div className="flex justify-end">
+            {/* ── Turn 1 ── */}
+            {chatStep >= 1 && (
+              <>
+                <div className="flex justify-end">
+              <div className="max-w-[65%] bg-[#f4effc] border border-[#e1d5f8] rounded-2xl rounded-tr-sm px-4 py-3 text-[13.5px] text-gray-700 font-medium leading-[1.65] shadow-sm">
+                {FIRST_QUESTION}
+              </div>
+            </div>
+
+            {/* ── Turn 1: AI Response ── */}
+            <div className="flex flex-col gap-1 border-l-2 border-[#e1daff] pl-7 py-1">
+              <h2 className="text-[22px] font-bold text-gray-900 tracking-tight leading-tight mb-1">
+                At-Risk & Expansion Focus Accounts
+              </h2>
+              <p className="text-[13.5px] text-gray-500 font-medium mb-8 leading-relaxed">
+                Based on health scores and revenue analysis, here are the key accounts requiring immediate attention for risk mitigation and expansion opportunities:
+              </p>
+
+              {/* Critical Risk Accounts */}
+              <div className="mb-8">
+                <h3 className="text-[16px] font-bold text-gray-900 mb-1 flex items-center gap-2">🚨 Critical Risk Accounts (Immediate Action Required)</h3>
+                <p className="text-[13px] text-gray-500 font-medium mb-4">These accounts have the lowest health scores and show severe warning signs that require urgent intervention:</p>
+                <p className="text-[13px] font-bold text-gray-800 mb-3">High-Risk Accounts Requiring Immediate Attention</p>
+                <div className="overflow-hidden rounded-xl border border-gray-200">
+                  <table className="w-full text-[12.5px]">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        {["ACCOUNT", "HEALTH SCORE", "ARR ($)", "RENEWAL DATE", "KEY RISK FACTORS", "CSM"].map(h => (
+                          <th key={h} className="px-4 py-2.5 text-left font-bold text-gray-500 uppercase tracking-wide text-[11px]">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {[
+                        { account: "Culinary Innovation Lab (HCIL)", health: "3.8/10", arr: "60.4K", renewal: "Apr 23, 2026", risk: "73% license underutilization, R&D team abandonment, NPS -100", csm: "Joe Smith" },
+                        { account: "Digital Operations", health: "3.8/10", arr: "30.9K", renewal: "Apr 7, 2026", risk: "90% license underutilization, trust erosion, manual process reversion", csm: "Joe Smith" },
+                        { account: "EMEA Operations", health: "4.5/10", arr: "38.7K", renewal: "Nov 27, 2026", risk: "Leadership questioning value, teams stopped using platform", csm: "Joe Smith" },
+                        { account: "Global Procurement Partners (GPP)", health: "4.6/10", arr: "23.5K", renewal: "Jul 16, 2026", risk: "58% license abandonment, trust issues from past support problems", csm: "Daniel Trial Test" },
+                      ].map((row, i) => (
+                        <tr key={i} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 font-semibold text-gray-800">{row.account}</td>
+                          <td className="px-4 py-3 font-bold text-red-600">{row.health}</td>
+                          <td className="px-4 py-3 text-gray-700 font-medium">{row.arr}</td>
+                          <td className="px-4 py-3 text-gray-700 font-medium">{row.renewal}</td>
+                          <td className="px-4 py-3 text-gray-500 font-medium">{row.risk}</td>
+                          <td className="px-4 py-3 text-gray-700 font-medium">{row.csm}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Prime Expansion Opportunity */}
+              <div className="mb-8">
+                <h3 className="text-[16px] font-bold text-gray-900 mb-1 flex items-center gap-2">🎯 Prime Expansion Opportunity</h3>
+                <p className="text-[13px] text-gray-500 font-medium mb-4"><span className="font-bold text-gray-700">Apple EMEA</span> stands out as the ideal expansion target with exceptional health metrics and strong revenue foundation:</p>
+                <p className="text-[13px] font-bold text-gray-800 mb-3">Top Expansion Opportunity</p>
+                <div className="overflow-hidden rounded-xl border border-gray-200">
+                  <table className="w-full text-[12.5px]">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        {["ACCOUNT", "HEALTH SCORE", "CURRENT ARR ($)", "LICENSE UTILIZATION (%)", "NPS", "EXPANSION POTENTIAL"].map(h => (
+                          <th key={h} className="px-4 py-2.5 text-left font-bold text-gray-500 uppercase tracking-wide text-[11px]">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr className="hover:bg-gray-50 transition-colors">
+                        <td className="px-4 py-3 font-semibold text-gray-800">Apple EMEA</td>
+                        <td className="px-4 py-3 font-bold text-emerald-600">9.3/10</td>
+                        <td className="px-4 py-3 text-gray-700 font-medium">128.3K</td>
+                        <td className="px-4 py-3 text-gray-700 font-medium">81%</td>
+                        <td className="px-4 py-3 text-gray-700 font-medium">100</td>
+                        <td className="px-4 py-3 text-gray-500 font-medium">High – Platform integrated into operations, proactive positive feedback</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Recommended Action Plan */}
+              <div className="mb-4">
+                <h3 className="text-[16px] font-bold text-gray-900 mb-4 flex items-center gap-2">📋 Recommended Action Plan</h3>
+                <div className="flex flex-col gap-4">
+                  <div>
+                    <p className="text-[13.5px] font-bold text-gray-800 mb-2">Immediate Risk Mitigation (Next 30 Days):</p>
+                    <ul className="flex flex-col gap-1.5">
+                      {[
+                        { bold: "Emergency intervention", rest: " for HCIL and Digital Operations (both renewing in April)" },
+                        { bold: "Executive escalation", rest: " meetings with leadership at all four risk accounts" },
+                        { bold: "Recovery roadmaps", rest: " with specific milestones and success metrics" },
+                        { bold: "Weekly check-ins", rest: " to monitor progress and prevent churn" },
+                      ].map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[13.5px] text-gray-600 font-medium">
+                          <span className="text-gray-300 mt-[3px] shrink-0">•</span>
+                          <span><strong className="text-gray-800">{item.bold}</strong>{item.rest}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-[13.5px] font-bold text-gray-800 mb-2">Expansion Strategy:</p>
+                    <ul className="flex flex-col gap-1.5">
+                      {[
+                        { bold: "Proactive outreach", rest: " to Apple EMEA for additional licenses/modules" },
+                        { bold: "Success story documentation", rest: " to leverage with other accounts" },
+                        { bold: "Upsell discussions", rest: " during their renewal cycle (Jan 2026)" },
+                      ].map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[13.5px] text-gray-600 font-medium">
+                          <span className="text-gray-300 mt-[3px] shrink-0">•</span>
+                          <span><strong className="text-gray-800">{item.bold}</strong>{item.rest}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="text-[13.5px] font-bold text-gray-800 mb-2">Resource Allocation:</p>
+                    <ul className="flex flex-col gap-1.5">
+                      {[
+                        { bold: "Joe Smith", rest: " needs immediate support managing 3 critical accounts" },
+                        { bold: "", rest: "Consider account redistribution or additional CSM resources" },
+                        { bold: "Product/Engineering escalation", rest: " for platform reliability issues" },
+                      ].map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[13.5px] text-gray-600 font-medium">
+                          <span className="text-gray-300 mt-[3px] shrink-0">•</span>
+                          <span>{item.bold && <strong className="text-gray-800">{item.bold}</strong>}{item.rest}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Feedback row for turn 1 */}
+              <div className="flex items-center gap-[18px] mt-4 text-gray-400">
+                <button className="hover:text-gray-700 hover:bg-gray-100 rounded-md p-1.5 transition-colors -ml-1.5"><Copy className="w-4 h-4 stroke-[2px]" /></button>
+                <button className="hover:text-gray-700 hover:bg-gray-100 rounded-md p-1.5 transition-colors"><ThumbsUp className="w-4 h-4 stroke-[2px]" /></button>
+                <button className="hover:text-gray-700 hover:bg-gray-100 rounded-md p-1.5 transition-colors"><ThumbsDown className="w-4 h-4 stroke-[2px]" /></button>
+              </div>
+            </div>
+            </>
+            )}
+
+            {/* ── Turn 2 ── */}
+            {chatStep >= 2 && (
+              <>
+              <div className="flex justify-end">
               <div className="max-w-[65%] bg-[#f4effc] border border-[#e1d5f8] rounded-2xl rounded-tr-sm px-4 py-3 text-[13.5px] text-gray-700 font-medium leading-[1.65] shadow-sm">
                 {USER_QUESTION}
               </div>
@@ -169,6 +319,34 @@ export function ChatView({ onSendPrompt, isEmpty }: { onSendPrompt: (p: string) 
               </div>
 
             </div>
+            </>
+            )}
+
+            {/* ── Generating State ── */}
+            {isGenerating && pendingPrompt && (
+              <>
+                <div className="flex justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="max-w-[65%] bg-[#f4effc] border border-[#e1d5f8] rounded-2xl rounded-tr-sm px-4 py-3 text-[13.5px] text-gray-700 font-medium leading-[1.65] shadow-sm">
+                    {pendingPrompt}
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-1 border-l-2 border-[#e1daff] pl-7 py-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                  <div className="flex items-center gap-3 text-[#6b47ed]">
+                    <div className="w-[22px] h-[22px] rounded-full bg-gradient-to-br from-[#8b5cf6] to-[#7c3aed] flex items-center justify-center text-white shadow-[0_2px_8px_rgba(139,92,246,0.4)] animate-pulse">
+                      <Sparkles className="w-[12px] h-[12px]" />
+                    </div>
+                    <span className="text-[13.5px] font-bold tracking-tight">Copilot is analyzing...</span>
+                    <div className="flex items-center gap-1 ml-1 mt-1">
+                      <div className="w-1.5 h-1.5 bg-[#8b5cf6] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+                      <div className="w-1.5 h-1.5 bg-[#8b5cf6] rounded-full animate-bounce [animation-delay:-0.15s] mx-1"></div>
+                      <div className="w-1.5 h-1.5 bg-[#8b5cf6] rounded-full animate-bounce"></div>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
           </div>
         )}
       </div>
@@ -181,9 +359,25 @@ export function ChatView({ onSendPrompt, isEmpty }: { onSendPrompt: (p: string) 
             <textarea
               className="w-full h-full min-h-[64px] bg-transparent resize-none outline-none border-none p-4 text-[15px] placeholder:text-gray-300 placeholder:italic text-gray-700 font-medium leading-relaxed"
               placeholder="Type '/' to add variables, like {Account} and {Organization}"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (inputText.trim()) {
+                    onSendPrompt(inputText);
+                    setInputText("");
+                  }
+                }
+              }}
             />
             <button
-              onClick={() => onSendPrompt("test")}
+              onClick={() => {
+                if (inputText.trim()) {
+                  onSendPrompt(inputText);
+                  setInputText("");
+                }
+              }}
               className="absolute right-3.5 bottom-3.5 w-[26px] h-[26px] bg-[#f1f1f4] hover:bg-[#8b5cf6] hover:text-white rounded-full flex items-center justify-center text-white shadow-sm transition-all cursor-pointer group"
             >
               <ArrowUp className="w-[14px] h-[14px] stroke-[3.5px] text-gray-400 group-hover:text-white" />

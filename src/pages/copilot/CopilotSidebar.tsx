@@ -5,7 +5,7 @@ interface Props {
   isExpanded: boolean;
   setIsExpanded: (val: boolean) => void;
   onNewChat?: () => void;
-  onSelectChat?: () => void;
+  onSelectChat?: (chatName: string) => void;
   onSelectSkill?: (skill: string) => void;
 }
 
@@ -100,9 +100,9 @@ export function CopilotSidebar({ isExpanded, setIsExpanded, onNewChat, onSelectC
   );
 }
 
-function ChatItem({ text, isActive, onClick }: { text: string, isActive?: boolean, onClick?: () => void }) {
+function ChatItem({ text, isActive, onClick }: { text: string, isActive?: boolean, onClick?: (text: string) => void }) {
   return (
-    <div onClick={onClick} className={`text-[12.5px] py-[6px] px-2.5 rounded-md cursor-pointer truncate transition-colors font-medium border border-transparent ${
+    <div onClick={() => onClick?.(text)} className={`text-[12.5px] py-[6px] px-2.5 rounded-md cursor-pointer truncate transition-colors font-medium border border-transparent ${
       isActive ? 'bg-[#f4effc] text-[#6b47ed] font-bold border-[#e1d5f8] shadow-sm' : 'text-gray-500 hover:bg-gray-50 hover:text-gray-800'
     }`}>
       {text}

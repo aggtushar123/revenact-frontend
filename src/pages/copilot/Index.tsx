@@ -9,10 +9,24 @@ export function CopilotIndex() {
   const [activeTab, setActiveTab] = useState<'copilot' | 'cockpit'>('copilot');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [selectedSkill, setSelectedSkill] = useState<string | null>(null);
+  const [chatStep, setChatStep] = useState(0);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null);
 
   const handleSendPrompt = (prompt: string) => {
-    if (prompt.trim()) {
+    if (prompt.trim() && !isGenerating) {
       setView('chat');
+      setIsGenerating(true);
+      setPendingPrompt(prompt);
+      const p = prompt.toLowerCase();
+      
+      const nextStep = (p.includes("why") || p.includes("impact")) && chatStep >= 1 ? 2 : 1;
+      
+      setTimeout(() => {
+        setChatStep(nextStep);
+        setPendingPrompt(null);
+        setIsGenerating(false);
+      }, 1800);
     }
   };
 
@@ -62,17 +76,31 @@ export function CopilotIndex() {
               onNewChat={() => {
                 setView('empty-chat');
                 setSelectedSkill(null);
+                setChatStep(0);
+                setIsGenerating(false);
+                setPendingPrompt(null);
               }}
-              onSelectChat={() => setView('chat')}
+              onSelectChat={(chatName) => {
+                setView('chat');
+                if (chatName === "Focus Accounts for Risk and Gr...") {
+                  setChatStep(1);
+                  setIsGenerating(false);
+                  setPendingPrompt(null);
+                } else {
+                  setChatStep(0);
+                  setIsGenerating(false);
+                  setPendingPrompt(null);
+                }
+              }}
               onSelectSkill={handleSelectSkill}
             />
             <div className="flex-1 overflow-hidden relative bg-white border border-gray-200/80 shadow-[0px_4px_24px_rgba(0,0,0,0.04)] rounded-[20px] m-1 mt-4 mr-4 mb-4 flex">
               {view === 'home' ? (
                 <HomeView onSendPrompt={handleSendPrompt} selectedSkill={selectedSkill} onSelectSkill={handleSelectSkill} />
               ) : view === 'empty-chat' ? (
-                <ChatView onSendPrompt={handleSendPrompt} isEmpty />
+                <ChatView onSendPrompt={handleSendPrompt} isEmpty chatStep={chatStep} isGenerating={isGenerating} pendingPrompt={pendingPrompt} />
               ) : (
-                <ChatView onSendPrompt={handleSendPrompt} />
+                <ChatView onSendPrompt={handleSendPrompt} chatStep={chatStep} isGenerating={isGenerating} pendingPrompt={pendingPrompt} />
               )}
             </div>
           </>
