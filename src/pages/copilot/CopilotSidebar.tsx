@@ -90,7 +90,7 @@ export function CopilotSidebar({ isExpanded, setIsExpanded, onNewChat, onSelectC
                <ChatItem text="Apple QBR Client Deck with Ta..." onClick={onSelectChat} />
                <ChatItem text="Apple QBR Deck Client Present..." onClick={onSelectChat} />
                <ChatItem text="Internal Business Review Apple..." onClick={onSelectChat} />
-               <ChatItem text="Focus Accounts for Risk and Gr..." isActive onClick={onSelectChat} />
+               <ChatItem text="Focus Accounts for Risk and Gr..." onClick={onSelectChat} />
                <ChatItem text="High-Impact Revenue Account..." onClick={onSelectChat} />
             </div>
           )}
