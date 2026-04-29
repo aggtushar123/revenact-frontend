@@ -22,6 +22,16 @@ import { HealthOverviewContainer } from './pages/dashboard/tabs/HealthOverviewCo
 import { ControlsView as HealthControlsView } from './pages/dashboard/tabs/health-overview/ControlsView';
 import { TicketOverviewContainer } from './pages/dashboard/tabs/ticket-overview/TicketOverviewContainer';
 import { ControlsView as TicketControlsView } from './pages/dashboard/tabs/ticket-overview/ControlsView';
+// Company Brain pages
+import { BrainDashboard } from './pages/brain/Dashboard';
+import { KnowledgeGraph } from './pages/brain/Graph';
+import { KnowledgeNodes } from './pages/brain/Nodes';
+import { NodeDetail } from './pages/brain/NodeDetail';
+import { SkillsLibrary } from './pages/brain/Skills';
+import { SkillDetail } from './pages/brain/SkillDetail';
+import { ConnectorsPage } from './pages/brain/Connectors';
+import { ReviewQueue } from './pages/brain/Review';
+import { FeedbackLog } from './pages/brain/Feedback';
 
 function RootRedirect() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -111,6 +121,20 @@ function App() {
             <Route index element={<Navigate to="board" replace />} />
             <Route path="list" element={<PipelinesPage view="list" />} />
             <Route path="board" element={<PipelinesPage view="board" />} />
+          </Route>
+
+          {/* Company Brain routes */}
+          <Route path="brain">
+            <Route index element={<Navigate to="dashboard" replace />} />
+            <Route path="dashboard" element={<BrainDashboard />} />
+            <Route path="graph" element={<KnowledgeGraph />} />
+            <Route path="nodes" element={<KnowledgeNodes />} />
+            <Route path="nodes/:id" element={<NodeDetail />} />
+            <Route path="skills" element={<SkillsLibrary />} />
+            <Route path="skills/:id" element={<SkillDetail />} />
+            <Route path="connectors" element={<ConnectorsPage />} />
+            <Route path="review" element={<ReviewQueue />} />
+            <Route path="feedback" element={<FeedbackLog />} />
           </Route>
           
           {/* Catch-all route to avoid losing layout on unimplemented tabs */}

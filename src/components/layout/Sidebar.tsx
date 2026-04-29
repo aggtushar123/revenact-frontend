@@ -4,7 +4,8 @@ import logoImg from '../../assets/logo.png';
 import { 
   LayoutGrid, MessageSquare, Network, Layers, Users, 
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
-  Columns, PenTool, Box, CircleDot, HeartPulse, UserCog, Plug, LogOut
+  Columns, PenTool, Box, CircleDot, HeartPulse, UserCog, Plug, LogOut,
+  Brain, GitMerge, BookOpen, CheckSquare, Zap
 } from 'lucide-react';
 import { useAppSelector, useAppDispatch } from '../../hooks';
 import { logout } from '../../features/auth/authSlice';
@@ -17,6 +18,7 @@ export function Sidebar() {
   const user = useAppSelector((state) => state.auth.user);
 
   const isOrgsActive = location.pathname.includes('/organizations');
+  const reviewCount = useAppSelector(s => s.brain.metrics.nodesPendingReview);
 
   return (
     <aside 
@@ -94,6 +96,23 @@ export function Sidebar() {
         <NavItem to="/campaigns" icon={<Columns className="w-[18px] h-[18px]" />} label="Campaigns" isExpanded={isExpanded} />
         <NavItem to="/canvas" icon={<PenTool className="w-[18px] h-[18px]" />} label="Canvas" isExpanded={isExpanded} />
 
+        {/* KNOWLEDGE BRAIN Section */}
+        {isExpanded ? (
+          <div className="text-[10px] font-bold text-gray-400/80 mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
+            KNOWLEDGE BRAIN <div className="h-px bg-gray-100 flex-1 ml-1 mr-2"></div>
+          </div>
+        ) : (
+          <div className="h-px bg-gray-100 mt-4 mb-2 mx-2"></div>
+        )}
+
+        <NavItem to="/brain/dashboard" icon={<Brain className="w-[18px] h-[18px]" />} label="Brain Overview" isExpanded={isExpanded} />
+        <NavItem to="/brain/graph" icon={<GitMerge className="w-[18px] h-[18px]" />} label="Knowledge Graph" isExpanded={isExpanded} />
+        <NavItem to="/brain/nodes" icon={<Network className="w-[18px] h-[18px]" />} label="Nodes" isExpanded={isExpanded} badge={reviewCount} />
+        <NavItem to="/brain/skills" icon={<BookOpen className="w-[18px] h-[18px]" />} label="Skills" isExpanded={isExpanded} />
+        <NavItem to="/brain/connectors" icon={<Plug className="w-[18px] h-[18px]" />} label="Connectors" isExpanded={isExpanded} />
+        <NavItem to="/brain/review" icon={<CheckSquare className="w-[18px] h-[18px]" />} label="Review Queue" isExpanded={isExpanded} badge={reviewCount} />
+        <NavItem to="/brain/feedback" icon={<Zap className="w-[18px] h-[18px]" />} label="Feedback" isExpanded={isExpanded} />
+
         {/* SETUP Section */}
         {isExpanded ? (
           <div className="text-[10px] font-bold text-gray-400/80 mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
@@ -141,7 +160,7 @@ export function Sidebar() {
   );
 }
 
-function NavItem({ icon, to, label, isExpanded, isActiveOverride = false }: { icon: React.ReactNode, to: string, label: string, isExpanded: boolean, isActiveOverride?: boolean }) {
+function NavItem({ icon, to, label, isExpanded, isActiveOverride = false, badge }: { icon: React.ReactNode, to: string, label: string, isExpanded: boolean, isActiveOverride?: boolean, badge?: number }) {
   return (
     <NavLink
       to={to}
@@ -166,12 +185,15 @@ function NavItem({ icon, to, label, isExpanded, isActiveOverride = false }: { ic
             </div>
             
             {isExpanded && (
-              <span className={`text-[13px] font-semibold truncate transition-colors ${active ? 'text-rose-500' : 'text-gray-600 group-hover:text-gray-900'}`}>
+              <span className={`text-[13px] font-semibold truncate transition-colors flex-1 ${active ? 'text-rose-500' : 'text-gray-600 group-hover:text-gray-900'}`}>
                 {label}
               </span>
             )}
-            
-            {/* Soft left accent indicating selection optionally */}
+
+            {/* Badge */}
+            {badge !== undefined && badge > 0 && isExpanded && (
+              <span style={{ background: 'var(--warning)', color: '#ffffff', borderRadius: '3px', padding: '1px 5px', fontSize: '9px', fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0, lineHeight: 1.6 }}>{badge}</span>
+            )}
           </>
         );
       }}

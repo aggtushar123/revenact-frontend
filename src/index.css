@@ -1,1 +1,132 @@
 @import "tailwindcss";
+
+/* ─────────────────────────────────────────────────────────────
+   TIER 1 — Primitive tokens: raw values (Velaris Light Theme)
+───────────────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --bg-base:         #F9FAFB; /* gray-50 */
+  --bg-surface:      #FFFFFF; /* white */
+  --bg-elevated:     #FFFFFF; /* white */
+  --bg-subtle:       #F3F4F6; /* gray-100 */
+
+  /* Text */
+  --text-primary:    #111827; /* gray-900 */
+  --text-secondary:  #4B5563; /* gray-600 */
+  --text-tertiary:   #9CA3AF; /* gray-400 */
+
+  /* Accent — Velaris Rose */
+  --accent:          #F43F5E; /* rose-500 */
+  --accent-dim:      #FFF1F2; /* rose-50 */
+  --accent-hover:    #E11D48; /* rose-600 */
+
+  /* Semantic */
+  --success:         #10B981; /* emerald-500 */
+  --warning:         #F59E0B; /* amber-500 */
+  --danger:          #EF4444; /* red-500 */
+  --info:            #3B82F6; /* blue-500 */
+
+  --success-dim:     #ECFDF5; /* emerald-50 */
+  --warning-dim:     #FFFBEB; /* amber-50 */
+  --danger-dim:      #FEF2F2; /* red-50 */
+  --info-dim:        #EFF6FF; /* blue-50 */
+
+  /* Borders */
+  --border-subtle:   #F3F4F6; /* gray-100 */
+  --border-default:  #E5E7EB; /* gray-200 */
+  --border-strong:   #D1D5DB; /* gray-300 */
+
+  /* Motion */
+  --ease-out:        cubic-bezier(0.0, 0.0, 0.2, 1);
+  --ease-in:         cubic-bezier(0.4, 0.0, 1, 1);
+  --dur-fast:        120ms;
+  --dur-base:        200ms;
+  --dur-slow:        300ms;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TIER 2 — Semantic tokens: purpose-named aliases
+───────────────────────────────────────────────────────────── */
+:root {
+  --color-surface-default:  var(--bg-surface);
+  --color-surface-elevated: var(--bg-elevated);
+  --color-surface-subtle:   var(--bg-subtle);
+  --color-text-default:     var(--text-primary);
+  --color-text-muted:       var(--text-secondary);
+  --color-text-faint:       var(--text-tertiary);
+  --color-border:           var(--border-default);
+  --color-border-subtle:    var(--border-subtle);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Typography utilities (Fallback to Tailwind sans)
+───────────────────────────────────────────────────────────── */
+.font-display {
+  font-family: inherit;
+  font-weight: 600;
+}
+.font-mono-brand {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+.font-body-brand {
+  font-family: inherit;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Brain surface base styles (applied to .brain-surface wrapper)
+───────────────────────────────────────────────────────────── */
+.brain-surface {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Node status animations
+───────────────────────────────────────────────────────────── */
+@keyframes pulse-border {
+  0%, 100% { box-shadow: 0 0 0 0 var(--accent-dim); }
+  50%       { box-shadow: 0 0 0 4px var(--accent-dim); }
+}
+@keyframes pulse-success {
+  0%   { background-color: transparent; }
+  40%  { background-color: var(--success-dim); }
+  100% { background-color: transparent; }
+}
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes fade-up {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+@keyframes count-up {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-pulse-border    { animation: pulse-border 2s ease-in-out infinite; }
+.animate-pulse-success   { animation: pulse-success 300ms var(--ease-out); }
+.animate-slide-in-right  { animation: slide-in-right 180ms var(--ease-out); }
+.animate-fade-up         { animation: fade-up 200ms var(--ease-out); }
+.animate-count-up        { animation: count-up 600ms var(--ease-out); }
+
+/* ─────────────────────────────────────────────────────────────
+   Reduced motion overrides
+───────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Scrollbar (brain surfaces)
+───────────────────────────────────────────────────────────── */
+.brain-surface ::-webkit-scrollbar        { width: 6px; }
+.brain-surface ::-webkit-scrollbar-track  { background: var(--bg-base); }
+.brain-surface ::-webkit-scrollbar-thumb  { background: var(--border-strong); border-radius: 3px; }
