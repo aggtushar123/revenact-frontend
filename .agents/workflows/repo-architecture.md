@@ -1,8 +1,8 @@
 ---
-description: Full repository architecture, module map, and data flow reference for the Velaris SaaS app
+description: Full repository architecture, module map, and data flow reference for the Revenact SaaS app
 ---
 
-# Velaris SaaS — Repository Architecture & Flow
+# Revenact SaaS — Repository Architecture & Flow
 
 ## Tech Stack
 
@@ -331,7 +331,7 @@ Pre-built AI workflows a CSM can run with one click. Scoped into four categories
 
 Clicking a skill card expands it inline on the home view, showing the full pre-filled prompt template with `{Account}` / `{Organization}` variables highlighted in pink. The user can review then run it.
 
-#### Key Copilot Capabilities (per screenshots from production Velaris app)
+#### Key Copilot Capabilities
 
 - **Cross-channel synthesis**: Copilot reads from calls (Call Sense), emails, tickets, and Slack threads across all accounts
 - **Account-by-account deep dives**: "Why are these accounts at risk?" → returns per-account analysis with ARR, utilization %, NPS, verbatim customer quotes with channel attribution

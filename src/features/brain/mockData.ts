@@ -84,7 +84,7 @@ export const mockNodes: KnowledgeNode[] = [
     domain: 'Support',
     status: 'healthy',
     confidence: 0.95,
-    sources: ['Velaris', 'Confluence'],
+    sources: ['Revenact', 'Confluence'],
     updatedAt: '2026-04-22',
     owner: 'Sarah Chen',
     content: 'Health score = weighted sum: Product usage (40%), Support ticket frequency (25%), NPS score (20%), Contract renewal probability (15%). Scores below 40 trigger automated CS outreach.',
@@ -257,7 +257,7 @@ inputs:
 
 steps:
   - fetch_signals:
-      sources: [velaris, zendesk, delighted]
+      sources: [revenact, zendesk, delighted]
   - compute_score:
       weights:
         usage: 0.40

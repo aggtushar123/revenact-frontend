@@ -48,7 +48,7 @@ const AI_ACTIONS = [
     id: 1,
     title: 'Advanced workflow optimization',
     description: 'Explore and potentially implement fine-tuning of advanced workflows to help the EMEA Retail team get even more value out of the platform, building on their current strong adoption and usage patterns.',
-    owner: 'Sarah Lee (velaris.com)',
+    owner: 'Sarah Lee (revenact.io)',
     timeframe: 'Not specified',
     timestamp: '1:33:21',
     note: "This was offered as the platform has become part of their standard operating rhythm and they're looking for ways to extract additional value. Current utilization is over 80% with 290 out of 360 users active regularly."
@@ -57,7 +57,7 @@ const AI_ACTIONS = [
     id: 2,
     title: 'Renewal timeline and optimization ideas',
     description: 'Follow up with a detailed renewal timeline to support the smooth renewal process for the EMEA Retail team and ensure continued platform satisfaction.',
-    owner: 'Sarah Lee (velaris.com)',
+    owner: 'Sarah Lee (revenact.io)',
     timeframe: 'Not specified',
     timestamp: '1:45:00',
     note: ''
@@ -426,8 +426,8 @@ function CallSensePanel({
                     <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-gray-600 font-medium">
                       <li>Recommended using ChatGPT and developer documentation for Bridge integration questions.</li>
                       <li>Web hooks can be triggered based on specific object updates and selected attributes.</li>
-                      <li>In Velaris bridge, flows must be tested before publication.</li>
-                      <li>Contract creation in Velaris triggered when sales moves deal to recorded stage in HubSpot.</li>
+                      <li>In Revenact bridge, flows must be tested before publication.</li>
+                      <li>Contract creation in Revenact triggered when sales moves deal to recorded stage in HubSpot.</li>
                       <li>Update API requests require authorization headers and JSON body with object properties.</li>
                       <li>Single option attributes can be updated using picklist value name or ID.</li>
                       <li>Aswin recommends adding validations when building flows, such as checking if an object is not archived before updating.</li>
@@ -440,7 +440,7 @@ function CallSensePanel({
                     <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-gray-600 font-medium">
                       <li>Aswin to check and potentially share Bridge API documentation link.</li>
                       <li>Aswin to investigate creating a technical account with administrator rights for API activities.</li>
-                      <li>Create separate folder for Doctena and Velaris workflows to prevent accidental modifications.</li>
+                      <li>Create separate folder for Doctena and Revenact workflows to prevent accidental modifications.</li>
                       <li>Create separate web hook for each flow, providing descriptive name and optional description.</li>
                       <li>Philippe suggests Maria review team feedback to identify fields that could benefit from default values.</li>
                       <li>Aswin offers ongoing support via Slack for any questions during workflow development.</li>
@@ -450,8 +450,8 @@ function CallSensePanel({
                   <div>
                     <p className="font-bold text-gray-800 mb-1">Contract and Lifecycle Management</p>
                     <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-gray-600 font-medium">
-                      <li>Contracts in Velaris linked to Accounts and Organizations, mapping to Deals in HubSpot.</li>
-                      <li>Velaris team to explore possible HubSpot contract sync enhancements based on team feedback.</li>
+                      <li>Contracts in Revenact linked to Accounts and Organizations, mapping to Deals in HubSpot.</li>
+                      <li>Revenact team to explore possible HubSpot contract sync enhancements based on team feedback.</li>
                     </ul>
                   </div>
 

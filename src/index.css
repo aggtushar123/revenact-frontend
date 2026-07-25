@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────
-   TIER 1 — Primitive tokens: raw values (Velaris Light Theme)
+   TIER 1 — Primitive tokens: raw values (Revenact Light Theme)
 ───────────────────────────────────────────────────────────── */
 :root {
   /* Backgrounds */
@@ -15,7 +15,7 @@
   --text-secondary:  #4B5563; /* gray-600 */
   --text-tertiary:   #9CA3AF; /* gray-400 */
 
-  /* Accent — Velaris Rose */
+  /* Accent — Revenact Rose */
   --accent:          #F43F5E; /* rose-500 */
   --accent-dim:      #FFF1F2; /* rose-50 */
   --accent-hover:    #E11D48; /* rose-600 */

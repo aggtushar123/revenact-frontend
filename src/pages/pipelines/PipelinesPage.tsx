@@ -426,7 +426,7 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             className="w-full pl-9 pr-4 py-2.5 text-[13px] border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white placeholder-gray-400 font-medium"
-            placeholder="Search by name, Velaris ID or External ID"
+            placeholder="Search by name, Revenact ID or External ID"
           />
         </div>
         <button className="flex items-center gap-2 px-4 py-2.5 bg-[#6D72D6] text-white rounded-lg text-[13px] font-bold hover:bg-indigo-600 transition-colors shadow-sm whitespace-nowrap">
