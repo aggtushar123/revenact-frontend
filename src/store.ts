@@ -4,7 +4,6 @@ import authReducer, { loggedOut, refreshSession } from './features/auth/authSlic
 import tasksReducer from './features/tasks/tasksSlice';
 import brainReducer from './features/brain/brainSlice';
 import userManagementReducer from './features/userManagement/userManagementSlice';
-import customersReducer from './features/customers/customersSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -14,7 +13,6 @@ export const store = configureStore({
     tasks: tasksReducer,
     brain: brainReducer,
     userManagement: userManagementReducer,
-    customers: customersReducer,
   },
 });
 
