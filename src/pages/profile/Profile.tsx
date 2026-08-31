@@ -78,7 +78,7 @@ export function Profile() {
   if (!user) return null;
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
+    <div className="h-full overflow-y-auto max-w-4xl mx-auto py-8 px-4 space-y-6">
       <div>
         <h1 className="text-xl font-bold text-ink">My Profile</h1>
         <p className="text-[13px] text-ink-muted mt-1">Your account details and organisation.</p>

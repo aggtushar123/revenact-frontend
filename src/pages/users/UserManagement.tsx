@@ -15,7 +15,7 @@ export function UserManagement() {
   }, [dispatch]);
 
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
+    <div className="h-full overflow-y-auto max-w-4xl mx-auto py-8 px-4 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-ink">User Management</h1>
