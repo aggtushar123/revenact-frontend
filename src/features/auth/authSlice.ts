@@ -101,6 +101,26 @@ export const login = createAsyncThunk<LoginPayload, { email: string; password: s
   }
 );
 
+// Best-effort server-side logout: blacklists the refresh token via
+// revenact-backend's /auth/logout/ so it can't be used again, but the user
+// is logged out client-side (loggedOut, below) regardless of whether this
+// call succeeds — a dead network shouldn't trap someone in a logged-in UI.
+export const logout = createAsyncThunk<void, void, { state: { auth: AuthState } }>(
+  'auth/logout',
+  async (_, { getState, dispatch }) => {
+    const { accessToken, refreshToken } = getState().auth;
+    dispatch(authSlice.actions.loggedOut());
+    if (refreshToken) {
+      try {
+        await apiFetch('/auth/logout/', { method: 'POST', body: { refresh: refreshToken }, accessToken });
+      } catch {
+        // Refresh token may already be expired/blacklisted, or the server
+        // is unreachable — the user is logged out client-side either way.
+      }
+    }
+  }
+);
+
 export const refreshSession = createAsyncThunk<{ accessToken: string }, void, { rejectValue: string }>(
   'auth/refreshSession',
   async (_, { getState, rejectWithValue }) => {
@@ -126,7 +146,9 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    logout(state) {
+    // Internal — dispatched by the `logout` thunk above. Not exported: call
+    // `logout()` instead so the server-side token blacklist call happens too.
+    loggedOut(state) {
       state.user = null;
       state.accessToken = null;
       state.refreshToken = null;
@@ -173,5 +195,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, clearError } = authSlice.actions;
+export const { clearError } = authSlice.actions;
 export default authSlice.reducer;

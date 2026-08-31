@@ -81,7 +81,7 @@ describe('authSlice', () => {
     expect(state.error).toBe('Could not reach the server. Please try again.');
   });
 
-  it('persists session to localStorage on login and clears it on logout', async () => {
+  it('persists session to localStorage on login', async () => {
     mockFetchOnce(200, { user: mockUser, access: 'access.jwt', refresh: 'refresh.jwt' });
 
     const store = makeStore();
@@ -90,14 +90,50 @@ describe('authSlice', () => {
     expect(localStorage.getItem('revenact_access_token')).toBe('access.jwt');
     expect(localStorage.getItem('revenact_refresh_token')).toBe('refresh.jwt');
     expect(JSON.parse(localStorage.getItem('revenact_user')!).email).toBe('demo@revenact.io');
+  });
 
-    store.dispatch(logout());
+  describe('logout', () => {
+    async function loggedInStore() {
+      mockFetchOnce(200, { user: mockUser, access: 'access.jwt', refresh: 'refresh.jwt' });
+      const store = makeStore();
+      await store.dispatch(login({ email: 'demo@revenact.io', password: 'demo1234' }));
+      return store;
+    }
 
-    const state = store.getState().auth;
-    expect(state.isAuthenticated).toBe(false);
-    expect(state.user).toBeNull();
-    expect(localStorage.getItem('revenact_access_token')).toBeNull();
-    expect(localStorage.getItem('revenact_user')).toBeNull();
+    it('clears state and localStorage immediately, and blacklists the refresh token', async () => {
+      const store = await loggedInStore();
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 205, json: async () => null });
+      vi.stubGlobal('fetch', fetchMock);
+
+      await store.dispatch(logout());
+
+      const state = store.getState().auth;
+      expect(state.isAuthenticated).toBe(false);
+      expect(state.user).toBeNull();
+      expect(localStorage.getItem('revenact_access_token')).toBeNull();
+      expect(localStorage.getItem('revenact_user')).toBeNull();
+
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/auth/logout/'),
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({ Authorization: 'Bearer access.jwt' }),
+          body: JSON.stringify({ refresh: 'refresh.jwt' }),
+        })
+      );
+    });
+
+    it('still logs out client-side even if the server call fails', async () => {
+      const store = await loggedInStore();
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+      await store.dispatch(logout());
+
+      const state = store.getState().auth;
+      expect(state.isAuthenticated).toBe(false);
+      expect(state.user).toBeNull();
+      expect(localStorage.getItem('revenact_access_token')).toBeNull();
+    });
   });
 
   it('clearError resets the error message', async () => {
