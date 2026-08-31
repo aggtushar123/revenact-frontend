@@ -3,20 +3,23 @@ import { apiFetch, ApiError } from '../../lib/apiClient';
 
 // --- Types ---
 // Shaped to match revenact-backend's UserSerializer — see
-// revenact-backend/docs/API_CONTRACTS.md.
-interface Organisation {
+// revenact-backend/docs/API_CONTRACTS.md. Exported: userManagement uses
+// the same shape for CSMs (they're the same User model, just listed by
+// an admin instead of viewing themselves).
+export interface Organisation {
   id: number;
   name: string;
   slug: string;
 }
 
-interface User {
+export interface User {
   id: number;
   email: string;
   name: string;
   avatar: string;
   role: 'admin' | 'csm';
   organisation: Organisation;
+  is_active: boolean;
 }
 
 interface AuthState {
@@ -101,6 +104,50 @@ export const login = createAsyncThunk<LoginPayload, { email: string; password: s
     }
   }
 );
+
+// Refreshes your own profile from the server — used on the Profile page's
+// mount, since localStorage's cached copy could be stale (e.g. an admin
+// deactivated then reactivated you in another tab).
+export const fetchMe = createAsyncThunk<User, void, { rejectValue: string }>(
+  'auth/fetchMe',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<User>('/auth/me/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load your profile.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Only `name` is writable — see revenact-backend's MeSerializer.
+export const updateProfile = createAsyncThunk<User, { name: string }, { rejectValue: string }>(
+  'auth/updateProfile',
+  async (data, { rejectWithValue }) => {
+    try {
+      return await apiFetch<User>('/auth/me/', { method: 'PATCH', body: data });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not update your profile.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const changePassword = createAsyncThunk<
+  void,
+  { currentPassword: string; newPassword: string },
+  { rejectValue: string }
+>('auth/changePassword', async ({ currentPassword, newPassword }, { rejectWithValue }) => {
+  try {
+    await apiFetch('/auth/me/change-password/', {
+      method: 'POST',
+      body: { current_password: currentPassword, new_password: newPassword },
+    });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not change your password.';
+    return rejectWithValue(message);
+  }
+});
 
 // Best-effort server-side logout: blacklists the refresh token via
 // revenact-backend's /auth/logout/ so it can't be used again, but the user
@@ -188,6 +235,16 @@ const authSlice = createSlice({
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload ?? 'An unexpected error occurred';
+      })
+      // Own profile — fetchMe/updateProfile both just replace `user` with
+      // whatever the server now says it is, and re-persist it.
+      .addCase(fetchMe.fulfilled, (state, action: PayloadAction<User>) => {
+        state.user = action.payload;
+        localStorage.setItem('revenact_user', JSON.stringify(action.payload));
+      })
+      .addCase(updateProfile.fulfilled, (state, action: PayloadAction<User>) => {
+        state.user = action.payload;
+        localStorage.setItem('revenact_user', JSON.stringify(action.payload));
       })
       // Refresh session
       .addCase(refreshSession.fulfilled, (state, action) => {

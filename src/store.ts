@@ -3,6 +3,7 @@ import counterReducer from './features/counter/counterSlice';
 import authReducer, { loggedOut, refreshSession } from './features/auth/authSlice';
 import tasksReducer from './features/tasks/tasksSlice';
 import brainReducer from './features/brain/brainSlice';
+import userManagementReducer from './features/userManagement/userManagementSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -11,6 +12,7 @@ export const store = configureStore({
     auth: authReducer,
     tasks: tasksReducer,
     brain: brainReducer,
+    userManagement: userManagementReducer,
   },
 });
 

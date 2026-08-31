@@ -1,7 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
+import { AdminRoute } from './components/auth/AdminRoute';
 import { Login } from './pages/auth/Login';
+import { Profile } from './pages/profile/Profile';
+import { UserManagement } from './pages/users/UserManagement';
 import { List } from './pages/organizations/List';
 import { Board } from './pages/organizations/Board';
 import { Details as OrganizationDetails } from './pages/organizations/Details';
@@ -111,6 +114,9 @@ function App() {
           </Route>
           
           <Route path="integrations" element={<Integrations />} />
+
+          <Route path="profile" element={<Profile />} />
+          <Route path="users" element={<AdminRoute><UserManagement /></AdminRoute>} />
           
           <Route path="contacts">
             <Route index element={<Navigate to="list" replace />} />

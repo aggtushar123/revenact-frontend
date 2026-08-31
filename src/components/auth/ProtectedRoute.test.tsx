@@ -15,6 +15,7 @@ const mockUser = {
   avatar: 'https://i.pravatar.cc/150?u=demo@revenact.io',
   role: 'admin' as const,
   organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc' },
+  is_active: true,
 };
 
 function renderAt(path: string, store: ReturnType<typeof makeStore>) {

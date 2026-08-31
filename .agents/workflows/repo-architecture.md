@@ -103,6 +103,8 @@ react-ts-app/
 │   ├── connect-widget         → Placeholder
 │   └── ai-agent               → Placeholder
 ├── integrations               → Integrations catalogue
+├── profile                    → My Profile (any role)
+├── users                      → User Management [ADMIN ONLY — AdminRoute]
 ├── contacts/
 │   ├── (index)                → Redirects to /contacts/list
 │   └── list                   → ContactsList
@@ -147,10 +149,15 @@ main.tsx
 Redux Store
 ├── auth (authSlice)
 │   ├── isAuthenticated: boolean
-│   ├── user: { email, name, avatar } | null
+│   ├── user: { id, email, name, avatar, role, organisation, is_active } | null
 │   ├── accessToken: string | null
 │   ├── refreshToken: string | null
-│   └── status: 'idle' | 'loading' | 'failed'
+│   ├── isLoading / error         ← login only
+│
+├── userManagement (userManagementSlice)
+│   ├── csms: CSM[]              ← admin's own org, User Management page
+│   ├── isLoading: boolean
+│   └── error: string | null
 │
 ├── tasks (tasksSlice)
 │   └── tasks: Task[]          ← Created from CallSense AI action items
@@ -167,20 +174,28 @@ Redux Store
 
 ## Feature Modules
 
-### 1. Auth (`features/auth/`)
+### 1. Auth, Profile & User Management (`features/auth/`, `features/userManagement/`)
 
-The only feature wired to the real backend so far — see
-`revenact-backend/.agents/workflows/auth-flow.md` for the full server-side
-flow (org signup, login, logout, admin-adds-CSM).
+Wired to the real backend — see `revenact-backend/.agents/workflows/auth-flow.md`
+for the full server-side flow (org signup, login, logout, own-profile
+editing, admin User Management).
 
 | File | Role |
 |---|---|
-| `authSlice.ts` | Redux slice — `login`/`logout`/`refreshSession` async thunks, localStorage hydration |
-| `loginSchema.ts` | Zod schema: email (required) + password (min 8 chars, matches backend) |
-| `../../lib/apiClient.ts` | Fetch wrapper — auto-attaches the access token, auto-refreshes on a `401` (retries once, then forces logout if that also fails) |
+| `features/auth/authSlice.ts` | Redux slice — `login`/`logout`/`refreshSession`/`fetchMe`/`updateProfile`/`changePassword` thunks, localStorage hydration. Exports the shared `User`/`Organisation` types. |
+| `features/auth/loginSchema.ts` | Zod schema: email (required) + password (min 8 chars, matches backend) |
+| `features/userManagement/userManagementSlice.ts` | Redux slice — `fetchCSMs`/`addCSM`/`updateCSM`, admin-only. `CSM` is just the `User` type. |
+| `lib/apiClient.ts` | Fetch wrapper — auto-attaches the access token, auto-refreshes on a `401` (retries once, then forces logout if that also fails) |
+| `components/auth/ProtectedRoute.tsx` | Redirects to `/login` if not authenticated |
+| `components/auth/AdminRoute.tsx` | Redirects to `/dashboard` if `user.role !== 'admin'` — nested inside `ProtectedRoute`, so auth is already guaranteed |
+| `pages/profile/Profile.tsx` | `/profile` — any role. View + edit own name, change password (needs current password) |
+| `pages/users/UserManagement.tsx` | `/users` (`AdminRoute`-gated) — list/add/edit/deactivate the org's CSMs |
 
-No signup or CSM-management UI yet — those backend endpoints exist and
-are documented, but only the Login page is wired up on this side.
+No signup UI yet — that backend endpoint exists and is documented, but
+organisations are still created via `curl`/the API directly. Sidebar's
+"Users" nav item only renders for `role === 'admin'` (`Sidebar.tsx`); the
+footer avatar/name block navigates to `/profile` for anyone.
+
 Real test users (see `revenact-backend`'s README): `alice@acme.io` /
 `supersecret1` (admin, Acme Inc), `carl@acme.io` / `csmpassword1` (CSM,
 same org).
@@ -513,7 +528,7 @@ App.tsx
 | `/accounts` (list) | No list route, only `/accounts/:id` |
 | `/sfdc`, `/feedbacks` | No route defined |
 | `/segments`, `/projects`, `/surveys`, `/campaigns`, `/canvas` | No route defined |
-| `/lifecycle`, `/health`, `/users` | No route defined |
+| `/lifecycle`, `/health` | No route defined |
 | `/settings/currency` … `/settings/ai-agent` | Stub `SettingPlaceholder` |
 | `/dashboard/advance/*` (non-controls sub-routes) | `PlaceholderView` |
 | `/dashboard/custom` | Placeholder div |

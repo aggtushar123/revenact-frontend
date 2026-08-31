@@ -18,6 +18,7 @@ const mockUser = {
   avatar: 'https://i.pravatar.cc/150?u=alice@acme.io',
   role: 'admin' as const,
   organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc' },
+  is_active: true,
 };
 
 function renderLogin() {

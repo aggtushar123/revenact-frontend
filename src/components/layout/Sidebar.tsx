@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import logoImg from '../../assets/logo.png';
-import { 
+import {
   LayoutGrid, MessageSquare, Network, Layers, Users, 
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
   Columns, PenTool, Box, CircleDot, HeartPulse, UserCog, Plug, LogOut,
@@ -24,7 +23,7 @@ export function Sidebar() {
     <aside 
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
-      className={`h-full border-r border-gray-200 bg-white flex flex-col transition-all duration-300 z-30 shrink-0 absolute md:relative ${
+      className={`h-full border-r border-line bg-surface flex flex-col transition-all duration-300 z-30 shrink-0 absolute md:relative ${
         isExpanded ? 'w-[240px] shadow-xl md:shadow-none' : 'w-[68px]'
       }`}
     >
@@ -33,9 +32,9 @@ export function Sidebar() {
         <div className="flex items-center cursor-pointer w-full">
           {/* Revenact Logo */}
           {isExpanded ? (
-            <img src={logoImg} alt="Revenact" className="w-[160px] max-w-full h-auto object-contain mix-blend-multiply" />
+            <span className="font-display text-[22px] text-ink tracking-tight leading-none" style={{ fontStyle: 'italic' }}>Revenact</span>
           ) : (
-            <div className="w-7 h-7 shrink-0 bg-[#593d80] rounded-[7px] shadow-sm flex items-center justify-center text-white font-extrabold text-[15px] tracking-tighter mix-blend-multiply mx-auto">
+            <div className="w-7 h-7 shrink-0 bg-accent rounded-[7px] shadow-sm flex items-center justify-center text-[#0D0F0E] font-extrabold text-[15px] tracking-tighter mx-auto">
               R
             </div>
           )}
@@ -51,11 +50,11 @@ export function Sidebar() {
 
         {/* ENTITIES Section */}
         {isExpanded ? (
-          <div className="text-[10px] font-bold text-gray-400/80 mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
-            ENTITIES <div className="h-px bg-gray-100 flex-1 ml-1 mr-2"></div>
+          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
+            ENTITIES <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
           </div>
         ) : (
-          <div className="h-px bg-gray-100 mt-4 mb-2 mx-2"></div>
+          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
         )}
         
         <NavItem to="/organizations/list" icon={<Network className="w-[18px] h-[18px]" />} label="Organizations" isExpanded={isExpanded} isActiveOverride={isOrgsActive} />
@@ -65,11 +64,11 @@ export function Sidebar() {
 
         {/* CUSTOM OBJECTS Section */}
         {isExpanded ? (
-          <div className="text-[10px] font-bold text-gray-400/80 mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-1.5 cursor-pointer hover:text-gray-600">
-            CUSTOM OBJECTS <ChevronDown className="w-3 h-3 ml-0.5" /> <div className="h-px bg-gray-100 flex-1 ml-1 mr-2"></div>
+          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-1.5 cursor-pointer hover:text-ink-muted">
+            CUSTOM OBJECTS <ChevronDown className="w-3 h-3 ml-0.5" /> <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
           </div>
         ) : (
-          <div className="h-px bg-gray-100 mt-4 mb-2 mx-2"></div>
+          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
         )}
 
         <NavItem 
@@ -82,11 +81,11 @@ export function Sidebar() {
 
         {/* TOOLS Section */}
         {isExpanded ? (
-          <div className="text-[10px] font-bold text-gray-400/80 mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
-            TOOLS <div className="h-px bg-gray-100 flex-1 ml-1 mr-2"></div>
+          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
+            TOOLS <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
           </div>
         ) : (
-          <div className="h-px bg-gray-100 mt-4 mb-2 mx-2"></div>
+          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
         )}
 
         <NavItem to="/segments" icon={<PieChart className="w-[18px] h-[18px]" />} label="Segments" isExpanded={isExpanded} />
@@ -98,11 +97,11 @@ export function Sidebar() {
 
         {/* KNOWLEDGE BRAIN Section */}
         {isExpanded ? (
-          <div className="text-[10px] font-bold text-gray-400/80 mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
-            KNOWLEDGE BRAIN <div className="h-px bg-gray-100 flex-1 ml-1 mr-2"></div>
+          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
+            KNOWLEDGE BRAIN <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
           </div>
         ) : (
-          <div className="h-px bg-gray-100 mt-4 mb-2 mx-2"></div>
+          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
         )}
 
         <NavItem to="/brain/dashboard" icon={<Brain className="w-[18px] h-[18px]" />} label="Brain Overview" isExpanded={isExpanded} />
@@ -115,24 +114,29 @@ export function Sidebar() {
 
         {/* SETUP Section */}
         {isExpanded ? (
-          <div className="text-[10px] font-bold text-gray-400/80 mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
-            SETUP <div className="h-px bg-gray-100 flex-1 ml-1 mr-2"></div>
+          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
+            SETUP <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
           </div>
         ) : (
-          <div className="h-px bg-gray-100 mt-4 mb-2 mx-2"></div>
+          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
         )}
 
         <NavItem to="/settings" icon={<Box className="w-[18px] h-[18px]" />} label="Settings" isExpanded={isExpanded} />
         <NavItem to="/lifecycle" icon={<CircleDot className="w-[18px] h-[18px]" />} label="Lifecycle" isExpanded={isExpanded} />
         <NavItem to="/health" icon={<HeartPulse className="w-[18px] h-[18px]" />} label="Health" isExpanded={isExpanded} />
-        <NavItem to="/users" icon={<UserCog className="w-[18px] h-[18px]" />} label="Users" isExpanded={isExpanded} />
+        {user?.role === 'admin' && (
+          <NavItem to="/users" icon={<UserCog className="w-[18px] h-[18px]" />} label="Users" isExpanded={isExpanded} />
+        )}
         <NavItem to="/integrations" icon={<Plug className="w-[18px] h-[18px]" />} label="Integrations" isExpanded={isExpanded} />
 
       </div>
 
       {/* User Footer */}
-      <div className={`mt-auto border-t border-gray-100 shrink-0`}>
-        <div className={`p-4 flex ${isExpanded ? 'items-center gap-3' : 'justify-center'} cursor-pointer hover:bg-gray-50 transition-colors`}>
+      <div className={`mt-auto border-t border-line-subtle shrink-0`}>
+        <div
+          onClick={() => navigate('/profile')}
+          className={`p-4 flex ${isExpanded ? 'items-center gap-3' : 'justify-center'} cursor-pointer hover:bg-subtle transition-colors`}
+        >
           <img 
              src={user?.avatar || 'https://i.pravatar.cc/150?u=default'} 
              alt={user?.name || 'User'} 
@@ -140,15 +144,15 @@ export function Sidebar() {
           />
           {isExpanded && (
             <div className="flex flex-col overflow-hidden justify-center flex-1">
-              <span className="text-[13px] font-bold text-gray-800 truncate leading-tight mt-0.5">{user?.name || 'User'}</span>
-              <span className="text-[11px] text-gray-500 truncate leading-tight">{user?.email || 'My Workspace'}</span>
+              <span className="text-[13px] font-bold text-ink truncate leading-tight mt-0.5">{user?.name || 'User'}</span>
+              <span className="text-[11px] text-ink-muted truncate leading-tight">{user?.email || 'My Workspace'}</span>
             </div>
           )}
         </div>
         {isExpanded && (
           <button
             onClick={() => { dispatch(logout()); navigate('/login'); }}
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] font-medium text-gray-500 hover:text-red-600 hover:bg-red-50/60 transition-all border-t border-gray-100 cursor-pointer"
+            className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] font-medium text-ink-muted hover:text-danger hover:bg-danger-dim transition-all border-t border-line-subtle cursor-pointer"
           >
             <LogOut className="w-[15px] h-[15px]" />
             Sign out
@@ -170,8 +174,8 @@ function NavItem({ icon, to, label, isExpanded, isActiveOverride = false, badge 
           isExpanded ? 'h-[38px]' : 'h-10 justify-center mx-1 rounded-lg'
         } ${
           active 
-            ? 'bg-rose-50/80' 
-            : 'hover:bg-gray-50'
+            ? 'bg-accent-dim' 
+            : 'hover:bg-subtle'
         }`;
       }}
       title={!isExpanded ? label : undefined}
@@ -180,12 +184,12 @@ function NavItem({ icon, to, label, isExpanded, isActiveOverride = false, badge 
         const active = isActive || isActiveOverride;
         return (
           <>
-            <div className={`shrink-0 transition-colors ${active ? 'text-rose-500' : 'text-gray-400 group-hover:text-gray-600'}`}>
+            <div className={`shrink-0 transition-colors ${active ? 'text-accent' : 'text-ink-faint group-hover:text-ink-muted'}`}>
               {icon}
             </div>
             
             {isExpanded && (
-              <span className={`text-[13px] font-semibold truncate transition-colors flex-1 ${active ? 'text-rose-500' : 'text-gray-600 group-hover:text-gray-900'}`}>
+              <span className={`text-[13px] font-semibold truncate transition-colors flex-1 ${active ? 'text-accent' : 'text-ink-muted group-hover:text-ink'}`}>
                 {label}
               </span>
             )}
