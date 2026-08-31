@@ -34,6 +34,7 @@ react-ts-app/
 │   ├── index.css               ← Global base styles
 │   ├── App.css                 ← App-level utility styles
 │   ├── assets/                 ← Static assets
+│   ├── lib/                    ← apiClient.ts — fetch wrapper to revenact-backend
 │   ├── features/               ← Redux slices & business logic
 │   │   ├── auth/               ← Auth state, thunks, Zod schema
 │   │   ├── tasks/              ← Tasks slice (create task from CallSense AI actions)
@@ -168,12 +169,21 @@ Redux Store
 
 ### 1. Auth (`features/auth/`)
 
+The only feature wired to the real backend so far — see
+`revenact-backend/.agents/workflows/auth-flow.md` for the full server-side
+flow (org signup, login, logout, admin-adds-CSM).
+
 | File | Role |
 |---|---|
-| `authSlice.ts` | Redux slice — `login` async thunk, `logout` action, localStorage hydration |
-| `loginSchema.ts` | Zod schema: email (required) + password (min 8 chars) |
+| `authSlice.ts` | Redux slice — `login`/`logout`/`refreshSession` async thunks, localStorage hydration |
+| `loginSchema.ts` | Zod schema: email (required) + password (min 8 chars, matches backend) |
+| `../../lib/apiClient.ts` | Fetch wrapper — auto-attaches the access token, auto-refreshes on a `401` (retries once, then forces logout if that also fails) |
 
-Dummy credentials: `admin@revenact.io / password123`, `demo@revenact.io / demo1234`
+No signup or CSM-management UI yet — those backend endpoints exist and
+are documented, but only the Login page is wired up on this side.
+Real test users (see `revenact-backend`'s README): `alice@acme.io` /
+`supersecret1` (admin, Acme Inc), `carl@acme.io` / `csmpassword1` (CSM,
+same org).
 
 ---
 
@@ -523,11 +533,16 @@ React Component (page/component)
     │                 selectedEventTrigger (EditNodePane), openAccordions, etc.
     │
     ├── Redux dispatch()
-    │       ├── authSlice → login/logout + localStorage persistence
+    │       ├── authSlice → login/logout/refreshSession → lib/apiClient.ts → revenact-backend
+    │       │       (real HTTP now — see below)
     │       └── tasksSlice → addTask (triggered from CallSense AI actions)
     │
     └── Mock data files (*.ts) for table/list/chart data
             └── Imported directly — no API calls
 ```
 
-> **Note:** This app has no real backend. All data is statically imported from mock data files (`tableData.ts`, `activityData.ts`, etc.). The only "async" operation is the simulated login delay in `authSlice.ts`.
+> **Note:** Auth (`features/auth/`) is the one feature wired to the real
+> `revenact-backend` — everything else still has no real backend. All
+> other data is statically imported from mock data files (`tableData.ts`,
+> `activityData.ts`, etc.). As each feature gets ported, it moves from
+> this mock-data path to the same `apiClient.ts` pattern auth uses.

@@ -1,8 +1,9 @@
 import { configureStore } from '@reduxjs/toolkit';
 import counterReducer from './features/counter/counterSlice';
-import authReducer from './features/auth/authSlice';
+import authReducer, { loggedOut, refreshSession } from './features/auth/authSlice';
 import tasksReducer from './features/tasks/tasksSlice';
 import brainReducer from './features/brain/brainSlice';
+import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
   reducer: {
@@ -15,3 +16,15 @@ export const store = configureStore({
 
 export type RootState = ReturnType<typeof store.getState>;
 export type AppDispatch = typeof store.dispatch;
+
+// Wires apiClient's auto-refresh-on-401 to this store, without apiClient
+// importing the store or authSlice directly (that would cycle back through
+// authSlice's own thunks, which call apiFetch). See lib/apiClient.ts.
+setAuthHooks({
+  getAccessToken: () => store.getState().auth.accessToken,
+  refreshAccessToken: async () => {
+    const result = await store.dispatch(refreshSession());
+    return refreshSession.fulfilled.match(result) ? result.payload.accessToken : null;
+  },
+  onAuthFailure: () => store.dispatch(loggedOut()),
+});

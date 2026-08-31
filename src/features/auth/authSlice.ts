@@ -92,6 +92,7 @@ export const login = createAsyncThunk<LoginPayload, { email: string; password: s
       const data = await apiFetch<AuthResponse>('/auth/login/', {
         method: 'POST',
         body: { email, password },
+        skipAuthRetry: true, // a 401 here means bad credentials, not an expired token
       });
       return { user: data.user, accessToken: data.access, refreshToken: data.refresh };
     } catch (err) {
@@ -112,7 +113,12 @@ export const logout = createAsyncThunk<void, void, { state: { auth: AuthState } 
     dispatch(authSlice.actions.loggedOut());
     if (refreshToken) {
       try {
-        await apiFetch('/auth/logout/', { method: 'POST', body: { refresh: refreshToken }, accessToken });
+        await apiFetch('/auth/logout/', {
+          method: 'POST',
+          body: { refresh: refreshToken },
+          accessToken,
+          skipAuthRetry: true, // state is already cleared; nothing to retry with
+        });
       } catch {
         // Refresh token may already be expired/blacklisted, or the server
         // is unreachable — the user is logged out client-side either way.
@@ -132,6 +138,7 @@ export const refreshSession = createAsyncThunk<{ accessToken: string }, void, { 
       const data = await apiFetch<{ access: string }>('/auth/token/refresh/', {
         method: 'POST',
         body: { refresh: state.auth.refreshToken },
+        skipAuthRetry: true, // this IS the refresh call — retrying it on 401 would recurse forever
       });
       return { accessToken: data.access };
     } catch (err) {
@@ -146,8 +153,11 @@ const authSlice = createSlice({
   name: 'auth',
   initialState,
   reducers: {
-    // Internal — dispatched by the `logout` thunk above. Not exported: call
-    // `logout()` instead so the server-side token blacklist call happens too.
+    // Clears the session with no network call. Used by the `logout` thunk
+    // (for the instant client-side part of a manual sign-out) and by
+    // apiClient's onAuthFailure hook (session died because refresh failed —
+    // nothing left to blacklist). For a manual sign-out from the UI, call
+    // the `logout` thunk instead so the server-side blacklist call happens.
     loggedOut(state) {
       state.user = null;
       state.accessToken = null;
@@ -195,5 +205,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { clearError } = authSlice.actions;
+export const { loggedOut, clearError } = authSlice.actions;
 export default authSlice.reducer;
