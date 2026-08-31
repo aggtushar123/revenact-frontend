@@ -136,8 +136,10 @@ main.tsx
 - **ENTITIES**: Organizations, Accounts, Contacts, Pipelines
 - **CUSTOM OBJECTS**: SFDC Opportunity, Product Feedbacks
 - **TOOLS**: Segments, Project Management, Scenarios, Surveys, Campaigns, Canvas
-- **SETUP**: Settings, Lifecycle, Health, Users, Integrations
-- **Footer**: User avatar + name + Sign out button
+- **SETUP**: Settings, Lifecycle, Health, Users (admin-only), Integrations
+
+No footer — account actions (profile, sign out) live in the Navbar's
+avatar menu instead (see below), not the sidebar.
 
 > Note: The `DashboardLayout` hides the `<Navbar />` and removes padding on the `/scenarios` route to give the builder a full-canvas feel.
 
@@ -190,11 +192,13 @@ editing, admin User Management).
 | `components/auth/AdminRoute.tsx` | Redirects to `/dashboard` if `user.role !== 'admin'` — nested inside `ProtectedRoute`, so auth is already guaranteed |
 | `pages/profile/Profile.tsx` | `/profile` — any role. View + edit own name, change password (needs current password) |
 | `pages/users/UserManagement.tsx` | `/users` (`AdminRoute`-gated) — list/add/edit/deactivate the org's CSMs |
+| `components/layout/Navbar.tsx` | Top-right avatar opens an account menu — "My Profile" (→ `/profile`) and "Sign out" (→ `logout` thunk). Closes on an outside click. |
 
 No signup UI yet — that backend endpoint exists and is documented, but
 organisations are still created via `curl`/the API directly. Sidebar's
-"Users" nav item only renders for `role === 'admin'` (`Sidebar.tsx`); the
-footer avatar/name block navigates to `/profile` for anyone.
+"Users" nav item only renders for `role === 'admin'` (`Sidebar.tsx`).
+Account actions used to live in a sidebar footer; that's gone now — the
+Navbar's avatar menu is the only place to reach Profile/Sign out.
 
 Real test users (see `revenact-backend`'s README): `alice@acme.io` /
 `supersecret1` (admin, Acme Inc), `carl@acme.io` / `csmpassword1` (CSM,

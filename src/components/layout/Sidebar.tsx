@@ -1,19 +1,16 @@
 import React, { useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
-  LayoutGrid, MessageSquare, Network, Layers, Users, 
+  LayoutGrid, MessageSquare, Network, Layers, Users,
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
-  Columns, PenTool, Box, CircleDot, HeartPulse, UserCog, Plug, LogOut,
+  Columns, PenTool, Box, CircleDot, HeartPulse, UserCog, Plug,
   Brain, GitMerge, BookOpen, CheckSquare, Zap
 } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '../../hooks';
-import { logout } from '../../features/auth/authSlice';
+import { useAppSelector } from '../../hooks';
 
 export function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const location = useLocation();
-  const navigate = useNavigate();
-  const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
 
   const isOrgsActive = location.pathname.includes('/organizations');
@@ -130,36 +127,6 @@ export function Sidebar() {
         <NavItem to="/integrations" icon={<Plug className="w-[18px] h-[18px]" />} label="Integrations" isExpanded={isExpanded} />
 
       </div>
-
-      {/* User Footer */}
-      <div className={`mt-auto border-t border-line-subtle shrink-0`}>
-        <div
-          onClick={() => navigate('/profile')}
-          className={`p-4 flex ${isExpanded ? 'items-center gap-3' : 'justify-center'} cursor-pointer hover:bg-subtle transition-colors`}
-        >
-          <img 
-             src={user?.avatar || 'https://i.pravatar.cc/150?u=default'} 
-             alt={user?.name || 'User'} 
-             className="w-[34px] h-[34px] rounded-full object-cover shrink-0 shadow-sm"
-          />
-          {isExpanded && (
-            <div className="flex flex-col overflow-hidden justify-center flex-1">
-              <span className="text-[13px] font-bold text-ink truncate leading-tight mt-0.5">{user?.name || 'User'}</span>
-              <span className="text-[11px] text-ink-muted truncate leading-tight">{user?.email || 'My Workspace'}</span>
-            </div>
-          )}
-        </div>
-        {isExpanded && (
-          <button
-            onClick={() => { dispatch(logout()); navigate('/login'); }}
-            className="w-full flex items-center gap-3 px-4 py-2.5 text-[12px] font-medium text-ink-muted hover:text-danger hover:bg-danger-dim transition-all border-t border-line-subtle cursor-pointer"
-          >
-            <LogOut className="w-[15px] h-[15px]" />
-            Sign out
-          </button>
-        )}
-      </div>
-
     </aside>
   );
 }
