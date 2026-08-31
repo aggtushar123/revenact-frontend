@@ -25,6 +25,7 @@ description: Full repository architecture, module map, and data flow reference f
 ```
 react-ts-app/
 ├── .agents/workflows/          ← Workflow knowledge files
+├── .claude/skills/             ← Claude Code skills (testing)
 ├── src/
 │   ├── App.tsx                 ← Route definitions (root)
 │   ├── main.tsx                ← React entry point, Redux Provider
@@ -471,6 +472,7 @@ App.tsx
 3. Add a `NavItem` in `src/components/layout/Sidebar.tsx` with the correct `to` path
 4. If it needs mock data, create `src/components/<domain>/myData.ts`
 5. If it needs Redux state, create `src/features/<domain>/<domain>Slice.ts` and register in `src/store.ts`
+6. Add unit + integration + end-to-end tests — see the `testing` skill.
 
 ---
 
@@ -479,6 +481,7 @@ App.tsx
 1. Create `src/components/organizations/activity/MyTab.tsx` — follows `{ entityId }` prop pattern
 2. Export it from `src/components/organizations/activity/index.ts`
 3. Register it in `src/components/shared/ActivityFeed.tsx` in the `TABS` array and the `renderContent()` switch
+4. Add unit + integration tests — see the `testing` skill.
 
 ---
 
@@ -487,6 +490,7 @@ App.tsx
 1. Create the chart in `src/components/dashboard/charts/` or `src/pages/dashboard/tabs/<section>/charts/`
 2. Use **Recharts** with standardized donut params: `innerRadius={45}` `outerRadius={60}` to prevent label clipping
 3. Import and place it in the appropriate `ControlsView.tsx`
+4. Add a unit test for the chart component — see the `testing` skill.
 
 ---
 
