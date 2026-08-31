@@ -1,10 +1,22 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
+import { apiFetch, ApiError } from '../../lib/apiClient';
 
 // --- Types ---
+// Shaped to match revenact-backend's UserSerializer — see
+// revenact-backend/docs/API_CONTRACTS.md.
+interface Organisation {
+  id: number;
+  name: string;
+  slug: string;
+}
+
 interface User {
+  id: number;
   email: string;
   name: string;
   avatar: string;
+  role: 'admin' | 'csm';
+  organisation: Organisation;
 }
 
 interface AuthState {
@@ -22,31 +34,11 @@ interface LoginPayload {
   refreshToken: string;
 }
 
-// --- Dummy credentials database ---
-const DUMMY_USERS: Record<string, { password: string; user: User }> = {
-  'admin@revenact.io': {
-    password: 'password123',
-    user: {
-      email: 'admin@revenact.io',
-      name: 'Daniel Trial Test',
-      avatar: 'https://i.pravatar.cc/150?u=daniel',
-    },
-  },
-  'demo@revenact.io': {
-    password: 'demo1234',
-    user: {
-      email: 'demo@revenact.io',
-      name: 'Demo User',
-      avatar: 'https://i.pravatar.cc/150?u=demo',
-    },
-  },
-};
-
-// --- Dummy token generator ---
-function generateDummyToken(prefix: string): string {
-  const payload = btoa(JSON.stringify({ iat: Date.now(), exp: Date.now() + 3600000 }));
-  const random = btoa(Math.random().toString(36).substring(2, 15));
-  return `${prefix}.${payload}.${random}`;
+// Raw shape returned by the backend's /login/ and /signup/ endpoints.
+interface AuthResponse {
+  user: User;
+  access: string;
+  refresh: string;
 }
 
 // --- Hydrate from localStorage ---
@@ -96,19 +88,16 @@ const initialState: AuthState = {
 export const login = createAsyncThunk<LoginPayload, { email: string; password: string }, { rejectValue: string }>(
   'auth/login',
   async ({ email, password }, { rejectWithValue }) => {
-    // Simulate network delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
-    const entry = DUMMY_USERS[email.toLowerCase()];
-    if (!entry || entry.password !== password) {
-      return rejectWithValue('Invalid email or password. Please try again.');
+    try {
+      const data = await apiFetch<AuthResponse>('/auth/login/', {
+        method: 'POST',
+        body: { email, password },
+      });
+      return { user: data.user, accessToken: data.access, refreshToken: data.refresh };
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not reach the server. Please try again.';
+      return rejectWithValue(message);
     }
-
-    return {
-      user: entry.user,
-      accessToken: generateDummyToken('access'),
-      refreshToken: generateDummyToken('refresh'),
-    };
   }
 );
 
@@ -119,9 +108,16 @@ export const refreshSession = createAsyncThunk<{ accessToken: string }, void, { 
     if (!state.auth.refreshToken) {
       return rejectWithValue('No refresh token available');
     }
-    // Simulate refresh
-    await new Promise((resolve) => setTimeout(resolve, 300));
-    return { accessToken: generateDummyToken('access') };
+    try {
+      const data = await apiFetch<{ access: string }>('/auth/token/refresh/', {
+        method: 'POST',
+        body: { refresh: state.auth.refreshToken },
+      });
+      return { accessToken: data.access };
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Session refresh failed.';
+      return rejectWithValue(message);
+    }
   }
 );
 
