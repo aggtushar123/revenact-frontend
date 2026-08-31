@@ -1,0 +1,132 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { configureStore } from '@reduxjs/toolkit';
+import customersReducer, { fetchCustomers } from './customersSlice';
+
+function makeStore() {
+  return configureStore({ reducer: { customers: customersReducer } });
+}
+
+// Minimal but real shape, matching revenact-backend's CustomerSerializer —
+// see docs/API_CONTRACTS.md -> customers.
+const globex = {
+  id: 1,
+  name: 'Globex Corp',
+  address: '',
+  domain: '',
+  owner: null,
+  created_by: null,
+  modified_by: null,
+  created_at: '2026-08-31T00:00:00Z',
+  updated_at: '2026-08-31T00:00:00Z',
+  lifecycle_stage: 'onboarding' as const,
+  health_score: '5.0',
+  health_category: 'average' as const,
+  pulse: [],
+  ai_pulse_score: '' as const,
+  ai_pulse_reason: '',
+  nps_score: null,
+  csat_score: null,
+  joined_date: null,
+  renewal_date: null,
+  contract_start_date: null,
+  contract_end_date: null,
+  arr_billed_at_account: '0.00',
+  arr_billed_at_hq: '0.00',
+  implementation_fee: '0.00',
+  total_contract_value: '0.00',
+  total_forecasted_renewal_revenue: '0.00',
+  primary_product: '',
+  additional_products_count: null,
+  top_source_channel: '',
+  total_contracted_seats: null,
+  total_active_seats: null,
+  seat_utilization_percentage: null,
+  total_hires: null,
+  scope_web_app: '',
+  ces_percentage: null,
+  churn_date: null,
+  churn_reason: '',
+  churn_comment: '',
+};
+
+function mockFetchOnce(status: number, body: unknown) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: status >= 200 && status < 300,
+      status,
+      json: async () => body,
+    })
+  );
+}
+
+describe('customersSlice', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('starts empty', () => {
+    const state = makeStore().getState().customers;
+    expect(state.customers).toEqual([]);
+    expect(state.count).toBe(0);
+    expect(state.isLoading).toBe(false);
+    expect(state.error).toBeNull();
+  });
+
+  it('fetchCustomers loads a page and tracks the pagination envelope', async () => {
+    mockFetchOnce(200, {
+      count: 30,
+      next: 'http://localhost:8000/api/v1/customers/?page=2',
+      previous: null,
+      results: [globex],
+    });
+
+    const store = makeStore();
+    await store.dispatch(fetchCustomers());
+
+    const state = store.getState().customers;
+    expect(state.isLoading).toBe(false);
+    expect(state.customers).toEqual([globex]);
+    expect(state.count).toBe(30);
+    expect(state.next).toBe('http://localhost:8000/api/v1/customers/?page=2');
+    expect(state.previous).toBeNull();
+  });
+
+  it('paging forward calls fetch with the exact next URL the server gave back, unprefixed', async () => {
+    mockFetchOnce(200, {
+      count: 30,
+      next: 'http://localhost:8000/api/v1/customers/?page=2',
+      previous: null,
+      results: [globex],
+    });
+    const store = makeStore();
+    await store.dispatch(fetchCustomers());
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ count: 30, next: null, previous: 'http://localhost:8000/api/v1/customers/', results: [] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await store.dispatch(fetchCustomers(store.getState().customers.next!));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://localhost:8000/api/v1/customers/?page=2',
+      expect.anything()
+    );
+  });
+
+  it('sets an error on failure without clearing already-loaded data', async () => {
+    mockFetchOnce(200, { count: 1, next: null, previous: null, results: [globex] });
+    const store = makeStore();
+    await store.dispatch(fetchCustomers());
+
+    mockFetchOnce(500, { detail: 'Server error.' });
+    await store.dispatch(fetchCustomers());
+
+    const state = store.getState().customers;
+    expect(state.error).toBe('Server error.');
+    expect(state.customers).toEqual([globex]);
+  });
+});

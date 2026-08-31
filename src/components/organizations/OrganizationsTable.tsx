@@ -5,21 +5,41 @@ import { HealthPopover } from './HealthPopover';
 import { CsatPopover } from './CsatPopover';
 import { EditColumnsPopover } from './EditColumnsPopover';
 import { RowActionsPopover } from './RowActionsPopover';
-import { ALL_COLUMNS, DEFAULT_VISIBLE_COLUMNS, TABLE_DATA } from './tableData';
-import type { ColumnId } from './tableData';
+import { ALL_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from './tableData';
+import type { ColumnId, OrgRow } from './tableData';
 
-export function OrganizationsTable() {
+interface OrganizationsTableProps {
+  rows: OrgRow[];
+  isLoading: boolean;
+  error: string | null;
+  /** Index (0-based) of the first row in `rows` within the full result set. */
+  offset: number;
+  count: number;
+  hasNext: boolean;
+  hasPrevious: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+}
+
+export function OrganizationsTable({
+  rows,
+  isLoading,
+  error,
+  offset,
+  count,
+  hasNext,
+  hasPrevious,
+  onNext,
+  onPrevious,
+}: OrganizationsTableProps) {
   const navigate = useNavigate();
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [showEditColumns, setShowEditColumns] = useState(false);
-  const [currentPage, setCurrentPage] = useState(1);
 
-  const rowsPerPage = 5;
-  const totalRows = TABLE_DATA.length;
-  const totalPages = Math.ceil(totalRows / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const currentData = TABLE_DATA.slice(startIndex, endIndex);
+  // `rows` is already just this one server-fetched page — no local slicing.
+  const currentData = rows;
+  const startIndex = offset;
+  const endIndex = offset + rows.length;
 
   const [healthHover, setHealthHover] = useState<{ val: number, style: React.CSSProperties } | null>(null);
   const [reasonHover, setReasonHover] = useState<{ text: string, style: React.CSSProperties } | null>(null);
@@ -79,7 +99,7 @@ export function OrganizationsTable() {
     setCsatHover(null);
   };
 
-  const renderCell = (colId: ColumnId, r: typeof TABLE_DATA[0]) => {
+  const renderCell = (colId: ColumnId, r: OrgRow) => {
     switch (colId) {
       case 'revenactId':
         return <td key={colId} className="px-6 py-4 bg-[#f8f9fc] group-hover:bg-[#f1f3f6] border-b border-[#f1f3f5] border-l border-r text-right pr-6 transition-colors font-medium text-gray-700">{r.id}</td>;
@@ -258,9 +278,28 @@ export function OrganizationsTable() {
           </thead>
           
           <tbody className="text-[13px] text-gray-700 whitespace-nowrap bg-white relative z-0">
-            {currentData.map((r, i) => (
-              <tr key={i} className="group hover:bg-gray-50 transition-colors">
-                
+            {error ? (
+              <tr>
+                <td colSpan={visibleColumns.length + 1} className="px-6 py-8 text-center text-[13px] font-medium text-[var(--danger)]">
+                  {error}
+                </td>
+              </tr>
+            ) : isLoading && currentData.length === 0 ? (
+              <tr>
+                <td colSpan={visibleColumns.length + 1} className="px-6 py-8 text-center text-[13px] font-medium text-gray-400">
+                  Loading organizations…
+                </td>
+              </tr>
+            ) : currentData.length === 0 ? (
+              <tr>
+                <td colSpan={visibleColumns.length + 1} className="px-6 py-8 text-center text-[13px] font-medium text-gray-400">
+                  No organizations yet.
+                </td>
+              </tr>
+            ) : (
+              currentData.map((r) => (
+              <tr key={r.id} className="group hover:bg-gray-50 transition-colors">
+
                 {/* Checkbox & Pinned Organization Item */}
                 <td className="px-6 py-4 border-b border-[#f3f4f6] relative sticky left-0 z-10 bg-white group-hover:bg-gray-50 shadow-[1px_0_0_0_#ebebeb] transition-colors">
                   <div className="flex items-center gap-4">
@@ -268,7 +307,7 @@ export function OrganizationsTable() {
                     <div className="w-6 h-6 flex items-center justify-center p-0.5 overflow-hidden shrink-0">
                       <img src={r.logo} alt={r.org} className="w-full h-full object-contain mix-blend-multiply" onError={(e) => { e.currentTarget.style.display='none' }} />
                     </div>
-                    <span 
+                    <span
                       className="font-bold text-gray-800 tracking-tight cursor-pointer hover:text-indigo-600 hover:underline transition-colors"
                       onClick={() => navigate(`/organizations/${r.id}`)}
                     >
@@ -283,7 +322,7 @@ export function OrganizationsTable() {
 
                 {/* Trailing Standard Multi-action Block  */}
                 <td className="px-3 py-4 border-b border-[#f8f9fa] sticky right-0 z-10 bg-white group-hover:bg-gray-50 shadow-[-1px_0_0_0_#ebebeb] transition-colors text-center">
-                  <div 
+                  <div
                     className="p-1 cursor-pointer hover:bg-gray-200 rounded transition-colors inline-block"
                     onClick={(e) => handleRowActionClick(e, r.id)}
                   >
@@ -292,7 +331,8 @@ export function OrganizationsTable() {
                 </td>
 
               </tr>
-            ))}
+              ))
+            )}
           </tbody>
         </table>
       </div>
@@ -300,19 +340,21 @@ export function OrganizationsTable() {
       {/* Pagination Footer */}
       <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-white shrink-0 mt-auto relative z-10">
         <div className="text-[13px] text-gray-500 font-medium tracking-tight">
-          Showing {startIndex + 1}-{Math.min(endIndex, totalRows)} of {totalRows} organizations
+          {count > 0 ? `Showing ${startIndex + 1}-${Math.min(endIndex, count)} of ${count} organizations` : 'No organizations'}
         </div>
         <div className="flex items-center gap-2">
-          <button 
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
+          <button
+            onClick={onPrevious}
+            disabled={!hasPrevious || isLoading}
+            aria-label="Previous page"
             className="p-[5px] rounded border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all outline-none"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
-          <button 
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
+          <button
+            onClick={onNext}
+            disabled={!hasNext || isLoading}
+            aria-label="Next page"
             className="p-[5px] rounded border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all outline-none"
           >
             <ChevronRight className="w-4 h-4" />

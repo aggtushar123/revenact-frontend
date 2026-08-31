@@ -66,7 +66,12 @@ function rawFetch(path: string, options: RequestOptions, token: string | null) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
-  return fetch(`${BASE_URL}${path}`, {
+  // DRF's pagination `next`/`previous` links are full absolute URLs (they
+  // include the scheme/host already) — pass those through as-is instead of
+  // prefixing with BASE_URL again.
+  const url = /^https?:\/\//.test(path) ? path : `${BASE_URL}${path}`;
+
+  return fetch(url, {
     method: options.method ?? 'GET',
     headers,
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
