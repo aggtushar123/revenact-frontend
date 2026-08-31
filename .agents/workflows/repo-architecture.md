@@ -161,6 +161,12 @@ Redux Store
 │   ├── isLoading: boolean
 │   └── error: string | null
 │
+├── customers (customersSlice)
+│   ├── customers: Customer[]    ← current page, Organizations List
+│   ├── count / next / previous  ← DRF pagination envelope
+│   ├── isLoading: boolean
+│   └── error: string | null
+│
 ├── tasks (tasksSlice)
 │   └── tasks: Task[]          ← Created from CallSense AI action items
 │
@@ -251,23 +257,51 @@ Chart components live in `src/components/dashboard/charts/`.
 
 ### 3. Organizations (`pages/organizations/` + `components/organizations/`)
 
-The richest domain in the app. Three views:
+**Naming**: these are `revenact-backend`'s `Customer` model — a Revenact
+customer's *own* customers, tracked for health/ARR/renewal. Not the same
+thing as `Organisation` (the tenant/`authSlice.ts`'s `user.organisation`)
+— see `revenact-backend/docs/API_CONTRACTS.md` → `customers` for why
+they're deliberately different models with different names, even though
+"Organizations" is still what this page is called in the UI.
 
-#### List View (`pages/organizations/List.tsx`)
-Renders `<OrganizationsTable />` — a feature-rich data table.
+Three views, at very different levels of completeness:
 
-**`components/organizations/OrganizationsTable.tsx`** (18 KB)
-- Displays org rows with health scores, ARR, NPS, CSAT, renewal date, pulse dots, AI pulse score
-- Paginated (5 rows/page), column visibility toggleable via `EditColumnsPopover`
-- Hoverable popovers: `HealthPopover`, `CsatPopover`, reason tooltip
-- Per-row action menu via `RowActionsPopover`
-- Aggregate KPI cards via `MetricsPanel`
-- Data source: `tableData.ts` (22 KB, mock data for 10+ orgs)
+#### List View (`pages/organizations/List.tsx`) — real backend, core fields only
+
+Wired to `revenact-backend`'s `GET/POST /api/v1/customers/` and
+`GET/PATCH /api/v1/customers/<id>/` via `features/customers/customersSlice.ts`
+— **not** mock data. Fields: name, health (score + derived good/average/poor
+badge), ARR, renewal date, lifecycle stage, owner (picked from
+`GET /api/v1/auth/members/`, populated in the Add/Edit modals).
+
+- `components/organizations/ActionBar.tsx` — client-side name search +
+  "Add Organization" (opens a modal defined in `List.tsx`)
+- `components/organizations/OrganizationsTable.tsx` — the table + an Edit
+  button per row (opens the same kind of modal, pre-filled) + Prev/Next
+  pagination following the API's `next`/`previous` links directly
+  (`apiClient.ts` passes an absolute URL through unprefixed for this)
+
+Deliberately **not** built: NPS, CSAT, TCV, seat utilization, churn
+tracking, and the rest of the old mock schema's 30+ fields; column
+visibility toggles; row-level popovers; an aggregate KPI/metrics panel
+(would need a real aggregation endpoint — computing "totals" from just
+the current page would be showing wrong numbers as if real, so it's
+skipped rather than faked). `tableData.ts` and the old
+`MetricsPanel.tsx`/`HealthPopover.tsx`/`CsatPopover.tsx`/
+`EditColumnsPopover.tsx`/`RowActionsPopover.tsx` were deleted along with
+this rewrite — nothing else imported them.
 
 #### Board View (`pages/organizations/Board.tsx`)
 Currently a stub placeholder.
 
-#### Details View (`pages/organizations/Details.tsx`)
+#### Details View (`pages/organizations/Details.tsx`) — still mock, untouched
+
+Still entirely `tableData.ts`-driven, deliberately out of scope for the
+List rewrite above. The List page's rows are **not** linked to this view
+— a real `Customer`'s id has no relationship to `tableData.ts`'s mock
+rows, so wiring row-click-through here would show wrong data as if real.
+Revisit once/if this view gets its own real backend pass.
+
 Full organization detail page. Contains:
 - **Header**: Org name, avatar, health badge, action buttons
 - **Metrics Banner**: KPI cards (ARR, health, renewal, NPS, CSAT, MRR)
@@ -560,8 +594,10 @@ React Component (page/component)
             └── Imported directly — no API calls
 ```
 
-> **Note:** Auth (`features/auth/`) is the one feature wired to the real
-> `revenact-backend` — everything else still has no real backend. All
-> other data is statically imported from mock data files (`tableData.ts`,
-> `activityData.ts`, etc.). As each feature gets ported, it moves from
-> this mock-data path to the same `apiClient.ts` pattern auth uses.
+> **Note:** Auth (`features/auth/`) and the Organizations **List** view
+> (`features/customers/`, core fields only) are wired to the real
+> `revenact-backend` — everything else (Board/Details, Accounts, Contacts,
+> Pipelines, dashboards, ...) still has no real backend and is statically
+> imported from mock data files (`tableData.ts`, `activityData.ts`, etc.).
+> As each feature gets ported, it moves from this mock-data path to the
+> same `apiClient.ts` pattern auth and customers use.
