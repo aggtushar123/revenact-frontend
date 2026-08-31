@@ -78,7 +78,7 @@ export function Profile() {
   if (!user) return null;
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4 space-y-6">
+    <div className="max-w-4xl mx-auto py-8 px-4 space-y-6">
       <div>
         <h1 className="text-xl font-bold text-ink">My Profile</h1>
         <p className="text-[13px] text-ink-muted mt-1">Your account details and organisation.</p>
@@ -102,81 +102,83 @@ export function Profile() {
         </div>
       </div>
 
-      <form onSubmit={handleNameSubmit} className="p-5 bg-surface border border-line rounded-xl space-y-4">
-        <h2 className="text-[14px] font-bold text-ink">Edit Profile</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        <form onSubmit={handleNameSubmit} className="p-5 bg-surface border border-line rounded-xl space-y-4">
+          <h2 className="text-[14px] font-bold text-ink">Edit Profile</h2>
 
-        <div>
-          <label htmlFor="profile-name" className="block text-[12px] font-semibold text-ink-muted mb-1">
-            Name
-          </label>
-          <input
-            id="profile-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full px-3 py-2 bg-subtle border border-line rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent transition-all"
+          <div>
+            <label htmlFor="profile-name" className="block text-[12px] font-semibold text-ink-muted mb-1">
+              Name
+            </label>
+            <input
+              id="profile-name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full px-3 py-2 bg-subtle border border-line rounded-lg text-[13px] focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent transition-all"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="profile-email" className="block text-[12px] font-semibold text-ink-muted mb-1">
+              Email
+            </label>
+            <input
+              id="profile-email"
+              type="email"
+              value={user.email}
+              disabled
+              className="w-full px-3 py-2 bg-subtle border border-line rounded-lg text-[13px] text-ink-faint cursor-not-allowed"
+            />
+          </div>
+
+          {nameMessage && <StatusMessage message={nameMessage} />}
+
+          <button
+            type="submit"
+            disabled={nameSaving || name.trim() === ''}
+            className="px-4 py-2 bg-accent text-white rounded-lg text-[12px] font-bold hover:bg-accent-hover transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {nameSaving ? 'Saving…' : 'Save changes'}
+          </button>
+        </form>
+
+        <form onSubmit={handlePasswordSubmit} className="p-5 bg-surface border border-line rounded-xl space-y-4">
+          <h2 className="text-[14px] font-bold text-ink">Change Password</h2>
+
+          <PasswordField
+            id="current-password"
+            label="Current password"
+            value={currentPassword}
+            onChange={setCurrentPassword}
+            autoComplete="current-password"
           />
-        </div>
-
-        <div>
-          <label htmlFor="profile-email" className="block text-[12px] font-semibold text-ink-muted mb-1">
-            Email
-          </label>
-          <input
-            id="profile-email"
-            type="email"
-            value={user.email}
-            disabled
-            className="w-full px-3 py-2 bg-subtle border border-line rounded-lg text-[13px] text-ink-faint cursor-not-allowed"
+          <PasswordField
+            id="new-password"
+            label="New password"
+            value={newPassword}
+            onChange={setNewPassword}
+            autoComplete="new-password"
           />
-        </div>
+          <PasswordField
+            id="confirm-password"
+            label="Confirm new password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            autoComplete="new-password"
+          />
 
-        {nameMessage && <StatusMessage message={nameMessage} />}
+          {passwordMessage && <StatusMessage message={passwordMessage} />}
 
-        <button
-          type="submit"
-          disabled={nameSaving || name.trim() === ''}
-          className="px-4 py-2 bg-accent text-white rounded-lg text-[12px] font-bold hover:bg-accent-hover transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {nameSaving ? 'Saving…' : 'Save changes'}
-        </button>
-      </form>
-
-      <form onSubmit={handlePasswordSubmit} className="p-5 bg-surface border border-line rounded-xl space-y-4">
-        <h2 className="text-[14px] font-bold text-ink">Change Password</h2>
-
-        <PasswordField
-          id="current-password"
-          label="Current password"
-          value={currentPassword}
-          onChange={setCurrentPassword}
-          autoComplete="current-password"
-        />
-        <PasswordField
-          id="new-password"
-          label="New password"
-          value={newPassword}
-          onChange={setNewPassword}
-          autoComplete="new-password"
-        />
-        <PasswordField
-          id="confirm-password"
-          label="Confirm new password"
-          value={confirmPassword}
-          onChange={setConfirmPassword}
-          autoComplete="new-password"
-        />
-
-        {passwordMessage && <StatusMessage message={passwordMessage} />}
-
-        <button
-          type="submit"
-          disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword}
-          className="px-4 py-2 bg-accent text-white rounded-lg text-[12px] font-bold hover:bg-accent-hover transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {passwordSaving ? 'Changing…' : 'Change password'}
-        </button>
-      </form>
+          <button
+            type="submit"
+            disabled={passwordSaving || !currentPassword || !newPassword || !confirmPassword}
+            className="px-4 py-2 bg-accent text-white rounded-lg text-[12px] font-bold hover:bg-accent-hover transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {passwordSaving ? 'Changing…' : 'Change password'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
