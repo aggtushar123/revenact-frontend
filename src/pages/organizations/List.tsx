@@ -9,7 +9,7 @@ import type { AppDispatch, RootState } from '../../store';
 
 export function List() {
   const dispatch = useDispatch<AppDispatch>();
-  const { customers, count, next, previous, isLoading, error } = useSelector(
+  const { customers, count, totalCount, next, previous, isLoading, error } = useSelector(
     (state: RootState) => state.customers
   );
   // Index (0-based) of the first row in the currently-loaded page, for the
@@ -76,7 +76,7 @@ export function List() {
     <div className="flex flex-col h-full w-full bg-surface text-ink">
       {/* Glass Metrics Banner */}
       <div className="px-6 pt-5 pb-4">
-        <MetricsPanel />
+        <MetricsPanel totalCount={totalCount} />
       </div>
 
       {/* Search and Table Area */}

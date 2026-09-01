@@ -82,8 +82,17 @@ function formatCurrency(val: number): string {
   return `$${val}`;
 }
 
+interface MetricsPanelProps {
+  /** Real count of onboarded organisations, from the backend — everything
+   * else in this panel (health/NPS/lifecycle breakdowns) is still derived
+   * from tableData.ts's mock rows, since those need a dedicated backend
+   * stats endpoint that doesn't exist yet. This one field doesn't: the
+   * customers list endpoint already returns a total count for free. */
+  totalCount: number;
+}
+
 // --- Main Component ---
-export function MetricsPanel() {
+export function MetricsPanel({ totalCount }: MetricsPanelProps) {
   const [healthTab, setHealthTab] = useState<MetricTab>('count');
   const [lifecycleTab, setLifecycleTab] = useState<MetricTab>('count');
 
@@ -295,7 +304,7 @@ export function MetricsPanel() {
           <div className="relative w-4 h-4 text-warning">
             <svg viewBox="0 0 24 24" className="w-full h-full fill-current"><path d="M12 2L2 20h20L12 2zm0 3.8l6.1 11H5.9L12 5.8z"/></svg>
           </div>
-          <span className="text-2xl font-bold text-ink leading-tight">{TABLE_DATA.length}</span>
+          <span className="text-2xl font-bold text-ink leading-tight">{totalCount}</span>
         </div>
       </div>
 

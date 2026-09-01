@@ -69,6 +69,7 @@ describe('customersSlice', () => {
     const state = makeStore().getState().customers;
     expect(state.customers).toEqual([]);
     expect(state.count).toBe(0);
+    expect(state.totalCount).toBe(0);
     expect(state.isLoading).toBe(false);
     expect(state.error).toBeNull();
   });
@@ -128,5 +129,45 @@ describe('customersSlice', () => {
     const state = store.getState().customers;
     expect(state.error).toBe('Server error.');
     expect(state.customers).toEqual([globex]);
+  });
+
+  it('an unfiltered fetch updates totalCount ("organisations onboarded")', async () => {
+    mockFetchOnce(200, { count: 12, next: null, previous: null, results: [globex] });
+    const store = makeStore();
+    await store.dispatch(fetchCustomers());
+
+    expect(store.getState().customers.totalCount).toBe(12);
+  });
+
+  it('a search-filtered fetch updates count but leaves totalCount alone', async () => {
+    mockFetchOnce(200, { count: 12, next: null, previous: null, results: [globex] });
+    const store = makeStore();
+    await store.dispatch(fetchCustomers());
+
+    mockFetchOnce(200, { count: 1, next: null, previous: null, results: [globex] });
+    await store.dispatch(fetchCustomers('/customers/?search=globex'));
+
+    const state = store.getState().customers;
+    expect(state.count).toBe(1);
+    expect(state.totalCount).toBe(12);
+  });
+
+  it('a page reached mid-search (next link still carrying ?search=) also leaves totalCount alone', async () => {
+    mockFetchOnce(200, { count: 12, next: null, previous: null, results: [globex] });
+    const store = makeStore();
+    await store.dispatch(fetchCustomers());
+
+    mockFetchOnce(200, {
+      count: 2,
+      next: 'http://localhost:8000/api/v1/customers/?search=globex&page=2',
+      previous: null,
+      results: [globex],
+    });
+    await store.dispatch(fetchCustomers('/customers/?search=globex'));
+
+    mockFetchOnce(200, { count: 2, next: null, previous: null, results: [globex] });
+    await store.dispatch(fetchCustomers(store.getState().customers.next!));
+
+    expect(store.getState().customers.totalCount).toBe(12);
   });
 });

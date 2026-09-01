@@ -66,7 +66,14 @@ interface CustomersPage {
 
 interface CustomersState {
   customers: Customer[];
+  /** Count for the current (possibly search-filtered) fetch — drives the
+   * table's "Showing X-Y of Z" pagination footer. */
   count: number;
+  /** Count from the last *unfiltered* fetch — how many organisations are
+   * onboarded overall, for MetricsPanel's "Number of Organizations" card.
+   * Deliberately not just `count`, which would otherwise dip to a search's
+   * result size while the user is filtering the table. */
+  totalCount: number;
   next: string | null;
   previous: string | null;
   isLoading: boolean;
@@ -76,6 +83,7 @@ interface CustomersState {
 const initialState: CustomersState = {
   customers: [],
   count: 0,
+  totalCount: 0,
   next: null,
   previous: null,
   isLoading: false,
@@ -113,6 +121,15 @@ const customersSlice = createSlice({
         state.count = action.payload.count;
         state.next = action.payload.next;
         state.previous = action.payload.previous;
+        // `action.meta.arg` is the exact URL this fetch was dispatched
+        // with. A search-filtered fetch (this one, or a next/previous page
+        // reached while a search is active — DRF's pagination links carry
+        // existing query params through) still has `search=` in it; only a
+        // plain listing fetch updates the "onboarded overall" total.
+        const url = action.meta.arg;
+        if (!url || !url.includes('search=')) {
+          state.totalCount = action.payload.count;
+        }
       })
       .addCase(fetchCustomers.rejected, (state, action) => {
         state.isLoading = false;
