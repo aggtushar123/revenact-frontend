@@ -5,8 +5,11 @@ import { ApiError } from '../../lib/apiClient';
 import { updateCustomer } from '../../features/customers/customersSlice';
 
 interface ChurnOrganizationModalProps {
-  customerId: number;
-  customerName: string;
+  /** One id for a single row's "..." menu; several for a bulk churn from
+   * the checkbox-selection + ActionBar's settings gear. Every selected
+   * organization gets the same date/reason/comment. */
+  customerIds: number[];
+  customerNames: string[];
   onClose: () => void;
 }
 
@@ -17,7 +20,7 @@ function today(): string {
 /** Sets lifecycle_stage='churn' plus the churn_date/reason/comment fields
  * together — a deliberately separate action from the general Edit form,
  * since "Churn" isn't one of that form's own lifecycle dropdown options. */
-export function ChurnOrganizationModal({ customerId, customerName, onClose }: ChurnOrganizationModalProps) {
+export function ChurnOrganizationModal({ customerIds, customerNames, onClose }: ChurnOrganizationModalProps) {
   const dispatch = useAppDispatch();
   const [churnDate, setChurnDate] = useState(today());
   const [churnReason, setChurnReason] = useState('');
@@ -29,23 +32,30 @@ export function ChurnOrganizationModal({ customerId, customerName, onClose }: Ch
   const dateId = useId();
   const commentId = useId();
 
+  const title = customerIds.length === 1 ? `Churn ${customerNames[0]}?` : `Churn ${customerIds.length} organizations?`;
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setIsSaving(true);
     try {
-      await dispatch(
-        updateCustomer({
-          id: customerId,
-          lifecycle_stage: 'churn',
-          churn_date: churnDate || null,
-          churn_reason: churnReason.trim(),
-          churn_comment: churnComment.trim(),
-        })
-      ).unwrap();
+      await Promise.all(
+        customerIds.map((id) =>
+          dispatch(
+            updateCustomer({
+              id,
+              lifecycle_stage: 'churn',
+              churn_date: churnDate || null,
+              churn_reason: churnReason.trim(),
+              churn_comment: churnComment.trim(),
+            })
+          ).unwrap()
+        )
+      );
       onClose();
     } catch (err) {
-      setError(typeof err === 'string' ? err : err instanceof ApiError ? err.message : 'Could not churn this organization.');
+      const noun = customerIds.length === 1 ? 'this organization' : 'these organizations';
+      setError(typeof err === 'string' ? err : err instanceof ApiError ? err.message : `Could not churn ${noun}.`);
     } finally {
       setIsSaving(false);
     }
@@ -58,7 +68,7 @@ export function ChurnOrganizationModal({ customerId, customerName, onClose }: Ch
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-[15px] font-bold text-ink">Churn {customerName}?</h2>
+          <h2 className="text-[15px] font-bold text-ink">{title}</h2>
           <button onClick={onClose} className="text-ink-faint hover:text-ink transition-colors">
             <X className="w-4 h-4" />
           </button>

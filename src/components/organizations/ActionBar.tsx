@@ -6,11 +6,25 @@ import { OrganizationFormModal } from './OrganizationFormModal';
 interface ActionBarProps {
   searchQuery: string;
   setSearchQuery: (value: string) => void;
+  /** Checkbox-selected rows from the table — the settings gear acts on
+   * these instead of needing its own row context. */
+  selectedOrganizations: { id: number; name: string }[];
+  onEditRequest: (id: number) => void;
+  onChurnRequest: (ids: number[], names: string[]) => void;
+  onArchiveRequest: (ids: number[], names: string[]) => void;
 }
 
-export function ActionBar({ searchQuery, setSearchQuery }: ActionBarProps) {
+export function ActionBar({
+  searchQuery,
+  setSearchQuery,
+  selectedOrganizations,
+  onEditRequest,
+  onChurnRequest,
+  onArchiveRequest,
+}: ActionBarProps) {
   const [showSettingsPopup, setShowSettingsPopup] = useState<{ style: React.CSSProperties } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const selectedCount = selectedOrganizations.length;
 
   const handleSettingsClick = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -32,6 +46,11 @@ export function ActionBar({ searchQuery, setSearchQuery }: ActionBarProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {selectedCount > 0 && (
+          <span className="text-[12px] font-semibold text-ink-muted mr-1">
+            {selectedCount} selected
+          </span>
+        )}
         <button
           onClick={() => setShowAddModal(true)}
           className="flex items-center gap-1.5 px-4 py-[8px] bg-accent hover:bg-accent-hover text-[#0D0F0E] text-[13px] font-semibold rounded-lg shadow-sm transition-colors tracking-wide"
@@ -48,15 +67,62 @@ export function ActionBar({ searchQuery, setSearchQuery }: ActionBarProps) {
           <CloudUpload className="w-4 h-4 stroke-[2px]" />
         </button>
         <button
-          className="p-[8px] bg-surface border border-line hover:bg-subtle text-ink-muted rounded-lg shadow-sm transition-colors"
+          className={`relative p-[8px] border rounded-lg shadow-sm transition-colors ${
+            selectedCount > 0
+              ? 'bg-accent-dim border-accent/30 text-accent hover:bg-accent-dim'
+              : 'bg-surface border-line hover:bg-subtle text-ink-muted'
+          }`}
           onClick={handleSettingsClick}
+          aria-label={
+            selectedCount > 0
+              ? `Actions for ${selectedCount} selected organization${selectedCount === 1 ? '' : 's'}`
+              : 'Settings'
+          }
         >
           <Settings className="w-4 h-4 stroke-[2px]" />
+          {selectedCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-accent text-[#0D0F0E] text-[10px] font-bold flex items-center justify-center leading-none">
+              {selectedCount}
+            </span>
+          )}
         </button>
       </div>
 
       {showSettingsPopup && (
-        <RowActionsPopover onClose={() => setShowSettingsPopup(null)} style={showSettingsPopup.style} />
+        <RowActionsPopover
+          onClose={() => setShowSettingsPopup(null)}
+          style={showSettingsPopup.style}
+          onEdit={
+            selectedCount === 1
+              ? () => {
+                  onEditRequest(selectedOrganizations[0].id);
+                  setShowSettingsPopup(null);
+                }
+              : undefined
+          }
+          onArchive={
+            selectedCount > 0
+              ? () => {
+                  onArchiveRequest(
+                    selectedOrganizations.map((o) => o.id),
+                    selectedOrganizations.map((o) => o.name)
+                  );
+                  setShowSettingsPopup(null);
+                }
+              : undefined
+          }
+          onChurn={
+            selectedCount > 0
+              ? () => {
+                  onChurnRequest(
+                    selectedOrganizations.map((o) => o.id),
+                    selectedOrganizations.map((o) => o.name)
+                  );
+                  setShowSettingsPopup(null);
+                }
+              : undefined
+          }
+        />
       )}
 
       {showAddModal && <OrganizationFormModal onClose={() => setShowAddModal(false)} />}

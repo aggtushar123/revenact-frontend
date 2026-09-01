@@ -3,7 +3,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { MetricsPanel } from '../../components/organizations/MetricsPanel';
 import { ActionBar } from '../../components/organizations/ActionBar';
 import { OrganizationsTable } from '../../components/organizations/OrganizationsTable';
-import { fetchCustomers } from '../../features/customers/customersSlice';
+import { OrganizationFormModal } from '../../components/organizations/OrganizationFormModal';
+import { ChurnOrganizationModal } from '../../components/organizations/ChurnOrganizationModal';
+import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
+import { fetchCustomers, updateCustomer } from '../../features/customers/customersSlice';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
 import type { AppDispatch, RootState } from '../../store';
 
@@ -72,6 +75,51 @@ export function List() {
     }
   };
 
+  // Checkbox selection — shared between the table's own checkboxes and the
+  // ActionBar's settings-gear menu, which acts on whatever's selected
+  // instead of needing its own separate row context. Only ever holds ids
+  // from the currently-loaded page; reset on paging/search since the ids
+  // on screen change entirely then (an id left over from a previous page
+  // just wouldn't match anything current otherwise, but starting fresh
+  // reads better than a phantom "2 selected" for rows no longer visible).
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  // Reset during render (React's documented pattern for "adjusting state
+  // when a prop/derived value changes") rather than in an effect, which
+  // would cost an extra commit-then-rerender cycle for no benefit here.
+  const [selectionPageKey, setSelectionPageKey] = useState({ offset, debouncedSearch });
+  if (selectionPageKey.offset !== offset || selectionPageKey.debouncedSearch !== debouncedSearch) {
+    setSelectionPageKey({ offset, debouncedSearch });
+    setSelectedIds(new Set());
+  }
+
+  const toggleSelect = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const allSelected = rows.length > 0 && rows.every((r) => prev.has(r.id));
+      return allSelected ? new Set() : new Set(rows.map((r) => r.id));
+    });
+  };
+
+  const selectedOrganizations = useMemo(
+    () => rows.filter((r) => selectedIds.has(r.id)).map((r) => ({ id: r.id, name: r.org })),
+    [rows, selectedIds]
+  );
+
+  // Edit/Churn/Archive modal state — shared for the same reason: a row's
+  // own "..." menu and the ActionBar's settings gear both open these.
+  const [editingCustomerId, setEditingCustomerId] = useState<number | null>(null);
+  const [churnTargets, setChurnTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
+  const [archiveTargets, setArchiveTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
+  const editingCustomer = customers.find((c) => c.id === editingCustomerId) ?? null;
+
   return (
     <div className="flex flex-col h-full w-full bg-surface text-ink">
       {/* Glass Metrics Banner */}
@@ -81,7 +129,14 @@ export function List() {
 
       {/* Search and Table Area */}
       <div className="flex flex-col flex-1 overflow-hidden px-6">
-        <ActionBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+        <ActionBar
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          selectedOrganizations={selectedOrganizations}
+          onEditRequest={setEditingCustomerId}
+          onChurnRequest={(ids, names) => setChurnTargets({ ids, names })}
+          onArchiveRequest={(ids, names) => setArchiveTargets({ ids, names })}
+        />
 
         <div className="flex-1 overflow-hidden mt-3 relative">
           <OrganizationsTable
@@ -94,9 +149,50 @@ export function List() {
             hasPrevious={previous !== null}
             onNext={handleNext}
             onPrevious={handlePrevious}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onToggleSelectAll={toggleSelectAll}
+            onEditRequest={setEditingCustomerId}
+            onChurnRequest={(ids, names) => setChurnTargets({ ids, names })}
+            onArchiveRequest={(ids, names) => setArchiveTargets({ ids, names })}
           />
         </div>
       </div>
+
+      {editingCustomer && (
+        <OrganizationFormModal customer={editingCustomer} onClose={() => setEditingCustomerId(null)} />
+      )}
+
+      {churnTargets && (
+        <ChurnOrganizationModal
+          customerIds={churnTargets.ids}
+          customerNames={churnTargets.names}
+          onClose={() => {
+            setChurnTargets(null);
+            setSelectedIds(new Set());
+          }}
+        />
+      )}
+
+      {archiveTargets && (
+        <ConfirmDialog
+          title={
+            archiveTargets.ids.length === 1
+              ? `Archive ${archiveTargets.names[0]}?`
+              : `Archive ${archiveTargets.ids.length} organizations?`
+          }
+          message="Hidden from this list and the metrics banner, but not deleted — you can unarchive later."
+          confirmLabel="Archive"
+          danger
+          onConfirm={async () => {
+            await Promise.all(
+              archiveTargets.ids.map((id) => dispatch(updateCustomer({ id, is_archived: true })).unwrap())
+            );
+            setSelectedIds(new Set());
+          }}
+          onClose={() => setArchiveTargets(null)}
+        />
+      )}
     </div>
   );
 }

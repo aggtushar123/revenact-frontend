@@ -5,13 +5,8 @@ import { HealthPopover } from './HealthPopover';
 import { CsatPopover } from './CsatPopover';
 import { EditColumnsPopover } from './EditColumnsPopover';
 import { RowActionsPopover } from './RowActionsPopover';
-import { OrganizationFormModal } from './OrganizationFormModal';
-import { ChurnOrganizationModal } from './ChurnOrganizationModal';
-import { ConfirmDialog } from './ConfirmDialog';
 import { ALL_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from './tableData';
 import type { ColumnId, OrgRow } from './tableData';
-import { useAppDispatch, useAppSelector } from '../../hooks';
-import { updateCustomer } from '../../features/customers/customersSlice';
 
 interface OrganizationsTableProps {
   rows: OrgRow[];
@@ -24,6 +19,16 @@ interface OrganizationsTableProps {
   hasPrevious: boolean;
   onNext: () => void;
   onPrevious: () => void;
+  /** Checkbox selection and Edit/Archive/Churn are shared with the
+   * ActionBar's settings-gear menu (a selection can be acted on from
+   * either place) — lifted to and rendered from List.tsx, the common
+   * parent, rather than owned here. */
+  selectedIds: Set<number>;
+  onToggleSelect: (id: number) => void;
+  onToggleSelectAll: () => void;
+  onEditRequest: (id: number) => void;
+  onChurnRequest: (ids: number[], names: string[]) => void;
+  onArchiveRequest: (ids: number[], names: string[]) => void;
 }
 
 export function OrganizationsTable({
@@ -36,10 +41,14 @@ export function OrganizationsTable({
   hasPrevious,
   onNext,
   onPrevious,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  onEditRequest,
+  onChurnRequest,
+  onArchiveRequest,
 }: OrganizationsTableProps) {
   const navigate = useNavigate();
-  const dispatch = useAppDispatch();
-  const rawCustomers = useAppSelector((state) => state.customers.customers);
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [showEditColumns, setShowEditColumns] = useState(false);
 
@@ -47,14 +56,12 @@ export function OrganizationsTable({
   const currentData = rows;
   const startIndex = offset;
   const endIndex = offset + rows.length;
+  const allOnPageSelected = currentData.length > 0 && currentData.every((r) => selectedIds.has(r.id));
 
   const [healthHover, setHealthHover] = useState<{ val: number, style: React.CSSProperties } | null>(null);
   const [reasonHover, setReasonHover] = useState<{ text: string, style: React.CSSProperties } | null>(null);
   const [csatHover, setCsatHover] = useState<{ style: React.CSSProperties } | null>(null);
   const [activeRowPopup, setActiveRowPopup] = useState<{ id: number, name: string, style: React.CSSProperties } | null>(null);
-  const [editingCustomerId, setEditingCustomerId] = useState<number | null>(null);
-  const [churningCustomer, setChurningCustomer] = useState<{ id: number; name: string } | null>(null);
-  const [archivingCustomer, setArchivingCustomer] = useState<{ id: number; name: string } | null>(null);
 
   const handleRowActionClick = (e: React.MouseEvent, id: number, name: string) => {
     e.stopPropagation();
@@ -243,7 +250,13 @@ export function OrganizationsTable({
               {/* Compulsory Sticky Organization Header */}
               <th className="px-6 py-4 font-bold border-b border-line-subtle sticky left-0 z-20 bg-surface shadow-[1px_0_0_0_var(--border-default)]">
                 <div className="flex items-center gap-4">
-                  <div className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer hover:border-accent"></div>
+                  <input
+                    type="checkbox"
+                    aria-label="Select all organizations on this page"
+                    checked={allOnPageSelected}
+                    onChange={onToggleSelectAll}
+                    className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer accent-accent"
+                  />
                   <span className="flex items-center gap-1.5 cursor-pointer">Organization <ArrowDownUp className="w-[11px] h-[11px] text-ink-faint" /></span>
                 </div>
               </th>
@@ -314,7 +327,13 @@ export function OrganizationsTable({
                 {/* Checkbox & Pinned Organization Item */}
                 <td className="px-6 py-4 border-b border-line-subtle relative sticky left-0 z-10 bg-surface group-hover:bg-subtle shadow-[1px_0_0_0_var(--border-default)] transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer hover:border-accent bg-surface"></div>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${r.org}`}
+                      checked={selectedIds.has(r.id)}
+                      onChange={() => onToggleSelect(r.id)}
+                      className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer accent-accent"
+                    />
                     <div className="w-6 h-6 flex items-center justify-center p-0.5 overflow-hidden shrink-0">
                       <img src={r.logo} alt={r.org} className="w-full h-full object-contain mix-blend-multiply" onError={(e) => { e.currentTarget.style.display='none' }} />
                     </div>
@@ -394,51 +413,17 @@ export function OrganizationsTable({
           onClose={() => setActiveRowPopup(null)}
           style={activeRowPopup.style}
           onEdit={() => {
-            setEditingCustomerId(activeRowPopup.id);
+            onEditRequest(activeRowPopup.id);
             setActiveRowPopup(null);
           }}
           onArchive={() => {
-            setArchivingCustomer({ id: activeRowPopup.id, name: activeRowPopup.name });
+            onArchiveRequest([activeRowPopup.id], [activeRowPopup.name]);
             setActiveRowPopup(null);
           }}
           onChurn={() => {
-            setChurningCustomer({ id: activeRowPopup.id, name: activeRowPopup.name });
+            onChurnRequest([activeRowPopup.id], [activeRowPopup.name]);
             setActiveRowPopup(null);
           }}
-        />
-      )}
-
-      {editingCustomerId !== null && (
-        (() => {
-          const target = rawCustomers.find((c) => c.id === editingCustomerId);
-          // Falls back to closing quietly rather than rendering a blank
-          // modal — e.g. if the row was archived by someone else and
-          // dropped out of `rawCustomers` between opening the row menu
-          // and this render.
-          return target ? (
-            <OrganizationFormModal customer={target} onClose={() => setEditingCustomerId(null)} />
-          ) : null;
-        })()
-      )}
-
-      {churningCustomer && (
-        <ChurnOrganizationModal
-          customerId={churningCustomer.id}
-          customerName={churningCustomer.name}
-          onClose={() => setChurningCustomer(null)}
-        />
-      )}
-
-      {archivingCustomer && (
-        <ConfirmDialog
-          title={`Archive ${archivingCustomer.name}?`}
-          message="It'll be hidden from this list and the metrics banner, but not deleted — you can unarchive it later."
-          confirmLabel="Archive"
-          danger
-          onConfirm={async () => {
-            await dispatch(updateCustomer({ id: archivingCustomer.id, is_archived: true })).unwrap();
-          }}
-          onClose={() => setArchivingCustomer(null)}
         />
       )}
     </div>

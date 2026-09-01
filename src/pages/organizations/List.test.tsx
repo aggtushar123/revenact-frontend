@@ -325,4 +325,72 @@ describe('Organizations List page — Add/Edit/Churn/Archive', () => {
     await waitFor(() => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument());
     expect(screen.getByText('No organizations yet.')).toBeInTheDocument();
   });
+
+  it("the settings gear's Edit/Archive/Churn are disabled until something is checkbox-selected", async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Globex Corp');
+
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(await screen.findByRole('button', { name: 'Edit Organization' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Archive Organization' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Churn Organization' })).toBeDisabled();
+  });
+
+  it('checking a row and using the settings gear edits that organization', async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Globex Corp');
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select Globex Corp' }));
+    await user.click(screen.getByRole('button', { name: 'Actions for 1 selected organization' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit Organization' }));
+
+    const nameInput = await screen.findByLabelText('Name *');
+    expect(nameInput).toHaveValue('Globex Corp');
+  });
+
+  it('selecting two rows and archiving from the settings gear removes both', async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([globex, initech]));
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Globex Corp');
+    await screen.findByText('Initech');
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select Globex Corp' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Select Initech' }));
+    await user.click(screen.getByRole('button', { name: 'Actions for 2 selected organizations' }));
+
+    // Edit doesn't make sense for a multi-selection.
+    expect(await screen.findByRole('button', { name: 'Edit Organization' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Archive Organization' }));
+    expect(await screen.findByText('Archive 2 organizations?')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Archive' }));
+
+    await waitFor(() => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument());
+    expect(screen.queryByText('Initech')).not.toBeInTheDocument();
+  });
+
+  it('the header checkbox selects and deselects every row on the page', async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([globex, initech]));
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Globex Corp');
+    await screen.findByText('Initech');
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select all organizations on this page' }));
+    expect(screen.getByRole('checkbox', { name: 'Select Globex Corp' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select Initech' })).toBeChecked();
+
+    await user.click(screen.getByRole('checkbox', { name: 'Select all organizations on this page' }));
+    expect(screen.getByRole('checkbox', { name: 'Select Globex Corp' })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select Initech' })).not.toBeChecked();
+  });
 });
