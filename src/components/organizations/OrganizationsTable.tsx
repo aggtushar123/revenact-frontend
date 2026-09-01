@@ -49,22 +49,22 @@ export function OrganizationsTable({
   const handleRowActionClick = (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
-    
+
     // Ensure the popup doesn't overflow bottom of viewport if scrolled
     const yOffset = rect.bottom > window.innerHeight - 200 ? rect.top - 160 : rect.bottom + 4;
-    
+
     setActiveRowPopup({
       id,
       style: { top: yOffset, right: window.innerWidth - rect.right }
     });
   };
 
-  /* Pulse mapping: 1=green, 2=red, 3=yellow, 0=gray */
+  /* Pulse mapping: 1=good, 2=bad, 3=warning, 0=no signal */
   const renderPulse = (dots: number[]) => (
     <div className="flex items-center gap-[5px]">
       {dots.map((d, i) => (
         <div key={i} className={`w-2 h-2 rounded-full ${
-          d === 1 ? 'bg-[#00a699]' : d === 2 ? 'bg-[#fa5c5c]' : d === 3 ? 'bg-[#ffbb00]' : 'bg-[#e5e7eb]'
+          d === 1 ? 'bg-success' : d === 2 ? 'bg-danger' : d === 3 ? 'bg-warning' : 'bg-line-strong'
         }`} />
       ))}
     </div>
@@ -102,43 +102,43 @@ export function OrganizationsTable({
   const renderCell = (colId: ColumnId, r: OrgRow) => {
     switch (colId) {
       case 'revenactId':
-        return <td key={colId} className="px-6 py-4 bg-[#f8f9fc] group-hover:bg-[#f1f3f6] border-b border-[#f1f3f5] border-l border-r text-right pr-6 transition-colors font-medium text-gray-700">{r.id}</td>;
+        return <td key={colId} className="px-6 py-4 bg-subtle group-hover:bg-elevated border-b border-line-subtle border-l border-r text-right pr-6 transition-colors font-medium text-ink-muted">{r.id}</td>;
       case 'owner':
         return (
-          <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa]">
+          <td key={colId} className="px-6 py-4 border-b border-line-subtle">
             <div className="flex items-center gap-2.5">
               {r.img ? (
-                <img src={r.img} alt={r.owner} className="w-[26px] h-[26px] rounded-full object-cover border border-gray-200" />
+                <img src={r.img} alt={r.owner} className="w-[26px] h-[26px] rounded-full object-cover border border-line" />
               ) : (
                 <div className={`w-[26px] h-[26px] rounded-full ${r.bg} text-white flex items-center justify-center font-bold text-[9px] shadow-sm`}>{r.avatar}</div>
               )}
-              <span className="text-[#3b82f6] hover:underline cursor-pointer font-medium">{r.owner}</span>
+              <span className="text-info hover:underline cursor-pointer font-medium">{r.owner}</span>
             </div>
           </td>
         );
       case 'lifecycleStage':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 font-medium">{r.stage}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium">{r.stage}</td>;
       case 'health':
         return (
-          <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] relative cursor-pointer" onMouseEnter={(e) => handleHealthMouseEnter(e, r.health.val)} onMouseLeave={handleMouseLeave}>
-            <div className="flex items-center gap-2 font-bold text-gray-900">
+          <td key={colId} className="px-6 py-4 border-b border-line-subtle relative cursor-pointer" onMouseEnter={(e) => handleHealthMouseEnter(e, r.health.val)} onMouseLeave={handleMouseLeave}>
+            <div className="flex items-center gap-2 font-bold text-ink">
               <span className={`w-[7px] h-[7px] rounded-full ${r.health.clr}`}></span> {r.health.val}
             </div>
           </td>
         );
       case 'pulse':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa]">{renderPulse(r.pulse)}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle">{renderPulse(r.pulse)}</td>;
       case 'aiPulseScore':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] font-medium text-gray-600">{r.aiScore}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle font-medium text-ink-muted">{r.aiScore}</td>;
       case 'aiPulseReason':
         return (
-          <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 cursor-pointer" onMouseEnter={(e) => handleReasonMouseEnter(e, r.fullReason)} onMouseLeave={handleMouseLeave}>
+          <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted cursor-pointer" onMouseEnter={(e) => handleReasonMouseEnter(e, r.fullReason)} onMouseLeave={handleMouseLeave}>
             <div className="w-[200px] truncate text-[12px] font-medium">{r.reason}</div>
           </td>
         );
       case 'nps':
         return (
-          <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa]">
+          <td key={colId} className="px-6 py-4 border-b border-line-subtle">
             <div className="flex justify-center w-full">
               <div className={`${r.npsColor} text-white px-[18px] py-[6px] rounded-[4px] font-bold text-[12px] min-w-[80px] text-center`}>{r.nps}</div>
             </div>
@@ -146,44 +146,44 @@ export function OrganizationsTable({
         );
       case 'csatScore':
         return (
-          <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] cursor-pointer" onMouseEnter={handleCsatMouseEnter} onMouseLeave={handleMouseLeave}>
+          <td key={colId} className="px-6 py-4 border-b border-line-subtle cursor-pointer" onMouseEnter={handleCsatMouseEnter} onMouseLeave={handleMouseLeave}>
             <div className="flex justify-center w-full">
               <div className={`${r.csatColor} text-white px-[18px] py-[6px] rounded-[4px] font-bold text-[12px] min-w-[80px] text-center`}>{r.csat}</div>
             </div>
           </td>
         );
       case 'joinedDate':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 text-[12px] font-medium">{r.joined}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted text-[12px] font-medium">{r.joined}</td>;
       case 'renewalDate':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 text-[12px] font-medium">{r.renewal}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted text-[12px] font-medium">{r.renewal}</td>;
       case 'arrAccount':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 text-[13px] font-medium">{r.arrAccount}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted text-[13px] font-medium">{r.arrAccount}</td>;
       case 'arrHQ':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 text-[13px] font-medium">{r.arrHQ}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted text-[13px] font-medium">{r.arrHQ}</td>;
       case 'implFee':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 text-[13px] font-medium">{r.implFee}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted text-[13px] font-medium">{r.implFee}</td>;
       case 'tcv':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 text-[13px] font-medium">{r.tcv}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted text-[13px] font-medium">{r.tcv}</td>;
       case 'tcvRenewal':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 text-[13px] font-medium">{r.tcvRenewal}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted text-[13px] font-medium">{r.tcvRenewal}</td>;
       case 'contractStart':
         return (
-          <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 text-[13px] font-medium group/editx">
+          <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted text-[13px] font-medium group/editx">
             <div className="flex items-center gap-2">
               <span>{r.contractStart}</span>
-              <Pencil className="w-3.5 h-3.5 text-gray-400 opacity-0 group-hover/editx:opacity-100 cursor-pointer hover:text-indigo-500 transition-opacity" />
+              <Pencil className="w-3.5 h-3.5 text-ink-faint opacity-0 group-hover/editx:opacity-100 cursor-pointer hover:text-accent transition-opacity" />
             </div>
           </td>
         );
       case 'contractEnd':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 text-[13px] font-medium">{r.contractEnd}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted text-[13px] font-medium">{r.contractEnd}</td>;
       case 'productsUtilized':
         return (
-          <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-600 font-medium">
+          <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium">
             <div className="flex items-center">
               <span>{r.productsUtilized.primary}</span>
               {r.productsUtilized.additional && (
-                <span className="ml-2 px-1.5 py-0.5 rounded text-[11px] font-bold text-indigo-600 cursor-pointer hover:underline">
+                <span className="ml-2 px-1.5 py-0.5 rounded text-[11px] font-bold text-accent cursor-pointer hover:underline">
                   + {r.productsUtilized.additional}
                 </span>
               )}
@@ -191,49 +191,49 @@ export function OrganizationsTable({
           </td>
         );
       case 'topSourceChannel':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-600 font-medium">{r.topSourceChannel}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium">{r.topSourceChannel}</td>;
       case 'totalContractedSeats':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-600 font-medium text-right pr-6">{r.totalContractedSeats}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium text-right pr-6">{r.totalContractedSeats}</td>;
       case 'totalActiveSeats':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-600 font-medium text-right pr-6">{r.totalActiveSeats}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium text-right pr-6">{r.totalActiveSeats}</td>;
       case 'totalSeatUtilization':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-600 font-medium text-right pr-6">{r.totalSeatUtilization}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium text-right pr-6">{r.totalSeatUtilization}</td>;
       case 'totalHires':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-600 font-medium text-right pr-6">{r.totalHires}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium text-right pr-6">{r.totalHires}</td>;
       case 'scopeWebApp':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 font-medium">{r.scopeWebApp}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium">{r.scopeWebApp}</td>;
       case 'cesPercentage':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-600 font-medium text-right pr-6">{r.cesPercentage}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium text-right pr-6">{r.cesPercentage}</td>;
       case 'churnDate':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 font-medium">{r.churnDate}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium">{r.churnDate}</td>;
       case 'churnReason':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 font-medium">{r.churnReason}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium">{r.churnReason}</td>;
       case 'churnComment':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 font-medium">{r.churnComment}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium">{r.churnComment}</td>;
       case 'domain':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-[#3b82f6] hover:underline cursor-pointer font-medium">{r.domain}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-info hover:underline cursor-pointer font-medium">{r.domain}</td>;
       case 'createdBy':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-400 text-[11px] font-medium">{r.createdBy}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-faint text-[11px] font-medium">{r.createdBy}</td>;
       case 'modifiedBy':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-400 text-[11px] font-medium">{r.modifiedBy}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-faint text-[11px] font-medium">{r.modifiedBy}</td>;
       case 'nameAddress':
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa] text-gray-500 font-medium text-[12px]">{r.nameAddress}</td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium text-[12px]">{r.nameAddress}</td>;
       default:
-        return <td key={colId} className="px-6 py-4 border-b border-[#f8f9fa]"></td>;
+        return <td key={colId} className="px-6 py-4 border-b border-line-subtle"></td>;
     }
   };
 
   return (
-    <div className="w-full h-full bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col relative z-0">
+    <div className="w-full h-full bg-surface rounded-xl border border-line shadow-sm overflow-hidden flex flex-col relative z-0">
       <div className="overflow-x-auto overflow-y-auto w-full flex-1 custom-scrollbar">
         <table className="w-full text-left border-collapse min-w-max relative pb-16">
-          <thead className="text-[12px] font-bold text-gray-700 bg-white shadow-[0_1px_0_0_#f3f4f6]">
+          <thead className="text-[12px] font-bold text-ink-muted bg-surface shadow-[0_1px_0_0_var(--border-default)]">
             <tr>
               {/* Compulsory Sticky Organization Header */}
-              <th className="px-6 py-4 font-bold border-b border-gray-100 sticky left-0 z-20 bg-white shadow-[1px_0_0_0_#ebebeb]">
+              <th className="px-6 py-4 font-bold border-b border-line-subtle sticky left-0 z-20 bg-surface shadow-[1px_0_0_0_var(--border-default)]">
                 <div className="flex items-center gap-4">
-                  <div className="w-[14px] h-[14px] rounded-[4px] border border-gray-200 shadow-sm cursor-pointer hover:border-indigo-400"></div>
-                  <span className="flex items-center gap-1.5 cursor-pointer">Organization <ArrowDownUp className="w-[11px] h-[11px] text-gray-400" /></span>
+                  <div className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer hover:border-accent"></div>
+                  <span className="flex items-center gap-1.5 cursor-pointer">Organization <ArrowDownUp className="w-[11px] h-[11px] text-ink-faint" /></span>
                 </div>
               </th>
 
@@ -243,28 +243,28 @@ export function OrganizationsTable({
                 if (!colDef) return null;
 
                 return (
-                  <th key={colDef.id} className={`px-6 py-4 font-bold border-b border-gray-100 ${colDef.id === 'revenactId' ? 'bg-[#f8f9fc] border-l border-r border-[#f1f3f5]' : ''}`}>
+                  <th key={colDef.id} className={`px-6 py-4 font-bold border-b border-line-subtle ${colDef.id === 'revenactId' ? 'bg-subtle border-l border-r border-line-subtle' : ''}`}>
                     <div className="flex items-center gap-2">
                       <span className="flex items-center gap-1.5 cursor-pointer whitespace-nowrap">{colDef.label}</span>
-                      {colDef.isCalc && <Calculator className="w-[14px] h-[14px] text-gray-400 shrink-0" />}
-                      <ArrowDownUp className="w-[11px] h-[11px] text-gray-400 shrink-0" />
+                      {colDef.isCalc && <Calculator className="w-[14px] h-[14px] text-ink-faint shrink-0" />}
+                      <ArrowDownUp className="w-[11px] h-[11px] text-ink-faint shrink-0" />
                     </div>
                   </th>
                 );
               })}
 
               {/* Edit Columns Plus Header */}
-              <th className="px-3 py-4 font-bold border-b border-gray-100 sticky right-0 z-30 bg-white shadow-[-1px_0_0_0_#ebebeb]">
+              <th className="px-3 py-4 font-bold border-b border-line-subtle sticky right-0 z-30 bg-surface shadow-[-1px_0_0_0_var(--border-default)]">
                 <div className="relative flex justify-center w-full h-full items-center">
-                  <button 
+                  <button
                     onClick={() => setShowEditColumns(!showEditColumns)}
-                    className="p-1 rounded-full hover:bg-gray-100 transition-colors"
+                    className="p-1 rounded-full hover:bg-subtle transition-colors"
                   >
-                    <PlusCircle className="w-[17px] h-[17px] text-gray-400 cursor-pointer hover:text-gray-600 fill-gray-50" />
+                    <PlusCircle className="w-[17px] h-[17px] text-ink-faint cursor-pointer hover:text-ink-muted fill-subtle" />
                   </button>
-                  
+
                   {showEditColumns && (
-                    <EditColumnsPopover 
+                    <EditColumnsPopover
                       allColumns={ALL_COLUMNS}
                       visibleColumns={visibleColumns}
                       setVisibleColumns={setVisibleColumns}
@@ -276,44 +276,44 @@ export function OrganizationsTable({
               </th>
             </tr>
           </thead>
-          
-          <tbody className="text-[13px] text-gray-700 whitespace-nowrap bg-white relative z-0">
+
+          <tbody className="text-[13px] text-ink-muted whitespace-nowrap bg-surface relative z-0">
             {error ? (
               <tr>
-                <td colSpan={visibleColumns.length + 1} className="px-6 py-8 text-center text-[13px] font-medium text-[var(--danger)]">
+                <td colSpan={visibleColumns.length + 1} className="px-6 py-8 text-center text-[13px] font-medium text-danger">
                   {error}
                 </td>
               </tr>
             ) : isLoading && currentData.length === 0 ? (
               <tr>
-                <td colSpan={visibleColumns.length + 1} className="px-6 py-8 text-center text-[13px] font-medium text-gray-400">
+                <td colSpan={visibleColumns.length + 1} className="px-6 py-8 text-center text-[13px] font-medium text-ink-faint">
                   Loading organizations…
                 </td>
               </tr>
             ) : currentData.length === 0 ? (
               <tr>
-                <td colSpan={visibleColumns.length + 1} className="px-6 py-8 text-center text-[13px] font-medium text-gray-400">
+                <td colSpan={visibleColumns.length + 1} className="px-6 py-8 text-center text-[13px] font-medium text-ink-faint">
                   No organizations yet.
                 </td>
               </tr>
             ) : (
               currentData.map((r) => (
-              <tr key={r.id} className="group hover:bg-gray-50 transition-colors">
+              <tr key={r.id} className="group hover:bg-subtle transition-colors">
 
                 {/* Checkbox & Pinned Organization Item */}
-                <td className="px-6 py-4 border-b border-[#f3f4f6] relative sticky left-0 z-10 bg-white group-hover:bg-gray-50 shadow-[1px_0_0_0_#ebebeb] transition-colors">
+                <td className="px-6 py-4 border-b border-line-subtle relative sticky left-0 z-10 bg-surface group-hover:bg-subtle shadow-[1px_0_0_0_var(--border-default)] transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-[14px] h-[14px] rounded-[4px] border border-gray-200 shadow-sm cursor-pointer hover:border-indigo-400 bg-white"></div>
+                    <div className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer hover:border-accent bg-surface"></div>
                     <div className="w-6 h-6 flex items-center justify-center p-0.5 overflow-hidden shrink-0">
                       <img src={r.logo} alt={r.org} className="w-full h-full object-contain mix-blend-multiply" onError={(e) => { e.currentTarget.style.display='none' }} />
                     </div>
                     <span
-                      className="font-bold text-gray-800 tracking-tight cursor-pointer hover:text-indigo-600 hover:underline transition-colors"
+                      className="font-bold text-ink tracking-tight cursor-pointer hover:text-accent hover:underline transition-colors"
                       onClick={() => navigate(`/organizations/${r.id}`)}
                     >
                       {r.org}
                     </span>
-                    <LinkIcon className="w-3.5 h-3.5 text-gray-400 ml-1 hover:text-indigo-500 cursor-pointer shrink-0" />
+                    <LinkIcon className="w-3.5 h-3.5 text-ink-faint ml-1 hover:text-accent cursor-pointer shrink-0" />
                   </div>
                 </td>
 
@@ -321,12 +321,12 @@ export function OrganizationsTable({
                 {visibleColumns.filter(id => id !== 'organization').map(colId => renderCell(colId, r))}
 
                 {/* Trailing Standard Multi-action Block  */}
-                <td className="px-3 py-4 border-b border-[#f8f9fa] sticky right-0 z-10 bg-white group-hover:bg-gray-50 shadow-[-1px_0_0_0_#ebebeb] transition-colors text-center">
+                <td className="px-3 py-4 border-b border-line-subtle sticky right-0 z-10 bg-surface group-hover:bg-subtle shadow-[-1px_0_0_0_var(--border-default)] transition-colors text-center">
                   <div
-                    className="p-1 cursor-pointer hover:bg-gray-200 rounded transition-colors inline-block"
+                    className="p-1 cursor-pointer hover:bg-line rounded transition-colors inline-block"
                     onClick={(e) => handleRowActionClick(e, r.id)}
                   >
-                    <MoreHorizontal className="w-[18px] h-[18px] text-gray-400 hover:text-gray-600 mx-auto" />
+                    <MoreHorizontal className="w-[18px] h-[18px] text-ink-faint hover:text-ink-muted mx-auto" />
                   </div>
                 </td>
 
@@ -338,8 +338,8 @@ export function OrganizationsTable({
       </div>
 
       {/* Pagination Footer */}
-      <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-white shrink-0 mt-auto relative z-10">
-        <div className="text-[13px] text-gray-500 font-medium tracking-tight">
+      <div className="flex items-center justify-between px-6 py-3 border-t border-line-subtle bg-surface shrink-0 mt-auto relative z-10">
+        <div className="text-[13px] text-ink-muted font-medium tracking-tight">
           {count > 0 ? `Showing ${startIndex + 1}-${Math.min(endIndex, count)} of ${count} organizations` : 'No organizations'}
         </div>
         <div className="flex items-center gap-2">
@@ -347,7 +347,7 @@ export function OrganizationsTable({
             onClick={onPrevious}
             disabled={!hasPrevious || isLoading}
             aria-label="Previous page"
-            className="p-[5px] rounded border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all outline-none"
+            className="p-[5px] rounded border border-line text-ink-faint hover:text-ink-muted hover:bg-subtle disabled:opacity-30 disabled:hover:bg-transparent transition-all outline-none"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -355,24 +355,24 @@ export function OrganizationsTable({
             onClick={onNext}
             disabled={!hasNext || isLoading}
             aria-label="Next page"
-            className="p-[5px] rounded border border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:hover:bg-transparent transition-all outline-none"
+            className="p-[5px] rounded border border-line text-ink-faint hover:text-ink-muted hover:bg-subtle disabled:opacity-30 disabled:hover:bg-transparent transition-all outline-none"
           >
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
       </div>
-      
+
       {/* Portal-like Popovers */}
       {healthHover && <HealthPopover val={healthHover.val} style={healthHover.style} />}
       {csatHover && <CsatPopover style={csatHover.style} />}
-      
+
       {reasonHover && (
-        <div 
+        <div
           style={reasonHover.style}
-          className="fixed z-[100] w-[300px] bg-[#535d6c] text-white text-[12.5px] p-3.5 rounded-[6px] shadow-xl pointer-events-none transition-opacity leading-relaxed"
+          className="fixed z-[100] w-[300px] bg-elevated text-ink text-[12.5px] p-3.5 rounded-[6px] border border-line-strong shadow-xl pointer-events-none transition-opacity leading-relaxed"
         >
           {reasonHover.text}
-          <div className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] bg-[#535d6c] transform rotate-45 rounded-sm"></div>
+          <div className="absolute -top-[5px] left-1/2 -translate-x-1/2 w-[10px] h-[10px] bg-elevated transform rotate-45"></div>
         </div>
       )}
 

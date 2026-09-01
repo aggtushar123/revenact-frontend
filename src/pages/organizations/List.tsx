@@ -47,7 +47,7 @@ export function List() {
   };
 
   return (
-    <div className="flex flex-col h-full w-full bg-white text-[#1f2937]">
+    <div className="flex flex-col h-full w-full bg-surface text-ink">
       {/* Glass Metrics Banner */}
       <div className="px-6 pt-5 pb-4">
         <MetricsPanel />
