@@ -19,9 +19,35 @@ export function List() {
   // back short (e.g. the last one).
   const [offset, setOffset] = useState(0);
 
+  // Search box state: `searchQuery` is what the input shows; `debouncedSearch`
+  // is what actually drives the fetch, updated 300ms after typing stops so a
+  // request isn't fired per keystroke.
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
   useEffect(() => {
-    dispatch(fetchCustomers());
-  }, [dispatch]);
+    const timeout = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const url = debouncedSearch ? `/customers/?search=${encodeURIComponent(debouncedSearch)}` : undefined;
+    dispatch(fetchCustomers(url))
+      .unwrap()
+      .then(() => {
+        // Guards against a slower, now-stale request (e.g. an earlier
+        // keystroke's fetch) resetting the offset after a newer one already
+        // has — this effect re-runs on every debouncedSearch change.
+        if (!cancelled) setOffset(0);
+      })
+      .catch(() => {
+        // Failure is already surfaced via redux `error` state into the table.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [dispatch, debouncedSearch]);
 
   const rows = useMemo(() => customers.map(mapCustomerToOrgRow), [customers]);
 
@@ -55,7 +81,7 @@ export function List() {
 
       {/* Search and Table Area */}
       <div className="flex flex-col flex-1 overflow-hidden px-6">
-        <ActionBar />
+        <ActionBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
 
         <div className="flex-1 overflow-hidden mt-3 relative">
           <OrganizationsTable

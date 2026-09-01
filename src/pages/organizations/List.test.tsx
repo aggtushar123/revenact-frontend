@@ -127,4 +127,36 @@ describe('Organizations List page', () => {
     );
     expect(screen.getByText('Showing 2-2 of 2 organizations')).toBeInTheDocument();
   });
+
+  it('searching debounces, hits ?search=, and resets pagination to the first page', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(200, { count: 2, next: null, previous: null, results: [globex, initech] }))
+      .mockResolvedValueOnce(jsonResponse(200, { count: 1, next: null, previous: null, results: [initech] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+
+    await user.type(
+      screen.getByPlaceholderText('Search by name, Revenact ID or External ID'),
+      'init'
+    );
+
+    // Typing alone shouldn't fire a request per keystroke — only after the
+    // 300ms debounce settles.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await waitFor(
+      () => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument(),
+      { timeout: 2000 }
+    );
+    expect(screen.getByText('Initech')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      expect.stringContaining('/api/v1/customers/?search=init'),
+      expect.anything()
+    );
+    expect(screen.getByText('Showing 1-1 of 1 organizations')).toBeInTheDocument();
+  });
 });

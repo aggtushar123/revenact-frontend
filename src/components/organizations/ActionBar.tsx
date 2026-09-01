@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import { Search, Download, CloudUpload, Filter, Settings } from 'lucide-react';
 import { RowActionsPopover } from './RowActionsPopover';
 
-export function ActionBar() {
+interface ActionBarProps {
+  searchQuery: string;
+  setSearchQuery: (value: string) => void;
+}
+
+export function ActionBar({ searchQuery, setSearchQuery }: ActionBarProps) {
   const [showSettingsPopup, setShowSettingsPopup] = useState<{ style: React.CSSProperties } | null>(null);
 
   const handleSettingsClick = (e: React.MouseEvent) => {
@@ -17,6 +22,8 @@ export function ActionBar() {
         <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2" />
         <input
           type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search by name, Revenact ID or External ID"
           className="w-full pl-9 pr-4 py-[8px] bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent placeholder:text-ink-faint"
         />
