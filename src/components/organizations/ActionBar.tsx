@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Search, Download, CloudUpload, Filter, Settings } from 'lucide-react';
 import { RowActionsPopover } from './RowActionsPopover';
+import { OrganizationFormModal } from './OrganizationFormModal';
 
 interface ActionBarProps {
   searchQuery: string;
@@ -9,6 +10,7 @@ interface ActionBarProps {
 
 export function ActionBar({ searchQuery, setSearchQuery }: ActionBarProps) {
   const [showSettingsPopup, setShowSettingsPopup] = useState<{ style: React.CSSProperties } | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   const handleSettingsClick = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -30,7 +32,10 @@ export function ActionBar({ searchQuery, setSearchQuery }: ActionBarProps) {
       </div>
 
       <div className="flex items-center gap-2">
-        <button className="flex items-center gap-1.5 px-4 py-[8px] bg-accent hover:bg-accent-hover text-[#0D0F0E] text-[13px] font-semibold rounded-lg shadow-sm transition-colors tracking-wide">
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-1.5 px-4 py-[8px] bg-accent hover:bg-accent-hover text-[#0D0F0E] text-[13px] font-semibold rounded-lg shadow-sm transition-colors tracking-wide"
+        >
           <span className="text-lg leading-none mb-[2px]">+</span> Add Organization
         </button>
         <button className="flex items-center gap-1.5 px-3 py-[8px] bg-accent-dim border border-accent/30 text-accent hover:bg-accent-dim text-[13px] font-semibold rounded-lg shadow-sm transition-colors">
@@ -53,6 +58,8 @@ export function ActionBar({ searchQuery, setSearchQuery }: ActionBarProps) {
       {showSettingsPopup && (
         <RowActionsPopover onClose={() => setShowSettingsPopup(null)} style={showSettingsPopup.style} />
       )}
+
+      {showAddModal && <OrganizationFormModal onClose={() => setShowAddModal(false)} />}
 
       {/* Floating Theme button on the right edge */}
       <div className="fixed right-0 top-[35%] bg-elevated text-accent p-2 pl-3 rounded-l-lg shadow-lg cursor-pointer z-50 flex items-center justify-center border border-line-strong border-r-0">

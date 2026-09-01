@@ -58,6 +58,7 @@ function appleCustomer(overrides: Partial<Customer> = {}): Customer {
     churn_date: null,
     churn_reason: '',
     churn_comment: '',
+    is_archived: false,
     ...overrides,
   };
 }

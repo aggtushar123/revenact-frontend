@@ -55,6 +55,32 @@ export interface Customer {
   churn_date: string | null;
   churn_reason: string;
   churn_comment: string;
+  is_archived: boolean;
+}
+
+// The subset of Customer fields the Add/Edit forms actually expose —
+// identity, ownership, lifecycle stage, and contract dates. Deliberately
+// excludes financials, product usage, and NPS/CSAT/health: per the
+// product decision behind this form, those are meant to eventually sync
+// from other systems (billing, usage tracking, surveys) rather than be
+// hand-typed when an organisation is added or edited. Also covers the
+// Churn action's own fields (churn_date/reason/comment) and is_archived
+// (Archive/unarchive) — both PATCH through the same updateCustomer thunk
+// as a normal edit, just with a different field subset.
+export interface CustomerWritePayload {
+  name?: string;
+  domain?: string;
+  address?: string;
+  owner_id?: number | null;
+  lifecycle_stage?: Customer['lifecycle_stage'];
+  joined_date?: string | null;
+  renewal_date?: string | null;
+  contract_start_date?: string | null;
+  contract_end_date?: string | null;
+  churn_date?: string | null;
+  churn_reason?: string;
+  churn_comment?: string;
+  is_archived?: boolean;
 }
 
 interface CustomersPage {
@@ -167,6 +193,36 @@ export const fetchCustomerStats = createAsyncThunk<CustomerStats, void, { reject
   }
 );
 
+// `name` is the only field the backend requires — everything else in
+// CustomerWritePayload is optional, matching the quick-add form.
+export const createCustomer = createAsyncThunk<
+  Customer,
+  CustomerWritePayload & { name: string },
+  { rejectValue: string }
+>('customers/createCustomer', async (data, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Customer>('/customers/', { method: 'POST', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not add organization.';
+    return rejectWithValue(message);
+  }
+});
+
+// Backs Edit, Churn, and Archive/Unarchive alike — each just sends a
+// different subset of CustomerWritePayload as a partial update.
+export const updateCustomer = createAsyncThunk<
+  Customer,
+  { id: number } & CustomerWritePayload,
+  { rejectValue: string }
+>('customers/updateCustomer', async ({ id, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Customer>(`/customers/${id}/`, { method: 'PATCH', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not update organization.';
+    return rejectWithValue(message);
+  }
+});
+
 const customersSlice = createSlice({
   name: 'customers',
   initialState,
@@ -221,6 +277,31 @@ const customersSlice = createSlice({
       .addCase(fetchCustomerStats.rejected, (state, action) => {
         state.statsLoading = false;
         state.statsError = action.payload ?? 'Something went wrong.';
+      })
+      // createCustomer/updateCustomer's own rejections are shown inline in
+      // their modal forms instead (same pattern as userManagementSlice's
+      // addCSM/updateCSM) — no .rejected case needed here.
+      .addCase(createCustomer.fulfilled, (state, action) => {
+        state.customers.unshift(action.payload);
+        state.count += 1;
+        state.totalCount += 1;
+      })
+      .addCase(updateCustomer.fulfilled, (state, action) => {
+        const updated = action.payload;
+        if (updated.is_archived) {
+          // Archived — soft-hidden from the list, same as the backend
+          // does for GET /customers/. Drop it locally too rather than
+          // leaving a stale, now-archived row visible until next fetch.
+          const wasPresent = state.customers.some((c) => c.id === updated.id);
+          state.customers = state.customers.filter((c) => c.id !== updated.id);
+          if (wasPresent) {
+            state.count = Math.max(0, state.count - 1);
+            state.totalCount = Math.max(0, state.totalCount - 1);
+          }
+        } else {
+          const index = state.customers.findIndex((c) => c.id === updated.id);
+          if (index !== -1) state.customers[index] = updated;
+        }
       });
   },
 });

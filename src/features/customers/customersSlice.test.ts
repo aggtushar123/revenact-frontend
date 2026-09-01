@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
-import customersReducer, { fetchCustomers, fetchUpcomingRenewals, fetchCustomerStats } from './customersSlice';
+import customersReducer, {
+  fetchCustomers,
+  fetchUpcomingRenewals,
+  fetchCustomerStats,
+  createCustomer,
+  updateCustomer,
+} from './customersSlice';
 
 function makeStore() {
   return configureStore({ reducer: { customers: customersReducer } });
@@ -47,6 +53,7 @@ const globex = {
   churn_date: null,
   churn_reason: '',
   churn_comment: '',
+  is_archived: false,
 };
 
 function mockFetchOnce(status: number, body: unknown) {
@@ -248,5 +255,62 @@ describe('customersSlice', () => {
     expect(state.stats).toBeNull();
     expect(state.error).toBeNull();
     expect(state.renewalsError).toBeNull();
+  });
+
+  it('createCustomer POSTs to /customers/ and unshifts the result, bumping count and totalCount', async () => {
+    mockFetchOnce(200, { count: 1, next: null, previous: null, results: [globex] });
+    const store = makeStore();
+    await store.dispatch(fetchCustomers());
+
+    const initech = { ...globex, id: 2, name: 'Initech' };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => initech });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await store.dispatch(createCustomer({ name: 'Initech' }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/customers/'),
+      expect.objectContaining({ method: 'POST' })
+    );
+    const state = store.getState().customers;
+    expect(state.customers).toEqual([initech, globex]);
+    expect(state.count).toBe(2);
+    expect(state.totalCount).toBe(2);
+  });
+
+  it('updateCustomer PATCHes /customers/<id>/ and replaces the matching entry in place', async () => {
+    mockFetchOnce(200, { count: 1, next: null, previous: null, results: [globex] });
+    const store = makeStore();
+    await store.dispatch(fetchCustomers());
+
+    const renamed = { ...globex, name: 'Globex Renamed' };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => renamed });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await store.dispatch(updateCustomer({ id: globex.id, name: 'Globex Renamed' }));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining(`/customers/${globex.id}/`),
+      expect.objectContaining({ method: 'PATCH' })
+    );
+    const state = store.getState().customers;
+    expect(state.customers).toEqual([renamed]);
+    expect(state.count).toBe(1);
+  });
+
+  it('updateCustomer with is_archived:true removes the row from the list and decrements counts', async () => {
+    mockFetchOnce(200, { count: 1, next: null, previous: null, results: [globex] });
+    const store = makeStore();
+    await store.dispatch(fetchCustomers());
+
+    const archived = { ...globex, is_archived: true };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => archived }));
+
+    await store.dispatch(updateCustomer({ id: globex.id, is_archived: true }));
+
+    const state = store.getState().customers;
+    expect(state.customers).toEqual([]);
+    expect(state.count).toBe(0);
+    expect(state.totalCount).toBe(0);
   });
 });

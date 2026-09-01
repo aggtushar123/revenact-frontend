@@ -50,6 +50,7 @@ const globex = {
   churn_date: null,
   churn_reason: '',
   churn_comment: '',
+  is_archived: false,
 };
 
 const initech = { ...globex, id: 2, name: 'Initech' };
@@ -219,5 +220,109 @@ describe('Organizations List page', () => {
       expect.anything()
     );
     expect(screen.getByText('Showing 1-1 of 1 organizations')).toBeInTheDocument();
+  });
+});
+
+// A tiny in-memory "backend" for POST/PATCH so these tests exercise the
+// real create/update thunks end-to-end (List -> table/ActionBar -> modal
+// -> thunk -> store -> re-render), not just a canned response.
+function makeMutationFetchMock(initial: (typeof globex)[]) {
+  let customers = [...initial];
+  let nextId = 1 + Math.max(0, ...customers.map((c) => c.id));
+  return vi.fn((url: string, options?: { method?: string; body?: string }) => {
+    const method = options?.method ?? 'GET';
+    if (url.includes('/customers/stats/')) return Promise.resolve(jsonResponse(200, ZERO_STATS));
+    if (url.includes('renewal_within')) {
+      return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
+    }
+    if (url.includes('/auth/members/')) return Promise.resolve(jsonResponse(200, []));
+
+    if (method === 'POST' && url.endsWith('/customers/')) {
+      const body = JSON.parse(options!.body!);
+      const created = { ...globex, ...body, id: nextId++, owner: null, created_by: null, modified_by: null };
+      customers = [created, ...customers];
+      return Promise.resolve(jsonResponse(201, created));
+    }
+    const patchMatch = /\/customers\/(\d+)\/$/.exec(url);
+    if (method === 'PATCH' && patchMatch) {
+      const id = Number(patchMatch[1]);
+      const body = JSON.parse(options!.body!);
+      customers = customers.map((c) => (c.id === id ? { ...c, ...body } : c));
+      return Promise.resolve(jsonResponse(200, customers.find((c) => c.id === id)));
+    }
+    return Promise.resolve(
+      jsonResponse(200, { count: customers.length, next: null, previous: null, results: customers })
+    );
+  });
+}
+
+describe('Organizations List page — Add/Edit/Churn/Archive', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('adding an organization posts to /customers/ and shows it in the table', async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([]));
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('No organizations yet.');
+
+    await user.click(screen.getByRole('button', { name: /Add Organization/ }));
+    await user.type(screen.getByLabelText('Name *'), 'New Co');
+    await user.click(screen.getByRole('button', { name: 'Create Organization' }));
+
+    expect(await screen.findByText('New Co')).toBeInTheDocument();
+    expect(screen.queryByText('Create Organization')).not.toBeInTheDocument(); // modal closed
+  });
+
+  it('editing an organization prefills the form and PATCHes the change', async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Globex Corp');
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Globex Corp' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit Organization' }));
+
+    const nameInput = await screen.findByLabelText('Name *');
+    expect(nameInput).toHaveValue('Globex Corp');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Globex Renamed');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    expect(await screen.findByText('Globex Renamed')).toBeInTheDocument();
+  });
+
+  it('churning an organization sets lifecycle_stage=churn and stays visible', async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Globex Corp');
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Globex Corp' }));
+    await user.click(await screen.findByRole('button', { name: 'Churn Organization' }));
+    await user.type(screen.getByLabelText('Reason'), 'Budget Cut');
+    await user.click(screen.getByRole('button', { name: 'Confirm Churn' }));
+
+    await waitFor(() => expect(screen.getByText('Churn')).toBeInTheDocument());
+    expect(screen.getByText('Globex Corp')).toBeInTheDocument();
+  });
+
+  it('archiving an organization removes it from the list after confirming', async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Globex Corp');
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Globex Corp' }));
+    await user.click(await screen.findByRole('button', { name: 'Archive Organization' }));
+    await user.click(await screen.findByRole('button', { name: 'Archive' }));
+
+    await waitFor(() => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument());
+    expect(screen.getByText('No organizations yet.')).toBeInTheDocument();
   });
 });

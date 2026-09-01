@@ -5,8 +5,13 @@ import { HealthPopover } from './HealthPopover';
 import { CsatPopover } from './CsatPopover';
 import { EditColumnsPopover } from './EditColumnsPopover';
 import { RowActionsPopover } from './RowActionsPopover';
+import { OrganizationFormModal } from './OrganizationFormModal';
+import { ChurnOrganizationModal } from './ChurnOrganizationModal';
+import { ConfirmDialog } from './ConfirmDialog';
 import { ALL_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from './tableData';
 import type { ColumnId, OrgRow } from './tableData';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { updateCustomer } from '../../features/customers/customersSlice';
 
 interface OrganizationsTableProps {
   rows: OrgRow[];
@@ -33,6 +38,8 @@ export function OrganizationsTable({
   onPrevious,
 }: OrganizationsTableProps) {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const rawCustomers = useAppSelector((state) => state.customers.customers);
   const [visibleColumns, setVisibleColumns] = useState<ColumnId[]>(DEFAULT_VISIBLE_COLUMNS);
   const [showEditColumns, setShowEditColumns] = useState(false);
 
@@ -44,9 +51,12 @@ export function OrganizationsTable({
   const [healthHover, setHealthHover] = useState<{ val: number, style: React.CSSProperties } | null>(null);
   const [reasonHover, setReasonHover] = useState<{ text: string, style: React.CSSProperties } | null>(null);
   const [csatHover, setCsatHover] = useState<{ style: React.CSSProperties } | null>(null);
-  const [activeRowPopup, setActiveRowPopup] = useState<{ id: number, style: React.CSSProperties } | null>(null);
+  const [activeRowPopup, setActiveRowPopup] = useState<{ id: number, name: string, style: React.CSSProperties } | null>(null);
+  const [editingCustomerId, setEditingCustomerId] = useState<number | null>(null);
+  const [churningCustomer, setChurningCustomer] = useState<{ id: number; name: string } | null>(null);
+  const [archivingCustomer, setArchivingCustomer] = useState<{ id: number; name: string } | null>(null);
 
-  const handleRowActionClick = (e: React.MouseEvent, id: number) => {
+  const handleRowActionClick = (e: React.MouseEvent, id: number, name: string) => {
     e.stopPropagation();
     const rect = e.currentTarget.getBoundingClientRect();
 
@@ -55,6 +65,7 @@ export function OrganizationsTable({
 
     setActiveRowPopup({
       id,
+      name,
       style: { top: yOffset, right: window.innerWidth - rect.right }
     });
   };
@@ -322,12 +333,14 @@ export function OrganizationsTable({
 
                 {/* Trailing Standard Multi-action Block  */}
                 <td className="px-3 py-4 border-b border-line-subtle sticky right-0 z-10 bg-surface group-hover:bg-subtle shadow-[-1px_0_0_0_var(--border-default)] transition-colors text-center">
-                  <div
+                  <button
+                    type="button"
+                    aria-label={`Actions for ${r.org}`}
                     className="p-1 cursor-pointer hover:bg-line rounded transition-colors inline-block"
-                    onClick={(e) => handleRowActionClick(e, r.id)}
+                    onClick={(e) => handleRowActionClick(e, r.id, r.org)}
                   >
                     <MoreHorizontal className="w-[18px] h-[18px] text-ink-faint hover:text-ink-muted mx-auto" />
-                  </div>
+                  </button>
                 </td>
 
               </tr>
@@ -377,7 +390,56 @@ export function OrganizationsTable({
       )}
 
       {activeRowPopup && (
-        <RowActionsPopover onClose={() => setActiveRowPopup(null)} style={activeRowPopup.style} />
+        <RowActionsPopover
+          onClose={() => setActiveRowPopup(null)}
+          style={activeRowPopup.style}
+          onEdit={() => {
+            setEditingCustomerId(activeRowPopup.id);
+            setActiveRowPopup(null);
+          }}
+          onArchive={() => {
+            setArchivingCustomer({ id: activeRowPopup.id, name: activeRowPopup.name });
+            setActiveRowPopup(null);
+          }}
+          onChurn={() => {
+            setChurningCustomer({ id: activeRowPopup.id, name: activeRowPopup.name });
+            setActiveRowPopup(null);
+          }}
+        />
+      )}
+
+      {editingCustomerId !== null && (
+        (() => {
+          const target = rawCustomers.find((c) => c.id === editingCustomerId);
+          // Falls back to closing quietly rather than rendering a blank
+          // modal — e.g. if the row was archived by someone else and
+          // dropped out of `rawCustomers` between opening the row menu
+          // and this render.
+          return target ? (
+            <OrganizationFormModal customer={target} onClose={() => setEditingCustomerId(null)} />
+          ) : null;
+        })()
+      )}
+
+      {churningCustomer && (
+        <ChurnOrganizationModal
+          customerId={churningCustomer.id}
+          customerName={churningCustomer.name}
+          onClose={() => setChurningCustomer(null)}
+        />
+      )}
+
+      {archivingCustomer && (
+        <ConfirmDialog
+          title={`Archive ${archivingCustomer.name}?`}
+          message="It'll be hidden from this list and the metrics banner, but not deleted — you can unarchive it later."
+          confirmLabel="Archive"
+          danger
+          onConfirm={async () => {
+            await dispatch(updateCustomer({ id: archivingCustomer.id, is_archived: true })).unwrap();
+          }}
+          onClose={() => setArchivingCustomer(null)}
+        />
       )}
     </div>
   );

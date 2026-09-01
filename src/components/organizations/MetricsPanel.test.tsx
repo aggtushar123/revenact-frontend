@@ -54,6 +54,7 @@ const globex = {
   churn_date: null,
   churn_reason: '',
   churn_comment: '',
+  is_archived: false,
 };
 
 function jsonResponse(status: number, body: unknown) {
