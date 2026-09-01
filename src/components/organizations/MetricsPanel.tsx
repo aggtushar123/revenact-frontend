@@ -1,8 +1,12 @@
-import { useState, useMemo } from 'react';
-import type { ReactNode } from 'react';
-import { Edit2 } from 'lucide-react';
+import { useState, useMemo, useEffect, useRef } from 'react';
+import type { ReactNode, CSSProperties, MouseEvent } from 'react';
+import { ChevronDown } from 'lucide-react';
+import { useDispatch, useSelector } from 'react-redux';
 import { TABLE_DATA } from './tableData';
 import type { HealthCategory, LifecycleCategory } from './tableData';
+import { RenewalPopover } from './RenewalPopover';
+import { fetchUpcomingRenewals } from '../../features/customers/customersSlice';
+import type { AppDispatch, RootState } from '../../store';
 
 type MetricTab = 'count' | 'mrr' | 'arr';
 
@@ -50,6 +54,7 @@ function TabPill({ label, isActive, onClick }: { label: string; isActive: boolea
   return (
     <button
       onClick={onClick}
+      aria-pressed={isActive}
       className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-all duration-200 ${
         isActive
           ? 'text-accent bg-accent-dim shadow-sm'
@@ -91,10 +96,43 @@ interface MetricsPanelProps {
   totalCount: number;
 }
 
+// Renewal window presets — `days` is what the backend's ?renewal_within=
+// expects; the rest are just display strings for the pill/card/popover.
+const RENEWAL_WINDOWS = [
+  { days: 30, pill: '1M', short: 'Next 1 mo', title: 'in the Next 1 Month' },
+  { days: 90, pill: '3M', short: 'Next 3 mo', title: 'in the Next 3 Months' },
+];
+
 // --- Main Component ---
 export function MetricsPanel({ totalCount }: MetricsPanelProps) {
   const [healthTab, setHealthTab] = useState<MetricTab>('count');
   const [lifecycleTab, setLifecycleTab] = useState<MetricTab>('count');
+
+  // --- Renewal (the one section backed by real, live data — see
+  // customersSlice.ts's fetchUpcomingRenewals and revenact-backend's
+  // ?renewal_within=. Independent of the main table's own customers/
+  // search state, so opening this never disturbs what the table shows.) ---
+  const dispatch = useDispatch<AppDispatch>();
+  const { renewals, renewalsCount, renewalsLoading, renewalsError } = useSelector(
+    (state: RootState) => state.customers
+  );
+  const [renewalDays, setRenewalDays] = useState(RENEWAL_WINDOWS[0].days);
+  const [renewalPanelStyle, setRenewalPanelStyle] = useState<CSSProperties | null>(null);
+  const renewalWindow = RENEWAL_WINDOWS.find((w) => w.days === renewalDays) ?? RENEWAL_WINDOWS[0];
+  const renewalCardRef = useRef<HTMLDivElement>(null);
+
+  const toggleRenewalPanel = (e: MouseEvent<HTMLButtonElement>) => {
+    if (renewalPanelStyle) {
+      setRenewalPanelStyle(null);
+      return;
+    }
+    const rect = e.currentTarget.getBoundingClientRect();
+    setRenewalPanelStyle({ top: rect.bottom + 8, right: window.innerWidth - rect.right });
+  };
+
+  useEffect(() => {
+    dispatch(fetchUpcomingRenewals(renewalDays));
+  }, [dispatch, renewalDays]);
 
   // --- Computed Health Metrics ---
   const healthMetrics = useMemo(() => {
@@ -141,19 +179,6 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
       }
     }
     return { stages, buckets };
-  }, []);
-
-  // --- Renewal count (within next 1 month) ---
-  const renewalCount = useMemo(() => {
-    const now = new Date();
-    const oneMonthLater = new Date(now.getFullYear(), now.getMonth() + 1, now.getDate());
-    let count = 0;
-    for (const row of TABLE_DATA) {
-      if (row.renewal === '-') continue;
-      const d = new Date(row.renewal);
-      if (!isNaN(d.getTime()) && d >= now && d <= oneMonthLater) count++;
-    }
-    return count;
   }, []);
 
   // --- Health donut data ---
@@ -310,15 +335,48 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
 
       <div className="w-px bg-line my-3" />
 
-      {/* Renewal */}
-      <div className="flex flex-col px-5 py-4 min-w-[100px]">
-        <div className="flex items-center gap-1.5 mb-2 text-[13px] font-semibold text-ink tracking-wide cursor-pointer hover:text-accent transition-colors">
-          Renewal <Edit2 className="w-3.5 h-3.5 text-ink-faint" />
+      {/* Renewal — the one section wired to real, live data (see
+          fetchUpcomingRenewals). The popover is a document-click-outside
+          portal (see RenewalPopover.tsx), not the overlay-based pattern
+          the other popovers in this app use, specifically so the whole
+          card (the 1M/3M pills included) stays clickable while it's open —
+          "outside" means outside this card, not just outside the popover. */}
+      <div ref={renewalCardRef} className="flex flex-col px-5 py-4 min-w-[150px] relative">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="text-[13px] font-semibold text-ink tracking-wide">Renewal</span>
+          <div className="flex items-center gap-0.5">
+            {RENEWAL_WINDOWS.map((w) => (
+              <TabPill key={w.days} label={w.pill} isActive={renewalDays === w.days} onClick={() => setRenewalDays(w.days)} />
+            ))}
+          </div>
         </div>
-        <div className="flex flex-col mt-1">
-          <span className="text-xl font-bold text-ink leading-tight">{renewalCount}</span>
-          <span className="text-[11px] font-medium text-ink-faint mt-0.5 whitespace-nowrap">Next 1 mo</span>
-        </div>
+        <button
+          onClick={toggleRenewalPanel}
+          aria-expanded={renewalPanelStyle !== null}
+          aria-label={`View organizations renewing ${renewalWindow.title}`}
+          className="flex flex-col items-start text-left group/renewal cursor-pointer mt-1"
+        >
+          <span className="text-xl font-bold text-ink leading-tight group-hover/renewal:text-accent transition-colors">
+            {renewalsLoading && renewals.length === 0 ? '…' : renewalsCount}
+          </span>
+          <span className="text-[11px] font-medium text-ink-faint mt-0.5 whitespace-nowrap flex items-center gap-1 group-hover/renewal:text-ink-muted transition-colors">
+            {renewalWindow.short}
+            <ChevronDown className={`w-3 h-3 transition-transform ${renewalPanelStyle ? 'rotate-180' : ''}`} />
+          </span>
+        </button>
+
+        {renewalPanelStyle && (
+          <RenewalPopover
+            customers={renewals}
+            count={renewalsCount}
+            isLoading={renewalsLoading}
+            error={renewalsError}
+            windowLabel={renewalWindow.title}
+            onClose={() => setRenewalPanelStyle(null)}
+            style={renewalPanelStyle}
+            anchorRef={renewalCardRef}
+          />
+        )}
       </div>
 
     </div>

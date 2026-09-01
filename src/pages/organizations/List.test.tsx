@@ -69,15 +69,38 @@ function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
+// MetricsPanel independently fetches upcoming renewals (?renewal_within=)
+// in parallel with the table's own customers fetch, so a plain queued
+// mockResolvedValueOnce sequence isn't reliable — dispatch on the URL
+// instead. `customers` is consumed one response per call (repeating the
+// last once exhausted); every `?renewal_within=` request gets its own
+// fixed (empty, by default) response, since these tests aren't about it.
+function makeFetchMock({
+  customers,
+  renewals = { count: 0, next: null, previous: null, results: [] },
+}: {
+  customers: Array<{ status: number; body: unknown }>;
+  renewals?: unknown;
+}) {
+  const queue = [...customers];
+  return vi.fn((url: string) => {
+    if (typeof url === 'string' && url.includes('renewal_within')) {
+      return Promise.resolve(jsonResponse(200, renewals));
+    }
+    const next = queue.length > 1 ? queue.shift()! : queue[0];
+    return Promise.resolve(jsonResponse(next.status, next.body));
+  });
+}
+
 describe('Organizations List page', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
   });
 
   it('calls the real paginated endpoint on mount and renders the fetched organizations', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValue(jsonResponse(200, { count: 1, next: null, previous: null, results: [globex] }));
+    const fetchMock = makeFetchMock({
+      customers: [{ status: 200, body: { count: 1, next: null, previous: null, results: [globex] } }],
+    });
     vi.stubGlobal('fetch', fetchMock);
 
     renderPage();
@@ -91,7 +114,10 @@ describe('Organizations List page', () => {
   });
 
   it('shows the backend error message when the fetch fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(500, { detail: 'Server error.' })));
+    const fetchMock = makeFetchMock({
+      customers: [{ status: 500, body: { detail: 'Server error.' } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
 
     renderPage();
 
@@ -99,19 +125,28 @@ describe('Organizations List page', () => {
   });
 
   it('paging to the next page fetches the server-supplied next URL and swaps the rows', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(
-        jsonResponse(200, {
-          count: 2,
-          next: 'http://localhost:8000/api/v1/customers/?page=2',
-          previous: null,
-          results: [globex],
-        })
-      )
-      .mockResolvedValueOnce(
-        jsonResponse(200, { count: 2, next: null, previous: 'http://localhost:8000/api/v1/customers/', results: [initech] })
-      );
+    const fetchMock = makeFetchMock({
+      customers: [
+        {
+          status: 200,
+          body: {
+            count: 2,
+            next: 'http://localhost:8000/api/v1/customers/?page=2',
+            previous: null,
+            results: [globex],
+          },
+        },
+        {
+          status: 200,
+          body: {
+            count: 2,
+            next: null,
+            previous: 'http://localhost:8000/api/v1/customers/',
+            results: [initech],
+          },
+        },
+      ],
+    });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
@@ -129,10 +164,12 @@ describe('Organizations List page', () => {
   });
 
   it('searching debounces, hits ?search=, and resets pagination to the first page', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, { count: 2, next: null, previous: null, results: [globex, initech] }))
-      .mockResolvedValueOnce(jsonResponse(200, { count: 1, next: null, previous: null, results: [initech] }));
+    const fetchMock = makeFetchMock({
+      customers: [
+        { status: 200, body: { count: 2, next: null, previous: null, results: [globex, initech] } },
+        { status: 200, body: { count: 1, next: null, previous: null, results: [initech] } },
+      ],
+    });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
@@ -145,8 +182,10 @@ describe('Organizations List page', () => {
     );
 
     // Typing alone shouldn't fire a request per keystroke — only after the
-    // 300ms debounce settles.
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // 300ms debounce settles. (MetricsPanel's separate renewals fetch on
+    // mount is excluded — it's unrelated to the search box.)
+    const customersCalls = fetchMock.mock.calls.filter(([url]) => !String(url).includes('renewal_within'));
+    expect(customersCalls).toHaveLength(1);
 
     await waitFor(
       () => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument(),

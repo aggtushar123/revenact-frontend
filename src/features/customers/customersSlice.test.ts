@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
-import customersReducer, { fetchCustomers } from './customersSlice';
+import customersReducer, { fetchCustomers, fetchUpcomingRenewals } from './customersSlice';
 
 function makeStore() {
   return configureStore({ reducer: { customers: customersReducer } });
@@ -169,5 +169,40 @@ describe('customersSlice', () => {
     await store.dispatch(fetchCustomers(store.getState().customers.next!));
 
     expect(store.getState().customers.totalCount).toBe(12);
+  });
+
+  it('fetchUpcomingRenewals hits ?renewal_within= with the given window and stores the results separately', async () => {
+    const wework = { ...globex, id: 3, name: 'WeWork' };
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ count: 1, next: null, previous: null, results: [wework] }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = makeStore();
+    await store.dispatch(fetchUpcomingRenewals(30));
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/customers/?renewal_within=30'),
+      expect.anything()
+    );
+    const state = store.getState().customers;
+    expect(state.renewals).toEqual([wework]);
+    expect(state.renewalsCount).toBe(1);
+    expect(state.renewalsLoading).toBe(false);
+    // Doesn't touch the main table's own list/count/totalCount.
+    expect(state.customers).toEqual([]);
+    expect(state.totalCount).toBe(0);
+  });
+
+  it('fetchUpcomingRenewals sets its own error, separate from the main list error', async () => {
+    mockFetchOnce(500, { detail: 'Server error.' });
+    const store = makeStore();
+    await store.dispatch(fetchUpcomingRenewals(90));
+
+    const state = store.getState().customers;
+    expect(state.renewalsError).toBe('Server error.');
+    expect(state.error).toBeNull();
   });
 });

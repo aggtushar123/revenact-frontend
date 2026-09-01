@@ -78,6 +78,14 @@ interface CustomersState {
   previous: string | null;
   isLoading: boolean;
   error: string | null;
+  /** Customers due for renewal within the window last asked for via
+   * fetchUpcomingRenewals — a separate list from `customers` so opening
+   * the Renewal popover never clobbers whatever the main table is
+   * currently showing (which may itself be search-filtered). */
+  renewals: Customer[];
+  renewalsCount: number;
+  renewalsLoading: boolean;
+  renewalsError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -88,6 +96,10 @@ const initialState: CustomersState = {
   previous: null,
   isLoading: false,
   error: null,
+  renewals: [],
+  renewalsCount: 0,
+  renewalsLoading: false,
+  renewalsError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -100,6 +112,21 @@ export const fetchCustomers = createAsyncThunk<CustomersPage, string | void, { r
       return await apiFetch<CustomersPage>(url || '/customers/');
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not load organizations.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// `days` becomes `?renewal_within=<days>` — see revenact-backend's
+// customers/views.py for the exact window semantics (includes already-
+// overdue renewals, not just upcoming ones).
+export const fetchUpcomingRenewals = createAsyncThunk<CustomersPage, number, { rejectValue: string }>(
+  'customers/fetchUpcomingRenewals',
+  async (days, { rejectWithValue }) => {
+    try {
+      return await apiFetch<CustomersPage>(`/customers/?renewal_within=${days}`);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load upcoming renewals.';
       return rejectWithValue(message);
     }
   }
@@ -134,6 +161,19 @@ const customersSlice = createSlice({
       .addCase(fetchCustomers.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload ?? 'Something went wrong.';
+      })
+      .addCase(fetchUpcomingRenewals.pending, (state) => {
+        state.renewalsLoading = true;
+        state.renewalsError = null;
+      })
+      .addCase(fetchUpcomingRenewals.fulfilled, (state, action) => {
+        state.renewalsLoading = false;
+        state.renewals = action.payload.results;
+        state.renewalsCount = action.payload.count;
+      })
+      .addCase(fetchUpcomingRenewals.rejected, (state, action) => {
+        state.renewalsLoading = false;
+        state.renewalsError = action.payload ?? 'Something went wrong.';
       });
   },
 });
