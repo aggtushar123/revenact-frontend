@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
-import customersReducer, { fetchCustomers, fetchUpcomingRenewals } from './customersSlice';
+import customersReducer, { fetchCustomers, fetchUpcomingRenewals, fetchCustomerStats } from './customersSlice';
 
 function makeStore() {
   return configureStore({ reducer: { customers: customersReducer } });
@@ -204,5 +204,49 @@ describe('customersSlice', () => {
     const state = store.getState().customers;
     expect(state.renewalsError).toBe('Server error.');
     expect(state.error).toBeNull();
+  });
+
+  it('fetchCustomerStats hits /customers/stats/ and stores the health/nps/lifecycle rollup', async () => {
+    const stats = {
+      health: {
+        good: { count: 9, mrr: 1000, arr: 12000 },
+        average: { count: 2, mrr: 200, arr: 2400 },
+        poor: { count: 3, mrr: 300, arr: 3600 },
+      },
+      nps: { promoters: 9, passives: 1, detractors: 4, score: 36 },
+      lifecycle: {
+        onboarding: { count: 1, mrr: 0, arr: 0 },
+        kickoff: { count: 0, mrr: 0, arr: 0 },
+        adoption: { count: 0, mrr: 0, arr: 0 },
+        live: { count: 10, mrr: 0, arr: 0 },
+        renewal: { count: 0, mrr: 0, arr: 0 },
+        churn: { count: 3, mrr: 0, arr: 0 },
+        expansion: { count: 0, mrr: 0, arr: 0 },
+        other: { count: 0, mrr: 0, arr: 0 },
+      },
+    };
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => stats });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const store = makeStore();
+    await store.dispatch(fetchCustomerStats());
+
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/customers/stats/'), expect.anything());
+    const state = store.getState().customers;
+    expect(state.stats).toEqual(stats);
+    expect(state.statsLoading).toBe(false);
+    expect(state.statsError).toBeNull();
+  });
+
+  it('fetchCustomerStats sets its own error, separate from the main list and renewals errors', async () => {
+    mockFetchOnce(500, { detail: 'Server error.' });
+    const store = makeStore();
+    await store.dispatch(fetchCustomerStats());
+
+    const state = store.getState().customers;
+    expect(state.statsError).toBe('Server error.');
+    expect(state.stats).toBeNull();
+    expect(state.error).toBeNull();
+    expect(state.renewalsError).toBeNull();
   });
 });

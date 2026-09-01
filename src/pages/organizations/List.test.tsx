@@ -75,15 +75,35 @@ function jsonResponse(status: number, body: unknown) {
 // instead. `customers` is consumed one response per call (repeating the
 // last once exhausted); every `?renewal_within=` request gets its own
 // fixed (empty, by default) response, since these tests aren't about it.
+const ZERO_STATS = {
+  health: {
+    good: { count: 0, mrr: 0, arr: 0 },
+    average: { count: 0, mrr: 0, arr: 0 },
+    poor: { count: 0, mrr: 0, arr: 0 },
+  },
+  nps: { promoters: 0, passives: 0, detractors: 0, score: 0 },
+  lifecycle: Object.fromEntries(
+    ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'churn', 'expansion', 'other'].map((s) => [
+      s,
+      { count: 0, mrr: 0, arr: 0 },
+    ])
+  ),
+};
+
 function makeFetchMock({
   customers,
   renewals = { count: 0, next: null, previous: null, results: [] },
+  stats = ZERO_STATS,
 }: {
   customers: Array<{ status: number; body: unknown }>;
   renewals?: unknown;
+  stats?: unknown;
 }) {
   const queue = [...customers];
   return vi.fn((url: string) => {
+    if (typeof url === 'string' && url.includes('/customers/stats/')) {
+      return Promise.resolve(jsonResponse(200, stats));
+    }
     if (typeof url === 'string' && url.includes('renewal_within')) {
       return Promise.resolve(jsonResponse(200, renewals));
     }
@@ -184,7 +204,9 @@ describe('Organizations List page', () => {
     // Typing alone shouldn't fire a request per keystroke — only after the
     // 300ms debounce settles. (MetricsPanel's separate renewals fetch on
     // mount is excluded — it's unrelated to the search box.)
-    const customersCalls = fetchMock.mock.calls.filter(([url]) => !String(url).includes('renewal_within'));
+    const customersCalls = fetchMock.mock.calls.filter(
+      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
+    );
     expect(customersCalls).toHaveLength(1);
 
     await waitFor(

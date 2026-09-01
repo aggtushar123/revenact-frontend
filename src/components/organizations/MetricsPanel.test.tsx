@@ -60,8 +60,31 @@ function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
+const ZERO_STATS = {
+  health: {
+    good: { count: 0, mrr: 0, arr: 0 },
+    average: { count: 0, mrr: 0, arr: 0 },
+    poor: { count: 0, mrr: 0, arr: 0 },
+  },
+  nps: { promoters: 0, passives: 0, detractors: 0, score: 0 },
+  lifecycle: Object.fromEntries(
+    ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'churn', 'expansion', 'other'].map((s) => [
+      s,
+      { count: 0, mrr: 0, arr: 0 },
+    ])
+  ),
+};
+
+// MetricsPanel also fires its own GET /customers/stats/ on mount (see
+// fetchCustomerStats) — give it a well-shaped response rather than
+// falling through to whatever the renewal_within default would be
+// (RenewalPopover's own {count/next/previous/results} shape is not
+// interchangeable with stats' {health/nps/lifecycle} shape).
 function makeFetchMock(responsesByWindow: Record<number, unknown>) {
   return vi.fn((url: string) => {
+    if (typeof url === 'string' && url.includes('/customers/stats/')) {
+      return Promise.resolve(jsonResponse(200, ZERO_STATS));
+    }
     const match = /renewal_within=(\d+)/.exec(url);
     const days = match ? Number(match[1]) : null;
     const body = (days !== null && responsesByWindow[days]) || { count: 0, next: null, previous: null, results: [] };
@@ -142,5 +165,68 @@ describe('MetricsPanel Renewal card', () => {
     await user.click(await screen.findByText('Globex Corp'));
 
     expect(await screen.findByText('Organization Detail Page')).toBeInTheDocument();
+  });
+});
+
+describe('MetricsPanel Health/NPS/Lifecycle sections', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders real numbers from GET /customers/stats/, not mock data', async () => {
+    const customStats = {
+      health: {
+        good: { count: 11, mrr: 100, arr: 1200 },
+        average: { count: 22, mrr: 200, arr: 2400 },
+        poor: { count: 33, mrr: 300, arr: 3600 },
+      },
+      nps: { promoters: 44, passives: 55, detractors: 66, score: 77 },
+      lifecycle: {
+        onboarding: { count: 1, mrr: 0, arr: 0 },
+        kickoff: { count: 2, mrr: 0, arr: 0 },
+        adoption: { count: 3, mrr: 0, arr: 0 },
+        live: { count: 4, mrr: 0, arr: 0 },
+        renewal: { count: 5, mrr: 0, arr: 0 },
+        churn: { count: 6, mrr: 0, arr: 0 },
+        expansion: { count: 7, mrr: 0, arr: 0 },
+        other: { count: 8, mrr: 0, arr: 0 },
+      },
+    };
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/customers/stats/')) return Promise.resolve(jsonResponse(200, customStats));
+      return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPanel();
+
+    expect(await screen.findByText('11')).toBeInTheDocument(); // Health: Good
+    expect(screen.getByText('22')).toBeInTheDocument(); // Health: Average
+    expect(screen.getByText('33')).toBeInTheDocument(); // Health: Poor
+    expect(screen.getByText('+77')).toBeInTheDocument(); // NPS score
+    expect(screen.getByText('44')).toBeInTheDocument(); // NPS: Promoters
+    expect(screen.getByText('55')).toBeInTheDocument(); // NPS: Passives
+    expect(screen.getByText('66')).toBeInTheDocument(); // NPS: Detractors
+    expect(screen.getByTitle('live: 4')).toBeInTheDocument(); // Lifecycle bar
+    expect(screen.getByTitle('churn: 6')).toBeInTheDocument();
+  });
+
+  it('shows a small error note on each section when stats fail to load, without crashing', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('/customers/stats/')) {
+          return Promise.resolve(jsonResponse(500, { detail: 'Server error.' }));
+        }
+        return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
+      })
+    );
+
+    renderPanel();
+
+    // One note each for Health, NPS, and Lifecycle Stages.
+    expect(await screen.findAllByText("Couldn't load")).toHaveLength(3);
+    // Falls back to zeroed sections rather than crashing.
+    expect(screen.getAllByText('0').length).toBeGreaterThan(0);
   });
 });

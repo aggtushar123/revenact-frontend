@@ -64,6 +64,21 @@ interface CustomersPage {
   results: Customer[];
 }
 
+interface StatsBucket {
+  count: number;
+  /** Derived (arr / 12) server-side — there's no stored MRR field. */
+  mrr: number;
+  arr: number;
+}
+
+// Mirrors revenact-backend's CustomerStatsView response exactly — see
+// docs/API_CONTRACTS.md -> GET /api/v1/customers/stats/.
+export interface CustomerStats {
+  health: Record<Customer['health_category'], StatsBucket>;
+  nps: { promoters: number; passives: number; detractors: number; score: number };
+  lifecycle: Record<Customer['lifecycle_stage'], StatsBucket>;
+}
+
 interface CustomersState {
   customers: Customer[];
   /** Count for the current (possibly search-filtered) fetch — drives the
@@ -86,6 +101,11 @@ interface CustomersState {
   renewalsCount: number;
   renewalsLoading: boolean;
   renewalsError: string | null;
+  /** MetricsPanel's Health/NPS/Lifecycle Stages sections — null until the
+   * first fetch resolves. */
+  stats: CustomerStats | null;
+  statsLoading: boolean;
+  statsError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -100,6 +120,9 @@ const initialState: CustomersState = {
   renewalsCount: 0,
   renewalsLoading: false,
   renewalsError: null,
+  stats: null,
+  statsLoading: false,
+  statsError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -127,6 +150,18 @@ export const fetchUpcomingRenewals = createAsyncThunk<CustomersPage, number, { r
       return await apiFetch<CustomersPage>(`/customers/?renewal_within=${days}`);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not load upcoming renewals.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const fetchCustomerStats = createAsyncThunk<CustomerStats, void, { rejectValue: string }>(
+  'customers/fetchCustomerStats',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<CustomerStats>('/customers/stats/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load stats.';
       return rejectWithValue(message);
     }
   }
@@ -174,6 +209,18 @@ const customersSlice = createSlice({
       .addCase(fetchUpcomingRenewals.rejected, (state, action) => {
         state.renewalsLoading = false;
         state.renewalsError = action.payload ?? 'Something went wrong.';
+      })
+      .addCase(fetchCustomerStats.pending, (state) => {
+        state.statsLoading = true;
+        state.statsError = null;
+      })
+      .addCase(fetchCustomerStats.fulfilled, (state, action) => {
+        state.statsLoading = false;
+        state.stats = action.payload;
+      })
+      .addCase(fetchCustomerStats.rejected, (state, action) => {
+        state.statsLoading = false;
+        state.statsError = action.payload ?? 'Something went wrong.';
       });
   },
 });

@@ -2,10 +2,9 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import type { ReactNode, CSSProperties, MouseEvent } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useDispatch, useSelector } from 'react-redux';
-import { TABLE_DATA } from './tableData';
 import type { HealthCategory, LifecycleCategory } from './tableData';
 import { RenewalPopover } from './RenewalPopover';
-import { fetchUpcomingRenewals } from '../../features/customers/customersSlice';
+import { fetchUpcomingRenewals, fetchCustomerStats } from '../../features/customers/customersSlice';
 import type { AppDispatch, RootState } from '../../store';
 
 type MetricTab = 'count' | 'mrr' | 'arr';
@@ -88,13 +87,15 @@ function formatCurrency(val: number): string {
 }
 
 interface MetricsPanelProps {
-  /** Real count of onboarded organisations, from the backend — everything
-   * else in this panel (health/NPS/lifecycle breakdowns) is still derived
-   * from tableData.ts's mock rows, since those need a dedicated backend
-   * stats endpoint that doesn't exist yet. This one field doesn't: the
-   * customers list endpoint already returns a total count for free. */
+  /** Real count of onboarded organisations, from the backend. Passed in
+   * as a prop (unlike the Health/NPS/Lifecycle sections and Renewal,
+   * which fetch their own data via Redux) because it's already sitting
+   * in the customers slice's state from the table's own fetch — no
+   * point re-requesting it. */
   totalCount: number;
 }
+
+const ZERO_BUCKET = { count: 0, mrr: 0, arr: 0 };
 
 // Renewal window presets — `days` is what the backend's ?renewal_within=
 // expects; the rest are just display strings for the pill/card/popover.
@@ -108,12 +109,13 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
   const [healthTab, setHealthTab] = useState<MetricTab>('count');
   const [lifecycleTab, setLifecycleTab] = useState<MetricTab>('count');
 
-  // --- Renewal (the one section backed by real, live data — see
-  // customersSlice.ts's fetchUpcomingRenewals and revenact-backend's
-  // ?renewal_within=. Independent of the main table's own customers/
-  // search state, so opening this never disturbs what the table shows.) ---
+  // --- Renewal + Stats (both backed by real, live data — see
+  // customersSlice.ts's fetchUpcomingRenewals/fetchCustomerStats and
+  // revenact-backend's ?renewal_within= / GET /customers/stats/.
+  // Independent of the main table's own customers/search state, so
+  // neither ever disturbs what the table shows.) ---
   const dispatch = useDispatch<AppDispatch>();
-  const { renewals, renewalsCount, renewalsLoading, renewalsError } = useSelector(
+  const { renewals, renewalsCount, renewalsLoading, renewalsError, stats, statsError } = useSelector(
     (state: RootState) => state.customers
   );
   const [renewalDays, setRenewalDays] = useState(RENEWAL_WINDOWS[0].days);
@@ -134,52 +136,41 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
     dispatch(fetchUpcomingRenewals(renewalDays));
   }, [dispatch, renewalDays]);
 
-  // --- Computed Health Metrics ---
+  useEffect(() => {
+    dispatch(fetchCustomerStats());
+  }, [dispatch]);
+
+  // --- Health metrics (real, from stats.health — zero-filled until the
+  // fetch resolves or if it fails, rather than leaving the section
+  // blank or crashing on a null read) ---
   const healthMetrics = useMemo(() => {
-    const buckets: Record<HealthCategory, { count: number; mrr: number; arr: number }> = {
-      good: { count: 0, mrr: 0, arr: 0 },
-      average: { count: 0, mrr: 0, arr: 0 },
-      poor: { count: 0, mrr: 0, arr: 0 },
-    };
+    const cats: HealthCategory[] = ['good', 'average', 'poor'];
+    return Object.fromEntries(cats.map((c) => [c, stats?.health[c] ?? ZERO_BUCKET])) as Record<
+      HealthCategory,
+      typeof ZERO_BUCKET
+    >;
+  }, [stats]);
 
-    for (const row of TABLE_DATA) {
-      const cat = row.healthCategory;
-      buckets[cat].count += 1;
-      buckets[cat].mrr += row.mrr;
-      buckets[cat].arr += row.arr;
-    }
-    return buckets;
-  }, []);
-
-  // --- Computed NPS ---
+  // --- NPS (real, from stats.nps) ---
   const npsMetrics = useMemo(() => {
-    let promoters = 0, passives = 0, detractors = 0;
-    for (const row of TABLE_DATA) {
-      if (row.npsValue > 0) promoters++;
-      else if (row.npsValue === 0) passives++;
-      else detractors++;
-    }
-    const total = TABLE_DATA.length;
-    const npsScore = total > 0
-      ? Math.round(((promoters - detractors) / total) * 100)
-      : 0;
-    return { promoters, passives, detractors, npsScore };
-  }, []);
+    const nps = stats?.nps;
+    return {
+      promoters: nps?.promoters ?? 0,
+      passives: nps?.passives ?? 0,
+      detractors: nps?.detractors ?? 0,
+      npsScore: nps?.score ?? 0,
+    };
+  }, [stats]);
 
-  // --- Computed Lifecycle ---
+  // --- Lifecycle (real, from stats.lifecycle) ---
   const lifecycleMetrics = useMemo(() => {
     const stages: LifecycleCategory[] = ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'expansion', 'churn', 'other'];
-    const buckets = Object.fromEntries(stages.map(s => [s, { count: 0, mrr: 0, arr: 0 }])) as Record<LifecycleCategory, { count: number; mrr: number; arr: number }>;
-    for (const row of TABLE_DATA) {
-      const cat = row.lifecycleCategory;
-      if (buckets[cat]) {
-        buckets[cat].count += 1;
-        buckets[cat].mrr += row.mrr;
-        buckets[cat].arr += row.arr;
-      }
-    }
+    const buckets = Object.fromEntries(stages.map((s) => [s, stats?.lifecycle[s] ?? ZERO_BUCKET])) as Record<
+      LifecycleCategory,
+      typeof ZERO_BUCKET
+    >;
     return { stages, buckets };
-  }, []);
+  }, [stats]);
 
   // --- Health donut data ---
   const healthDonutData = (tab: MetricTab) => {
@@ -237,6 +228,7 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
             <TabPill label="MRR" isActive={healthTab === 'mrr'} onClick={() => setHealthTab('mrr')} />
             <TabPill label="ARR" isActive={healthTab === 'arr'} onClick={() => setHealthTab('arr')} />
           </div>
+          {statsError && <span className="text-[10px] font-medium text-danger normal-case">Couldn't load</span>}
         </div>
         <div className="flex items-center gap-5">
           <div className="flex gap-5">
@@ -254,7 +246,10 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
 
       {/* NPS Section */}
       <div className="flex flex-col flex-1 px-5 py-4">
-        <div className="mb-2 text-[13px] font-semibold text-ink tracking-wide">NPS</div>
+        <div className="mb-2 text-[13px] font-semibold text-ink tracking-wide flex items-center gap-2">
+          NPS
+          {statsError && <span className="text-[10px] font-medium text-danger normal-case">Couldn't load</span>}
+        </div>
         <div className="flex items-center gap-5 mt-0.5">
           <span className="text-[38px] font-light text-ink leading-none tracking-tight">
             {npsMetrics.npsScore > 0 ? '+' : ''}{npsMetrics.npsScore}
@@ -287,6 +282,7 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
             <TabPill label="MRR" isActive={lifecycleTab === 'mrr'} onClick={() => setLifecycleTab('mrr')} />
             <TabPill label="ARR" isActive={lifecycleTab === 'arr'} onClick={() => setLifecycleTab('arr')} />
           </div>
+          {statsError && <span className="text-[10px] font-medium text-danger normal-case">Couldn't load</span>}
         </div>
         <div className="flex items-center gap-4">
           {/* Bar chart */}
