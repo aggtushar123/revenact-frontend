@@ -44,7 +44,7 @@ export function Details() {
   ];
 
   return (
-    <div className="flex flex-col h-full w-full bg-[var(--bg-surface)]">
+    <div className="flex flex-col h-full w-full bg-surface">
       {/* Tabs Navigation */}
       <nav className="px-6 bg-surface border-b border-line-subtle flex items-center justify-between shrink-0">
         <div className="flex items-center gap-8 h-10 overflow-x-auto no-scrollbar whitespace-nowrap">
@@ -86,7 +86,7 @@ export function Details() {
       </nav>
 
       {/* Tab Content */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--bg-subtle)]/50 p-4">
+      <main className="flex-1 overflow-y-auto custom-scrollbar bg-subtle/50 px-6 pt-5 pb-4">
         {activeTab === 'General' && !organization && (
           <div className="flex items-center justify-center h-full">
             <span className={`text-[13px] font-medium ${selectedCustomerError ? 'text-danger' : 'text-ink-faint'}`}>
@@ -190,124 +190,112 @@ export function Details() {
 
 // --- Sub-Components ---
 
+// One cohesive glass strip with divided sections — the same structure as
+// the organizations list's own MetricsPanel (and this file's own
+// AccountsMetricsBanner, further down) rather than several separate
+// floating cards. Kept consistent deliberately: this page used to be the
+// odd one out, with 3 disconnected cards that didn't fill the row's width
+// evenly, right next to an Accounts tab that already got this pattern right.
 function MetricsBanner({ organization }: { organization: OrgRow }) {
   const npsSign = organization.npsValue > 0 ? '+' : '';
   const csatNum = parseFloat(organization.csat);
   const csatPct = !isNaN(csatNum) ? csatNum : 0;
 
-  // Health ring color
   const healthVal = organization.health.val;
   const healthColor = healthVal >= 7 ? 'var(--success)' : healthVal >= 4 ? 'var(--warning)' : 'var(--danger)';
   const healthPct = (healthVal / 10) * 100;
 
-  // CSM pulse text & color
   const csmPulseText = healthVal >= 7 ? 'Very Satisfied' : healthVal >= 4 ? 'Neutral' : 'High Risk';
-  const csmPulseColor = healthVal >= 7 ? 'text-[var(--success)]' : healthVal >= 4 ? 'text-[var(--warning)]' : 'text-[var(--danger)]';
+  const csmPulseColor = healthVal >= 7 ? 'text-success' : healthVal >= 4 ? 'text-warning' : 'text-danger';
 
-  // NPS breakdown
   const promoters = organization.npsValue > 0 ? 1 : 0;
   const passives = organization.npsValue === 0 ? 1 : 0;
   const detractors = organization.npsValue < 0 ? 1 : 0;
 
-  // CSAT ring color
   const csatColor = csatPct >= 70 ? 'var(--success)' : csatPct >= 40 ? 'var(--warning)' : 'var(--danger)';
 
   return (
-    <div className="flex items-stretch w-full gap-4">
-      {/* Card 1 — Health Score */}
-      <div
-        className="flex-1 rounded-xl border border-line/80 bg-surface/70 shadow-sm px-5 py-4 flex items-center gap-5"
-        style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-      >
-        {/* Circular ring */}
-        <div className="relative shrink-0" style={{ width: 72, height: 72 }}>
+    <div
+      className="flex items-stretch w-full h-[110px] font-sans rounded-xl border border-line bg-surface/70 shadow-sm"
+      style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+    >
+      {/* Health Score */}
+      <div className="flex items-center gap-4 flex-1 px-5 py-4 min-w-0">
+        <div className="relative shrink-0" style={{ width: 56, height: 56 }}>
           <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="2.5" />
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke={healthColor} strokeWidth="2.5"
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="3.5" />
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke={healthColor} strokeWidth="3.5"
               strokeDasharray={`${healthPct} ${100 - healthPct}`} strokeLinecap="round"
               style={{ transition: 'stroke-dasharray 0.6s ease' }} />
           </svg>
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px] font-bold text-ink-faint uppercase leading-none">Health</span>
-            <span className="text-[10px] font-bold text-ink-faint uppercase leading-none">Score</span>
-          </div>
         </div>
-        {/* Text info */}
-        <div className="flex flex-col gap-1.5 min-w-0">
-          <span className="text-[28px] font-bold text-ink leading-none tracking-tight">{healthVal}</span>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">Lifecycle Stage</span>
-            <span className="text-[13px] font-bold text-ink truncate">{organization.stage}</span>
+        <div className="flex flex-col gap-1 min-w-0">
+          <span className="text-[13px] font-semibold text-ink tracking-wide">Health Score</span>
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="text-2xl font-bold text-ink leading-none">{healthVal}</span>
+            <span className="text-[12px] font-medium text-ink-muted truncate">{organization.stage}</span>
           </div>
         </div>
       </div>
 
-      {/* Card 2 — CSM Pulse + NPS + Renewal */}
-      <div
-        className="flex-[1.6] rounded-xl border border-line/80 bg-surface/70 shadow-sm px-5 py-4 flex items-center gap-6"
-        style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-      >
-        {/* CSM Pulse */}
-        <div className="flex flex-col gap-0.5 min-w-[100px]">
-          <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">CSM Pulse</span>
-          <span className={`text-[14px] font-bold ${csmPulseColor}`}>{csmPulseText}</span>
-        </div>
+      <div className="w-px bg-line my-3" />
 
-        <div className="w-px h-12 bg-line/70 shrink-0" />
+      {/* CSM Pulse */}
+      <div className="flex flex-col justify-center flex-1 px-5 py-4 min-w-0">
+        <span className="text-[13px] font-semibold text-ink tracking-wide mb-2">CSM Pulse</span>
+        <span className={`text-xl font-bold leading-none truncate ${csmPulseColor}`}>{csmPulseText}</span>
+      </div>
 
-        {/* NPS */}
-        <div className="flex items-center gap-4 flex-1 min-w-0">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">NPS</span>
-            <span className="text-[28px] font-light text-ink leading-none tracking-tight">{npsSign}{organization.npsValue}</span>
-          </div>
-          <div className="flex flex-col gap-0.5 text-[10px] font-bold">
-            <div className="flex items-center gap-2 text-ink-muted">
-              <span className="w-1.5 h-1.5 rounded-sm bg-[var(--success)]" />
-              <span className="w-16">Promoters</span>
-              <span className="text-ink text-[11px]">{promoters}</span>
+      <div className="w-px bg-line my-3" />
+
+      {/* NPS */}
+      <div className="flex flex-col flex-1 px-5 py-4">
+        <div className="mb-2 text-[13px] font-semibold text-ink tracking-wide">NPS</div>
+        <div className="flex items-center gap-5 mt-0.5">
+          <span className="text-[38px] font-light text-ink leading-none tracking-tight">
+            {npsSign}{organization.npsValue}
+          </span>
+          <div className="flex flex-col text-[12px] text-ink-muted font-medium gap-1">
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-success" /> Promoters</div>
+              <span className="font-semibold text-ink ml-4">{promoters}</span>
             </div>
-            <div className="flex items-center gap-2 text-ink-muted">
-              <span className="w-1.5 h-1.5 rounded-sm bg-[var(--warning)]" />
-              <span className="w-16">Passives</span>
-              <span className="text-ink text-[11px]">{passives}</span>
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-warning" /> Passives</div>
+              <span className="font-semibold text-ink ml-4">{passives}</span>
             </div>
-            <div className="flex items-center gap-2 text-ink-muted">
-              <span className="w-1.5 h-1.5 rounded-sm bg-[var(--danger)]" />
-              <span className="w-16">Detractors</span>
-              <span className="text-ink text-[11px]">{detractors}</span>
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-danger" /> Detractors</div>
+              <span className="font-semibold text-ink ml-4">{detractors}</span>
             </div>
           </div>
-        </div>
-
-        <div className="w-px h-12 bg-line/70 shrink-0" />
-
-        {/* Next Renewal Date */}
-        <div className="flex flex-col gap-0.5 min-w-[100px]">
-          <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">Next Renewal Date</span>
-          <span className="text-[14px] font-bold text-ink leading-tight">{organization.renewal}</span>
         </div>
       </div>
 
-      {/* Card 3 — CSAT Score */}
-      <div
-        className="flex-1 rounded-xl border border-line/80 bg-surface/70 shadow-sm px-5 py-4 flex items-center gap-5"
-        style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
-      >
-        {/* Text */}
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">CSAT Score</span>
-          <span className="text-[28px] font-bold text-ink leading-none tracking-tight">{organization.csat}</span>
+      <div className="w-px bg-line my-3" />
+
+      {/* CSAT Score */}
+      <div className="flex flex-col px-5 py-4 min-w-[140px]">
+        <div className="mb-2 text-[13px] font-semibold text-ink tracking-wide">CSAT Score</div>
+        <div className="flex items-center gap-3 mt-0.5">
+          <span className="text-xl font-bold text-ink leading-tight">{organization.csat}</span>
+          <div className="shrink-0" style={{ width: 40, height: 40 }}>
+            <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+              <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="3.5" />
+              <circle cx="18" cy="18" r="15.9155" fill="none" stroke={csatColor} strokeWidth="3.5"
+                strokeDasharray={`${csatPct} ${100 - csatPct}`} strokeLinecap="round"
+                style={{ transition: 'stroke-dasharray 0.6s ease' }} />
+            </svg>
+          </div>
         </div>
-        {/* Large donut ring */}
-        <div className="relative ml-auto shrink-0" style={{ width: 72, height: 72 }}>
-          <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="2.5" />
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke={csatColor} strokeWidth="2.5"
-              strokeDasharray={`${csatPct} ${100 - csatPct}`} strokeLinecap="round"
-              style={{ transition: 'stroke-dasharray 0.6s ease' }} />
-          </svg>
-        </div>
+      </div>
+
+      <div className="w-px bg-line my-3" />
+
+      {/* Next Renewal Date */}
+      <div className="flex flex-col px-5 py-4 min-w-[150px] justify-center">
+        <span className="text-[13px] font-semibold text-ink tracking-wide mb-2">Next Renewal Date</span>
+        <span className="text-xl font-bold text-ink leading-tight">{organization.renewal}</span>
       </div>
     </div>
   );
