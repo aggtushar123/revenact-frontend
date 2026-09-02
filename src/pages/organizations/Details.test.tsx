@@ -73,7 +73,7 @@ describe('Organization Details page (/organizations/:id)', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
-        const body = url.includes('/accounts/') ? [] : globex;
+        const body = url.includes('/accounts/') || url.includes('/activities/') ? [] : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
       })
     );
@@ -90,6 +90,40 @@ describe('Organization Details page (/organizations/:id)', () => {
     );
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/customers/10/accounts/'),
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('fetches and renders this organization\'s own real activities on the General tab', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('/activities/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                id: 1,
+                type: 'health_check_review',
+                type_display: 'Health Check Review',
+                occurred_at: '2026-02-28',
+                links: 2,
+                watchers: 3,
+              },
+            ],
+          });
+        }
+        const body = url.includes('/accounts/') ? [] : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      })
+    );
+
+    renderDetails('10');
+
+    expect(await screen.findByText('Health Check Review')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/customers/10/activities/'),
       expect.objectContaining({ method: 'GET' })
     );
   });
@@ -138,7 +172,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       vi.stubGlobal(
         'fetch',
         vi.fn((url: string) => {
-          const body = url.includes('/accounts/') ? accounts : globex;
+          const body = url.includes('/activities/') ? [] : url.includes('/accounts/') ? accounts : globex;
           return Promise.resolve({ ok: true, status: 200, json: async () => body });
         })
       );
@@ -158,6 +192,9 @@ describe('Organization Details page (/organizations/:id)', () => {
       vi.stubGlobal(
         'fetch',
         vi.fn((url: string) => {
+          if (url.includes('/activities/')) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+          }
           if (url.includes('/accounts/')) return new Promise(() => {});
           return Promise.resolve({ ok: true, status: 200, json: async () => globex });
         })
@@ -180,6 +217,9 @@ describe('Organization Details page (/organizations/:id)', () => {
       vi.stubGlobal(
         'fetch',
         vi.fn((url: string) => {
+          if (url.includes('/activities/')) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+          }
           if (url.includes('/accounts/')) {
             return Promise.resolve({ ok: false, status: 404, json: async () => ({ detail: 'Not found.' }) });
           }
@@ -233,6 +273,9 @@ describe('Organization Details page (/organizations/:id)', () => {
             const body = JSON.parse(options!.body!);
             accounts = accounts.map((a) => (a.id === id ? { ...a, ...body } : a));
             return Promise.resolve({ ok: true, status: 200, json: async () => accounts.find((a) => a.id === id) });
+          }
+          if (url.includes('/activities/')) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => [] });
           }
           if (url.includes('/accounts/')) {
             return Promise.resolve({ ok: true, status: 200, json: async () => accounts });

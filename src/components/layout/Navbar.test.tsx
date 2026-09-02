@@ -99,6 +99,9 @@ function renderNavbar(
         accountsForCustomer: [],
         accountsLoading: false,
         accountsError: null,
+        activities: [],
+        activitiesLoading: false,
+        activitiesError: null,
       },
     },
   });

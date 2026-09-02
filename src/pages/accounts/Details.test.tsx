@@ -1,8 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { AccountDetails } from './Details';
 import type { AccountRow } from '../../components/organizations/accountsData';
+import customersReducer from '../../features/customers/customersSlice';
 
 // Real-shaped AccountRow, the kind organizations/Details.tsx's AccountsTab
 // passes through navigate()'s state when a row is clicked — see that
@@ -31,17 +34,31 @@ const apacDivision: AccountRow = {
   renewal: '-',
 };
 
+// ActivityFeed (rendered on the General tab, which is the default) fetches
+// real Activities on mount whenever it has real ids to fetch with — every
+// test below reaches that tab, so `fetch` needs stubbing regardless of
+// what each test is actually asserting on.
 function renderAccountDetails(state?: { account: AccountRow }) {
+  const store = configureStore({ reducer: { customers: customersReducer } });
   render(
-    <MemoryRouter initialEntries={[{ pathname: '/accounts/17', state }]}>
-      <Routes>
-        <Route path="/accounts/:id" element={<AccountDetails />} />
-      </Routes>
-    </MemoryRouter>
+    <Provider store={store}>
+      <MemoryRouter initialEntries={[{ pathname: '/accounts/17', state }]}>
+        <Routes>
+          <Route path="/accounts/:id" element={<AccountDetails />} />
+        </Routes>
+      </MemoryRouter>
+    </Provider>
   );
 }
 
 describe('AccountDetails page (/accounts/:id)', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => [] }))
+    );
+  });
+
   it('renders every metric from the real AccountRow passed via navigation state, not hardcoded placeholders', () => {
     // These used to be hardcoded regardless of which account was passed
     // in (9.3/100/100, "Very Satisfied", Promoters 10/Passives 0/
@@ -79,5 +96,92 @@ describe('AccountDetails page (/accounts/:id)', () => {
     // ACCOUNTS_DATA[0]'s own real mock health (9.5), not the old
     // hardcoded 9.3 that didn't even match it.
     expect(screen.getByText('9.5')).toBeInTheDocument();
+  });
+
+  describe('Activity Feed (real Activities, not the same mock for every account)', () => {
+    // The bug this whole feature replaced: ACCOUNT_ID_MAP's `?? 101`
+    // fallback made every real account show the exact same hardcoded
+    // activities. This pins down the fix — a real account's own
+    // orgId/revenactId (from the navigated AccountRow) must reach the
+    // correctly-nested endpoint, and its own distinct activity content
+    // must be what actually renders.
+    it('fetches and renders this account\'s own activities, from its own nested endpoint', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () =>
+              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/activities/`)
+                ? [
+                    {
+                      id: 1,
+                      type: 'escalation_triggered',
+                      type_display: 'Escalation Triggered',
+                      occurred_at: '2026-03-02',
+                      links: 1,
+                      watchers: 5,
+                    },
+                  ]
+                : [],
+          })
+        )
+      );
+
+      renderAccountDetails({ account: apacDivision });
+
+      expect(await screen.findByText('Escalation Triggered')).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(
+          `/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/activities/`
+        ),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('a different account fetches its own activities, not the first account\'s', async () => {
+      const otherAccount: AccountRow = {
+        ...apacDivision,
+        orgId: 6,
+        id: '6',
+        revenactId: 6,
+        name: 'Heinz Europe',
+      };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () =>
+              url.includes(`/customers/${otherAccount.orgId}/accounts/${otherAccount.revenactId}/activities/`)
+                ? [
+                    {
+                      id: 2,
+                      type: 'success_plan_created',
+                      type_display: 'Success Plan Created',
+                      occurred_at: '2026-03-01',
+                      links: 2,
+                      watchers: 1,
+                    },
+                  ]
+                : [],
+          })
+        )
+      );
+
+      renderAccountDetails({ account: otherAccount });
+
+      expect(await screen.findByText('Success Plan Created')).toBeInTheDocument();
+      expect(screen.queryByText('Escalation Triggered')).not.toBeInTheDocument();
+    });
+
+    it('shows no activities (not a stale or hardcoded set) when reached without navigation state', async () => {
+      renderAccountDetails();
+
+      await screen.findByText('9.5'); // page finished rendering the mock fallback
+      expect(screen.getByText('No activities found')).toBeInTheDocument();
+    });
   });
 });

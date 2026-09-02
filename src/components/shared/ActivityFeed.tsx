@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Search, Plus, Filter, Sparkles, Layout, FileText, Zap, Globe, MapPin, Mail, Phone } from 'lucide-react';
 import React from 'react';
 import {
@@ -13,16 +13,23 @@ import {
   HeadlinesTab,
   SlackTab,
 } from '../organizations/activity';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import {
+  fetchActivitiesForCustomer,
+  fetchActivitiesForAccount,
+  clearActivities,
+} from '../../features/customers/customersSlice';
 
 // ── Data sources ─────────────────────────────────────────────────────────────
-// Org data (original arrays — imported lazily to avoid mutating them)
+// Org data (original arrays — imported lazily to avoid mutating them).
+// Activities isn't here — it's wired to the real Activity model below,
+// not this mock injection scheme (see fetchActivitiesFor* above).
 import {
   EMAILS_DATA as ORG_EMAILS,
   TASKS_DATA as ORG_TASKS,
   NOTES_DATA as ORG_NOTES,
   TICKETS_DATA as ORG_TICKETS,
   CALENDAR_EVENTS_DATA as ORG_CALENDAR,
-  ACTIVITIES_DATA as ORG_ACTIVITIES,
 } from '../organizations/activityData';
 
 // Account data
@@ -32,7 +39,6 @@ import {
   ACCOUNT_NOTES_DATA,
   ACCOUNT_TICKETS_DATA,
   ACCOUNT_CALENDAR_EVENTS_DATA,
-  ACCOUNT_ACTIVITIES_DATA,
   ACCOUNT_ID_MAP,
 } from '../organizations/accountActivityData';
 
@@ -45,6 +51,15 @@ import type { EmailItem } from '../organizations/activityData';
 export interface ActivityFeedProps {
   entityId: number | string;
   entityType: 'organization' | 'account';
+  /** The parent Customer id — needed to hit the nested
+   * /customers/<customerId>/accounts/<accountId>/activities/ endpoint
+   * when entityType is 'account'. Ignored for entityType 'organization'
+   * (entityId already IS the customer id there). Omit it for an account
+   * reached with no resolvable real id (a direct URL visit/refresh with
+   * no navigation state, e.g. AccountDetails' own mock fallback) —
+   * without a real customerId there's no real Activity data to fetch,
+   * so the Activities tab just shows its empty state. */
+  customerId?: number;
   /** Shown in Overview tab */
   overviewInfo?: {
     domain?: string;
@@ -79,6 +94,10 @@ const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'T
 // activityData module's exported arrays so the existing tab components
 // (which reference those arrays directly) pick up account-specific data.
 // We restore the original org data after rendering.
+//
+// Covers Emails/Tasks/Notes/Tickets/Calendar Events only — Activities is
+// wired to the real Activity model (fetchActivitiesForCustomer/
+// fetchActivitiesForAccount below), not this mock scheme.
 
 function injectAccountData(accountId: string) {
   const numId = ACCOUNT_ID_MAP[accountId] ?? 101;
@@ -94,7 +113,6 @@ function injectAccountData(accountId: string) {
   swap(orgActivityData.NOTES_DATA, ACCOUNT_NOTES_DATA.filter(n => n.orgId === numId));
   swap(orgActivityData.TICKETS_DATA, ACCOUNT_TICKETS_DATA.filter(t => t.orgId === numId));
   swap(orgActivityData.CALENDAR_EVENTS_DATA, ACCOUNT_CALENDAR_EVENTS_DATA.filter(e => e.orgId === numId));
-  swap(orgActivityData.ACTIVITIES_DATA, ACCOUNT_ACTIVITIES_DATA.filter(a => a.orgId === numId));
 
   return numId;
 }
@@ -109,15 +127,22 @@ function restoreOrgData() {
   swap(orgActivityData.NOTES_DATA, ORG_NOTES);
   swap(orgActivityData.TICKETS_DATA, ORG_TICKETS);
   swap(orgActivityData.CALENDAR_EVENTS_DATA, ORG_CALENDAR);
-  swap(orgActivityData.ACTIVITIES_DATA, ORG_ACTIVITIES);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor = 'bg-teal-400' }: ActivityFeedProps) {
+export function ActivityFeed({
+  entityId,
+  entityType,
+  customerId,
+  overviewInfo,
+  healthColor = 'bg-success',
+}: ActivityFeedProps) {
   const [activeSubTab, setActiveSubTab] = useState('Activity Feed');
   const [filter, setFilter] = useState('All');
   const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
+  const dispatch = useAppDispatch();
+  const { activities, activitiesLoading, activitiesError } = useAppSelector((state) => state.customers);
 
   // Resolve numeric ID for tab components.
   // For accounts, inject mock data and use the numeric stub.
@@ -129,22 +154,38 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
     resolvedId = Number(entityId);
   }
 
+  // Activities is wired to the real backend model, not the mock
+  // injection above — org case always has a resolvable customer id
+  // (entityId itself); account case only does when reached with a real
+  // account (customerId set — see this component's own prop doc).
+  // Re-fires whenever the entity being viewed changes, same as
+  // fetchAccountsForCustomer's own effect in organizations/Details.tsx.
+  useEffect(() => {
+    if (entityType === 'organization') {
+      dispatch(fetchActivitiesForCustomer(Number(entityId)));
+    } else if (customerId !== undefined) {
+      dispatch(fetchActivitiesForAccount({ customerId, accountId: Number(entityId) }));
+    } else {
+      dispatch(clearActivities());
+    }
+  }, [dispatch, entityType, entityId, customerId]);
+
   return (
     <div className="flex flex-col h-full">
       {/* Sub-tabs: Activity Feed | Headlines | Overview | Files | CallSense */}
-      <div className="px-4 pt-3 flex items-center justify-between border-b border-gray-100 flex-wrap shrink-0">
+      <div className="px-4 pt-3 flex items-center justify-between border-b border-line-subtle flex-wrap shrink-0">
         <div className="flex gap-5">
           {FEED_TABS.map(tab => (
             <button
               key={tab.name}
               onClick={() => setActiveSubTab(tab.name)}
-              className={`flex items-center gap-1.5 pb-2.5 text-[13px] font-semibold transition-all relative ${activeSubTab === tab.name ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600'
+              className={`flex items-center gap-1.5 pb-2.5 text-[13px] font-semibold transition-all relative ${activeSubTab === tab.name ? 'text-accent' : 'text-ink-faint hover:text-ink-muted'
                 }`}
             >
               {tab.icon && tab.icon}
               {tab.name}
               {activeSubTab === tab.name && (
-                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full" />
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />
               )}
             </button>
           ))}
@@ -154,23 +195,23 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
       <div className="flex flex-1 overflow-hidden">
         {activeSubTab === 'Activity Feed' ? (
           <>
-            <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300 relative bg-white z-0">
+            <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300 relative bg-surface z-0">
               {/* Filter Toolbar */}
-            <div className="p-4 flex flex-col gap-4 border-b border-gray-50 shrink-0">
+            <div className="p-4 flex flex-col gap-4 border-b border-line-subtle shrink-0">
               <div className="flex items-center gap-3">
                 <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
                   <input
                     type="text"
                     placeholder={`Search ${filter.toLowerCase()}...`}
-                    className="w-full pl-9 pr-4 py-1.5 bg-white border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-indigo-500/20 placeholder:text-gray-400"
+                    className="w-full pl-9 pr-4 py-1.5 bg-surface border border-line rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-accent/20 placeholder:text-ink-faint"
                   />
                 </div>
-                <button className="flex items-center gap-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[13px] font-bold transition-all shadow-sm">
+                <button className="flex items-center gap-2 px-4 py-1.5 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold transition-all shadow-sm">
                   <Plus className="w-4 h-4" />
                   Add Action
                 </button>
-                <button className="p-1.5 border border-gray-200 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50">
+                <button className="p-1.5 border border-line rounded-lg text-ink-faint hover:text-ink-muted hover:bg-subtle">
                   <Filter className="w-4 h-4" />
                 </button>
               </div>
@@ -182,8 +223,8 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
                     key={item}
                     onClick={() => setFilter(item)}
                     className={`px-3 py-1 rounded-full text-[12px] font-bold transition-all border ${filter === item
-                      ? 'bg-indigo-50 border-indigo-100 text-indigo-700'
-                      : 'bg-white border-transparent text-gray-500 hover:bg-gray-50'
+                      ? 'bg-accent-dim border-accent/30 text-accent'
+                      : 'bg-surface border-transparent text-ink-muted hover:bg-subtle'
                       }`}
                   >
                     {item}
@@ -195,7 +236,12 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
             {/* Tab content */}
             <div className="flex-1 overflow-hidden flex flex-col">
               {(filter === 'All' || filter === 'Activities') && (
-                <ActivitiesTab entityId={resolvedId} healthColor={healthColor} />
+                <ActivitiesTab
+                  activities={activities}
+                  isLoading={activitiesLoading}
+                  error={activitiesError}
+                  healthColor={healthColor}
+                />
               )}
               {filter === 'Emails' && <EmailsTab entityId={resolvedId} selectedEmail={selectedEmail} onSelectEmail={setSelectedEmail} />}
               {filter === 'Tasks' && <TasksTab entityId={resolvedId} />}
@@ -206,8 +252,8 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
 
               {!IMPLEMENTED_FILTERS.includes(filter) && (
                 <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-30">
-                  <Layout className="w-12 h-12 text-gray-400 mb-2" />
-                  <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">
+                  <Layout className="w-12 h-12 text-ink-faint mb-2" />
+                  <span className="text-sm font-bold text-ink-muted uppercase tracking-widest">
                     {filter} coming soon
                   </span>
                 </div>
@@ -218,7 +264,7 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
             {/* Slide-in panel area */}
             {selectedEmail && (
               <div 
-                className="w-[420px] shrink-0 bg-white h-full shadow-[0_0_20px_rgba(0,0,0,0.05)] z-10 border-l border-gray-100 relative"
+                className="w-[420px] shrink-0 bg-surface h-full shadow-[0_0_20px_rgba(0,0,0,0.05)] z-10 border-l border-line-subtle relative"
                 style={{ animation: 'slideInRight 0.3s cubic-bezier(0.4,0,0.2,1)' }}
               >
                 <EmailThreadPanel email={selectedEmail} onClose={() => setSelectedEmail(null)} />
@@ -233,7 +279,7 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
             `}</style>
           </>
         ) : activeSubTab === 'Overview' ? (
-          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-gray-50/20">
+          <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-subtle/20">
             <div className="grid grid-cols-2 gap-4 max-w-4xl">
               <InfoCard icon={<Globe className="w-4 h-4" />} label="Domain" value={overviewInfo?.domain ?? '—'} />
               <InfoCard icon={<MapPin className="w-4 h-4" />} label="Location" value={overviewInfo?.location ?? '—'} />
@@ -247,8 +293,8 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
           <CallSenseTab entityId={resolvedId} />
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 py-10 opacity-30">
-            <Layout className="w-12 h-12 text-gray-400 mb-2" />
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">
+            <Layout className="w-12 h-12 text-ink-faint mb-2" />
+            <span className="text-sm font-bold text-ink-muted uppercase tracking-widest">
               {activeSubTab} coming soon
             </span>
           </div>
@@ -260,11 +306,11 @@ export function ActivityFeed({ entityId, entityType, overviewInfo, healthColor =
 
 function InfoCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="p-4 bg-white rounded-xl border border-gray-100 shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
-      <div className="p-2 bg-indigo-50/50 rounded-lg text-indigo-600">{icon}</div>
+    <div className="p-4 bg-surface rounded-xl border border-line-subtle shadow-sm flex items-start gap-3 hover:shadow-md transition-shadow">
+      <div className="p-2 bg-accent-dim/50 rounded-lg text-accent">{icon}</div>
       <div>
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-widest">{label}</p>
-        <p className="text-sm font-bold text-gray-900">{value}</p>
+        <p className="text-[11px] font-bold text-ink-faint uppercase tracking-widest">{label}</p>
+        <p className="text-sm font-bold text-ink">{value}</p>
       </div>
     </div>
   );

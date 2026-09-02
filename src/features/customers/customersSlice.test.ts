@@ -10,6 +10,9 @@ import customersReducer, {
   updateAccount,
   createCustomer,
   updateCustomer,
+  fetchActivitiesForCustomer,
+  fetchActivitiesForAccount,
+  clearActivities,
 } from './customersSlice';
 
 function makeStore() {
@@ -482,6 +485,112 @@ describe('customersSlice', () => {
         expect(createAccount.rejected.match(result)).toBe(true);
         expect(result.payload).toBe('This field is required.');
       });
+    });
+  });
+
+  describe('fetchActivitiesForCustomer / fetchActivitiesForAccount (ActivityFeed\'s Activities filter)', () => {
+    const orgActivity = {
+      id: 1,
+      type: 'health_check_review',
+      type_display: 'Health Check Review',
+      occurred_at: '2026-02-28',
+      links: 2,
+      watchers: 3,
+    };
+    const accountActivity = {
+      id: 2,
+      type: 'renewal_proposal_submitted',
+      type_display: 'Renewal Proposal Submitted',
+      occurred_at: '2026-03-15',
+      links: 1,
+      watchers: 4,
+    };
+
+    it('fetchActivitiesForCustomer GETs /customers/<id>/activities/ and stores the result', async () => {
+      mockFetchOnce(200, [orgActivity]);
+      const store = makeStore();
+
+      await store.dispatch(fetchActivitiesForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/activities/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.activities).toEqual([orgActivity]);
+      expect(state.activitiesLoading).toBe(false);
+      expect(state.activitiesError).toBeNull();
+    });
+
+    it('fetchActivitiesForAccount GETs the nested account endpoint and stores the result', async () => {
+      mockFetchOnce(200, [accountActivity]);
+      const store = makeStore();
+
+      await store.dispatch(fetchActivitiesForAccount({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/activities/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(store.getState().customers.activities).toEqual([accountActivity]);
+    });
+
+    // This is the direct regression guard for the bug that prompted this
+    // feature: every real account used to show the exact same hardcoded
+    // mock activities (ACCOUNT_ID_MAP's `?? 101` fallback). Dispatching
+    // for two different accounts back to back must leave each one's own,
+    // distinct activities in the single `activities` slot — not a stale
+    // mix or the first account's data reused for the second.
+    it('activities for one account never leak into another account\'s fetch', async () => {
+      mockFetchOnce(200, [accountActivity]);
+      const store = makeStore();
+      await store.dispatch(fetchActivitiesForAccount({ customerId: globex.id, accountId: 17 }));
+      expect(store.getState().customers.activities).toEqual([accountActivity]);
+
+      const otherAccountActivity = { ...orgActivity, id: 3, type_display: 'Success Plan Updated' };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [otherAccountActivity] })
+      );
+      await store.dispatch(fetchActivitiesForAccount({ customerId: globex.id, accountId: 6 }));
+
+      expect(store.getState().customers.activities).toEqual([otherAccountActivity]);
+    });
+
+    it('sets an error and leaves activities empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchActivitiesForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.activities).toEqual([]);
+      expect(state.activitiesError).toBe('Not found.');
+    });
+
+    it('clears a previous fetch\'s activities as soon as a new one starts', async () => {
+      mockFetchOnce(200, [orgActivity]);
+      const store = makeStore();
+      await store.dispatch(fetchActivitiesForCustomer(globex.id));
+      expect(store.getState().customers.activities).toEqual([orgActivity]);
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchActivitiesForCustomer(2));
+
+      expect(store.getState().customers.activities).toEqual([]);
+    });
+
+    it('clearActivities empties the slot outright (ActivityFeed\'s no-resolvable-id fallback)', async () => {
+      mockFetchOnce(200, [orgActivity]);
+      const store = makeStore();
+      await store.dispatch(fetchActivitiesForCustomer(globex.id));
+      expect(store.getState().customers.activities).toEqual([orgActivity]);
+
+      store.dispatch(clearActivities());
+
+      const state = store.getState().customers;
+      expect(state.activities).toEqual([]);
+      expect(state.activitiesError).toBeNull();
     });
   });
 });

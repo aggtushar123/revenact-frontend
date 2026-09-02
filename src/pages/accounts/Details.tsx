@@ -136,6 +136,12 @@ export function AccountDetails() {
                 <ActivityFeed
                   entityId={account.id}
                   entityType="account"
+                  // Only set for a real account reached via nav state
+                  // (account.orgId is the real parent customer id from
+                  // mapAccountToAccountRow) — undefined for the mock
+                  // fallback below, since there's no real customer id to
+                  // fetch real Activities against then.
+                  customerId={accountNavState?.account ? account.orgId : undefined}
                   healthColor="bg-success"
                   overviewInfo={{
                     domain: `${account.name.toLowerCase().replace(/\s+/g, '')}.com`,

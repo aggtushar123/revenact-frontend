@@ -82,6 +82,22 @@ export interface Account {
   arr: string;
 }
 
+// Mirrors revenact-backend's ActivitySerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Activity. A timeline entry
+// belonging to exactly one Customer or Account (never both, enforced
+// server-side) — which one it belongs to is implied by which endpoint
+// fetched it (fetchActivitiesForCustomer vs fetchActivitiesForAccount),
+// not carried as a field here. Read-only, no write payload yet.
+export interface Activity {
+  id: number;
+  type: string;
+  /** Human label (e.g. "Health Check Review") — this is the card's title. */
+  type_display: string;
+  occurred_at: string;
+  links: number;
+  watchers: number;
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -184,6 +200,14 @@ interface CustomersState {
   accountsForCustomer: Account[];
   accountsLoading: boolean;
   accountsError: string | null;
+  /** Activities for whichever Customer or Account ActivityFeed's
+   * "Activities" filter is currently showing — a single slot, same
+   * reasoning as selectedCustomer/accountsForCustomer: only one
+   * entity's Activity Feed is ever mounted at a time (Organization
+   * Details page's General tab, or the standalone Account page). */
+  activities: Activity[];
+  activitiesLoading: boolean;
+  activitiesError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -207,6 +231,9 @@ const initialState: CustomersState = {
   accountsForCustomer: [],
   accountsLoading: false,
   accountsError: null,
+  activities: [],
+  activitiesLoading: false,
+  activitiesError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -314,6 +341,39 @@ export const updateAccount = createAsyncThunk<
   }
 });
 
+// Powers ActivityFeed's "Activities" filter on the Organization Details
+// page's General tab — every organization-level Activity for one
+// Customer.
+export const fetchActivitiesForCustomer = createAsyncThunk<
+  Activity[],
+  number,
+  { rejectValue: string }
+>('customers/fetchActivitiesForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Activity[]>(`/customers/${customerId}/activities/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load activities.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers ActivityFeed's "Activities" filter on the standalone Account
+// page — every account-level Activity for one Account. Needs
+// `customerId` too since the endpoint is nested under its parent
+// Customer (see AccountActivityListView on the backend).
+export const fetchActivitiesForAccount = createAsyncThunk<
+  Activity[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>('customers/fetchActivitiesForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Activity[]>(`/customers/${customerId}/accounts/${accountId}/activities/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load activities.';
+    return rejectWithValue(message);
+  }
+});
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -347,7 +407,19 @@ export const updateCustomer = createAsyncThunk<
 const customersSlice = createSlice({
   name: 'customers',
   initialState,
-  reducers: {},
+  reducers: {
+    // ActivityFeed calls this when it's mounted for an account reached
+    // with no resolvable real ids (a direct URL visit/refresh with no
+    // navigation state — see AccountDetails' own comment on that
+    // fallback). Without it, switching from a real entity's Activities
+    // straight into that fallback would leave the previous entity's
+    // activities on screen instead of the correct "none loaded" state.
+    clearActivities(state) {
+      state.activities = [];
+      state.activitiesLoading = false;
+      state.activitiesError = null;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchCustomers.pending, (state) => {
@@ -431,6 +503,36 @@ const customersSlice = createSlice({
         state.accountsLoading = false;
         state.accountsError = action.payload ?? 'Could not load accounts.';
       })
+      // fetchActivitiesForCustomer and fetchActivitiesForAccount share the
+      // same activities/activitiesLoading/activitiesError slots — only one
+      // of the two is ever in flight at a time, same reasoning as the
+      // single accountsForCustomer slot above.
+      .addCase(fetchActivitiesForCustomer.pending, (state) => {
+        state.activitiesLoading = true;
+        state.activitiesError = null;
+        state.activities = [];
+      })
+      .addCase(fetchActivitiesForCustomer.fulfilled, (state, action) => {
+        state.activitiesLoading = false;
+        state.activities = action.payload;
+      })
+      .addCase(fetchActivitiesForCustomer.rejected, (state, action) => {
+        state.activitiesLoading = false;
+        state.activitiesError = action.payload ?? 'Could not load activities.';
+      })
+      .addCase(fetchActivitiesForAccount.pending, (state) => {
+        state.activitiesLoading = true;
+        state.activitiesError = null;
+        state.activities = [];
+      })
+      .addCase(fetchActivitiesForAccount.fulfilled, (state, action) => {
+        state.activitiesLoading = false;
+        state.activities = action.payload;
+      })
+      .addCase(fetchActivitiesForAccount.rejected, (state, action) => {
+        state.activitiesLoading = false;
+        state.activitiesError = action.payload ?? 'Could not load activities.';
+      })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -472,4 +574,5 @@ const customersSlice = createSlice({
   },
 });
 
+export const { clearActivities } = customersSlice.actions;
 export default customersSlice.reducer;
