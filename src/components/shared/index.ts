@@ -1,5 +1,8 @@
 export { ActivityFeed } from './ActivityFeed';
 export type { ActivityFeedProps } from './ActivityFeed';
 
+export { EntityAvatar } from './EntityAvatar';
+export type { EntityAvatarProps } from './EntityAvatar';
+
 export { PinnedAttributes } from './PinnedAttributes';
 export type { PinnedAttributesProps, AttributeDef, AttributeType } from './PinnedAttributes';

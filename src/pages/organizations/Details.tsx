@@ -4,7 +4,7 @@ import { MessageSquare, RefreshCw, MoreHorizontal, CheckCircle, Globe, Mail, Pho
 import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { CONTACTS_DATA } from '../../components/organizations/contactsData';
-import { ActivityFeed, PinnedAttributes } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, EntityAvatar } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { fetchCustomerById, fetchAccountsForCustomer } from '../../features/customers/customersSlice';
@@ -438,9 +438,11 @@ function AccountsTab({ accounts, rawAccounts, customerId, isLoading, error }: Ac
                      <td className="p-4"><input type="checkbox" className="rounded border-line" onClick={(e) => e.stopPropagation()} /></td>
                      <td className="p-4">
                         <div className="flex items-center gap-4">
-                           <div className="w-9 h-9 flex items-center justify-center bg-surface border border-line-subtle rounded-xl shadow-xs p-1.5 shrink-0">
-                              <img src={acc.logo} alt={acc.name} className="w-7 h-7 object-contain" />
-                           </div>
+                           <EntityAvatar
+                             name={acc.name}
+                             logoUrl={acc.logo}
+                             className="w-9 h-9 rounded-xl border border-line-subtle shadow-xs"
+                           />
                            <div className="flex flex-col overflow-hidden pt-0.5">
                               <div className="flex items-center gap-2">
                                 <span className="text-[13.5px] font-bold text-ink group-hover:text-accent transition-colors uppercase tracking-tight truncate">{acc.name}</span>

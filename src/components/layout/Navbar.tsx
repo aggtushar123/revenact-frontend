@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ACCOUNTS_DATA } from '../organizations/accountsData';
 import type { AccountRow } from '../organizations/accountsData';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
+import { EntityAvatar } from '../shared';
 import {
   ChevronLeft,
   ChevronDown,
@@ -113,9 +114,11 @@ export function Navbar() {
               </button>
               
               <div className="flex items-center gap-3">
-                 <div className="w-[36px] h-[36px] flex items-center justify-center p-1 bg-surface rounded-full border border-line-subtle shadow-sm overflow-hidden shrink-0">
-                    <img src={account.logo} alt={account.name} className="w-full h-full object-contain" />
-                 </div>
+                 <EntityAvatar
+                    name={account.name}
+                    logoUrl={account.logo}
+                    className="w-[36px] h-[36px] rounded-full border border-line-subtle shadow-sm"
+                 />
                  <div className="flex items-center gap-3">
                     <h1 className="text-[16px] font-bold text-ink tracking-tight uppercase whitespace-nowrap">{account.name}</h1>
                     <div className="w-px h-3.5 bg-line" />
@@ -133,14 +136,11 @@ export function Navbar() {
               </button>
               
               <div className="flex items-center gap-3">
-                 <div className="w-[36px] h-[36px] flex items-center justify-center p-1 bg-surface rounded-full border border-line-subtle shadow-sm overflow-hidden shrink-0">
-                    <img
-                      src={organization.logo}
-                      alt={organization.org}
-                      className="w-full h-full object-contain mix-blend-multiply"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
-                 </div>
+                 <EntityAvatar
+                    name={organization.org}
+                    logoUrl={organization.logo}
+                    className="w-[36px] h-[36px] rounded-full border border-line-subtle shadow-sm"
+                 />
                  <h1 className="text-[16px] font-bold text-ink tracking-tight uppercase">{organization.org}</h1>
               </div>
           </div>

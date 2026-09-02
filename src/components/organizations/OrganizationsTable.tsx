@@ -5,6 +5,7 @@ import { HealthPopover } from './HealthPopover';
 import { CsatPopover } from './CsatPopover';
 import { EditColumnsPopover } from './EditColumnsPopover';
 import { RowActionsPopover } from './RowActionsPopover';
+import { EntityAvatar } from '../shared';
 import { ALL_COLUMNS, DEFAULT_VISIBLE_COLUMNS } from './tableData';
 import type { ColumnId, OrgRow } from './tableData';
 
@@ -334,9 +335,7 @@ export function OrganizationsTable({
                       onChange={() => onToggleSelect(r.id)}
                       className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer accent-accent"
                     />
-                    <div className="w-6 h-6 flex items-center justify-center p-0.5 overflow-hidden shrink-0">
-                      <img src={r.logo} alt={r.org} className="w-full h-full object-contain mix-blend-multiply" onError={(e) => { e.currentTarget.style.display='none' }} />
-                    </div>
+                    <EntityAvatar name={r.org} logoUrl={r.logo} className="w-6 h-6 rounded-md" />
                     <span
                       className="font-bold text-ink tracking-tight cursor-pointer hover:text-accent hover:underline transition-colors"
                       onClick={() => navigate(`/organizations/${r.id}`)}
