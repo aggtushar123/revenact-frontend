@@ -1,6 +1,52 @@
 import { useState } from 'react';
 import { MoreHorizontal, Sparkles, Link2, Eye, MessageCircle, X, ChevronDown, Reply, Forward, Star, Paperclip, ExternalLink, Smile } from 'lucide-react';
-import { EMAILS_DATA, type EmailItem } from '../activityData';
+import type { Email } from '../../../features/customers/customersSlice';
+
+// "2026-03-05T18:20:00Z" -> "Mar 5th 6:20 PM" / "6:20 PM" / "5 Mar 2026" —
+// the card's own date, the thread panel's time, and the day-group
+// header, all derived from the one real sent_at timestamp rather than
+// stored as separate strings (see the Email model's own docstring).
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function ordinal(day: number): string {
+  if (day >= 11 && day <= 13) return `${day}th`;
+  switch (day % 10) {
+    case 1:
+      return `${day}st`;
+    case 2:
+      return `${day}nd`;
+    case 3:
+      return `${day}rd`;
+    default:
+      return `${day}th`;
+  }
+}
+
+function formatTime(iso: string): string {
+  const d = new Date(iso);
+  let hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const period = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${hours}:${minutes} ${period}`;
+}
+
+function formatCardDate(iso: string): string {
+  const d = new Date(iso);
+  return `${MONTHS[d.getMonth()]} ${ordinal(d.getDate())} ${formatTime(iso)}`;
+}
+
+function formatGroupHeader(iso: string): string {
+  const d = new Date(iso);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// A placeholder avatar derived from the sender's name — not stored on
+// the backend (see the Email model's own docstring), same as before
+// this model existed.
+function avatarFor(name: string): string {
+  return `https://i.pravatar.cc/150?u=${encodeURIComponent(name)}`;
+}
 
 // ── Email Thread Panel ────────────────────────────────────────────────────────
 
@@ -11,34 +57,33 @@ interface ThreadMessage {
   recipient: string;
   date: string;
   body: string;
-  isExpanded: boolean;
 }
 
-function buildThread(email: EmailItem): ThreadMessage[] {
-  // Build a realistic back-and-forth thread from a single EmailItem
+function buildThread(email: Email): ThreadMessage[] {
+  // Build a realistic back-and-forth thread from a single Email — the
+  // first message is a synthetic kickoff note from the recipient, the
+  // second is the real logged email.
   return [
     {
       id: 1,
-      sender: email.recipientName,
-      senderAvatar: `https://i.pravatar.cc/150?u=${email.recipientName}`,
-      recipient: email.senderName,
-      date: email.group.replace(/(\d+) (\w+) (\d+)/, '$1 $2 $3').replace('2026', '10:43 AM').replace('2025', '10:43 AM'),
-      body: `Hi ${email.senderName.split(' ')[0]},\n\nHope you're doing well. I'm excited to help you get started. To begin onboarding, I'd like to walk you through the core setup steps and ensure everything is aligned with your team's goals.\n\nCould we schedule a short call this week to kick things off?\n\nBest regards,\n${email.recipientName}`,
-      isExpanded: true,
+      sender: email.recipient_name,
+      senderAvatar: avatarFor(email.recipient_name),
+      recipient: email.sender_name,
+      date: formatTime(email.sent_at),
+      body: `Hi ${email.sender_name.split(' ')[0]},\n\nHope you're doing well. I'm excited to help you get started. To begin onboarding, I'd like to walk you through the core setup steps and ensure everything is aligned with your team's goals.\n\nCould we schedule a short call this week to kick things off?\n\nBest regards,\n${email.recipient_name}`,
     },
     {
       id: 2,
-      sender: email.senderName,
-      senderAvatar: email.senderAvatar,
-      recipient: email.recipientName,
-      date: email.date,
+      sender: email.sender_name,
+      senderAvatar: avatarFor(email.sender_name),
+      recipient: email.recipient_name,
+      date: formatCardDate(email.sent_at),
       body: email.body,
-      isExpanded: true,
     },
   ];
 }
 
-export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose: () => void }) {
+export function EmailThreadPanel({ email, onClose }: { email: Email; onClose: () => void }) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set([1, 2]));
   const thread = buildThread(email);
 
@@ -59,16 +104,16 @@ export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose
 
       {/* Panel */}
       <div
-        className="h-full flex flex-col bg-white"
+        className="h-full flex flex-col bg-surface"
         onClick={e => e.stopPropagation()}
       >
         {/* Panel Header */}
-        <div className="px-5 py-4 border-b border-gray-100 shrink-0">
+        <div className="px-5 py-4 border-b border-line-subtle shrink-0">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-[14px] font-extrabold text-[#6D72D6]">Email Thread</h2>
+            <h2 className="text-[14px] font-extrabold text-accent">Email Thread</h2>
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all"
+              className="p-1.5 rounded-lg hover:bg-subtle text-ink-faint hover:text-ink-muted transition-all"
             >
               <X className="w-4 h-4" />
             </button>
@@ -76,14 +121,14 @@ export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose
 
           {/* Subject line + link count */}
           <div className="flex items-center justify-between">
-            <h3 className="text-[13.5px] font-semibold text-gray-800 truncate flex-1 pr-3" title={email.subject}>
+            <h3 className="text-[13.5px] font-semibold text-ink truncate flex-1 pr-3" title={email.subject}>
               {email.subject}
             </h3>
             <div className="flex items-center gap-1 shrink-0">
               {email.links > 0 && (
-                <span className="flex items-center gap-1 text-[11.5px] font-bold text-indigo-400 bg-transparent px-1 cursor-pointer">
+                <span className="flex items-center gap-1 text-[11.5px] font-bold text-accent bg-transparent px-1 cursor-pointer">
                   {email.links} Links
-                  <ChevronDown className="w-3.5 h-3.5 text-indigo-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-accent" />
                 </span>
               )}
             </div>
@@ -97,7 +142,7 @@ export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose
             const isLast = idx === thread.length - 1;
 
             return (
-              <div key={msg.id} className={`border-b border-gray-50 ${isLast ? 'border-b-0' : ''}`}>
+              <div key={msg.id} className={`border-b border-line-subtle ${isLast ? 'border-b-0' : ''}`}>
                 {/* Message header — always visible */}
                 <div
                   className="px-5 pt-4 pb-1 flex items-start justify-between cursor-pointer transition-colors"
@@ -107,22 +152,22 @@ export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose
                     <img
                       src={msg.senderAvatar}
                       alt={msg.sender}
-                      className="w-8 h-8 rounded-full border border-gray-100 object-cover shrink-0"
+                      className="w-8 h-8 rounded-full border border-line-subtle object-cover shrink-0"
                     />
                     <div className="flex flex-col">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-[13px] font-bold text-gray-900">{msg.sender}</span>
-                        <ChevronDown className={`w-3 h-3 text-gray-400 transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
+                        <span className="text-[13px] font-bold text-ink">{msg.sender}</span>
+                        <ChevronDown className={`w-3 h-3 text-ink-faint transition-transform ${isExpanded ? '' : '-rotate-90'}`} />
                       </div>
-                      <span className="text-[11.5px] text-gray-400">{msg.recipient}</span>
+                      <span className="text-[11.5px] text-ink-faint">{msg.recipient}</span>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-[11.5px] font-medium text-gray-400 whitespace-nowrap">{msg.date}</span>
+                    <span className="text-[11.5px] font-medium text-ink-faint whitespace-nowrap">{msg.date}</span>
                     <button
                       onClick={e => e.stopPropagation()}
-                      className="p-0.5 rounded opacity-60 hover:opacity-100 text-gray-400 hover:text-gray-600 transition-opacity"
+                      className="p-0.5 rounded opacity-60 hover:opacity-100 text-ink-faint hover:text-ink-muted transition-opacity"
                     >
                       <MoreHorizontal className="w-4 h-4" />
                     </button>
@@ -134,23 +179,23 @@ export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose
                   <div className="px-5 pb-5">
                     {/* Emoji reaction row */}
                     <div className="flex justify-end mb-2">
-                       <div className="w-6 h-6 rounded-full border border-teal-200 bg-teal-50 flex items-center justify-center text-teal-500 cursor-pointer">
+                       <div className="w-6 h-6 rounded-full border border-success/40 bg-success-dim flex items-center justify-center text-success cursor-pointer">
                          <Smile className="w-3.5 h-3.5" />
                        </div>
                     </div>
 
                     {/* Body text */}
-                    <div className="text-[12.5px] text-gray-600 leading-[1.6] whitespace-pre-line pl-11">
+                    <div className="text-[12.5px] text-ink-muted leading-[1.6] whitespace-pre-line pl-11">
                       {msg.body}
                     </div>
 
                     {/* Action buttons */}
                     <div className="flex items-center gap-2 mt-5 pl-11">
-                      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-indigo-50 border border-gray-200 hover:border-indigo-200 rounded-lg text-[12px] font-semibold text-gray-600 hover:text-indigo-600 transition-all">
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-subtle hover:bg-accent-dim border border-line hover:border-accent/40 rounded-lg text-[12px] font-semibold text-ink-muted hover:text-accent transition-all">
                         <Reply className="w-3.5 h-3.5" />
                         Reply
                       </button>
-                      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-[12px] font-semibold text-gray-600 transition-all">
+                      <button className="flex items-center gap-1.5 px-3 py-1.5 bg-subtle hover:bg-subtle border border-line rounded-lg text-[12px] font-semibold text-ink-muted transition-all">
                         <Forward className="w-3.5 h-3.5" />
                         Forward
                       </button>
@@ -161,7 +206,7 @@ export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose
                 {/* Collapsed preview */}
                 {!isExpanded && (
                   <div className="px-5 pb-3 pl-16">
-                    <p className="text-[12px] text-gray-400 truncate">{msg.body.split('\n')[0]}</p>
+                    <p className="text-[12px] text-ink-faint truncate">{msg.body.split('\n')[0]}</p>
                   </div>
                 )}
 
@@ -169,8 +214,8 @@ export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose
                 {idx < thread.length - 1 && (
                   <div className="relative flex items-center py-4">
                      {/* Horizontal line extending through the circle */}
-                     <div className="absolute left-6 right-6 h-px bg-gray-100"></div>
-                     <div className="relative left-[22px] w-8 h-8 bg-white border border-gray-200 shadow-sm rounded-full flex items-center justify-center text-[12px] font-bold text-gray-500 z-10">
+                     <div className="absolute left-6 right-6 h-px bg-subtle"></div>
+                     <div className="relative left-[22px] w-8 h-8 bg-surface border border-line shadow-sm rounded-full flex items-center justify-center text-[12px] font-bold text-ink-muted z-10">
                         1
                      </div>
                   </div>
@@ -183,30 +228,30 @@ export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose
         </div>
 
         {/* Quick Reply Composer */}
-        <div className="border-t border-gray-100 p-3 shrink-0 bg-gray-50/30">
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="px-3 py-1.5 border-b border-gray-100 flex items-center gap-2">
-              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Reply to</span>
-              <span className="text-[12px] font-semibold text-gray-700">{email.senderName}</span>
+        <div className="border-t border-line-subtle p-3 shrink-0 bg-subtle/30">
+          <div className="bg-surface rounded-xl border border-line shadow-sm overflow-hidden flex flex-col">
+            <div className="px-3 py-1.5 border-b border-line-subtle flex items-center gap-2">
+              <span className="text-[11px] font-bold text-ink-faint uppercase tracking-wider">Reply to</span>
+              <span className="text-[12px] font-semibold text-ink-muted">{email.sender_name}</span>
             </div>
             <textarea
               placeholder="Write a reply..."
               rows={1}
-              className="w-full px-3 py-2 text-[13px] text-gray-700 placeholder:text-gray-400 resize-none focus:outline-none bg-transparent min-h-[36px]"
+              className="w-full px-3 py-2 text-[13px] text-ink-muted placeholder:text-ink-faint resize-none focus:outline-none bg-transparent min-h-[36px]"
             />
-            <div className="px-3 py-1.5 border-t border-gray-100 flex items-center justify-between">
+            <div className="px-3 py-1.5 border-t border-line-subtle flex items-center justify-between">
               <div className="flex items-center gap-1">
-                <button className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+                <button className="p-1 rounded-lg text-ink-faint hover:text-ink-muted hover:bg-subtle transition-all">
                   <Paperclip className="w-3.5 h-3.5" />
                 </button>
-                <button className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+                <button className="p-1 rounded-lg text-ink-faint hover:text-ink-muted hover:bg-subtle transition-all">
                   <Star className="w-3.5 h-3.5" />
                 </button>
-                <button className="p-1 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-all">
+                <button className="p-1 rounded-lg text-ink-faint hover:text-ink-muted hover:bg-subtle transition-all">
                   <ExternalLink className="w-3.5 h-3.5" />
                 </button>
               </div>
-              <button className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-bold transition-all shadow-sm active:scale-95">
+              <button className="px-3 py-1 bg-accent hover:bg-accent-hover text-white rounded-lg text-[11px] font-bold transition-all shadow-sm active:scale-95">
                 Send
               </button>
             </div>
@@ -219,46 +264,61 @@ export function EmailThreadPanel({ email, onClose }: { email: EmailItem; onClose
 
 // ── EmailsTab ─────────────────────────────────────────────────────────────────
 
-export function EmailsTab({ 
-  entityId, 
-  selectedEmail, 
-  onSelectEmail 
-}: { 
-  entityId: number | string;
-  selectedEmail?: EmailItem | null;
-  onSelectEmail?: (email: EmailItem | null) => void;
-}) {
-  const [localSelected, setLocalSelected] = useState<EmailItem | null>(null);
+export interface EmailsTabProps {
+  emails: Email[];
+  isLoading: boolean;
+  error: string | null;
+  selectedEmail?: Email | null;
+  onSelectEmail?: (email: Email | null) => void;
+}
+
+export function EmailsTab({ emails, isLoading, error, selectedEmail, onSelectEmail }: EmailsTabProps) {
+  const [localSelected, setLocalSelected] = useState<Email | null>(null);
   const currentSelectedEmail = selectedEmail !== undefined ? selectedEmail : localSelected;
   const handleSelectEmail = onSelectEmail || setLocalSelected;
-  const emails = EMAILS_DATA.filter(e => e.orgId == entityId);
 
-  // Group by date
-  const grouped = emails.reduce<Record<string, EmailItem[]>>((acc, email) => {
-    if (!acc[email.group]) acc[email.group] = [];
-    acc[email.group].push(email);
+  // Group by calendar day (derived from sent_at, not a separate stored
+  // field — see formatGroupHeader above).
+  const grouped = emails.reduce<Record<string, Email[]>>((acc, email) => {
+    const day = email.sent_at.slice(0, 10);
+    if (!acc[day]) acc[day] = [];
+    acc[day].push(email);
     return acc;
   }, {});
 
-  const sortedGroups = Object.entries(grouped).sort(
-    (a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime()
-  );
+  const sortedGroups = Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0]));
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
+        <span className="text-sm font-semibold text-ink-faint">Loading emails…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 py-16">
+        <span className="text-sm font-semibold text-danger">{error}</span>
+      </div>
+    );
+  }
 
   if (emails.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
-        <MessageCircle className="w-10 h-10 text-gray-300 mb-2" />
-        <span className="text-sm font-semibold text-gray-400">No emails found</span>
+        <MessageCircle className="w-10 h-10 text-ink-faint mb-2" />
+        <span className="text-sm font-semibold text-ink-faint">No emails found</span>
       </div>
     );
   }
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar relative">
-      {sortedGroups.map(([group, items]) => (
-        <div key={group} className="flex flex-col">
-          <div className="px-6 py-2 bg-gray-50/80 border-b border-gray-100 sticky top-0 z-10">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{group}</span>
+      {sortedGroups.map(([day, items]) => (
+        <div key={day} className="flex flex-col">
+          <div className="px-6 py-2 bg-subtle/80 border-b border-line-subtle sticky top-0 z-10">
+            <span className="text-[11px] font-bold text-ink-faint uppercase tracking-wider">{formatGroupHeader(items[0].sent_at)}</span>
           </div>
           {items.map(email => (
             <EmailCard
@@ -282,56 +342,56 @@ function EmailCard({
   isSelected,
   onClick,
 }: {
-  email: EmailItem;
+  email: Email;
   isSelected: boolean;
   onClick: () => void;
 }) {
   return (
     <div
       onClick={onClick}
-      className={`px-6 py-4 border-b border-gray-50 cursor-pointer group transition-all ${
+      className={`px-6 py-4 border-b border-line-subtle cursor-pointer group transition-all ${
         isSelected
-          ? 'bg-indigo-50/60 border-l-2 border-l-indigo-400'
-          : 'hover:bg-indigo-50/20 border-l-2 border-l-transparent'
+          ? 'bg-accent-dim/60 border-l-2 border-l-accent'
+          : 'hover:bg-accent-dim/20 border-l-2 border-l-transparent'
       }`}
     >
       <div className="flex items-start justify-between mb-2">
         <h4 className={`text-[14px] font-semibold leading-snug flex-1 pr-4 transition-colors ${
-          isSelected ? 'text-indigo-700' : 'text-gray-900 group-hover:text-indigo-700'
+          isSelected ? 'text-accent' : 'text-ink group-hover:text-accent'
         }`}>
           {email.subject}
         </h4>
         <div className="flex items-center gap-2 shrink-0">
-          {email.isStarred && (
-            <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+          {email.is_starred && (
+            <Sparkles className="w-3.5 h-3.5 text-warning" />
           )}
-          <span className="text-[11.5px] font-medium text-gray-400 whitespace-nowrap">{email.date}</span>
+          <span className="text-[11.5px] font-medium text-ink-faint whitespace-nowrap">{formatCardDate(email.sent_at)}</span>
           <button
             onClick={e => e.stopPropagation()}
-            className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-gray-400 hover:text-gray-600"
+            className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-ink-faint hover:text-ink-muted"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
         </div>
       </div>
       <div className="flex items-center gap-2 mb-2">
-        <img src={email.senderAvatar} alt={email.senderName} className="w-6 h-6 rounded-full border border-gray-100 object-cover" />
+        <img src={avatarFor(email.sender_name)} alt={email.sender_name} className="w-6 h-6 rounded-full border border-line-subtle object-cover" />
         <div className="flex items-center gap-1.5">
-          <span className="text-[12.5px] font-semibold text-gray-700">{email.senderName}</span>
-          <span className="text-[11px] text-gray-400">▸</span>
-          <span className="text-[12px] text-gray-400 italic">{email.recipientName}</span>
+          <span className="text-[12.5px] font-semibold text-ink-muted">{email.sender_name}</span>
+          <span className="text-[11px] text-ink-faint">▸</span>
+          <span className="text-[12px] text-ink-faint italic">{email.recipient_name}</span>
         </div>
       </div>
-      <p className="text-[12.5px] text-gray-500 leading-relaxed mb-3 pl-8 line-clamp-2">{email.body}</p>
+      <p className="text-[12.5px] text-ink-muted leading-relaxed mb-3 pl-8 line-clamp-2">{email.body}</p>
       <div className="flex items-center gap-4 pl-8">
         {email.watchers > 0 && (
-          <div className="flex items-center gap-1 text-[11px] font-medium text-gray-400">
+          <div className="flex items-center gap-1 text-[11px] font-medium text-ink-faint">
             <Eye className="w-3 h-3" />
             <span>{email.watchers}</span>
           </div>
         )}
         {email.links > 0 && (
-          <div className="flex items-center gap-1 text-[11px] font-medium text-indigo-400">
+          <div className="flex items-center gap-1 text-[11px] font-medium text-accent">
             <Link2 className="w-3 h-3" />
             <span>{email.links} Links</span>
           </div>

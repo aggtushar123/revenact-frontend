@@ -98,6 +98,24 @@ export interface Activity {
   watchers: number;
 }
 
+// Mirrors revenact-backend's EmailSerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Email. Which parent (Customer or
+// Account) it belongs to is implied by which endpoint fetched it, same
+// as Activity. `sender_name`/`recipient_name` are plain text, not a
+// User/Contact reference — see the Email model's own docstring for why.
+export interface Email {
+  id: number;
+  subject: string;
+  sender_name: string;
+  recipient_name: string;
+  /** The summarized preview shown on the card. */
+  body: string;
+  sent_at: string;
+  links: number;
+  watchers: number;
+  is_starred: boolean;
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -208,6 +226,12 @@ interface CustomersState {
   activities: Activity[];
   activitiesLoading: boolean;
   activitiesError: string | null;
+  /** Emails for whichever Customer or Account ActivityFeed's "Emails"
+   * filter is currently showing — same single-slot reasoning as
+   * `activities` above. */
+  emails: Email[];
+  emailsLoading: boolean;
+  emailsError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -234,6 +258,9 @@ const initialState: CustomersState = {
   activities: [],
   activitiesLoading: false,
   activitiesError: null,
+  emails: [],
+  emailsLoading: false,
+  emailsError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -374,6 +401,37 @@ export const fetchActivitiesForAccount = createAsyncThunk<
   }
 });
 
+// Powers ActivityFeed's "Emails" filter on the Organization Details
+// page's General tab — every organization-level Email for one
+// Customer.
+export const fetchEmailsForCustomer = createAsyncThunk<
+  Email[],
+  number,
+  { rejectValue: string }
+>('customers/fetchEmailsForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Email[]>(`/customers/${customerId}/emails/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load emails.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers ActivityFeed's "Emails" filter on the standalone Account
+// page — every account-level Email for one Account.
+export const fetchEmailsForAccount = createAsyncThunk<
+  Email[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>('customers/fetchEmailsForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Email[]>(`/customers/${customerId}/accounts/${accountId}/emails/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load emails.';
+    return rejectWithValue(message);
+  }
+});
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -418,6 +476,12 @@ const customersSlice = createSlice({
       state.activities = [];
       state.activitiesLoading = false;
       state.activitiesError = null;
+    },
+    // Same reasoning as clearActivities above, for the "Emails" filter.
+    clearEmails(state) {
+      state.emails = [];
+      state.emailsLoading = false;
+      state.emailsError = null;
     },
   },
   extraReducers: (builder) => {
@@ -533,6 +597,35 @@ const customersSlice = createSlice({
         state.activitiesLoading = false;
         state.activitiesError = action.payload ?? 'Could not load activities.';
       })
+      // fetchEmailsForCustomer and fetchEmailsForAccount share the same
+      // emails/emailsLoading/emailsError slots, same reasoning as the
+      // activities slots above.
+      .addCase(fetchEmailsForCustomer.pending, (state) => {
+        state.emailsLoading = true;
+        state.emailsError = null;
+        state.emails = [];
+      })
+      .addCase(fetchEmailsForCustomer.fulfilled, (state, action) => {
+        state.emailsLoading = false;
+        state.emails = action.payload;
+      })
+      .addCase(fetchEmailsForCustomer.rejected, (state, action) => {
+        state.emailsLoading = false;
+        state.emailsError = action.payload ?? 'Could not load emails.';
+      })
+      .addCase(fetchEmailsForAccount.pending, (state) => {
+        state.emailsLoading = true;
+        state.emailsError = null;
+        state.emails = [];
+      })
+      .addCase(fetchEmailsForAccount.fulfilled, (state, action) => {
+        state.emailsLoading = false;
+        state.emails = action.payload;
+      })
+      .addCase(fetchEmailsForAccount.rejected, (state, action) => {
+        state.emailsLoading = false;
+        state.emailsError = action.payload ?? 'Could not load emails.';
+      })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -574,5 +667,5 @@ const customersSlice = createSlice({
   },
 });
 
-export const { clearActivities } = customersSlice.actions;
+export const { clearActivities, clearEmails } = customersSlice.actions;
 export default customersSlice.reducer;

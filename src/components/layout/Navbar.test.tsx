@@ -102,6 +102,9 @@ function renderNavbar(
         activities: [],
         activitiesLoading: false,
         activitiesError: null,
+        emails: [],
+        emailsLoading: false,
+        emailsError: null,
       },
     },
   });

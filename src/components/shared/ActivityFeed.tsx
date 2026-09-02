@@ -18,14 +18,18 @@ import {
   fetchActivitiesForCustomer,
   fetchActivitiesForAccount,
   clearActivities,
+  fetchEmailsForCustomer,
+  fetchEmailsForAccount,
+  clearEmails,
+  type Email,
 } from '../../features/customers/customersSlice';
 
 // ── Data sources ─────────────────────────────────────────────────────────────
 // Org data (original arrays — imported lazily to avoid mutating them).
-// Activities isn't here — it's wired to the real Activity model below,
-// not this mock injection scheme (see fetchActivitiesFor* above).
+// Activities/Emails aren't here — they're wired to real backend models
+// below, not this mock injection scheme (see fetchActivitiesFor*/
+// fetchEmailsFor* above).
 import {
-  EMAILS_DATA as ORG_EMAILS,
   TASKS_DATA as ORG_TASKS,
   NOTES_DATA as ORG_NOTES,
   TICKETS_DATA as ORG_TICKETS,
@@ -34,7 +38,6 @@ import {
 
 // Account data
 import {
-  ACCOUNT_EMAILS_DATA,
   ACCOUNT_TASKS_DATA,
   ACCOUNT_NOTES_DATA,
   ACCOUNT_TICKETS_DATA,
@@ -44,7 +47,6 @@ import {
 
 // Re-export from activityData so tabs can still import from there
 import * as orgActivityData from '../organizations/activityData';
-import type { EmailItem } from '../organizations/activityData';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -95,9 +97,9 @@ const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'T
 // (which reference those arrays directly) pick up account-specific data.
 // We restore the original org data after rendering.
 //
-// Covers Emails/Tasks/Notes/Tickets/Calendar Events only — Activities is
-// wired to the real Activity model (fetchActivitiesForCustomer/
-// fetchActivitiesForAccount below), not this mock scheme.
+// Covers Tasks/Notes/Tickets/Calendar Events only — Activities and Emails
+// are wired to real backend models (fetchActivitiesFor*/fetchEmailsFor*
+// above), not this mock scheme.
 
 function injectAccountData(accountId: string) {
   const numId = ACCOUNT_ID_MAP[accountId] ?? 101;
@@ -108,7 +110,6 @@ function injectAccountData(accountId: string) {
     arr.splice(0, arr.length, ...data);
   };
 
-  swap(orgActivityData.EMAILS_DATA, ACCOUNT_EMAILS_DATA.filter(e => e.orgId === numId));
   swap(orgActivityData.TASKS_DATA, ACCOUNT_TASKS_DATA.filter(t => t.orgId === numId));
   swap(orgActivityData.NOTES_DATA, ACCOUNT_NOTES_DATA.filter(n => n.orgId === numId));
   swap(orgActivityData.TICKETS_DATA, ACCOUNT_TICKETS_DATA.filter(t => t.orgId === numId));
@@ -122,7 +123,6 @@ function restoreOrgData() {
     arr.splice(0, arr.length, ...data);
   };
 
-  swap(orgActivityData.EMAILS_DATA, ORG_EMAILS);
   swap(orgActivityData.TASKS_DATA, ORG_TASKS);
   swap(orgActivityData.NOTES_DATA, ORG_NOTES);
   swap(orgActivityData.TICKETS_DATA, ORG_TICKETS);
@@ -140,9 +140,10 @@ export function ActivityFeed({
 }: ActivityFeedProps) {
   const [activeSubTab, setActiveSubTab] = useState('Activity Feed');
   const [filter, setFilter] = useState('All');
-  const [selectedEmail, setSelectedEmail] = useState<EmailItem | null>(null);
+  const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const dispatch = useAppDispatch();
-  const { activities, activitiesLoading, activitiesError } = useAppSelector((state) => state.customers);
+  const { activities, activitiesLoading, activitiesError, emails, emailsLoading, emailsError } =
+    useAppSelector((state) => state.customers);
 
   // Resolve numeric ID for tab components.
   // For accounts, inject mock data and use the numeric stub.
@@ -167,6 +168,19 @@ export function ActivityFeed({
       dispatch(fetchActivitiesForAccount({ customerId, accountId: Number(entityId) }));
     } else {
       dispatch(clearActivities());
+    }
+  }, [dispatch, entityType, entityId, customerId]);
+
+  // Emails is wired to the real backend model the same way Activities
+  // is above — same resolvability rules, same clear-on-no-real-id
+  // fallback.
+  useEffect(() => {
+    if (entityType === 'organization') {
+      dispatch(fetchEmailsForCustomer(Number(entityId)));
+    } else if (customerId !== undefined) {
+      dispatch(fetchEmailsForAccount({ customerId, accountId: Number(entityId) }));
+    } else {
+      dispatch(clearEmails());
     }
   }, [dispatch, entityType, entityId, customerId]);
 
@@ -243,7 +257,15 @@ export function ActivityFeed({
                   healthColor={healthColor}
                 />
               )}
-              {filter === 'Emails' && <EmailsTab entityId={resolvedId} selectedEmail={selectedEmail} onSelectEmail={setSelectedEmail} />}
+              {filter === 'Emails' && (
+                <EmailsTab
+                  emails={emails}
+                  isLoading={emailsLoading}
+                  error={emailsError}
+                  selectedEmail={selectedEmail}
+                  onSelectEmail={setSelectedEmail}
+                />
+              )}
               {filter === 'Tasks' && <TasksTab entityId={resolvedId} />}
               {filter === 'Notes' && <NotesTab entityId={resolvedId} />}
               {filter === 'Tickets' && <TicketsTab entityId={resolvedId} />}

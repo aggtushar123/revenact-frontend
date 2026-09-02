@@ -13,6 +13,9 @@ import customersReducer, {
   fetchActivitiesForCustomer,
   fetchActivitiesForAccount,
   clearActivities,
+  fetchEmailsForCustomer,
+  fetchEmailsForAccount,
+  clearEmails,
 } from './customersSlice';
 
 function makeStore() {
@@ -591,6 +594,114 @@ describe('customersSlice', () => {
       const state = store.getState().customers;
       expect(state.activities).toEqual([]);
       expect(state.activitiesError).toBeNull();
+    });
+  });
+
+  describe('fetchEmailsForCustomer / fetchEmailsForAccount (ActivityFeed\'s Emails filter)', () => {
+    const orgEmail = {
+      id: 1,
+      subject: 'Quarterly Business Review - Q4 2025 Recap',
+      sender_name: 'Edgar Holmes',
+      recipient_name: 'Sarah Chen',
+      body: 'Hi Sarah, please find attached the QBR deck for Q4.',
+      sent_at: '2026-01-15T15:45:00Z',
+      links: 5,
+      watchers: 3,
+      is_starred: true,
+    };
+    const accountEmail = {
+      id: 2,
+      subject: 'Renewal Prep: Expansion Proposal Draft',
+      sender_name: 'Sarah Chen',
+      recipient_name: 'Edgar Holmes',
+      body: 'Draft expansion proposal attached.',
+      sent_at: '2026-03-15T14:00:00Z',
+      links: 1,
+      watchers: 2,
+      is_starred: false,
+    };
+
+    it('fetchEmailsForCustomer GETs /customers/<id>/emails/ and stores the result', async () => {
+      mockFetchOnce(200, [orgEmail]);
+      const store = makeStore();
+
+      await store.dispatch(fetchEmailsForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/emails/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.emails).toEqual([orgEmail]);
+      expect(state.emailsLoading).toBe(false);
+      expect(state.emailsError).toBeNull();
+    });
+
+    it('fetchEmailsForAccount GETs the nested account endpoint and stores the result', async () => {
+      mockFetchOnce(200, [accountEmail]);
+      const store = makeStore();
+
+      await store.dispatch(fetchEmailsForAccount({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/emails/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(store.getState().customers.emails).toEqual([accountEmail]);
+    });
+
+    // Same regression shape as the Activities leak-guard above — one
+    // account's emails must never bleed into another account's fetch.
+    it('emails for one account never leak into another account\'s fetch', async () => {
+      mockFetchOnce(200, [accountEmail]);
+      const store = makeStore();
+      await store.dispatch(fetchEmailsForAccount({ customerId: globex.id, accountId: 17 }));
+      expect(store.getState().customers.emails).toEqual([accountEmail]);
+
+      const otherAccountEmail = { ...orgEmail, id: 3, subject: 'Escalation: Critical Integration Issue' };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [otherAccountEmail] })
+      );
+      await store.dispatch(fetchEmailsForAccount({ customerId: globex.id, accountId: 6 }));
+
+      expect(store.getState().customers.emails).toEqual([otherAccountEmail]);
+    });
+
+    it('sets an error and leaves emails empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchEmailsForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.emails).toEqual([]);
+      expect(state.emailsError).toBe('Not found.');
+    });
+
+    it('clears a previous fetch\'s emails as soon as a new one starts', async () => {
+      mockFetchOnce(200, [orgEmail]);
+      const store = makeStore();
+      await store.dispatch(fetchEmailsForCustomer(globex.id));
+      expect(store.getState().customers.emails).toEqual([orgEmail]);
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchEmailsForCustomer(2));
+
+      expect(store.getState().customers.emails).toEqual([]);
+    });
+
+    it('clearEmails empties the slot outright (ActivityFeed\'s no-resolvable-id fallback)', async () => {
+      mockFetchOnce(200, [orgEmail]);
+      const store = makeStore();
+      await store.dispatch(fetchEmailsForCustomer(globex.id));
+      expect(store.getState().customers.emails).toEqual([orgEmail]);
+
+      store.dispatch(clearEmails());
+
+      const state = store.getState().customers;
+      expect(state.emails).toEqual([]);
+      expect(state.emailsError).toBeNull();
     });
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -182,6 +183,54 @@ describe('AccountDetails page (/accounts/:id)', () => {
 
       await screen.findByText('9.5'); // page finished rendering the mock fallback
       expect(screen.getByText('No activities found')).toBeInTheDocument();
+    });
+  });
+
+  describe('Email Feed (real Emails, same wiring as Activities)', () => {
+    it('fetches and renders this account\'s own emails, from its own nested endpoint', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () =>
+              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/emails/`)
+                ? [
+                    {
+                      id: 1,
+                      subject: 'Usage Analysis — APAC Division',
+                      sender_name: 'Sarah Chen',
+                      recipient_name: 'Edgar Holmes',
+                      body: 'Usage in the APAC division ticked up after the new rollout.',
+                      sent_at: '2026-07-15T09:30:00Z',
+                      links: 1,
+                      watchers: 2,
+                      is_starred: false,
+                    },
+                  ]
+                : [],
+          })
+        )
+      );
+
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Emails' }));
+
+      expect(await screen.findByText('Usage Analysis — APAC Division')).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/emails/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('shows no emails (not a stale or hardcoded set) when reached without navigation state', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Emails' }));
+
+      expect(await screen.findByText('No emails found')).toBeInTheDocument();
     });
   });
 });
