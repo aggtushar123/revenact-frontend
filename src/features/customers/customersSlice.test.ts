@@ -25,6 +25,9 @@ import customersReducer, {
   fetchTicketsForCustomer,
   fetchTicketsForAccount,
   clearTickets,
+  fetchCalendarEventsForCustomer,
+  fetchCalendarEventsForAccount,
+  clearCalendarEvents,
 } from './customersSlice';
 
 function makeStore() {
@@ -1024,6 +1027,113 @@ describe('customersSlice', () => {
       const state = store.getState().customers;
       expect(state.tickets).toEqual([]);
       expect(state.ticketsError).toBeNull();
+    });
+  });
+
+  describe('fetchCalendarEventsForCustomer / fetchCalendarEventsForAccount (ActivityFeed\'s Calendar Events filter)', () => {
+    const orgEvent = {
+      id: 1,
+      title: 'Quarterly Business Review',
+      description: 'Q1 2026 QBR with stakeholders',
+      type: 'review',
+      event_date: '2026-03-15',
+      start_time: '10:00:00',
+      end_time: '11:30:00',
+      attendee_count: 3,
+    };
+    const accountEvent = {
+      id: 2,
+      title: 'Renewal Negotiation Call',
+      description: 'Commercial terms alignment for 3-year renewal proposal',
+      type: 'call',
+      event_date: '2026-04-10',
+      start_time: '11:00:00',
+      end_time: '12:00:00',
+      attendee_count: 2,
+    };
+
+    it('fetchCalendarEventsForCustomer GETs /customers/<id>/calendar-events/ and stores the result', async () => {
+      mockFetchOnce(200, [orgEvent]);
+      const store = makeStore();
+
+      await store.dispatch(fetchCalendarEventsForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/calendar-events/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.calendarEvents).toEqual([orgEvent]);
+      expect(state.calendarEventsLoading).toBe(false);
+      expect(state.calendarEventsError).toBeNull();
+    });
+
+    it('fetchCalendarEventsForAccount GETs the nested account endpoint and stores the result', async () => {
+      mockFetchOnce(200, [accountEvent]);
+      const store = makeStore();
+
+      await store.dispatch(fetchCalendarEventsForAccount({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/calendar-events/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(store.getState().customers.calendarEvents).toEqual([accountEvent]);
+    });
+
+    // Same regression shape as the other feed filters' leak-guards
+    // above — one account's events must never bleed into another
+    // account's fetch.
+    it('events for one account never leak into another account\'s fetch', async () => {
+      mockFetchOnce(200, [accountEvent]);
+      const store = makeStore();
+      await store.dispatch(fetchCalendarEventsForAccount({ customerId: globex.id, accountId: 17 }));
+      expect(store.getState().customers.calendarEvents).toEqual([accountEvent]);
+
+      const otherAccountEvent = { ...orgEvent, id: 3, title: 'Escalation Follow-Up' };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [otherAccountEvent] })
+      );
+      await store.dispatch(fetchCalendarEventsForAccount({ customerId: globex.id, accountId: 6 }));
+
+      expect(store.getState().customers.calendarEvents).toEqual([otherAccountEvent]);
+    });
+
+    it('sets an error and leaves calendarEvents empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchCalendarEventsForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.calendarEvents).toEqual([]);
+      expect(state.calendarEventsError).toBe('Not found.');
+    });
+
+    it('clears a previous fetch\'s calendarEvents as soon as a new one starts', async () => {
+      mockFetchOnce(200, [orgEvent]);
+      const store = makeStore();
+      await store.dispatch(fetchCalendarEventsForCustomer(globex.id));
+      expect(store.getState().customers.calendarEvents).toEqual([orgEvent]);
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchCalendarEventsForCustomer(2));
+
+      expect(store.getState().customers.calendarEvents).toEqual([]);
+    });
+
+    it('clearCalendarEvents empties the slot outright (ActivityFeed\'s no-resolvable-id fallback)', async () => {
+      mockFetchOnce(200, [orgEvent]);
+      const store = makeStore();
+      await store.dispatch(fetchCalendarEventsForCustomer(globex.id));
+      expect(store.getState().customers.calendarEvents).toEqual([orgEvent]);
+
+      store.dispatch(clearCalendarEvents());
+
+      const state = store.getState().customers;
+      expect(state.calendarEvents).toEqual([]);
+      expect(state.calendarEventsError).toBeNull();
     });
   });
 });

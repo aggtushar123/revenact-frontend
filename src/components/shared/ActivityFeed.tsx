@@ -30,27 +30,19 @@ import {
   fetchTicketsForCustomer,
   fetchTicketsForAccount,
   clearTickets,
+  fetchCalendarEventsForCustomer,
+  fetchCalendarEventsForAccount,
+  clearCalendarEvents,
   type Email,
 } from '../../features/customers/customersSlice';
 
 // ── Data sources ─────────────────────────────────────────────────────────────
-// Org data (original arrays — imported lazily to avoid mutating them).
-// Activities/Emails/Tasks/Notes/Tickets aren't here — they're wired to
-// real backend models below, not this mock injection scheme (see
+// Activities/Emails/Tasks/Notes/Tickets/Calendar Events are all wired
+// to real backend models below, not this mock injection scheme (see
 // fetchActivitiesFor*/fetchEmailsFor*/fetchTasksFor*/fetchNotesFor*/
-// fetchTicketsFor* above).
-import {
-  CALENDAR_EVENTS_DATA as ORG_CALENDAR,
-} from '../organizations/activityData';
-
-// Account data
-import {
-  ACCOUNT_CALENDAR_EVENTS_DATA,
-  ACCOUNT_ID_MAP,
-} from '../organizations/accountActivityData';
-
-// Re-export from activityData so tabs can still import from there
-import * as orgActivityData from '../organizations/activityData';
+// fetchTicketsFor*/fetchCalendarEventsFor* above) — only Slack (and
+// the numeric id it and Headlines/CallSense need) still uses it.
+import { ACCOUNT_ID_MAP } from '../organizations/accountActivityData';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -95,37 +87,16 @@ const FILTER_ITEMS = [
 
 const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events', 'Slack'];
 
-// ── Data injection helper ─────────────────────────────────────────────────────
-// For the account entity type, we temporarily swap the data in the shared
-// activityData module's exported arrays so the existing tab components
-// (which reference those arrays directly) pick up account-specific data.
-// We restore the original org data after rendering.
-//
-// Covers Calendar Events only — Activities/Emails/Tasks/Notes/Tickets
-// are wired to real backend models (fetchActivitiesFor*/
-// fetchEmailsFor*/fetchTasksFor*/fetchNotesFor*/fetchTicketsFor*
-// above), not this mock scheme.
+// ── Account id resolution ────────────────────────────────────────────────────
+// Headlines/CallSense/Slack are still fully mock (SlackTab keeps its
+// own SLACK_DATA locally; Headlines/CallSense are decorative) — they
+// take a resolved numeric id the same way the mock-swapped filters
+// used to. ACCOUNT_ID_MAP only knows the mock's own string ids (e.g.
+// 'acc-1'), so a real account id falls back to the stub 101, same
+// fallback those tabs' own mock content already keys off.
 
-function injectAccountData(accountId: string) {
-  const numId = ACCOUNT_ID_MAP[accountId] ?? 101;
-
-  // Temporarily replace every exported array with account-filtered data
-  // by re-assigning length + push (in-place mutation of the array reference).
-  const swap = (arr: unknown[], data: unknown[]) => {
-    arr.splice(0, arr.length, ...data);
-  };
-
-  swap(orgActivityData.CALENDAR_EVENTS_DATA, ACCOUNT_CALENDAR_EVENTS_DATA.filter(e => e.orgId === numId));
-
-  return numId;
-}
-
-function restoreOrgData() {
-  const swap = (arr: unknown[], data: unknown[]) => {
-    arr.splice(0, arr.length, ...data);
-  };
-
-  swap(orgActivityData.CALENDAR_EVENTS_DATA, ORG_CALENDAR);
+function resolveAccountId(accountId: string): number {
+  return ACCOUNT_ID_MAP[accountId] ?? 101;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -157,15 +128,17 @@ export function ActivityFeed({
     tickets,
     ticketsLoading,
     ticketsError,
+    calendarEvents,
+    calendarEventsLoading,
+    calendarEventsError,
   } = useAppSelector((state) => state.customers);
 
-  // Resolve numeric ID for tab components.
-  // For accounts, inject mock data and use the numeric stub.
+  // Resolve numeric ID for the still-mock tabs (Headlines/CallSense/
+  // Slack) — see resolveAccountId's own comment.
   let resolvedId: number;
   if (entityType === 'account') {
-    resolvedId = injectAccountData(String(entityId));
+    resolvedId = resolveAccountId(String(entityId));
   } else {
-    restoreOrgData();
     resolvedId = Number(entityId);
   }
 
@@ -234,6 +207,19 @@ export function ActivityFeed({
       dispatch(fetchTicketsForAccount({ customerId, accountId: Number(entityId) }));
     } else {
       dispatch(clearTickets());
+    }
+  }, [dispatch, entityType, entityId, customerId]);
+
+  // Calendar Events is wired to the real backend model the same way
+  // Activities/Emails/Tasks/Notes/Tickets are above — same
+  // resolvability rules, same clear-on-no-real-id fallback.
+  useEffect(() => {
+    if (entityType === 'organization') {
+      dispatch(fetchCalendarEventsForCustomer(Number(entityId)));
+    } else if (customerId !== undefined) {
+      dispatch(fetchCalendarEventsForAccount({ customerId, accountId: Number(entityId) }));
+    } else {
+      dispatch(clearCalendarEvents());
     }
   }, [dispatch, entityType, entityId, customerId]);
 
@@ -328,7 +314,13 @@ export function ActivityFeed({
               {filter === 'Tickets' && (
                 <TicketsTab tickets={tickets} isLoading={ticketsLoading} error={ticketsError} />
               )}
-              {filter === 'Calendar Events' && <CalendarEventsTab entityId={resolvedId} />}
+              {filter === 'Calendar Events' && (
+                <CalendarEventsTab
+                  events={calendarEvents}
+                  isLoading={calendarEventsLoading}
+                  error={calendarEventsError}
+                />
+              )}
               {filter === 'Slack' && <SlackTab entityId={resolvedId} />}
 
               {!IMPLEMENTED_FILTERS.includes(filter) && (

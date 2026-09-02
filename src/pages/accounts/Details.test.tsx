@@ -371,4 +371,51 @@ describe('AccountDetails page (/accounts/:id)', () => {
       expect(await screen.findByText('No tickets found')).toBeInTheDocument();
     });
   });
+
+  describe('Calendar Events Feed (real events, same wiring as Activities)', () => {
+    it('fetches and renders this account\'s own calendar events, from its own nested endpoint', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () =>
+              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/calendar-events/`)
+                ? [
+                    {
+                      id: 1,
+                      title: 'Usage Review',
+                      description: 'Review the APAC division\'s usage uptick',
+                      type: 'review',
+                      event_date: '2026-07-15',
+                      start_time: '10:00:00',
+                      end_time: '10:30:00',
+                      attendee_count: 2,
+                    },
+                  ]
+                : [],
+          })
+        )
+      );
+
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Calendar Events' }));
+
+      expect(await screen.findByText('Usage Review')).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/calendar-events/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('shows no calendar events (not a stale or hardcoded set) when reached without navigation state', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Calendar Events' }));
+
+      expect(await screen.findByText('No calendar events')).toBeInTheDocument();
+    });
+  });
 });

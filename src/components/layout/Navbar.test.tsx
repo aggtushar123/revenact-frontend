@@ -114,6 +114,9 @@ function renderNavbar(
         tickets: [],
         ticketsLoading: false,
         ticketsError: null,
+        calendarEvents: [],
+        calendarEventsLoading: false,
+        calendarEventsError: null,
       },
     },
   });

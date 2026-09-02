@@ -167,6 +167,26 @@ export interface Ticket {
   links: number;
 }
 
+// Mirrors revenact-backend's CalendarEventSerializer field-for-field —
+// see docs/API_CONTRACTS.md -> customers -> CalendarEvent. `type`
+// values match the frontend's own existing display-config keys
+// exactly. `attendee_count` is a count, not the mock's full list of
+// attendee names — the card only ever renders the count. No `group` —
+// the date-group header is derived from `event_date` at render time
+// (see CalendarEventsTab.tsx). `start_time`/`end_time` are "HH:MM:SS"
+// (Django's default TimeField serialization), formatted to a
+// 12-hour display string on the frontend.
+export interface CalendarEvent {
+  id: number;
+  title: string;
+  description: string;
+  type: 'meeting' | 'call' | 'review' | 'demo';
+  event_date: string;
+  start_time: string;
+  end_time: string;
+  attendee_count: number;
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -301,6 +321,13 @@ interface CustomersState {
   tickets: Ticket[];
   ticketsLoading: boolean;
   ticketsError: string | null;
+  /** Calendar events for whichever Customer or Account ActivityFeed's
+   * "Calendar Events" filter is currently showing — same single-slot
+   * reasoning as `activities`/`emails`/`tasks`/`notes`/`tickets`
+   * above. */
+  calendarEvents: CalendarEvent[];
+  calendarEventsLoading: boolean;
+  calendarEventsError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -339,6 +366,9 @@ const initialState: CustomersState = {
   tickets: [],
   ticketsLoading: false,
   ticketsError: null,
+  calendarEvents: [],
+  calendarEventsLoading: false,
+  calendarEventsError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -603,6 +633,42 @@ export const fetchTicketsForAccount = createAsyncThunk<
   }
 });
 
+// Powers ActivityFeed's "Calendar Events" filter on the Organization
+// Details page's General tab — every organization-level CalendarEvent
+// for one Customer.
+export const fetchCalendarEventsForCustomer = createAsyncThunk<
+  CalendarEvent[],
+  number,
+  { rejectValue: string }
+>('customers/fetchCalendarEventsForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<CalendarEvent[]>(`/customers/${customerId}/calendar-events/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load calendar events.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers ActivityFeed's "Calendar Events" filter on the standalone
+// Account page — every account-level CalendarEvent for one Account.
+export const fetchCalendarEventsForAccount = createAsyncThunk<
+  CalendarEvent[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>(
+  'customers/fetchCalendarEventsForAccount',
+  async ({ customerId, accountId }, { rejectWithValue }) => {
+    try {
+      return await apiFetch<CalendarEvent[]>(
+        `/customers/${customerId}/accounts/${accountId}/calendar-events/`
+      );
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load calendar events.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -674,6 +740,13 @@ const customersSlice = createSlice({
       state.tickets = [];
       state.ticketsLoading = false;
       state.ticketsError = null;
+    },
+    // Same reasoning as clearActivities/clearEmails/clearTasks/
+    // clearNotes/clearTickets above, for the "Calendar Events" filter.
+    clearCalendarEvents(state) {
+      state.calendarEvents = [];
+      state.calendarEventsLoading = false;
+      state.calendarEventsError = null;
     },
   },
   extraReducers: (builder) => {
@@ -905,6 +978,36 @@ const customersSlice = createSlice({
         state.ticketsLoading = false;
         state.ticketsError = action.payload ?? 'Could not load tickets.';
       })
+      // fetchCalendarEventsForCustomer and fetchCalendarEventsForAccount
+      // share the same calendarEvents/calendarEventsLoading/
+      // calendarEventsError slots, same reasoning as the other feed
+      // filters' slots above.
+      .addCase(fetchCalendarEventsForCustomer.pending, (state) => {
+        state.calendarEventsLoading = true;
+        state.calendarEventsError = null;
+        state.calendarEvents = [];
+      })
+      .addCase(fetchCalendarEventsForCustomer.fulfilled, (state, action) => {
+        state.calendarEventsLoading = false;
+        state.calendarEvents = action.payload;
+      })
+      .addCase(fetchCalendarEventsForCustomer.rejected, (state, action) => {
+        state.calendarEventsLoading = false;
+        state.calendarEventsError = action.payload ?? 'Could not load calendar events.';
+      })
+      .addCase(fetchCalendarEventsForAccount.pending, (state) => {
+        state.calendarEventsLoading = true;
+        state.calendarEventsError = null;
+        state.calendarEvents = [];
+      })
+      .addCase(fetchCalendarEventsForAccount.fulfilled, (state, action) => {
+        state.calendarEventsLoading = false;
+        state.calendarEvents = action.payload;
+      })
+      .addCase(fetchCalendarEventsForAccount.rejected, (state, action) => {
+        state.calendarEventsLoading = false;
+        state.calendarEventsError = action.payload ?? 'Could not load calendar events.';
+      })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -946,6 +1049,12 @@ const customersSlice = createSlice({
   },
 });
 
-export const { clearActivities, clearEmails, clearTasks, clearNotes, clearTickets } =
-  customersSlice.actions;
+export const {
+  clearActivities,
+  clearEmails,
+  clearTasks,
+  clearNotes,
+  clearTickets,
+  clearCalendarEvents,
+} = customersSlice.actions;
 export default customersSlice.reducer;
