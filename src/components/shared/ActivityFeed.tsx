@@ -21,16 +21,18 @@ import {
   fetchEmailsForCustomer,
   fetchEmailsForAccount,
   clearEmails,
+  fetchTasksForCustomer,
+  fetchTasksForAccount,
+  clearTasks,
   type Email,
 } from '../../features/customers/customersSlice';
 
 // ── Data sources ─────────────────────────────────────────────────────────────
 // Org data (original arrays — imported lazily to avoid mutating them).
-// Activities/Emails aren't here — they're wired to real backend models
-// below, not this mock injection scheme (see fetchActivitiesFor*/
-// fetchEmailsFor* above).
+// Activities/Emails/Tasks aren't here — they're wired to real backend
+// models below, not this mock injection scheme (see
+// fetchActivitiesFor*/fetchEmailsFor*/fetchTasksFor* above).
 import {
-  TASKS_DATA as ORG_TASKS,
   NOTES_DATA as ORG_NOTES,
   TICKETS_DATA as ORG_TICKETS,
   CALENDAR_EVENTS_DATA as ORG_CALENDAR,
@@ -38,7 +40,6 @@ import {
 
 // Account data
 import {
-  ACCOUNT_TASKS_DATA,
   ACCOUNT_NOTES_DATA,
   ACCOUNT_TICKETS_DATA,
   ACCOUNT_CALENDAR_EVENTS_DATA,
@@ -97,9 +98,9 @@ const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'T
 // (which reference those arrays directly) pick up account-specific data.
 // We restore the original org data after rendering.
 //
-// Covers Tasks/Notes/Tickets/Calendar Events only — Activities and Emails
-// are wired to real backend models (fetchActivitiesFor*/fetchEmailsFor*
-// above), not this mock scheme.
+// Covers Notes/Tickets/Calendar Events only — Activities/Emails/Tasks
+// are wired to real backend models (fetchActivitiesFor*/
+// fetchEmailsFor*/fetchTasksFor* above), not this mock scheme.
 
 function injectAccountData(accountId: string) {
   const numId = ACCOUNT_ID_MAP[accountId] ?? 101;
@@ -110,7 +111,6 @@ function injectAccountData(accountId: string) {
     arr.splice(0, arr.length, ...data);
   };
 
-  swap(orgActivityData.TASKS_DATA, ACCOUNT_TASKS_DATA.filter(t => t.orgId === numId));
   swap(orgActivityData.NOTES_DATA, ACCOUNT_NOTES_DATA.filter(n => n.orgId === numId));
   swap(orgActivityData.TICKETS_DATA, ACCOUNT_TICKETS_DATA.filter(t => t.orgId === numId));
   swap(orgActivityData.CALENDAR_EVENTS_DATA, ACCOUNT_CALENDAR_EVENTS_DATA.filter(e => e.orgId === numId));
@@ -123,7 +123,6 @@ function restoreOrgData() {
     arr.splice(0, arr.length, ...data);
   };
 
-  swap(orgActivityData.TASKS_DATA, ORG_TASKS);
   swap(orgActivityData.NOTES_DATA, ORG_NOTES);
   swap(orgActivityData.TICKETS_DATA, ORG_TICKETS);
   swap(orgActivityData.CALENDAR_EVENTS_DATA, ORG_CALENDAR);
@@ -142,8 +141,17 @@ export function ActivityFeed({
   const [filter, setFilter] = useState('All');
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const dispatch = useAppDispatch();
-  const { activities, activitiesLoading, activitiesError, emails, emailsLoading, emailsError } =
-    useAppSelector((state) => state.customers);
+  const {
+    activities,
+    activitiesLoading,
+    activitiesError,
+    emails,
+    emailsLoading,
+    emailsError,
+    tasks,
+    tasksLoading,
+    tasksError,
+  } = useAppSelector((state) => state.customers);
 
   // Resolve numeric ID for tab components.
   // For accounts, inject mock data and use the numeric stub.
@@ -181,6 +189,19 @@ export function ActivityFeed({
       dispatch(fetchEmailsForAccount({ customerId, accountId: Number(entityId) }));
     } else {
       dispatch(clearEmails());
+    }
+  }, [dispatch, entityType, entityId, customerId]);
+
+  // Tasks is wired to the real backend model the same way
+  // Activities/Emails are above — same resolvability rules, same
+  // clear-on-no-real-id fallback.
+  useEffect(() => {
+    if (entityType === 'organization') {
+      dispatch(fetchTasksForCustomer(Number(entityId)));
+    } else if (customerId !== undefined) {
+      dispatch(fetchTasksForAccount({ customerId, accountId: Number(entityId) }));
+    } else {
+      dispatch(clearTasks());
     }
   }, [dispatch, entityType, entityId, customerId]);
 
@@ -266,7 +287,9 @@ export function ActivityFeed({
                   onSelectEmail={setSelectedEmail}
                 />
               )}
-              {filter === 'Tasks' && <TasksTab entityId={resolvedId} />}
+              {filter === 'Tasks' && (
+                <TasksTab tasks={tasks} isLoading={tasksLoading} error={tasksError} />
+              )}
               {filter === 'Notes' && <NotesTab entityId={resolvedId} />}
               {filter === 'Tickets' && <TicketsTab entityId={resolvedId} />}
               {filter === 'Calendar Events' && <CalendarEventsTab entityId={resolvedId} />}

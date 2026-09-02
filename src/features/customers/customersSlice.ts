@@ -116,6 +116,22 @@ export interface Email {
   is_starred: boolean;
 }
 
+// Mirrors revenact-backend's TaskSerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Task. `priority`/`status`
+// values match the frontend's own existing display-config keys
+// exactly (e.g. "in-progress"), so no separate _display field is
+// needed the way Activity's type_display was. No `group` — the
+// Overdue/This Week/Next Week/Later bucket is computed from
+// `due_date` at render time (see TasksTab.tsx), not carried here.
+export interface Task {
+  id: number;
+  title: string;
+  assignee_name: string;
+  due_date: string;
+  priority: 'high' | 'medium' | 'low';
+  status: 'pending' | 'in-progress' | 'completed';
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -232,6 +248,12 @@ interface CustomersState {
   emails: Email[];
   emailsLoading: boolean;
   emailsError: string | null;
+  /** Tasks for whichever Customer or Account ActivityFeed's "Tasks"
+   * filter is currently showing — same single-slot reasoning as
+   * `activities`/`emails` above. */
+  tasks: Task[];
+  tasksLoading: boolean;
+  tasksError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -261,6 +283,9 @@ const initialState: CustomersState = {
   emails: [],
   emailsLoading: false,
   emailsError: null,
+  tasks: [],
+  tasksLoading: false,
+  tasksError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -432,6 +457,37 @@ export const fetchEmailsForAccount = createAsyncThunk<
   }
 });
 
+// Powers ActivityFeed's "Tasks" filter on the Organization Details
+// page's General tab — every organization-level Task for one
+// Customer.
+export const fetchTasksForCustomer = createAsyncThunk<
+  Task[],
+  number,
+  { rejectValue: string }
+>('customers/fetchTasksForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Task[]>(`/customers/${customerId}/tasks/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load tasks.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers ActivityFeed's "Tasks" filter on the standalone Account
+// page — every account-level Task for one Account.
+export const fetchTasksForAccount = createAsyncThunk<
+  Task[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>('customers/fetchTasksForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Task[]>(`/customers/${customerId}/accounts/${accountId}/tasks/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load tasks.';
+    return rejectWithValue(message);
+  }
+});
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -482,6 +538,13 @@ const customersSlice = createSlice({
       state.emails = [];
       state.emailsLoading = false;
       state.emailsError = null;
+    },
+    // Same reasoning as clearActivities/clearEmails above, for the
+    // "Tasks" filter.
+    clearTasks(state) {
+      state.tasks = [];
+      state.tasksLoading = false;
+      state.tasksError = null;
     },
   },
   extraReducers: (builder) => {
@@ -626,6 +689,35 @@ const customersSlice = createSlice({
         state.emailsLoading = false;
         state.emailsError = action.payload ?? 'Could not load emails.';
       })
+      // fetchTasksForCustomer and fetchTasksForAccount share the same
+      // tasks/tasksLoading/tasksError slots, same reasoning as the
+      // activities/emails slots above.
+      .addCase(fetchTasksForCustomer.pending, (state) => {
+        state.tasksLoading = true;
+        state.tasksError = null;
+        state.tasks = [];
+      })
+      .addCase(fetchTasksForCustomer.fulfilled, (state, action) => {
+        state.tasksLoading = false;
+        state.tasks = action.payload;
+      })
+      .addCase(fetchTasksForCustomer.rejected, (state, action) => {
+        state.tasksLoading = false;
+        state.tasksError = action.payload ?? 'Could not load tasks.';
+      })
+      .addCase(fetchTasksForAccount.pending, (state) => {
+        state.tasksLoading = true;
+        state.tasksError = null;
+        state.tasks = [];
+      })
+      .addCase(fetchTasksForAccount.fulfilled, (state, action) => {
+        state.tasksLoading = false;
+        state.tasks = action.payload;
+      })
+      .addCase(fetchTasksForAccount.rejected, (state, action) => {
+        state.tasksLoading = false;
+        state.tasksError = action.payload ?? 'Could not load tasks.';
+      })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -667,5 +759,5 @@ const customersSlice = createSlice({
   },
 });
 
-export const { clearActivities, clearEmails } = customersSlice.actions;
+export const { clearActivities, clearEmails, clearTasks } = customersSlice.actions;
 export default customersSlice.reducer;

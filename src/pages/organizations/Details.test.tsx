@@ -73,7 +73,7 @@ describe('Organization Details page (/organizations/:id)', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
-        const body = url.includes('/accounts/') || (url.includes('/activities/') || url.includes('/emails/')) ? [] : globex;
+        const body = url.includes('/accounts/') || (url.includes('/activities/') || (url.includes('/emails/') || url.includes('/tasks/'))) ? [] : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
       })
     );
@@ -114,7 +114,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/emails/') ? [] : globex;
+        const body = url.includes('/accounts/') || (url.includes('/emails/') || url.includes('/tasks/')) ? [] : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
       })
     );
@@ -151,7 +151,9 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') ? [] : globex;
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/tasks/')
+          ? []
+          : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
       })
     );
@@ -163,6 +165,45 @@ describe('Organization Details page (/organizations/:id)', () => {
     expect(await screen.findByText('Quarterly Business Review - Q4 2025 Recap')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/customers/10/emails/'),
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('fetches this organization\'s own real tasks on the General tab, under the Tasks filter', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('/tasks/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                id: 1,
+                title: 'Prepare QBR deck for Q1',
+                assignee_name: 'Edgar Holmes',
+                due_date: '2026-03-15',
+                priority: 'high',
+                status: 'in-progress',
+              },
+            ],
+          });
+        }
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/')
+          ? []
+          : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      })
+    );
+
+    renderDetails('10');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Tasks' }));
+
+    expect(await screen.findByText('Prepare QBR deck for Q1')).toBeInTheDocument();
+    expect(screen.getByText('Edgar Holmes')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/customers/10/tasks/'),
       expect.objectContaining({ method: 'GET' })
     );
   });
@@ -211,7 +252,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       vi.stubGlobal(
         'fetch',
         vi.fn((url: string) => {
-          const body = (url.includes('/activities/') || url.includes('/emails/')) ? [] : url.includes('/accounts/') ? accounts : globex;
+          const body = (url.includes('/activities/') || (url.includes('/emails/') || url.includes('/tasks/'))) ? [] : url.includes('/accounts/') ? accounts : globex;
           return Promise.resolve({ ok: true, status: 200, json: async () => body });
         })
       );
@@ -231,7 +272,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       vi.stubGlobal(
         'fetch',
         vi.fn((url: string) => {
-          if ((url.includes('/activities/') || url.includes('/emails/'))) {
+          if ((url.includes('/activities/') || (url.includes('/emails/') || url.includes('/tasks/')))) {
             return Promise.resolve({ ok: true, status: 200, json: async () => [] });
           }
           if (url.includes('/accounts/')) return new Promise(() => {});
@@ -256,7 +297,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       vi.stubGlobal(
         'fetch',
         vi.fn((url: string) => {
-          if ((url.includes('/activities/') || url.includes('/emails/'))) {
+          if ((url.includes('/activities/') || (url.includes('/emails/') || url.includes('/tasks/')))) {
             return Promise.resolve({ ok: true, status: 200, json: async () => [] });
           }
           if (url.includes('/accounts/')) {
@@ -313,7 +354,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             accounts = accounts.map((a) => (a.id === id ? { ...a, ...body } : a));
             return Promise.resolve({ ok: true, status: 200, json: async () => accounts.find((a) => a.id === id) });
           }
-          if ((url.includes('/activities/') || url.includes('/emails/'))) {
+          if ((url.includes('/activities/') || (url.includes('/emails/') || url.includes('/tasks/')))) {
             return Promise.resolve({ ok: true, status: 200, json: async () => [] });
           }
           if (url.includes('/accounts/')) {

@@ -16,6 +16,9 @@ import customersReducer, {
   fetchEmailsForCustomer,
   fetchEmailsForAccount,
   clearEmails,
+  fetchTasksForCustomer,
+  fetchTasksForAccount,
+  clearTasks,
 } from './customersSlice';
 
 function makeStore() {
@@ -702,6 +705,109 @@ describe('customersSlice', () => {
       const state = store.getState().customers;
       expect(state.emails).toEqual([]);
       expect(state.emailsError).toBeNull();
+    });
+  });
+
+  describe('fetchTasksForCustomer / fetchTasksForAccount (ActivityFeed\'s Tasks filter)', () => {
+    const orgTask = {
+      id: 1,
+      title: 'Prepare QBR deck for Q1',
+      assignee_name: 'Edgar Holmes',
+      due_date: '2026-03-15',
+      priority: 'high',
+      status: 'in-progress',
+    };
+    const accountTask = {
+      id: 2,
+      title: 'Draft renewal commercial terms',
+      assignee_name: 'Edgar Holmes',
+      due_date: '2026-03-28',
+      priority: 'high',
+      status: 'in-progress',
+    };
+
+    it('fetchTasksForCustomer GETs /customers/<id>/tasks/ and stores the result', async () => {
+      mockFetchOnce(200, [orgTask]);
+      const store = makeStore();
+
+      await store.dispatch(fetchTasksForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/tasks/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.tasks).toEqual([orgTask]);
+      expect(state.tasksLoading).toBe(false);
+      expect(state.tasksError).toBeNull();
+    });
+
+    it('fetchTasksForAccount GETs the nested account endpoint and stores the result', async () => {
+      mockFetchOnce(200, [accountTask]);
+      const store = makeStore();
+
+      await store.dispatch(fetchTasksForAccount({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/tasks/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(store.getState().customers.tasks).toEqual([accountTask]);
+    });
+
+    // Same regression shape as the Activities/Emails leak-guards above
+    // — one account's tasks must never bleed into another account's
+    // fetch.
+    it('tasks for one account never leak into another account\'s fetch', async () => {
+      mockFetchOnce(200, [accountTask]);
+      const store = makeStore();
+      await store.dispatch(fetchTasksForAccount({ customerId: globex.id, accountId: 17 }));
+      expect(store.getState().customers.tasks).toEqual([accountTask]);
+
+      const otherAccountTask = { ...orgTask, id: 3, title: 'Resolve integration escalation' };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [otherAccountTask] })
+      );
+      await store.dispatch(fetchTasksForAccount({ customerId: globex.id, accountId: 6 }));
+
+      expect(store.getState().customers.tasks).toEqual([otherAccountTask]);
+    });
+
+    it('sets an error and leaves tasks empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchTasksForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.tasks).toEqual([]);
+      expect(state.tasksError).toBe('Not found.');
+    });
+
+    it('clears a previous fetch\'s tasks as soon as a new one starts', async () => {
+      mockFetchOnce(200, [orgTask]);
+      const store = makeStore();
+      await store.dispatch(fetchTasksForCustomer(globex.id));
+      expect(store.getState().customers.tasks).toEqual([orgTask]);
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchTasksForCustomer(2));
+
+      expect(store.getState().customers.tasks).toEqual([]);
+    });
+
+    it('clearTasks empties the slot outright (ActivityFeed\'s no-resolvable-id fallback)', async () => {
+      mockFetchOnce(200, [orgTask]);
+      const store = makeStore();
+      await store.dispatch(fetchTasksForCustomer(globex.id));
+      expect(store.getState().customers.tasks).toEqual([orgTask]);
+
+      store.dispatch(clearTasks());
+
+      const state = store.getState().customers;
+      expect(state.tasks).toEqual([]);
+      expect(state.tasksError).toBeNull();
     });
   });
 });

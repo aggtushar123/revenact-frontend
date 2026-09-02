@@ -233,4 +233,49 @@ describe('AccountDetails page (/accounts/:id)', () => {
       expect(await screen.findByText('No emails found')).toBeInTheDocument();
     });
   });
+
+  describe('Task Feed (real Tasks, same wiring as Activities)', () => {
+    it('fetches and renders this account\'s own tasks, from its own nested endpoint', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () =>
+              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/tasks/`)
+                ? [
+                    {
+                      id: 1,
+                      title: 'Review APAC usage uptick',
+                      assignee_name: 'Sarah Chen',
+                      due_date: '2026-07-15',
+                      priority: 'low',
+                      status: 'completed',
+                    },
+                  ]
+                : [],
+          })
+        )
+      );
+
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Tasks' }));
+
+      expect(await screen.findByText('Review APAC usage uptick')).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/tasks/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('shows no tasks (not a stale or hardcoded set) when reached without navigation state', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Tasks' }));
+
+      expect(await screen.findByText('No tasks found')).toBeInTheDocument();
+    });
+  });
 });

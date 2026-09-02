@@ -105,6 +105,9 @@ function renderNavbar(
         emails: [],
         emailsLoading: false,
         emailsError: null,
+        tasks: [],
+        tasksLoading: false,
+        tasksError: null,
       },
     },
   });
