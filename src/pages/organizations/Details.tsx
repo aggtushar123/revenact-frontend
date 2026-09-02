@@ -8,8 +8,10 @@ import { ActivityFeed, PinnedAttributes } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { fetchCustomerById, fetchAccountsForCustomer } from '../../features/customers/customersSlice';
+import type { Account } from '../../features/customers/customersSlice';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
 import { mapAccountToAccountRow } from '../../features/customers/mapToAccountRow';
+import { AccountFormModal } from './AccountFormModal';
 
 
 
@@ -183,7 +185,13 @@ export function Details() {
           </div>
         )}
         {activeTab === 'Accounts' && (
-          <AccountsTab accounts={accounts} isLoading={accountsLoading} error={accountsError} />
+          <AccountsTab
+            accounts={accounts}
+            rawAccounts={accountsForCustomer}
+            customerId={orgId}
+            isLoading={accountsLoading}
+            error={accountsError}
+          />
         )}
         {activeTab === 'Contacts' && <ContactsTab orgId={orgId} />}
         {activeTab !== 'General' && activeTab !== 'Accounts' && activeTab !== 'Contacts' && (
@@ -326,12 +334,21 @@ function buildOrgAttributes(organization: OrgRow): AttributeDef[] {
 
 interface AccountsTabProps {
   accounts: AccountRow[];
+  /** Unmapped Account records, keyed the same way as `accounts` (same
+   * order/ids) — needed to pre-fill the Edit form with raw values
+   * (owner id, ISO renewal_date, ...) rather than the display-formatted
+   * strings AccountRow carries. */
+  rawAccounts: Account[];
+  customerId: number;
   isLoading: boolean;
   error: string | null;
 }
 
-function AccountsTab({ accounts, isLoading, error }: AccountsTabProps) {
+function AccountsTab({ accounts, rawAccounts, customerId, isLoading, error }: AccountsTabProps) {
   const navigate = useNavigate();
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
+  const editingAccount = rawAccounts.find((a) => a.id === editingAccountId) ?? null;
 
   return (
     <div className="flex flex-col w-full h-full gap-4 max-w-7xl mx-auto">
@@ -345,13 +362,16 @@ function AccountsTab({ accounts, isLoading, error }: AccountsTabProps) {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
               <input type="text" placeholder="Search by name, Revenact ID or External ID" className="w-full pl-10 pr-4 py-2 bg-surface border border-line rounded-lg text-[13px] font-medium shadow-xs focus:outline-none focus:ring-2 focus:ring-accent/10 placeholder:text-ink-faint transition-all" />
            </div>
-           
+
            <div className="flex items-center gap-2">
-              <button className="flex items-center gap-2 px-5 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-all transform active:scale-95">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="flex items-center gap-2 px-5 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-all transform active:scale-95"
+              >
                  <Plus className="w-4 h-4" />
                  Add Account
               </button>
-              
+
               <div className="h-9 w-px bg-subtle mx-1" />
               
               <button className="flex items-center gap-2 px-3 py-2 bg-surface border border-line rounded-lg text-ink-muted hover:bg-subtle text-[13px] font-bold shadow-xs transition-colors relative">
@@ -440,7 +460,17 @@ function AccountsTab({ accounts, isLoading, error }: AccountsTabProps) {
                         </div>
                      </td>
                      <td className="p-4">
-                        <MoreHorizontal className="w-4 h-4 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <button
+                          type="button"
+                          aria-label={`Edit ${acc.name}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingAccountId(acc.revenactId);
+                          }}
+                          className="p-1 rounded-md text-ink-faint opacity-0 group-hover:opacity-100 hover:text-accent hover:bg-subtle transition-all"
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
                      </td>
                    </tr>
                  ))}
@@ -461,6 +491,17 @@ function AccountsTab({ accounts, isLoading, error }: AccountsTabProps) {
         </div>
 
       </div>
+
+      {showAddModal && (
+        <AccountFormModal customerId={customerId} onClose={() => setShowAddModal(false)} />
+      )}
+      {editingAccount && (
+        <AccountFormModal
+          customerId={customerId}
+          account={editingAccount}
+          onClose={() => setEditingAccountId(null)}
+        />
+      )}
     </div>
   );
 }
@@ -699,6 +740,9 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
   const csmScore = useMemo(() => {
     if (accounts.length === 0) return 0;
     const totalPulse = accounts.reduce((s, a) => {
+      // A freshly-added account (Add Account) starts with an empty pulse
+      // history — 0/0 would be NaN, not 0, and poison the whole average.
+      if (a.pulse.length === 0) return s;
       const active = a.pulse.filter(v => v === 1).length;
       return s + (active / a.pulse.length) * 100;
     }, 0);

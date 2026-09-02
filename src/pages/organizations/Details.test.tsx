@@ -192,5 +192,89 @@ describe('Organization Details page (/organizations/:id)', () => {
 
       expect(await screen.findAllByText('Not found.')).not.toHaveLength(0);
     });
+
+    it('renders the CSM score without NaN when an account has no pulse history yet (a freshly-Added one)', async () => {
+      // pulse: [] is the real default for a brand-new Account (see
+      // customers/models.py) — the metrics banner's CSM average used to
+      // divide 0/0 for a row like this, producing a NaN strokeDashoffset
+      // React logs as an error. Guarding it is the fix; this pins it down.
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      await openAccountsTab([{ ...account, pulse: [] }]);
+      await screen.findByText('North America Enterprise');
+
+      const nanWarning = consoleError.mock.calls.find((args) =>
+        args.some((arg) => String(arg).includes('strokeDashoffset'))
+      );
+      expect(nanWarning).toBeUndefined();
+      consoleError.mockRestore();
+    });
+
+    describe('Add/Edit Account', () => {
+      // Stateful mock: GET/POST/PATCH against /customers/10/accounts/...
+      // all operate on the same in-memory list, mirroring the real
+      // backend's behavior closely enough to drive the modal end to end.
+      function makeAccountsMutationFetchMock(initial: (typeof account)[]) {
+        let accounts = [...initial];
+        let nextId = 1 + Math.max(0, ...accounts.map((a) => a.id));
+        return vi.fn((url: string, options?: { method?: string; body?: string }) => {
+          const method = options?.method ?? 'GET';
+          if (url.includes('/auth/members/')) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+          }
+          if (method === 'POST' && url.endsWith('/customers/10/accounts/')) {
+            const body = JSON.parse(options!.body!);
+            const created = { ...account, ...body, id: nextId++, customer: 10, owner: null };
+            accounts = [created, ...accounts];
+            return Promise.resolve({ ok: true, status: 201, json: async () => created });
+          }
+          const patchMatch = /\/customers\/10\/accounts\/(\d+)\/$/.exec(url);
+          if (method === 'PATCH' && patchMatch) {
+            const id = Number(patchMatch[1]);
+            const body = JSON.parse(options!.body!);
+            accounts = accounts.map((a) => (a.id === id ? { ...a, ...body } : a));
+            return Promise.resolve({ ok: true, status: 200, json: async () => accounts.find((a) => a.id === id) });
+          }
+          if (url.includes('/accounts/')) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => accounts });
+          }
+          return Promise.resolve({ ok: true, status: 200, json: async () => globex });
+        });
+      }
+
+      it('adding an account posts to /customers/<id>/accounts/ and shows it in the table', async () => {
+        vi.stubGlobal('fetch', makeAccountsMutationFetchMock([]));
+        const user = userEvent.setup();
+
+        renderDetails('10');
+        await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
+        await screen.findByText('No accounts for this organization yet.');
+
+        await user.click(screen.getByRole('button', { name: 'Add Account' }));
+        await user.type(screen.getByLabelText('Name *'), 'EMEA');
+        await user.click(screen.getByRole('button', { name: 'Create Account' }));
+
+        expect(await screen.findByText('EMEA')).toBeInTheDocument();
+        expect(screen.queryByText('Create Account')).not.toBeInTheDocument(); // modal closed
+      });
+
+      it('editing an account prefills the form and PATCHes the change', async () => {
+        vi.stubGlobal('fetch', makeAccountsMutationFetchMock([account]));
+        const user = userEvent.setup();
+
+        renderDetails('10');
+        await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
+        await screen.findByText('North America Enterprise');
+
+        await user.click(screen.getByRole('button', { name: 'Edit North America Enterprise' }));
+
+        const nameInput = await screen.findByLabelText('Name *');
+        expect(nameInput).toHaveValue('North America Enterprise');
+        await user.clear(nameInput);
+        await user.type(nameInput, 'North America Renamed');
+        await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+        expect(await screen.findByText('North America Renamed')).toBeInTheDocument();
+      });
+    });
   });
 });

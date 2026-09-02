@@ -6,6 +6,8 @@ import customersReducer, {
   fetchCustomerStats,
   fetchCustomerById,
   fetchAccountsForCustomer,
+  createAccount,
+  updateAccount,
   createCustomer,
   updateCustomer,
 } from './customersSlice';
@@ -431,6 +433,55 @@ describe('customersSlice', () => {
       store.dispatch(fetchAccountsForCustomer(2));
 
       expect(store.getState().customers.accountsForCustomer).toEqual([]);
+    });
+
+    describe('createAccount/updateAccount (Add/Edit Account)', () => {
+      it('createAccount POSTs to /customers/<id>/accounts/ and unshifts the result', async () => {
+        mockFetchOnce(200, [account]);
+        const store = makeStore();
+        await store.dispatch(fetchAccountsForCustomer(globex.id));
+
+        const created = { ...account, id: 2, name: 'EMEA' };
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 201, json: async () => created }));
+
+        await store.dispatch(createAccount({ customerId: globex.id, name: 'EMEA' }));
+
+        expect(fetch).toHaveBeenCalledWith(
+          expect.stringContaining(`/customers/${globex.id}/accounts/`),
+          expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'EMEA' }) })
+        );
+        expect(store.getState().customers.accountsForCustomer).toEqual([created, account]);
+      });
+
+      it('updateAccount PATCHes /customers/<id>/accounts/<id>/ and replaces the matching entry in place', async () => {
+        mockFetchOnce(200, [account]);
+        const store = makeStore();
+        await store.dispatch(fetchAccountsForCustomer(globex.id));
+
+        const renamed = { ...account, name: 'North America Renamed' };
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => renamed });
+        vi.stubGlobal('fetch', fetchMock);
+
+        await store.dispatch(
+          updateAccount({ customerId: globex.id, id: account.id, name: 'North America Renamed' })
+        );
+
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining(`/customers/${globex.id}/accounts/${account.id}/`),
+          expect.objectContaining({ method: 'PATCH' })
+        );
+        expect(store.getState().customers.accountsForCustomer).toEqual([renamed]);
+      });
+
+      it('createAccount surfaces the backend error on rejection', async () => {
+        mockFetchOnce(400, { name: ['This field is required.'] });
+        const store = makeStore();
+
+        const result = await store.dispatch(createAccount({ customerId: globex.id, name: '' }));
+
+        expect(createAccount.rejected.match(result)).toBe(true);
+        expect(result.payload).toBe('This field is required.');
+      });
     });
   });
 });

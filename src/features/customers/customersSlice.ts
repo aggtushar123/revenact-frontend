@@ -61,7 +61,7 @@ export interface Customer {
 // Mirrors revenact-backend's AccountSerializer field-for-field — see
 // docs/API_CONTRACTS.md -> customers -> Account. A named sub-account
 // under one Customer (one-to-many: a Customer can have any number of
-// these). Read-only for now — no write endpoint yet.
+// these).
 export interface Account {
   id: number;
   customer: number;
@@ -80,6 +80,20 @@ export interface Account {
   csat_score: string | null;
   renewal_date: string | null;
   arr: string;
+}
+
+// The subset of Account fields the Add/Edit Account form actually
+// exposes — identity, ownership, lifecycle stage, and renewal date.
+// Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
+// NPS/CSAT/ARR are meant to sync from other systems later, not be
+// hand-typed here. `customer` is never sent — the backend takes it from
+// the URL (see createAccount/updateAccount below).
+export interface AccountWritePayload {
+  name?: string;
+  domain?: string;
+  owner_id?: number | null;
+  lifecycle_stage?: Account['lifecycle_stage'];
+  renewal_date?: string | null;
 }
 
 // The subset of Customer fields the Add/Edit forms actually expose —
@@ -252,8 +266,8 @@ export const fetchCustomerById = createAsyncThunk<Customer, number, { rejectValu
 );
 
 // Powers Details.tsx's Accounts tab — every Account under one Customer.
-// Read-only (see Account's own docstring); no pagination envelope, an
-// individual organization's account list is expected to stay small.
+// No pagination envelope, an individual organization's account list is
+// expected to stay small.
 export const fetchAccountsForCustomer = createAsyncThunk<
   Account[],
   number,
@@ -263,6 +277,39 @@ export const fetchAccountsForCustomer = createAsyncThunk<
     return await apiFetch<Account[]>(`/customers/${customerId}/accounts/`);
   } catch (err) {
     const message = err instanceof ApiError ? err.message : 'Could not load accounts.';
+    return rejectWithValue(message);
+  }
+});
+
+// `name` is the only field the backend requires — everything else in
+// AccountWritePayload is optional, matching the quick-add form.
+// `customerId` addresses the nested URL; it's never part of the body
+// (the backend takes `customer` from the URL, not the payload).
+export const createAccount = createAsyncThunk<
+  Account,
+  { customerId: number } & AccountWritePayload & { name: string },
+  { rejectValue: string }
+>('customers/createAccount', async ({ customerId, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Account>(`/customers/${customerId}/accounts/`, { method: 'POST', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not add account.';
+    return rejectWithValue(message);
+  }
+});
+
+export const updateAccount = createAsyncThunk<
+  Account,
+  { customerId: number; id: number } & AccountWritePayload,
+  { rejectValue: string }
+>('customers/updateAccount', async ({ customerId, id, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Account>(`/customers/${customerId}/accounts/${id}/`, {
+      method: 'PATCH',
+      body: data,
+    });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not update account.';
     return rejectWithValue(message);
   }
 });
@@ -411,6 +458,16 @@ const customersSlice = createSlice({
         if (state.selectedCustomer?.id === updated.id) {
           state.selectedCustomer = updated;
         }
+      })
+      // createAccount/updateAccount's own rejections are shown inline in
+      // their modal form instead, same pattern as above.
+      .addCase(createAccount.fulfilled, (state, action) => {
+        state.accountsForCustomer.unshift(action.payload);
+      })
+      .addCase(updateAccount.fulfilled, (state, action) => {
+        const updated = action.payload;
+        const index = state.accountsForCustomer.findIndex((a) => a.id === updated.id);
+        if (index !== -1) state.accountsForCustomer[index] = updated;
       });
   },
 });
