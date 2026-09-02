@@ -3,9 +3,7 @@ import { useParams } from 'react-router-dom';
 import {
   RefreshCw,
   MoreHorizontal,
-  Pencil,
   Layout,
-  ChevronUp,
   MessageCircle,
   ChevronRight,
 } from 'lucide-react';
@@ -42,26 +40,26 @@ export function AccountDetails() {
   ];
 
   return (
-    <div className="flex flex-col h-full bg-[#fcfdfe] overflow-hidden">
+    <div className="flex flex-col h-full bg-surface overflow-hidden">
       {/* Tab Navigation */}
-      <div className="bg-white border-b border-gray-100 px-6 flex items-center justify-between shrink-0 z-10">
+      <div className="bg-surface border-b border-line-subtle px-6 flex items-center justify-between shrink-0 z-10">
         <nav className="flex items-center gap-8 h-12 overflow-x-auto no-scrollbar whitespace-nowrap">
           {tabs.map((tab) => (
             <button
               key={tab.name}
               onClick={() => setActiveTab(tab.name)}
               className={`relative h-full text-[13.5px] font-semibold transition-colors flex items-center gap-1.5 ${
-                activeTab === tab.name ? 'text-indigo-600' : 'text-gray-500 hover:text-gray-700'
+                activeTab === tab.name ? 'text-accent' : 'text-ink-muted hover:text-ink-muted'
               }`}
             >
               {tab.name}
               {tab.count !== null && (
-                <span className={`text-[11px] font-bold ${activeTab === tab.name ? 'text-indigo-400' : 'text-gray-400'}`}>
+                <span className={`text-[11px] font-bold ${activeTab === tab.name ? 'text-accent' : 'text-ink-faint'}`}>
                   ({tab.count})
                 </span>
               )}
               {activeTab === tab.name && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-indigo-500 to-purple-500 rounded-t-full shadow-[0_-2px_6px_rgba(99,102,241,0.3)]" />
+                <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-accent rounded-t-full shadow-[0_-2px_6px_rgba(45,212,168,0.35)]" />
               )}
             </button>
           ))}
@@ -69,16 +67,16 @@ export function AccountDetails() {
 
         <div className="flex items-center gap-5 pt-0.5">
           <div className="flex items-center gap-2.5">
-            <span className="text-[11.5px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Enable new 360 UI</span>
+            <span className="text-[11.5px] font-bold text-ink-faint uppercase tracking-widest mt-0.5">Enable new 360 UI</span>
             <button
               onClick={() => setIs360Enabled(!is360Enabled)}
-              className={`w-9 h-[21px] rounded-full relative transition-all duration-300 ${is360Enabled ? 'bg-indigo-600' : 'bg-gray-200'}`}
+              className={`w-9 h-[21px] rounded-full relative transition-all duration-300 ${is360Enabled ? 'bg-accent' : 'bg-line'}`}
             >
-              <div className={`absolute top-[2.5px] w-4 h-4 bg-white rounded-full shadow-sm transition-all duration-300 ${is360Enabled ? 'right-[2.5px]' : 'left-[2.5px]'}`} />
+              <div className={`absolute top-[2.5px] w-4 h-4 bg-surface rounded-full shadow-sm transition-all duration-300 ${is360Enabled ? 'right-[2.5px]' : 'left-[2.5px]'}`} />
             </button>
           </div>
 
-          <div className="h-6 w-px bg-gray-100" />
+          <div className="h-6 w-px bg-subtle" />
 
           <HeaderAction icon={<MessageCircle className="w-[18px] h-[18px]" />} />
           <HeaderAction icon={<RefreshCw className="w-[18px] h-[18px]" />} />
@@ -87,9 +85,9 @@ export function AccountDetails() {
       </div>
 
       {/* Content */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8f9fc]/50">
+      <main className="flex-1 overflow-y-auto custom-scrollbar bg-subtle/50">
         {activeTab === 'General' ? (
-          <div className="flex flex-col gap-4 w-full px-3 pt-4 pb-4 h-full">
+          <div className="flex flex-col gap-4 w-full px-6 pt-5 pb-4 h-full">
             {/* Metrics Banner */}
             <AccountMetricsBanner account={account} />
 
@@ -100,7 +98,7 @@ export function AccountDetails() {
                 <div className="flex flex-col items-center pt-3 shrink-0">
                   <button
                     onClick={() => setIsPinnedOpen(true)}
-                    className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-400 hover:text-indigo-600 hover:border-indigo-200 transition-all"
+                    className="p-1.5 bg-surface border border-line rounded-lg shadow-sm text-ink-faint hover:text-accent hover:border-accent/40 transition-all"
                     title="Expand panel"
                   >
                     <ChevronRight className="w-4 h-4" />
@@ -110,7 +108,7 @@ export function AccountDetails() {
 
               {/* Pinned Attributes Panel */}
               {isPinnedOpen && (
-                <div className="w-[320px] flex flex-col bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden shrink-0">
+                <div className="w-[320px] flex flex-col bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden shrink-0">
                   <PinnedAttributes
                     entityName={account.name}
                     attributes={accountAttributes}
@@ -120,11 +118,11 @@ export function AccountDetails() {
               )}
 
               {/* Activity Feed */}
-              <div className="flex-1 overflow-hidden bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
+              <div className="flex-1 overflow-hidden bg-surface rounded-xl border border-line-subtle shadow-sm flex flex-col">
                 <ActivityFeed
                   entityId={account.id}
                   entityType="account"
-                  healthColor="bg-teal-400"
+                  healthColor="bg-success"
                   overviewInfo={{
                     domain: `${account.name.toLowerCase().replace(/\s+/g, '')}.com`,
                     location: 'London, UK',
@@ -136,12 +134,12 @@ export function AccountDetails() {
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full text-gray-400 py-24 bg-white m-6 rounded-3xl border-2 border-dashed border-gray-100 shadow-inner">
-            <div className="w-20 h-20 bg-gray-50 rounded-[28px] flex items-center justify-center mb-6 shadow-xs border border-gray-100">
+          <div className="flex flex-col items-center justify-center h-full text-ink-faint py-24 bg-surface m-6 rounded-3xl border-2 border-dashed border-line-subtle shadow-inner">
+            <div className="w-20 h-20 bg-subtle rounded-[28px] flex items-center justify-center mb-6 shadow-xs border border-line-subtle">
               <Layout className="w-10 h-10 opacity-20" />
             </div>
             <p className="text-[15px] font-bold uppercase tracking-[0.2em] opacity-40">{activeTab} coming soon</p>
-            <p className="text-[11px] font-bold text-gray-300 uppercase tracking-widest mt-2">Integrating Salesforce Data...</p>
+            <p className="text-[11px] font-bold text-ink-faint uppercase tracking-widest mt-2">Integrating Salesforce Data...</p>
           </div>
         )}
       </main>
@@ -151,96 +149,104 @@ export function AccountDetails() {
 
 // ── Metrics Banner ─────────────────────────────────────────────────────────────
 
+// Same unified glass-strip pattern as the organizations list's own
+// MetricsPanel and the parent Organization Details page's own
+// MetricsBanner (react-ts-app/src/pages/organizations/Details.tsx) — one
+// cohesive card with divided sections, rather than this page's previous
+// standalone card with its own smaller dots/typography scale. The
+// numbers themselves are unchanged (still the same placeholders this
+// page always showed — see this component's own history — not real
+// per-account data yet); only the presentation was brought in line.
 function AccountMetricsBanner({ account }: { account: typeof ACCOUNTS_DATA[0] }) {
   const healthScore = 9.3;
+  const healthPct = (healthScore / 10) * 100;
   const npsScore = 100;
   const csatPct = 100;
-  const csatColor = '#00a699';
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-[0_1px_3px_rgba(0,0,0,0.05)] flex overflow-hidden lg:divide-x divide-gray-50 relative group shrink-0">
-      {/* Health */}
-      <div className="px-4 py-4 flex flex-col gap-1.5 min-w-[130px]">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Health Score</span>
-        <div className="flex items-center gap-2.5 mt-0.5">
-          <div className="w-[7px] h-[7px] bg-[#00a699] rounded-full shadow-[0_0_8px_rgba(0,166,153,0.4)]" />
-          <span className="text-[22px] font-bold text-gray-900 tracking-tight leading-none">{healthScore}</span>
+    <div
+      className="flex items-stretch w-full h-[110px] font-sans rounded-xl border border-line bg-surface/70 shadow-sm"
+      style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
+    >
+      {/* Health Score */}
+      <div className="flex items-center gap-4 flex-1 px-5 py-4 min-w-0">
+        <div className="relative shrink-0" style={{ width: 56, height: 56 }}>
+          <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="3.5" />
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--success)" strokeWidth="3.5"
+              strokeDasharray={`${healthPct} ${100 - healthPct}`} strokeLinecap="round" />
+          </svg>
+        </div>
+        <div className="flex flex-col gap-1 min-w-0">
+          <span className="text-[13px] font-semibold text-ink tracking-wide">Health Score</span>
+          <div className="flex items-baseline gap-2 min-w-0">
+            <span className="text-2xl font-bold text-ink leading-none">{healthScore}</span>
+            <span className="text-[12px] font-medium text-ink-muted truncate">
+              {account.lifecycleStage ?? 'Live (Enterprise)'}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Lifecycle */}
-      <div className="px-4 py-4 flex flex-col gap-1.5 min-w-[170px]">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Lifecycle Stage</span>
-        <span className="text-[15px] font-bold text-gray-900 mt-1">{account.lifecycleStage ?? 'Live (Enterprise)'}</span>
-      </div>
+      <div className="w-px bg-line my-3" />
 
       {/* CSM Pulse */}
-      <div className="px-4 py-4 flex flex-col gap-1.5 min-w-[140px]">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">CSM Pulse</span>
-        <div className="flex items-center gap-2.5 mt-1">
-          <div className="w-[7px] h-[7px] bg-[#00a699] rounded-sm" />
-          <span className="text-[15px] font-bold text-gray-700">Very Satisfied</span>
-        </div>
+      <div className="flex flex-col justify-center flex-1 px-5 py-4 min-w-0">
+        <span className="text-[13px] font-semibold text-ink tracking-wide mb-2">CSM Pulse</span>
+        <span className="text-xl font-bold leading-none truncate text-success">Very Satisfied</span>
       </div>
 
+      <div className="w-px bg-line my-3" />
+
       {/* NPS */}
-      <div className="px-4 py-4 flex flex-col gap-1 flex-1 min-w-[220px]">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">NPS</span>
-        <div className="flex items-end gap-6 h-full mt-0.5">
-          <span className="text-[32px] font-bold text-gray-900 leading-none tracking-tighter">
+      <div className="flex flex-col flex-1 px-5 py-4">
+        <div className="mb-2 text-[13px] font-semibold text-ink tracking-wide">NPS</div>
+        <div className="flex items-center gap-5 mt-0.5">
+          <span className="text-[38px] font-light text-ink leading-none tracking-tight">
             {npsScore > 0 ? '+' : ''}{npsScore}
           </span>
-          <div className="flex flex-col gap-1 text-[10.5px] font-bold pb-0.5">
-            <div className="flex items-center gap-2.5 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-sm bg-[#00a699]" />
-              <span className="w-16 whitespace-nowrap">Promoters</span>
-              <span className="ml-auto text-gray-900">10</span>
+          <div className="flex flex-col text-[12px] text-ink-muted font-medium gap-1">
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-success" /> Promoters</div>
+              <span className="font-semibold text-ink ml-4">10</span>
             </div>
-            <div className="flex items-center gap-2.5 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-sm bg-[#ffbb00]" />
-              <span className="w-16 whitespace-nowrap">Passives</span>
-              <span className="ml-auto text-gray-900">0</span>
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-warning" /> Passives</div>
+              <span className="font-semibold text-ink ml-4">0</span>
             </div>
-            <div className="flex items-center gap-2.5 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-sm bg-[#fa5c5c]" />
-              <span className="w-16 whitespace-nowrap">Detractors</span>
-              <span className="ml-auto text-gray-900">0</span>
+            <div className="flex items-center gap-2 justify-between">
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-danger" /> Detractors</div>
+              <span className="font-semibold text-ink ml-4">0</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* CSAT */}
-      <div className="px-4 py-4 flex flex-col gap-1 min-w-[150px] relative">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">CSAT Score</span>
-        <div className="flex items-center gap-4 mt-1">
-          <span className="text-[18px] font-bold text-gray-900 leading-none">{csatPct}%</span>
-          <div className="relative w-10 h-10 flex items-center justify-center">
-            <svg className="w-full h-full transform -rotate-90">
-              <circle cx="20" cy="20" r="16" stroke="currentColor" strokeWidth="3" fill="transparent" className="text-gray-50" />
-              <circle cx="20" cy="20" r="16" stroke={csatColor} strokeWidth="3" fill="transparent"
-                strokeDasharray={`${csatPct} ${100 - csatPct}`} strokeDashoffset="0" />
+      <div className="w-px bg-line my-3" />
+
+      {/* CSAT Score */}
+      <div className="flex flex-col px-5 py-4 min-w-[140px]">
+        <div className="mb-2 text-[13px] font-semibold text-ink tracking-wide">CSAT Score</div>
+        <div className="flex items-center gap-3 mt-0.5">
+          <span className="text-xl font-bold text-ink leading-tight">{csatPct}%</span>
+          <div className="shrink-0" style={{ width: 40, height: 40 }}>
+            <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+              <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="3.5" />
+              <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--success)" strokeWidth="3.5"
+                strokeDasharray={`${csatPct} ${100 - csatPct}`} strokeLinecap="round" />
             </svg>
           </div>
         </div>
       </div>
 
-      {/* ARR */}
-      <div className="px-4 py-4 flex flex-col gap-1 min-w-[120px] border-l border-gray-50">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Total ARR</span>
-        <span className="text-[18px] font-bold text-gray-900 mt-1">
+      <div className="w-px bg-line my-3" />
+
+      {/* Total ARR */}
+      <div className="flex flex-col px-5 py-4 min-w-[130px] justify-center">
+        <span className="text-[13px] font-semibold text-ink tracking-wide mb-2">Total ARR</span>
+        <span className="text-xl font-bold text-ink leading-tight">
           ${account.arr ? (account.arr >= 1_000_000 ? `${(account.arr / 1_000_000).toFixed(1)}M` : `${(account.arr / 1_000).toFixed(0)}K`) : '1.2M'}
         </span>
-      </div>
-
-      {/* Hover actions */}
-      <div className="absolute right-2.5 top-1/2 -translate-y-1/2 hidden group-hover:flex flex-col gap-1.5 lg:flex">
-        <div className="p-1 hover:bg-gray-50 rounded-full transition-colors cursor-pointer text-gray-300 hover:text-indigo-500">
-          <ChevronUp className="w-4 h-4" />
-        </div>
-        <div className="p-1 hover:bg-gray-50 rounded-full transition-colors cursor-pointer text-gray-300 hover:text-indigo-500">
-          <Pencil className="w-[14px] h-[14px]" />
-        </div>
       </div>
     </div>
   );
@@ -248,7 +254,7 @@ function AccountMetricsBanner({ account }: { account: typeof ACCOUNTS_DATA[0] })
 
 function HeaderAction({ icon }: { icon: React.ReactNode }) {
   return (
-    <button className="p-1.5 hover:bg-gray-50 rounded-lg text-gray-400 transition-all border border-transparent hover:border-gray-100 hover:text-indigo-600">
+    <button className="p-1.5 hover:bg-subtle rounded-lg text-ink-faint transition-all border border-transparent hover:border-line-subtle hover:text-accent">
       {icon}
     </button>
   );
