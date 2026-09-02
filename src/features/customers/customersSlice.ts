@@ -132,6 +132,13 @@ interface CustomersState {
   stats: CustomerStats | null;
   statsLoading: boolean;
   statsError: string | null;
+  /** The single organization Details.tsx (/organizations/:id) is showing.
+   * Separate from `customers` (the paginated list) since Details is reached
+   * directly by URL — it can't assume the list has already loaded this
+   * particular row. */
+  selectedCustomer: Customer | null;
+  selectedCustomerLoading: boolean;
+  selectedCustomerError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -149,6 +156,9 @@ const initialState: CustomersState = {
   stats: null,
   statsLoading: false,
   statsError: null,
+  selectedCustomer: null,
+  selectedCustomerLoading: false,
+  selectedCustomerError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -188,6 +198,20 @@ export const fetchCustomerStats = createAsyncThunk<CustomerStats, void, { reject
       return await apiFetch<CustomerStats>('/customers/stats/');
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not load stats.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Powers Details.tsx (/organizations/:id) — a single organization by its
+// backend pk, independent of whatever page/search the list is on.
+export const fetchCustomerById = createAsyncThunk<Customer, number, { rejectValue: string }>(
+  'customers/fetchCustomerById',
+  async (id, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Customer>(`/customers/${id}/`);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load this organization.';
       return rejectWithValue(message);
     }
   }
@@ -278,6 +302,22 @@ const customersSlice = createSlice({
         state.statsLoading = false;
         state.statsError = action.payload ?? 'Something went wrong.';
       })
+      .addCase(fetchCustomerById.pending, (state) => {
+        state.selectedCustomerLoading = true;
+        state.selectedCustomerError = null;
+        // Cleared, not left stale — otherwise navigating straight from one
+        // org's Details page to another's briefly shows the previous org's
+        // data under the new id while the fetch is in flight.
+        state.selectedCustomer = null;
+      })
+      .addCase(fetchCustomerById.fulfilled, (state, action) => {
+        state.selectedCustomerLoading = false;
+        state.selectedCustomer = action.payload;
+      })
+      .addCase(fetchCustomerById.rejected, (state, action) => {
+        state.selectedCustomerLoading = false;
+        state.selectedCustomerError = action.payload ?? 'Could not load this organization.';
+      })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -301,6 +341,9 @@ const customersSlice = createSlice({
         } else {
           const index = state.customers.findIndex((c) => c.id === updated.id);
           if (index !== -1) state.customers[index] = updated;
+        }
+        if (state.selectedCustomer?.id === updated.id) {
+          state.selectedCustomer = updated;
         }
       });
   },

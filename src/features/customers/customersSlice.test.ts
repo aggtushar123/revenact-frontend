@@ -4,6 +4,7 @@ import customersReducer, {
   fetchCustomers,
   fetchUpcomingRenewals,
   fetchCustomerStats,
+  fetchCustomerById,
   createCustomer,
   updateCustomer,
 } from './customersSlice';
@@ -312,5 +313,60 @@ describe('customersSlice', () => {
     expect(state.customers).toEqual([]);
     expect(state.count).toBe(0);
     expect(state.totalCount).toBe(0);
+  });
+
+  describe('fetchCustomerById (Details.tsx)', () => {
+    it('GETs /customers/<id>/ and stores the result as selectedCustomer', async () => {
+      mockFetchOnce(200, globex);
+      const store = makeStore();
+
+      await store.dispatch(fetchCustomerById(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.selectedCustomer).toEqual(globex);
+      expect(state.selectedCustomerLoading).toBe(false);
+      expect(state.selectedCustomerError).toBeNull();
+    });
+
+    it('sets an error and leaves selectedCustomer null on a 404 (out-of-org or nonexistent id)', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchCustomerById(999));
+
+      const state = store.getState().customers;
+      expect(state.selectedCustomer).toBeNull();
+      expect(state.selectedCustomerError).toBe('Not found.');
+    });
+
+    it('clears a previous selectedCustomer as soon as a new fetch starts', async () => {
+      mockFetchOnce(200, globex);
+      const store = makeStore();
+      await store.dispatch(fetchCustomerById(globex.id));
+      expect(store.getState().customers.selectedCustomer).toEqual(globex);
+
+      // Simulate navigating straight from this org's Details page to
+      // another's — dispatch a second fetch without awaiting it yet.
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchCustomerById(2));
+
+      expect(store.getState().customers.selectedCustomer).toBeNull();
+    });
+
+    it('updateCustomer keeps selectedCustomer in sync when it edits the currently-viewed organization', async () => {
+      mockFetchOnce(200, globex);
+      const store = makeStore();
+      await store.dispatch(fetchCustomerById(globex.id));
+
+      const renamed = { ...globex, name: 'Globex Renamed' };
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => renamed }));
+      await store.dispatch(updateCustomer({ id: globex.id, name: 'Globex Renamed' }));
+
+      expect(store.getState().customers.selectedCustomer).toEqual(renamed);
+    });
   });
 });

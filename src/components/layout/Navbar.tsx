@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { TABLE_DATA } from '../organizations/tableData';
 import { ACCOUNTS_DATA } from '../organizations/accountsData';
+import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
 import {
   ChevronLeft,
   ChevronDown,
@@ -36,10 +36,17 @@ export function Navbar() {
   }, []);
 
 
-  // Detect organization details path
+  // Detect organization details path. Reads the same selectedCustomer that
+  // Details.tsx's own fetchCustomerById() populates (see customersSlice.ts)
+  // rather than fetching independently — Navbar and Details are mounted
+  // together under DashboardLayout for this route, so one fetch backs
+  // both. The id check guards the moment right after navigating from one
+  // org's page to another's, before the new fetch has resolved.
   const orgDetailMatch = location.pathname.match(/\/organizations\/(\d+)/);
   const orgId = orgDetailMatch ? parseInt(orgDetailMatch[1], 10) : null;
-  const organization = orgId ? TABLE_DATA.find(o => o.id === orgId) : null;
+  const selectedCustomer = useAppSelector((state) => state.customers.selectedCustomer);
+  const organization =
+    orgId && selectedCustomer?.id === orgId ? mapCustomerToOrgRow(selectedCustomer) : null;
 
   // Detect account details path
   const accountMatch = location.pathname.match(/\/accounts\/([^/]+)/);
@@ -116,7 +123,12 @@ export function Navbar() {
               
               <div className="flex items-center gap-3">
                  <div className="w-[36px] h-[36px] flex items-center justify-center p-1 bg-surface rounded-full border border-line-subtle shadow-sm overflow-hidden shrink-0">
-                    <img src={organization.logo} alt={organization.org} className="w-full h-full object-contain mix-blend-multiply" />
+                    <img
+                      src={organization.logo}
+                      alt={organization.org}
+                      className="w-full h-full object-contain mix-blend-multiply"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
                  </div>
                  <h1 className="text-[16px] font-bold text-ink tracking-tight uppercase">{organization.org}</h1>
               </div>

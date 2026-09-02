@@ -1,21 +1,33 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MessageSquare, RefreshCw, MoreHorizontal, CheckCircle, Globe, Mail, Phone, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, Sparkles, ExternalLink, Download, X } from 'lucide-react';
-import { TABLE_DATA } from '../../components/organizations/tableData';
 import type { OrgRow } from '../../components/organizations/tableData';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { CONTACTS_DATA } from '../../components/organizations/contactsData';
 import { ActivityFeed, PinnedAttributes } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { fetchCustomerById } from '../../features/customers/customersSlice';
+import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
 
 
 
 // --- Main Component ---
 export function Details() {
   const { id } = useParams<{ id: string }>();
-  const orgId = parseInt(id || '1', 10);
-  const organization = TABLE_DATA.find(o => o.id === orgId) || TABLE_DATA[0];
+  const orgId = parseInt(id || '0', 10);
+  const dispatch = useAppDispatch();
+  const { selectedCustomer, selectedCustomerError } = useAppSelector((state) => state.customers);
+
+  useEffect(() => {
+    dispatch(fetchCustomerById(orgId));
+  }, [dispatch, orgId]);
+
+  // The General tab, PinnedAttributes panel, and ActivityFeed all render
+  // off this — Accounts/Contacts/etc. below still use their own mock data
+  // (ACCOUNTS_DATA/CONTACTS_DATA), which has no backend model yet.
+  const organization = selectedCustomer ? mapCustomerToOrgRow(selectedCustomer) : null;
 
   const [activeTab, setActiveTab] = useState('General');
   const [isPinnedOpen, setIsPinnedOpen] = useState(true);
@@ -32,36 +44,36 @@ export function Details() {
   ];
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#fcfdfe]">
+    <div className="flex flex-col h-full w-full bg-[var(--bg-surface)]">
       {/* Tabs Navigation */}
-      <nav className="px-6 bg-white border-b border-gray-100 flex items-center justify-between shrink-0">
+      <nav className="px-6 bg-surface border-b border-line-subtle flex items-center justify-between shrink-0">
         <div className="flex items-center gap-8 h-10 overflow-x-auto no-scrollbar whitespace-nowrap">
           {tabs.map(tab => (
             <button
               key={tab.name}
               onClick={() => setActiveTab(tab.name)}
               className={`relative h-full text-[13.5px] font-semibold transition-colors flex items-center gap-1.5 ${
-                activeTab === tab.name ? 'text-indigo-600' : 'text-gray-500 hover:text-gray-700'
+                activeTab === tab.name ? 'text-accent' : 'text-ink-muted hover:text-ink-muted'
               }`}
             >
               {tab.name}
               {tab.count !== null && (
-                <span className={`text-[11px] font-bold ${activeTab === tab.name ? 'text-indigo-400' : 'text-gray-400'}`}>
+                <span className={`text-[11px] font-bold ${activeTab === tab.name ? 'text-accent' : 'text-ink-faint'}`}>
                   ({tab.count})
                 </span>
               )}
               {activeTab === tab.name && (
-                <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-gradient-to-r from-indigo-500 to-purple-500 rounded-t-full shadow-[0_-2px_6px_rgba(99,102,241,0.3)]"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-[2.5px] bg-accent rounded-t-full shadow-[0_-2px_6px_rgba(45,212,168,0.35)]"></div>
               )}
             </button>
           ))}
         </div>
 
         <div className="flex items-center gap-4 py-2 shrink-0">
-           <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-gray-50/50 rounded-lg border border-gray-100">
-             <span className="text-[12px] font-medium text-gray-500">Enable new 360 UI</span>
-             <div className="w-8 h-4 bg-indigo-500 rounded-full relative cursor-pointer">
-               <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-white rounded-full shadow-sm"></div>
+           <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-subtle/50 rounded-lg border border-line-subtle">
+             <span className="text-[12px] font-medium text-ink-muted">Enable new 360 UI</span>
+             <div className="w-8 h-4 bg-accent rounded-full relative cursor-pointer">
+               <div className="absolute right-0.5 top-0.5 w-3 h-3 bg-surface rounded-full shadow-sm"></div>
              </div>
            </div>
            
@@ -74,8 +86,15 @@ export function Details() {
       </nav>
 
       {/* Tab Content */}
-      <main className="flex-1 overflow-y-auto custom-scrollbar bg-[#f8f9fc]/50 p-4">
-        {activeTab === 'General' && (
+      <main className="flex-1 overflow-y-auto custom-scrollbar bg-[var(--bg-subtle)]/50 p-4">
+        {activeTab === 'General' && !organization && (
+          <div className="flex items-center justify-center h-full">
+            <span className={`text-[13px] font-medium ${selectedCustomerError ? 'text-danger' : 'text-ink-faint'}`}>
+              {selectedCustomerError ?? 'Loading organization…'}
+            </span>
+          </div>
+        )}
+        {activeTab === 'General' && organization && (
           <div className="flex flex-col w-full h-full gap-4 max-w-7xl mx-auto">
             <MetricsBanner organization={organization} />
             <div className="flex gap-4 w-full h-[calc(100vh-260px)] overflow-hidden">
@@ -84,7 +103,7 @@ export function Details() {
                  <div className="flex flex-col items-center pt-3 shrink-0">
                    <button
                      onClick={() => setIsPinnedOpen(true)}
-                     className="p-1.5 bg-white border border-gray-200 rounded-lg shadow-sm text-gray-400 hover:text-indigo-600 hover:border-indigo-200 transition-all"
+                     className="p-1.5 bg-surface border border-line rounded-lg shadow-sm text-ink-faint hover:text-accent hover:border-accent/40 transition-all"
                      title="Expand panel"
                    >
                      <ChevronRight className="w-4 h-4" />
@@ -93,7 +112,7 @@ export function Details() {
                )}
                {/* Pinned Attributes Panel */}
                {isPinnedOpen && (
-                 <div className="w-[320px] flex flex-col h-full bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden shrink-0 transition-all">
+                 <div className="w-[320px] flex flex-col h-full bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden shrink-0 transition-all">
                    <PinnedAttributes
                      entityName={organization.org}
                      attributes={buildOrgAttributes(organization)}
@@ -102,7 +121,7 @@ export function Details() {
                    />
                  </div>
                )}
-               <div className="flex-1 h-full overflow-hidden bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col">
+               <div className="flex-1 h-full overflow-hidden bg-surface rounded-xl border border-line-subtle shadow-sm flex flex-col">
                  <ActivityFeed
                    entityId={organization.id}
                    entityType="organization"
@@ -122,13 +141,13 @@ export function Details() {
               <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={() => setIsAttrModalOpen(false)}>
                 <div className="absolute inset-0 bg-black/30" style={{ backdropFilter: 'blur(4px)' }} />
                 <div
-                  className="relative w-full max-w-2xl max-h-[80vh] bg-white rounded-2xl border border-gray-200 shadow-2xl flex flex-col overflow-hidden"
+                  className="relative w-full max-w-2xl max-h-[80vh] bg-surface rounded-2xl border border-line shadow-2xl flex flex-col overflow-hidden"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {/* Modal header */}
-                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-                    <h2 className="text-[16px] font-bold text-gray-900">All Attributes — {organization.org}</h2>
-                    <button onClick={() => setIsAttrModalOpen(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-all">
+                  <div className="px-6 py-4 border-b border-line-subtle flex items-center justify-between shrink-0">
+                    <h2 className="text-[16px] font-bold text-ink">All Attributes — {organization.org}</h2>
+                    <button onClick={() => setIsAttrModalOpen(false)} className="p-1.5 rounded-lg hover:bg-subtle text-ink-faint hover:text-ink-muted transition-all">
                       <X className="w-5 h-5" />
                     </button>
                   </div>
@@ -160,8 +179,8 @@ export function Details() {
         {activeTab === 'Contacts' && <ContactsTab orgId={orgId} />}
         {activeTab !== 'General' && activeTab !== 'Accounts' && activeTab !== 'Contacts' && (
           <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
-            <Layout className="w-12 h-12 text-gray-400 mb-2" />
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{activeTab} Coming Soon</span>
+            <Layout className="w-12 h-12 text-ink-faint mb-2" />
+            <span className="text-sm font-bold text-ink-muted uppercase tracking-widest">{activeTab} Coming Soon</span>
           </div>
         )}
       </main>
@@ -178,12 +197,12 @@ function MetricsBanner({ organization }: { organization: OrgRow }) {
 
   // Health ring color
   const healthVal = organization.health.val;
-  const healthColor = healthVal >= 7 ? '#00a699' : healthVal >= 4 ? '#ffbb00' : '#fa5c5c';
+  const healthColor = healthVal >= 7 ? 'var(--success)' : healthVal >= 4 ? 'var(--warning)' : 'var(--danger)';
   const healthPct = (healthVal / 10) * 100;
 
   // CSM pulse text & color
   const csmPulseText = healthVal >= 7 ? 'Very Satisfied' : healthVal >= 4 ? 'Neutral' : 'High Risk';
-  const csmPulseColor = healthVal >= 7 ? 'text-[#00a699]' : healthVal >= 4 ? 'text-[#ffbb00]' : 'text-[#fa5c5c]';
+  const csmPulseColor = healthVal >= 7 ? 'text-[var(--success)]' : healthVal >= 4 ? 'text-[var(--warning)]' : 'text-[var(--danger)]';
 
   // NPS breakdown
   const promoters = organization.npsValue > 0 ? 1 : 0;
@@ -191,99 +210,99 @@ function MetricsBanner({ organization }: { organization: OrgRow }) {
   const detractors = organization.npsValue < 0 ? 1 : 0;
 
   // CSAT ring color
-  const csatColor = csatPct >= 70 ? '#00a699' : csatPct >= 40 ? '#ffbb00' : '#fa5c5c';
+  const csatColor = csatPct >= 70 ? 'var(--success)' : csatPct >= 40 ? 'var(--warning)' : 'var(--danger)';
 
   return (
     <div className="flex items-stretch w-full gap-4">
       {/* Card 1 — Health Score */}
       <div
-        className="flex-1 rounded-xl border border-gray-200/80 bg-white/70 shadow-sm px-5 py-4 flex items-center gap-5"
+        className="flex-1 rounded-xl border border-line/80 bg-surface/70 shadow-sm px-5 py-4 flex items-center gap-5"
         style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
       >
         {/* Circular ring */}
         <div className="relative shrink-0" style={{ width: 72, height: 72 }}>
           <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="2.5" />
             <circle cx="18" cy="18" r="15.9155" fill="none" stroke={healthColor} strokeWidth="2.5"
               strokeDasharray={`${healthPct} ${100 - healthPct}`} strokeLinecap="round"
               style={{ transition: 'stroke-dasharray 0.6s ease' }} />
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px] font-bold text-gray-400 uppercase leading-none">Health</span>
-            <span className="text-[10px] font-bold text-gray-400 uppercase leading-none">Score</span>
+            <span className="text-[10px] font-bold text-ink-faint uppercase leading-none">Health</span>
+            <span className="text-[10px] font-bold text-ink-faint uppercase leading-none">Score</span>
           </div>
         </div>
         {/* Text info */}
         <div className="flex flex-col gap-1.5 min-w-0">
-          <span className="text-[28px] font-bold text-gray-900 leading-none tracking-tight">{healthVal}</span>
+          <span className="text-[28px] font-bold text-ink leading-none tracking-tight">{healthVal}</span>
           <div className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Lifecycle Stage</span>
-            <span className="text-[13px] font-bold text-gray-800 truncate">{organization.stage}</span>
+            <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">Lifecycle Stage</span>
+            <span className="text-[13px] font-bold text-ink truncate">{organization.stage}</span>
           </div>
         </div>
       </div>
 
       {/* Card 2 — CSM Pulse + NPS + Renewal */}
       <div
-        className="flex-[1.6] rounded-xl border border-gray-200/80 bg-white/70 shadow-sm px-5 py-4 flex items-center gap-6"
+        className="flex-[1.6] rounded-xl border border-line/80 bg-surface/70 shadow-sm px-5 py-4 flex items-center gap-6"
         style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
       >
         {/* CSM Pulse */}
         <div className="flex flex-col gap-0.5 min-w-[100px]">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CSM Pulse</span>
+          <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">CSM Pulse</span>
           <span className={`text-[14px] font-bold ${csmPulseColor}`}>{csmPulseText}</span>
         </div>
 
-        <div className="w-px h-12 bg-gray-200/70 shrink-0" />
+        <div className="w-px h-12 bg-line/70 shrink-0" />
 
         {/* NPS */}
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <div className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">NPS</span>
-            <span className="text-[28px] font-light text-gray-800 leading-none tracking-tight">{npsSign}{organization.npsValue}</span>
+            <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">NPS</span>
+            <span className="text-[28px] font-light text-ink leading-none tracking-tight">{npsSign}{organization.npsValue}</span>
           </div>
           <div className="flex flex-col gap-0.5 text-[10px] font-bold">
-            <div className="flex items-center gap-2 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-sm bg-[#00a699]" />
+            <div className="flex items-center gap-2 text-ink-muted">
+              <span className="w-1.5 h-1.5 rounded-sm bg-[var(--success)]" />
               <span className="w-16">Promoters</span>
-              <span className="text-gray-900 text-[11px]">{promoters}</span>
+              <span className="text-ink text-[11px]">{promoters}</span>
             </div>
-            <div className="flex items-center gap-2 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-sm bg-[#ffbb00]" />
+            <div className="flex items-center gap-2 text-ink-muted">
+              <span className="w-1.5 h-1.5 rounded-sm bg-[var(--warning)]" />
               <span className="w-16">Passives</span>
-              <span className="text-gray-900 text-[11px]">{passives}</span>
+              <span className="text-ink text-[11px]">{passives}</span>
             </div>
-            <div className="flex items-center gap-2 text-gray-500">
-              <span className="w-1.5 h-1.5 rounded-sm bg-[#fa5c5c]" />
+            <div className="flex items-center gap-2 text-ink-muted">
+              <span className="w-1.5 h-1.5 rounded-sm bg-[var(--danger)]" />
               <span className="w-16">Detractors</span>
-              <span className="text-gray-900 text-[11px]">{detractors}</span>
+              <span className="text-ink text-[11px]">{detractors}</span>
             </div>
           </div>
         </div>
 
-        <div className="w-px h-12 bg-gray-200/70 shrink-0" />
+        <div className="w-px h-12 bg-line/70 shrink-0" />
 
         {/* Next Renewal Date */}
         <div className="flex flex-col gap-0.5 min-w-[100px]">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Next Renewal Date</span>
-          <span className="text-[14px] font-bold text-gray-900 leading-tight">{organization.renewal}</span>
+          <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">Next Renewal Date</span>
+          <span className="text-[14px] font-bold text-ink leading-tight">{organization.renewal}</span>
         </div>
       </div>
 
       {/* Card 3 — CSAT Score */}
       <div
-        className="flex-1 rounded-xl border border-gray-200/80 bg-white/70 shadow-sm px-5 py-4 flex items-center gap-5"
+        className="flex-1 rounded-xl border border-line/80 bg-surface/70 shadow-sm px-5 py-4 flex items-center gap-5"
         style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
       >
         {/* Text */}
         <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">CSAT Score</span>
-          <span className="text-[28px] font-bold text-gray-900 leading-none tracking-tight">{organization.csat}</span>
+          <span className="text-[10px] font-bold text-ink-faint uppercase tracking-wider">CSAT Score</span>
+          <span className="text-[28px] font-bold text-ink leading-none tracking-tight">{organization.csat}</span>
         </div>
         {/* Large donut ring */}
         <div className="relative ml-auto shrink-0" style={{ width: 72, height: 72 }}>
           <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="2.5" />
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="2.5" />
             <circle cx="18" cy="18" r="15.9155" fill="none" stroke={csatColor} strokeWidth="2.5"
               strokeDasharray={`${csatPct} ${100 - csatPct}`} strokeLinecap="round"
               style={{ transition: 'stroke-dasharray 0.6s ease' }} />
@@ -318,25 +337,25 @@ function AccountsTab({ orgId }: { orgId: number }) {
       <AccountsMetricsBanner accounts={accounts} />
 
       {/* Sub-Accounts Table Section */}
-      <div className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-gray-50 bg-white flex items-center justify-between gap-4">
+      <div className="w-full bg-surface rounded-2xl border border-line-subtle shadow-sm flex flex-col overflow-hidden">
+        <div className="p-4 border-b border-line-subtle bg-surface flex items-center justify-between gap-4">
            <div className="relative flex-1 max-w-2xl">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Search by name, Revenact ID or External ID" className="w-full pl-10 pr-4 py-2 bg-white border border-gray-200 rounded-lg text-[13px] font-medium shadow-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/10 placeholder:text-gray-400 transition-all" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
+              <input type="text" placeholder="Search by name, Revenact ID or External ID" className="w-full pl-10 pr-4 py-2 bg-surface border border-line rounded-lg text-[13px] font-medium shadow-xs focus:outline-none focus:ring-2 focus:ring-accent/10 placeholder:text-ink-faint transition-all" />
            </div>
            
            <div className="flex items-center gap-2">
-              <button className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[13px] font-bold shadow-sm transition-all transform active:scale-95">
+              <button className="flex items-center gap-2 px-5 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-all transform active:scale-95">
                  <Plus className="w-4 h-4" />
                  Add Account
               </button>
               
-              <div className="h-9 w-px bg-gray-100 mx-1" />
+              <div className="h-9 w-px bg-subtle mx-1" />
               
-              <button className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 text-[13px] font-bold shadow-xs transition-colors relative">
-                 <Filter className="w-4 h-4 text-gray-400" />
+              <button className="flex items-center gap-2 px-3 py-2 bg-surface border border-line rounded-lg text-ink-muted hover:bg-subtle text-[13px] font-bold shadow-xs transition-colors relative">
+                 <Filter className="w-4 h-4 text-ink-faint" />
                  Filter
-                 <span className="flex items-center justify-center w-5 h-5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-md text-[10px] font-bold">(2)</span>
+                 <span className="flex items-center justify-center w-5 h-5 bg-accent-dim text-accent border border-accent/30 rounded-md text-[10px] font-bold">(2)</span>
               </button>
               
               <IconButton icon={<Download className="w-4 h-4" />} />
@@ -349,8 +368,8 @@ function AccountsTab({ orgId }: { orgId: number }) {
         <div className="overflow-x-auto min-h-[400px]">
            <table className="w-full border-collapse">
               <thead>
-                 <tr className="bg-gray-50/50 border-b border-gray-100">
-                    <th className="p-4 w-10"><input type="checkbox" className="rounded border-gray-300 text-indigo-600" /></th>
+                 <tr className="bg-subtle/50 border-b border-line-subtle">
+                    <th className="p-4 w-10"><input type="checkbox" className="rounded border-line-strong text-accent" /></th>
                     <HeaderCell label="Account" />
                     <HeaderCell label="Revenact ID" />
                     <HeaderCell label="Pulse" />
@@ -358,56 +377,56 @@ function AccountsTab({ orgId }: { orgId: number }) {
                     <HeaderCell label="AI Pulse-Score" />
                     <HeaderCell label="Owner" />
                     <th className="p-4 text-center w-12">
-                       <Plus className="w-4 h-4 text-gray-400 cursor-pointer hover:text-gray-600" />
+                       <Plus className="w-4 h-4 text-ink-faint cursor-pointer hover:text-ink-muted" />
                     </th>
                  </tr>
               </thead>
               <tbody>
                  {accounts.map((acc) => (
-                   <tr key={acc.id} className="hover:bg-indigo-50/20 border-b border-gray-50 transition-all cursor-pointer group" onClick={() => navigate(`/accounts/${acc.id}`)}>
-                     <td className="p-4"><input type="checkbox" className="rounded border-gray-200" onClick={(e) => e.stopPropagation()} /></td>
+                   <tr key={acc.id} className="hover:bg-accent-dim/20 border-b border-line-subtle transition-all cursor-pointer group" onClick={() => navigate(`/accounts/${acc.id}`)}>
+                     <td className="p-4"><input type="checkbox" className="rounded border-line" onClick={(e) => e.stopPropagation()} /></td>
                      <td className="p-4">
                         <div className="flex items-center gap-4">
-                           <div className="w-9 h-9 flex items-center justify-center bg-white border border-gray-100 rounded-xl shadow-xs p-1.5 shrink-0">
+                           <div className="w-9 h-9 flex items-center justify-center bg-surface border border-line-subtle rounded-xl shadow-xs p-1.5 shrink-0">
                               <img src={acc.logo} alt={acc.name} className="w-7 h-7 object-contain" />
                            </div>
                            <div className="flex flex-col overflow-hidden pt-0.5">
                               <div className="flex items-center gap-2">
-                                <span className="text-[13.5px] font-bold text-gray-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight truncate">{acc.name}</span>
-                                <ExternalLink className="w-3 h-3 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                <span className="text-[13.5px] font-bold text-ink group-hover:text-accent transition-colors uppercase tracking-tight truncate">{acc.name}</span>
+                                <ExternalLink className="w-3 h-3 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity" />
                               </div>
-                              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest truncate">{acc.orgName}</span>
+                              <span className="text-[11px] font-bold text-ink-faint uppercase tracking-widest truncate">{acc.orgName}</span>
                            </div>
                         </div>
                      </td>
-                     <td className="p-4 text-[13px] font-bold text-gray-600">{acc.revenactId}</td>
+                     <td className="p-4 text-[13px] font-bold text-ink-muted">{acc.revenactId}</td>
                      <td className="p-4">
                         <div className="flex items-center gap-1">
                            {acc.pulse.map((val: number, i: number) => (
-                             <div key={i} className={`w-2 h-2 rounded-full border border-white shadow-sm ${val === 1 ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+                             <div key={i} className={`w-2 h-2 rounded-full border border-white shadow-sm ${val === 1 ? 'bg-success' : 'bg-line'}`} />
                            ))}
                         </div>
                      </td>
                      <td className="p-4 max-w-[280px]">
-                        <span className="text-[12px] font-medium text-gray-500 leading-relaxed line-clamp-2">
+                        <span className="text-[12px] font-medium text-ink-muted leading-relaxed line-clamp-2">
                            {acc.aiPulseReason}
                         </span>
                      </td>
                      <td className="p-4">
-                        <span className="text-[12px] font-bold text-emerald-600 bg-emerald-50/50 px-2 py-0.5 rounded-md border border-emerald-100/50 uppercase tracking-tight">
+                        <span className="text-[12px] font-bold text-success bg-success-dim px-2 py-0.5 rounded-md border border-success/30 uppercase tracking-tight">
                            {acc.aiPulseScore}
                         </span>
                      </td>
                      <td className="p-4">
                         <div className="flex items-center gap-3">
-                           <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-[10px] font-bold text-gray-500 overflow-hidden shadow-sm">
+                           <div className="w-8 h-8 rounded-full bg-subtle border-2 border-white flex items-center justify-center text-[10px] font-bold text-ink-muted overflow-hidden shadow-sm">
                               {acc.avatar ? acc.avatar : <img src={`https://i.pravatar.cc/150?u=${acc.owner}`} alt={acc.owner} className="w-full h-full object-cover" />}
                            </div>
-                           <span className="text-[13px] font-bold text-gray-700 whitespace-nowrap">{acc.owner}</span>
+                           <span className="text-[13px] font-bold text-ink-muted whitespace-nowrap">{acc.owner}</span>
                         </div>
                      </td>
                      <td className="p-4">
-                        <MoreHorizontal className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        <MoreHorizontal className="w-4 h-4 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity" />
                      </td>
                    </tr>
                  ))}
@@ -416,14 +435,14 @@ function AccountsTab({ orgId }: { orgId: number }) {
         </div>
 
         {/* Pagination Footer */}
-        <div className="p-4 bg-white border-t border-gray-50 flex items-center justify-end gap-6 shrink-0">
+        <div className="p-4 bg-surface border-t border-line-subtle flex items-center justify-end gap-6 shrink-0">
            <div className="flex items-center gap-1">
-              <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-indigo-600 text-white text-[12px] font-bold shadow-sm">1</button>
+              <button className="w-8 h-8 flex items-center justify-center rounded-lg bg-accent text-white text-[12px] font-bold shadow-sm">1</button>
            </div>
            
            <div className="flex items-center gap-2">
-              <span className="text-[12px] font-bold text-gray-400 uppercase">100 / page</span>
-              <ChevronUp className="w-4 h-4 text-gray-400 rotate-180 cursor-pointer" />
+              <span className="text-[12px] font-bold text-ink-faint uppercase">100 / page</span>
+              <ChevronUp className="w-4 h-4 text-ink-faint rotate-180 cursor-pointer" />
            </div>
         </div>
 
@@ -436,10 +455,10 @@ function HeaderCell({ label }: { label: string }) {
   return (
     <th className="p-4 text-left group/header cursor-pointer">
        <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+          <span className="text-[11px] font-bold text-ink-faint uppercase tracking-wider">{label}</span>
           <div className="flex flex-col -gap-1 opacity-0 group-hover/header:opacity-100 transition-opacity">
-             <ChevronUp className="w-2.5 h-2.5 text-gray-400" />
-             <ChevronUp className="w-2.5 h-2.5 text-gray-400 rotate-180" />
+             <ChevronUp className="w-2.5 h-2.5 text-ink-faint" />
+             <ChevronUp className="w-2.5 h-2.5 text-ink-faint rotate-180" />
           </div>
        </div>
     </th>
@@ -459,29 +478,29 @@ function ContactsTab({ orgId }: { orgId: number }) {
   return (
     <div className="flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar p-6 pt-2">
       {/* Contacts Summary Banner */}
-      <div className="max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm shrink-0">
-        <ContactStatCard title="Total Contacts" value={stats.total.toString()} subtext="Across all departments" icon={<Layout className="w-4 h-4 text-indigo-500" />} />
-        <ContactStatCard title="Decision Makers" value={stats.decisionMakers.toString()} subtext="High influence" icon={<Sparkles className="w-4 h-4 text-purple-500" />} />
-        <ContactStatCard title="Active Users" value={stats.active.toString()} subtext="Logged in last 30d" icon={<CheckCircle className="w-4 h-4 text-teal-500" />} />
-        <ContactStatCard title="Avg Sentiment" value={`${stats.total > 0 ? Math.round((stats.positiveSentiment / stats.total) * 100) : 0}%`} subtext="Positive feedback" icon={<MessageSquare className="w-4 h-4 text-amber-500" />} />
+      <div className="max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-4 gap-4 bg-surface p-4 rounded-2xl border border-line-subtle shadow-sm shrink-0">
+        <ContactStatCard title="Total Contacts" value={stats.total.toString()} subtext="Across all departments" icon={<Layout className="w-4 h-4 text-accent" />} />
+        <ContactStatCard title="Decision Makers" value={stats.decisionMakers.toString()} subtext="High influence" icon={<Sparkles className="w-4 h-4 text-accent" />} />
+        <ContactStatCard title="Active Users" value={stats.active.toString()} subtext="Logged in last 30d" icon={<CheckCircle className="w-4 h-4 text-success" />} />
+        <ContactStatCard title="Avg Sentiment" value={`${stats.total > 0 ? Math.round((stats.positiveSentiment / stats.total) * 100) : 0}%`} subtext="Positive feedback" icon={<MessageSquare className="w-4 h-4 text-info" />} />
       </div>
 
       {/* Action Bar & Table */}
-      <div className="max-w-7xl w-full mx-auto bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-gray-50 bg-white flex items-center justify-between gap-4">
+      <div className="max-w-7xl w-full mx-auto bg-surface rounded-2xl border border-line-subtle shadow-sm flex flex-col overflow-hidden">
+        <div className="p-4 border-b border-line-subtle bg-surface flex items-center justify-between gap-4">
            <div className="relative flex-1 max-w-2xl">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Search contacts by name, role or email..." className="w-full pl-10 pr-4 py-2 bg-gray-50/30 border border-gray-200 rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-indigo-500/10 placeholder:text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
+              <input type="text" placeholder="Search contacts by name, role or email..." className="w-full pl-10 pr-4 py-2 bg-subtle/30 border border-line rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-accent/10 placeholder:text-ink-faint" />
            </div>
            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[13px] font-bold shadow-sm transition-all">
+              <button className="flex items-center gap-2 px-6 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-all">
                  <Plus className="w-4 h-4" />
                  Add Contact
               </button>
-              <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50 transition-colors">
+              <button className="p-2 border border-line rounded-lg text-ink-faint hover:bg-subtle transition-colors">
                  <Filter className="w-4 h-4" />
               </button>
-              <button className="p-2 border border-gray-200 rounded-lg text-gray-400 hover:bg-gray-50 transition-colors">
+              <button className="p-2 border border-line rounded-lg text-ink-faint hover:bg-subtle transition-colors">
                  <Download className="w-4 h-4" />
               </button>
            </div>
@@ -491,71 +510,71 @@ function ContactsTab({ orgId }: { orgId: number }) {
         <div className="overflow-x-auto min-h-[400px]">
            <table className="w-full border-collapse">
               <thead>
-                 <tr className="bg-white border-b border-gray-50">
-                    <th className="p-4 w-10"><input type="checkbox" className="rounded border-gray-300 text-indigo-600" /></th>
-                    <th className="p-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Contact</th>
-                    <th className="p-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Role</th>
-                    <th className="p-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="p-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Sentiment</th>
-                    <th className="p-4 text-left text-[11px] font-bold text-gray-400 uppercase tracking-wider">Last Contacted</th>
+                 <tr className="bg-surface border-b border-line-subtle">
+                    <th className="p-4 w-10"><input type="checkbox" className="rounded border-line-strong text-accent" /></th>
+                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Contact</th>
+                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Role</th>
+                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Status</th>
+                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Sentiment</th>
+                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Last Contacted</th>
                     <th className="p-4 text-center w-10"></th>
                  </tr>
               </thead>
               <tbody>
                  {contacts.map((contact) => (
-                   <tr key={contact.id} className="hover:bg-gray-50 border-b border-gray-50 transition-all cursor-pointer group">
+                   <tr key={contact.id} className="hover:bg-subtle border-b border-line-subtle transition-all cursor-pointer group">
                      <td className="p-4"><input type="checkbox" className="rounded" onClick={(e) => e.stopPropagation()} /></td>
                      <td className="p-4">
                         <div className="flex items-center gap-3">
-                           <div className="w-9 h-9 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[12px] font-bold text-indigo-600 shadow-xs">
+                           <div className="w-9 h-9 rounded-full bg-accent-dim border border-accent/30 flex items-center justify-center text-[12px] font-bold text-accent shadow-xs">
                               {contact.avatar}
                            </div>
                            <div className="flex flex-col">
-                              <span className="text-[13.5px] font-bold text-gray-900 group-hover:text-indigo-600 transition-colors">{contact.name}</span>
-                              <span className="text-[11px] font-medium text-gray-400 lowercase">{contact.email}</span>
+                              <span className="text-[13.5px] font-bold text-ink group-hover:text-accent transition-colors">{contact.name}</span>
+                              <span className="text-[11px] font-medium text-ink-faint lowercase">{contact.email}</span>
                            </div>
                         </div>
                      </td>
                      <td className="p-4">
-                        <span className="px-2.5 py-1 rounded-md bg-gray-50 border border-gray-100 text-[11.5px] font-bold text-gray-600 uppercase tracking-tight">
+                        <span className="px-2.5 py-1 rounded-md bg-subtle border border-line-subtle text-[11.5px] font-bold text-ink-muted uppercase tracking-tight">
                            {contact.role}
                         </span>
                      </td>
                      <td className="p-4">
                         <div className="flex items-center gap-2">
-                           <div className={`w-2 h-2 rounded-full ${contact.status === 'Active' ? 'bg-emerald-500' : 'bg-gray-300'}`} />
-                           <span className={`text-[13px] font-medium ${contact.status === 'Active' ? 'text-gray-700' : 'text-gray-400'}`}>{contact.status}</span>
+                           <div className={`w-2 h-2 rounded-full ${contact.status === 'Active' ? 'bg-success' : 'bg-line-strong'}`} />
+                           <span className={`text-[13px] font-medium ${contact.status === 'Active' ? 'text-ink-muted' : 'text-ink-faint'}`}>{contact.status}</span>
                         </div>
                      </td>
                      <td className="p-4">
                         <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-bold ${
-                          contact.sentiment === 'Positive' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' :
-                          contact.sentiment === 'Negative' ? 'bg-rose-50 border-rose-100 text-rose-700' :
-                          'bg-amber-50 border-amber-100 text-amber-700'
+                          contact.sentiment === 'Positive' ? 'bg-success-dim border-success/30 text-success' :
+                          contact.sentiment === 'Negative' ? 'bg-danger-dim border-danger/30 text-danger' :
+                          'bg-warning-dim border-warning/30 text-warning'
                         }`}>
                            <div className={`w-1.5 h-1.5 rounded-full ${
-                             contact.sentiment === 'Positive' ? 'bg-emerald-500' :
-                             contact.sentiment === 'Negative' ? 'bg-rose-500' :
-                             'bg-amber-500'
+                             contact.sentiment === 'Positive' ? 'bg-success' :
+                             contact.sentiment === 'Negative' ? 'bg-danger' :
+                             'bg-warning'
                            }`} />
                            {contact.sentiment}
                         </div>
                      </td>
                      <td className="p-4">
                         <div className="flex flex-col">
-                           <span className="text-[13px] font-bold text-gray-700">{contact.lastContacted}</span>
+                           <span className="text-[13px] font-bold text-ink-muted">{contact.lastContacted}</span>
                            <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Mail className="w-3 h-3 text-indigo-400 hover:text-indigo-600 cursor-pointer" />
-                              <Phone className="w-3 h-3 text-indigo-400 hover:text-indigo-600 cursor-pointer" />
+                              <Mail className="w-3 h-3 text-accent hover:text-accent cursor-pointer" />
+                              <Phone className="w-3 h-3 text-accent hover:text-accent cursor-pointer" />
                            </div>
                         </div>
                      </td>
-                     <td className="p-4"><MoreHorizontal className="w-4 h-4 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" /></td>
+                     <td className="p-4"><MoreHorizontal className="w-4 h-4 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity" /></td>
                    </tr>
                  ))}
                  {contacts.length === 0 && (
                    <tr>
-                     <td colSpan={7} className="p-20 text-center text-gray-400 font-medium">No contacts found for this organization.</td>
+                     <td colSpan={7} className="p-20 text-center text-ink-faint font-medium">No contacts found for this organization.</td>
                    </tr>
                  )}
               </tbody>
@@ -569,13 +588,13 @@ function ContactsTab({ orgId }: { orgId: number }) {
 function ContactStatCard({ title, value, subtext, icon }: { title: string, value: string, subtext: string, icon: React.ReactNode }) {
   return (
     <div className="flex items-start gap-4">
-      <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+      <div className="p-3 bg-subtle rounded-xl border border-line-subtle">
         {icon}
       </div>
       <div className="flex flex-col">
-        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">{title}</span>
-        <span className="text-[20px] font-bold text-gray-900 leading-tight">{value}</span>
-        <span className="text-[11px] font-medium text-gray-400 pt-0.5">{subtext}</span>
+        <span className="text-[11px] font-bold text-ink-faint uppercase tracking-widest leading-none mb-1">{title}</span>
+        <span className="text-[20px] font-bold text-ink leading-tight">{value}</span>
+        <span className="text-[11px] font-medium text-ink-faint pt-0.5">{subtext}</span>
       </div>
     </div>
   );
@@ -583,7 +602,7 @@ function ContactStatCard({ title, value, subtext, icon }: { title: string, value
 
 function IconButton({ icon, minimal = false }: { icon: React.ReactNode, minimal?: boolean }) {
   return (
-    <button className={`p-2 rounded-lg transition-colors text-gray-400 hover:text-gray-600 ${minimal ? 'hover:bg-gray-100' : 'hover:bg-gray-50 border border-transparent hover:border-gray-200'}`}>
+    <button className={`p-2 rounded-lg transition-colors text-ink-faint hover:text-ink-muted ${minimal ? 'hover:bg-subtle' : 'hover:bg-subtle border border-transparent hover:border-line'}`}>
       {icon}
     </button>
   );
@@ -634,9 +653,9 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
     renewal: 'RE', expansion: 'EX', churn: 'CH', other: 'OT',
   };
   const lifecycleColors: Record<LifecycleKey, string> = {
-    onboarding: '#6366f1', kickoff: '#818cf8', adoption: '#a78bfa',
-    live: '#00a699', renewal: '#f59e0b', expansion: '#10b981',
-    churn: '#ef4444', other: '#94a3b8',
+    onboarding: 'var(--accent)', kickoff: 'var(--accent)', adoption: 'var(--accent)',
+    live: 'var(--success)', renewal: 'var(--warning)', expansion: 'var(--success)',
+    churn: 'var(--danger)', other: 'var(--text-tertiary)',
   };
   const allStages: LifecycleKey[] = ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'expansion', 'churn', 'other'];
 
@@ -686,9 +705,9 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
 
   // Health donut
   const healthDonutData = [
-    { value: health.good[healthTab], color: '#00a699' },
-    { value: health.average[healthTab], color: '#ffbb00' },
-    { value: health.poor[healthTab], color: '#fa5c5c' },
+    { value: health.good[healthTab], color: 'var(--success)' },
+    { value: health.average[healthTab], color: 'var(--warning)' },
+    { value: health.poor[healthTab], color: 'var(--danger)' },
   ];
 
   // Lifecycle donut
@@ -696,8 +715,8 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
     .filter(s => lifecycle[s][lifecycleTab] > 0)
     .map(s => ({ value: lifecycle[s][lifecycleTab], color: lifecycleColors[s] }));
 
-  const csatColor = avgCsat >= 70 ? '#00a699' : avgCsat >= 40 ? '#ffbb00' : '#fa5c5c';
-  const csmColor = csmScore >= 70 ? '#00a699' : csmScore >= 40 ? '#ffbb00' : '#fa5c5c';
+  const csatColor = avgCsat >= 70 ? 'var(--success)' : avgCsat >= 40 ? 'var(--warning)' : 'var(--danger)';
+  const csmColor = csmScore >= 70 ? 'var(--success)' : csmScore >= 40 ? 'var(--warning)' : 'var(--danger)';
 
   // Donut renderer — same as MetricsPanel DonutChart
   const renderDonut = (segments: { value: number; color: string }[], size: number) => {
@@ -705,14 +724,14 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
     if (total === 0) {
       return (
         <svg viewBox="0 0 36 36" style={{ width: size, height: size }}>
-          <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#e5e7eb" strokeWidth="3.5" />
+          <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--border-strong)" strokeWidth="3.5" />
         </svg>
       );
     }
     let offset = 0;
     return (
       <svg viewBox="0 0 36 36" style={{ width: size, height: size }}>
-        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="#f3f4f6" strokeWidth="3.5" />
+        <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="3.5" />
         {segments.map((seg, i) => {
           const pct = (seg.value / total) * 100;
           const el = (
@@ -732,13 +751,13 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
 
   return (
     <div
-      className="flex items-stretch w-full h-[110px] font-sans rounded-xl border border-gray-200/80 bg-white/70 shadow-sm"
+      className="flex items-stretch w-full h-[110px] font-sans rounded-xl border border-line/80 bg-surface/70 shadow-sm"
       style={{ backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)' }}
     >
       {/* Health Section */}
       <div className="flex flex-col flex-1 px-5 py-4">
         <div className="flex items-center gap-3 mb-3">
-          <span className="text-[13px] font-semibold text-gray-800 tracking-wide">Health</span>
+          <span className="text-[13px] font-semibold text-ink tracking-wide">Health</span>
           <div className="flex items-center gap-0.5">
             <TabPill label="COUNT" isActive={healthTab === 'count'} onClick={() => setHealthTab('count')} />
             <TabPill label="MRR" isActive={healthTab === 'mrr'} onClick={() => setHealthTab('mrr')} />
@@ -747,9 +766,9 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
         </div>
         <div className="flex items-center gap-5">
           <div className="flex gap-5">
-            <MItem color="#00a699" label="Good" formatted={getHealthVal('good')} />
-            <MItem color="#ffbb00" label="Average" formatted={getHealthVal('average')} />
-            <MItem color="#fa5c5c" label="Poor" formatted={getHealthVal('poor')} />
+            <MItem color="var(--success)" label="Good" formatted={getHealthVal('good')} />
+            <MItem color="var(--warning)" label="Average" formatted={getHealthVal('average')} />
+            <MItem color="var(--danger)" label="Poor" formatted={getHealthVal('poor')} />
           </div>
           <div className="ml-2">
             {renderDonut(healthDonutData, 44)}
@@ -757,49 +776,49 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
         </div>
       </div>
 
-      <div className="w-px bg-gray-200/70 my-3" />
+      <div className="w-px bg-line/70 my-3" />
 
       {/* NPS Section */}
       <div className="flex flex-col flex-1 px-5 py-4">
-        <div className="mb-2 text-[13px] font-semibold text-gray-800 tracking-wide">NPS</div>
+        <div className="mb-2 text-[13px] font-semibold text-ink tracking-wide">NPS</div>
         <div className="flex items-center gap-5 mt-0.5">
-          <span className="text-[38px] font-light text-gray-800 leading-none tracking-tight">
+          <span className="text-[38px] font-light text-ink leading-none tracking-tight">
             {nps.score > 0 ? '+' : ''}{nps.score}
           </span>
-          <div className="flex flex-col text-[12px] text-gray-600 font-medium gap-1">
+          <div className="flex flex-col text-[12px] text-ink-muted font-medium gap-1">
             <div className="flex items-center gap-2 justify-between">
-              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-[#00a699]" /> Promoters</div>
-              <span className="font-semibold text-gray-800 ml-4">{nps.promoters}</span>
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-[var(--success)]" /> Promoters</div>
+              <span className="font-semibold text-ink ml-4">{nps.promoters}</span>
             </div>
             <div className="flex items-center gap-2 justify-between">
-              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-[#ffbb00]" /> Passives</div>
-              <span className="font-semibold text-gray-800 ml-4">{nps.passives}</span>
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-[var(--warning)]" /> Passives</div>
+              <span className="font-semibold text-ink ml-4">{nps.passives}</span>
             </div>
             <div className="flex items-center gap-2 justify-between">
-              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-[#fa5c5c]" /> Detractors</div>
-              <span className="font-semibold text-gray-800 ml-4">{nps.detractors}</span>
+              <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-[var(--danger)]" /> Detractors</div>
+              <span className="font-semibold text-ink ml-4">{nps.detractors}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="w-px bg-gray-200/70 my-3" />
+      <div className="w-px bg-line/70 my-3" />
 
       {/* CSAT Score */}
       <div className="flex flex-col px-5 py-4 min-w-[120px]">
-        <div className="mb-2 text-[13px] font-semibold text-gray-800 tracking-wide">CSAT Score</div>
+        <div className="mb-2 text-[13px] font-semibold text-ink tracking-wide">CSAT Score</div>
         <div className="flex items-center gap-3 mt-0.5">
-          <span className="text-xl font-bold text-gray-900 leading-tight">{avgCsat}%</span>
-          {renderDonut([{ value: avgCsat, color: csatColor }, { value: 100 - avgCsat, color: '#e5e7eb' }], 40)}
+          <span className="text-xl font-bold text-ink leading-tight">{avgCsat}%</span>
+          {renderDonut([{ value: avgCsat, color: csatColor }, { value: 100 - avgCsat, color: 'var(--border-strong)' }], 40)}
         </div>
       </div>
 
-      <div className="w-px bg-gray-200/70 my-3" />
+      <div className="w-px bg-line/70 my-3" />
 
       {/* Lifecycle Stages Section */}
       <div className="flex flex-col flex-1 px-5 py-4">
         <div className="flex items-center gap-3 mb-3">
-          <span className="text-[13px] font-semibold text-gray-800 tracking-wide">Lifecycle Stages</span>
+          <span className="text-[13px] font-semibold text-ink tracking-wide">Lifecycle Stages</span>
           <div className="flex items-center gap-0.5">
             <TabPill label="COUNT" isActive={lifecycleTab === 'count'} onClick={() => setLifecycleTab('count')} />
             <TabPill label="MRR" isActive={lifecycleTab === 'mrr'} onClick={() => setLifecycleTab('mrr')} />
@@ -809,20 +828,20 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
         <div className="flex items-center gap-4">
           {/* Bar chart */}
           <div className="flex flex-col w-[200px]">
-            <div className="flex items-end gap-[3px] h-8 w-full border-b border-gray-200 pb-0.5">
+            <div className="flex items-end gap-[3px] h-8 w-full border-b border-line pb-0.5">
               {allStages.map(stage => {
                 const val = lifecycle[stage][lifecycleTab];
                 const maxVal = Math.max(...allStages.map(s => lifecycle[s][lifecycleTab]));
                 const heightPct = maxVal > 0 ? Math.max((val / maxVal) * 100, val > 0 ? 8 : 3) : 3;
                 return (
                   <div key={stage} className="flex-1 rounded-t-[2px] transition-all duration-300"
-                    style={{ height: `${heightPct}%`, backgroundColor: val > 0 ? lifecycleColors[stage] : '#e5e7eb' }}
+                    style={{ height: `${heightPct}%`, backgroundColor: val > 0 ? lifecycleColors[stage] : 'var(--border-strong)' }}
                     title={`${stage}: ${lifecycleTab === 'count' ? val : fmtCur(val)}`}
                   />
                 );
               })}
             </div>
-            <div className="flex items-center justify-between text-[8px] font-bold text-gray-400 mt-1 uppercase w-full">
+            <div className="flex items-center justify-between text-[8px] font-bold text-ink-faint mt-1 uppercase w-full">
               {allStages.map(s => (
                 <span key={s} className="flex-1 text-center">{lifecycleLabels[s]}</span>
               ))}
@@ -833,13 +852,13 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
         </div>
       </div>
 
-      <div className="w-px bg-gray-200/70 my-3" />
+      <div className="w-px bg-line/70 my-3" />
 
       {/* CSM */}
       <div className="flex flex-col px-5 py-4 min-w-[80px] items-center">
-        <div className="mb-2 text-[13px] font-semibold text-gray-800 tracking-wide">CSM</div>
+        <div className="mb-2 text-[13px] font-semibold text-ink tracking-wide">CSM</div>
         <div className="mt-0.5">
-          {renderDonut([{ value: csmScore, color: csmColor }, { value: 100 - csmScore, color: '#e5e7eb' }], 44)}
+          {renderDonut([{ value: csmScore, color: csmColor }, { value: 100 - csmScore, color: 'var(--border-strong)' }], 44)}
         </div>
       </div>
     </div>
@@ -849,10 +868,10 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
 function AttrModalItem({ label, value, dotColor }: { label: string; value: string; dotColor?: string }) {
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{label}</span>
+      <span className="text-[11px] font-bold text-ink-faint uppercase tracking-wider">{label}</span>
       <div className="flex items-center gap-2">
         {dotColor && <span className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />}
-        <span className="text-[14px] font-semibold text-gray-800">{value}</span>
+        <span className="text-[14px] font-semibold text-ink">{value}</span>
       </div>
     </div>
   );
@@ -864,7 +883,7 @@ function TabPill({ label, isActive, onClick }: { label: string; isActive: boolea
     <button
       onClick={onClick}
       className={`text-[10px] font-bold px-2 py-0.5 rounded cursor-pointer transition-all duration-200 ${
-        isActive ? 'text-indigo-600 bg-indigo-50 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+        isActive ? 'text-accent bg-accent-dim shadow-sm' : 'text-ink-faint hover:text-ink-muted hover:bg-subtle'
       }`}
     >
       {label}
@@ -875,10 +894,10 @@ function TabPill({ label, isActive, onClick }: { label: string; isActive: boolea
 function MItem({ color, label, formatted }: { color: string; label: string; formatted: string }) {
   return (
     <div className="flex flex-col">
-      <div className="flex items-center gap-1.5 text-[12px] text-gray-500 mb-0.5">
+      <div className="flex items-center gap-1.5 text-[12px] text-ink-muted mb-0.5">
         <span className="w-2 h-2 rounded-sm" style={{ backgroundColor: color }} /> {label}
       </div>
-      <span className="text-xl font-bold text-gray-900 leading-tight">{formatted}</span>
+      <span className="text-xl font-bold text-ink leading-tight">{formatted}</span>
     </div>
   );
 }

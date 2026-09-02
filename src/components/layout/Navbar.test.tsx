@@ -6,6 +6,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import brainReducer from '../../features/brain/brainSlice';
+import customersReducer from '../../features/customers/customersSlice';
 import { Navbar } from './Navbar';
 
 const mockUser = {
@@ -18,9 +19,53 @@ const mockUser = {
   is_active: true,
 };
 
-function renderNavbar() {
+// Minimal but real shape, matching revenact-backend's CustomerSerializer —
+// see customersSlice.test.ts / docs/API_CONTRACTS.md -> customers.
+const globex = {
+  id: 10,
+  name: 'Globex Corp',
+  address: '',
+  domain: 'globex.example',
+  owner: null,
+  created_by: null,
+  modified_by: null,
+  created_at: '2026-08-31T00:00:00Z',
+  updated_at: '2026-08-31T00:00:00Z',
+  lifecycle_stage: 'onboarding' as const,
+  health_score: '5.0',
+  health_category: 'average' as const,
+  pulse: [],
+  ai_pulse_score: '' as const,
+  ai_pulse_reason: '',
+  nps_score: null,
+  csat_score: null,
+  joined_date: null,
+  renewal_date: null,
+  contract_start_date: null,
+  contract_end_date: null,
+  arr_billed_at_account: '0.00',
+  arr_billed_at_hq: '0.00',
+  implementation_fee: '0.00',
+  total_contract_value: '0.00',
+  total_forecasted_renewal_revenue: '0.00',
+  primary_product: '',
+  additional_products_count: null,
+  top_source_channel: '',
+  total_contracted_seats: null,
+  total_active_seats: null,
+  seat_utilization_percentage: null,
+  total_hires: null,
+  scope_web_app: '',
+  ces_percentage: null,
+  churn_date: null,
+  churn_reason: '',
+  churn_comment: '',
+  is_archived: false,
+};
+
+function renderNavbar(initialRoute = '/dashboard', selectedCustomer: typeof globex | null = null) {
   const store = configureStore({
-    reducer: { auth: authReducer, brain: brainReducer },
+    reducer: { auth: authReducer, brain: brainReducer, customers: customersReducer },
     preloadedState: {
       auth: {
         user: mockUser,
@@ -30,17 +75,37 @@ function renderNavbar() {
         isLoading: false,
         error: null,
       },
+      customers: {
+        customers: [],
+        count: 0,
+        totalCount: 0,
+        next: null,
+        previous: null,
+        isLoading: false,
+        error: null,
+        renewals: [],
+        renewalsCount: 0,
+        renewalsLoading: false,
+        renewalsError: null,
+        stats: null,
+        statsLoading: false,
+        statsError: null,
+        selectedCustomer,
+        selectedCustomerLoading: false,
+        selectedCustomerError: null,
+      },
     },
   });
 
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/dashboard']}>
+      <MemoryRouter initialEntries={[initialRoute]}>
         <Navbar />
         <Routes>
           <Route path="/dashboard" element={<div>Dashboard Marker</div>} />
           <Route path="/profile" element={<div>Profile Marker</div>} />
           <Route path="/login" element={<div>Login Marker</div>} />
+          <Route path="/organizations/:id" element={<div>Details Marker</div>} />
         </Routes>
       </MemoryRouter>
     </Provider>
@@ -105,5 +170,35 @@ describe('Navbar account menu', () => {
     await user.click(screen.getByText('Dashboard Marker'));
 
     await waitFor(() => expect(screen.queryByText('My Profile')).not.toBeInTheDocument());
+  });
+});
+
+describe('Navbar organization breadcrumb (/organizations/:id)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the real organization name once Details.tsx has loaded it into the store', () => {
+    // Navbar doesn't fetch this itself — it reads the same
+    // selectedCustomer that Details.tsx's fetchCustomerById() populates
+    // (see customersSlice.ts). Preloading it here stands in for that.
+    renderNavbar('/organizations/10', globex);
+
+    expect(screen.getByRole('heading', { name: 'Globex Corp' })).toBeInTheDocument();
+  });
+
+  it('falls back to the plain "Organizations" header while the fetch is still in flight', () => {
+    renderNavbar('/organizations/10', null);
+
+    expect(screen.queryByRole('heading', { name: 'Globex Corp' })).not.toBeInTheDocument();
+    expect(screen.getByText('Organizations')).toBeInTheDocument();
+  });
+
+  it('does not show a stale organization name for a different id than the one loaded', () => {
+    // e.g. navigating from org 10's page straight to org 11's, before the
+    // new fetch has resolved and overwritten selectedCustomer.
+    renderNavbar('/organizations/11', globex);
+
+    expect(screen.queryByRole('heading', { name: 'Globex Corp' })).not.toBeInTheDocument();
   });
 });
