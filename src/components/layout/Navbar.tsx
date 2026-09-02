@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ACCOUNTS_DATA } from '../organizations/accountsData';
+import type { AccountRow } from '../organizations/accountsData';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
 import {
   ChevronLeft,
@@ -49,23 +50,18 @@ export function Navbar() {
     orgId && selectedCustomer?.id === orgId ? mapCustomerToOrgRow(selectedCustomer) : null;
 
   // Detect account details path. pages/accounts/Details.tsx itself still
-  // runs on ACCOUNTS_DATA mock data (a real backend id from the Accounts
-  // tab never matches the mock's own 'acc-N' string ids) — but a click
-  // through from that real Accounts tab (see Details.tsx) carries the
-  // real account's name/org/logo via navigation `state`, so at least
-  // *this header* can show the org/account actually clicked rather than
-  // whatever the mock falls back to. A direct URL visit or a refresh has
-  // no state to read, so it still falls back to the mock's first entry,
-  // same as the page body below it.
+  // falls back to ACCOUNTS_DATA mock data on a direct visit/refresh (a
+  // real backend id from the Accounts tab never matches the mock's own
+  // 'acc-N' string ids) — but a click through from that real Accounts
+  // tab (see organizations/Details.tsx) carries the real AccountRow via
+  // navigation `state`, the same one that page's own body now renders,
+  // so this header shows the org/account actually clicked instead of
+  // whatever the mock falls back to.
   const accountMatch = location.pathname.match(/\/accounts\/([^/]+)/);
   const accountId = accountMatch ? accountMatch[1] : null;
-  const accountNavState = location.state as
-    | { accountName: string; orgName: string; logo: string }
-    | null;
+  const accountNavState = location.state as { account: AccountRow } | null;
   const account = accountId
-    ? accountNavState
-      ? { name: accountNavState.accountName, orgName: accountNavState.orgName, logo: accountNavState.logo }
-      : (ACCOUNTS_DATA.find((a) => a.id === accountId) ?? ACCOUNTS_DATA[0])
+    ? (accountNavState?.account ?? ACCOUNTS_DATA.find((a) => a.id === accountId) ?? ACCOUNTS_DATA[0])
     : null;
 
   const isOrganizations = location.pathname.startsWith('/organizations');

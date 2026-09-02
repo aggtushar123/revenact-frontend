@@ -421,18 +421,18 @@ function AccountsTab({ accounts, rawAccounts, customerId, isLoading, error }: Ac
                      key={acc.id}
                      className="hover:bg-accent-dim/20 border-b border-line-subtle transition-all cursor-pointer group"
                      onClick={() =>
-                       // The standalone /accounts/:id page (and its header,
-                       // see Navbar.tsx) still runs on ACCOUNTS_DATA mock
-                       // lookups keyed by the mock's own string ids, so a
-                       // real backend id never matches there. Passing the
-                       // already-known real name/org/logo through
-                       // navigation state at least gets the *header* right
-                       // when reached this way — a direct URL visit or
-                       // refresh still falls back to the mock, since
-                       // there's nothing to read state from then.
-                       navigate(`/accounts/${acc.id}`, {
-                         state: { accountName: acc.name, orgName: acc.orgName, logo: acc.logo },
-                       })
+                       // The standalone /accounts/:id page still runs on
+                       // ACCOUNTS_DATA mock lookups keyed by the mock's own
+                       // string ids, so a real backend id never matches
+                       // there. Passing the already-known real AccountRow
+                       // through navigation state gets that page (header,
+                       // metrics banner, pinned attributes — all of it,
+                       // since they already just render whatever AccountRow
+                       // they're given) showing this exact account when
+                       // reached this way — a direct URL visit or refresh
+                       // still falls back to the mock, since there's
+                       // nothing to read state from then.
+                       navigate(`/accounts/${acc.id}`, { state: { account: acc } })
                      }
                    >
                      <td className="p-4"><input type="checkbox" className="rounded border-line" onClick={(e) => e.stopPropagation()} /></td>

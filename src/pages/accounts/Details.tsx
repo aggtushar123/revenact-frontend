@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import {
   RefreshCw,
   MoreHorizontal,
@@ -8,16 +8,26 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
+import type { AccountRow } from '../../components/organizations/accountsData';
 import { ActivityFeed, PinnedAttributes } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 
 export function AccountDetails() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState('General');
   const [is360Enabled, setIs360Enabled] = useState(true);
   const [isPinnedOpen, setIsPinnedOpen] = useState(true);
 
-  const account = ACCOUNTS_DATA.find(a => a.id === id) || ACCOUNTS_DATA[0];
+  // Clicking through from a real org's Accounts tab (see
+  // organizations/Details.tsx) carries the real, already-fetched
+  // AccountRow via navigation `state` — everything below already just
+  // renders whatever AccountRow it's given, so that's the only change
+  // needed to make a click-through show the real account end to end.
+  // A direct URL visit or refresh has no state to read, so it still
+  // falls back to the mock, same as before.
+  const accountNavState = location.state as { account: AccountRow } | null;
+  const account = accountNavState?.account ?? ACCOUNTS_DATA.find((a) => a.id === id) ?? ACCOUNTS_DATA[0];
 
   const tabs = [
     { name: 'General', count: null },
@@ -153,19 +163,43 @@ export function AccountDetails() {
 
 // ── Metrics Banner ─────────────────────────────────────────────────────────────
 
+// Same tiering as AccountsMetricsBanner's fmtCur (organizations/Details.tsx)
+// and MetricsPanel's formatCurrency. Always computed, no "missing" fallback
+// placeholder — `arr` a real, always-present number (0 for a freshly-added
+// account is a legitimate value, not a signal to show a made-up "$1.2M").
+function formatArr(arr: number): string {
+  if (arr >= 1_000_000) return `$${(arr / 1_000_000).toFixed(1)}M`;
+  if (arr >= 1_000) return `$${(arr / 1_000).toFixed(0)}K`;
+  return `$${arr}`;
+}
+
 // Same unified glass-strip pattern as the organizations list's own
 // MetricsPanel and the parent Organization Details page's own
 // MetricsBanner (react-ts-app/src/pages/organizations/Details.tsx) — one
 // cohesive card with divided sections, rather than this page's previous
-// standalone card with its own smaller dots/typography scale. The
-// numbers themselves are unchanged (still the same placeholders this
-// page always showed — see this component's own history — not real
-// per-account data yet); only the presentation was brought in line.
-function AccountMetricsBanner({ account }: { account: typeof ACCOUNTS_DATA[0] }) {
-  const healthScore = 9.3;
+// standalone card with its own smaller dots/typography scale.
+//
+// Every value here is derived from the `account` prop — previously
+// healthScore/npsScore/csatPct were hardcoded regardless of which
+// account was passed in (a real bug: they didn't even match
+// ACCOUNTS_DATA[0]'s own mock health of 9.5). CSM Pulse text and the
+// Promoters/Passives/Detractors breakdown are derived from health/NPS
+// the same simplified way the Organization Details page's own
+// single-entity MetricsBanner already does (a single account has one
+// NPS score, not a real distribution across many respondents).
+function AccountMetricsBanner({ account }: { account: AccountRow }) {
+  const healthScore = account.health.val;
   const healthPct = (healthScore / 10) * 100;
-  const npsScore = 100;
-  const csatPct = 100;
+  const npsScore = account.npsValue;
+  const csatPct = account.csatValue;
+
+  const csmPulseText = healthScore >= 7 ? 'Very Satisfied' : healthScore >= 4 ? 'Neutral' : 'High Risk';
+  const csmPulseColor = healthScore >= 7 ? 'text-success' : healthScore >= 4 ? 'text-warning' : 'text-danger';
+  const healthColor = healthScore >= 7 ? 'var(--success)' : healthScore >= 4 ? 'var(--warning)' : 'var(--danger)';
+  const csatColor = csatPct >= 70 ? 'var(--success)' : csatPct >= 40 ? 'var(--warning)' : 'var(--danger)';
+  const promoters = npsScore > 0 ? 1 : 0;
+  const passives = npsScore === 0 ? 1 : 0;
+  const detractors = npsScore < 0 ? 1 : 0;
 
   return (
     <div
@@ -177,7 +211,7 @@ function AccountMetricsBanner({ account }: { account: typeof ACCOUNTS_DATA[0] })
         <div className="relative shrink-0" style={{ width: 56, height: 56 }}>
           <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
             <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="3.5" />
-            <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--success)" strokeWidth="3.5"
+            <circle cx="18" cy="18" r="15.9155" fill="none" stroke={healthColor} strokeWidth="3.5"
               strokeDasharray={`${healthPct} ${100 - healthPct}`} strokeLinecap="round" />
           </svg>
         </div>
@@ -197,7 +231,7 @@ function AccountMetricsBanner({ account }: { account: typeof ACCOUNTS_DATA[0] })
       {/* CSM Pulse */}
       <div className="flex flex-col justify-center flex-1 px-5 py-4 min-w-0">
         <span className="text-[13px] font-semibold text-ink tracking-wide mb-2">CSM Pulse</span>
-        <span className="text-xl font-bold leading-none truncate text-success">Very Satisfied</span>
+        <span className={`text-xl font-bold leading-none truncate ${csmPulseColor}`}>{csmPulseText}</span>
       </div>
 
       <div className="w-px bg-line my-3" />
@@ -212,15 +246,15 @@ function AccountMetricsBanner({ account }: { account: typeof ACCOUNTS_DATA[0] })
           <div className="flex flex-col text-[12px] text-ink-muted font-medium gap-1">
             <div className="flex items-center gap-2 justify-between">
               <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-success" /> Promoters</div>
-              <span className="font-semibold text-ink ml-4">10</span>
+              <span className="font-semibold text-ink ml-4">{promoters}</span>
             </div>
             <div className="flex items-center gap-2 justify-between">
               <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-warning" /> Passives</div>
-              <span className="font-semibold text-ink ml-4">0</span>
+              <span className="font-semibold text-ink ml-4">{passives}</span>
             </div>
             <div className="flex items-center gap-2 justify-between">
               <div className="flex items-center gap-1.5"><span className="w-1.5 h-1.5 rounded-sm bg-danger" /> Detractors</div>
-              <span className="font-semibold text-ink ml-4">0</span>
+              <span className="font-semibold text-ink ml-4">{detractors}</span>
             </div>
           </div>
         </div>
@@ -236,7 +270,7 @@ function AccountMetricsBanner({ account }: { account: typeof ACCOUNTS_DATA[0] })
           <div className="shrink-0" style={{ width: 40, height: 40 }}>
             <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
               <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="3.5" />
-              <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--success)" strokeWidth="3.5"
+              <circle cx="18" cy="18" r="15.9155" fill="none" stroke={csatColor} strokeWidth="3.5"
                 strokeDasharray={`${csatPct} ${100 - csatPct}`} strokeLinecap="round" />
             </svg>
           </div>
@@ -248,9 +282,7 @@ function AccountMetricsBanner({ account }: { account: typeof ACCOUNTS_DATA[0] })
       {/* Total ARR */}
       <div className="flex flex-col px-5 py-4 min-w-[130px] justify-center">
         <span className="text-[13px] font-semibold text-ink tracking-wide mb-2">Total ARR</span>
-        <span className="text-xl font-bold text-ink leading-tight">
-          ${account.arr ? (account.arr >= 1_000_000 ? `${(account.arr / 1_000_000).toFixed(1)}M` : `${(account.arr / 1_000).toFixed(0)}K`) : '1.2M'}
-        </span>
+        <span className="text-xl font-bold text-ink leading-tight">{formatArr(account.arr)}</span>
       </div>
     </div>
   );

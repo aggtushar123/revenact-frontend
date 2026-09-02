@@ -210,19 +210,42 @@ describe('Navbar organization breadcrumb (/organizations/:id)', () => {
   });
 });
 
+// Minimal but real-shaped AccountRow — see mapToAccountRow.test.ts for
+// the full field list. Only what Navbar's own header actually reads
+// (name/orgName/logo) needs realistic values here.
+const apacDivision = {
+  orgId: 9,
+  id: '17',
+  name: 'APAC Division',
+  orgName: 'Kraft Heinz',
+  logo: 'https://logo.clearbit.com/kraftheinz.com',
+  revenactId: 17,
+  pulse: [],
+  aiPulseScore: '—',
+  aiPulseReason: '-',
+  owner: 'Unassigned',
+  avatar: '—',
+  health: { val: 5, clr: 'bg-[var(--warning)]' },
+  healthCategory: 'average' as const,
+  nps: '0',
+  npsValue: 0,
+  csat: 'N/A',
+  csatValue: 0,
+  lifecycleStage: 'Onboarding',
+  mrr: 0,
+  arr: 0,
+  renewal: '-',
+};
+
 describe('Navbar account breadcrumb (/accounts/:id)', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
   });
 
   it('shows the real account/org name from navigation state (a click-through from a real Accounts tab)', () => {
-    // Details.tsx's AccountsTab passes this through navigate()'s state
-    // when a row is clicked — see that file. The standalone Account page
-    // itself is still mock-data-only; this is just the header.
-    renderNavbar({
-      pathname: '/accounts/17',
-      state: { accountName: 'APAC Division', orgName: 'Kraft Heinz', logo: 'https://logo.clearbit.com/kraftheinz.com' },
-    });
+    // organizations/Details.tsx's AccountsTab passes the real AccountRow
+    // through navigate()'s state when a row is clicked — see that file.
+    renderNavbar({ pathname: '/accounts/17', state: { account: apacDivision } });
 
     expect(screen.getByRole('heading', { name: 'APAC Division' })).toBeInTheDocument();
     expect(screen.getByText('Kraft Heinz')).toBeInTheDocument();
