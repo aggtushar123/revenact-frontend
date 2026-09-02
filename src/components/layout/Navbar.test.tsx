@@ -108,6 +108,9 @@ function renderNavbar(
         tasks: [],
         tasksLoading: false,
         tasksError: null,
+        notes: [],
+        notesLoading: false,
+        notesError: null,
       },
     },
   });

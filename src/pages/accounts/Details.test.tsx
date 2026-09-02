@@ -278,4 +278,50 @@ describe('AccountDetails page (/accounts/:id)', () => {
       expect(await screen.findByText('No tasks found')).toBeInTheDocument();
     });
   });
+
+  describe('Notes Feed (real Notes, same wiring as Activities)', () => {
+    it('fetches and renders this account\'s own notes, from its own nested endpoint', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () =>
+              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/notes/`)
+                ? [
+                    {
+                      id: 1,
+                      title: 'Usage Uptick Notes',
+                      author_name: 'Sarah Chen',
+                      body: 'Adoption ticked up noticeably after the new regional rollout completed.',
+                      logged_at: '2026-07-15',
+                      links: 1,
+                    },
+                  ]
+                : [],
+          })
+        )
+      );
+
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Notes' }));
+
+      expect(await screen.findByText('Usage Uptick Notes')).toBeInTheDocument();
+      expect(screen.getByText('1 Links')).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/notes/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('shows no notes (not a stale or hardcoded set) when reached without navigation state', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Notes' }));
+
+      expect(await screen.findByText('No notes found')).toBeInTheDocument();
+    });
+  });
 });

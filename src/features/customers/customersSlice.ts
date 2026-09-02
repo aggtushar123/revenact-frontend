@@ -132,6 +132,21 @@ export interface Task {
   status: 'pending' | 'in-progress' | 'completed';
 }
 
+// Mirrors revenact-backend's NoteSerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Note. `author_name` is plain
+// text, not a FK, same reasoning as Task's `assignee_name`. `links` is
+// a real count — the card only shows its link line when it's greater
+// than zero ("links if any"). No `group` — the date-group header is
+// derived from `logged_at` at render time (see NotesTab.tsx).
+export interface Note {
+  id: number;
+  title: string;
+  author_name: string;
+  body: string;
+  logged_at: string;
+  links: number;
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -254,6 +269,12 @@ interface CustomersState {
   tasks: Task[];
   tasksLoading: boolean;
   tasksError: string | null;
+  /** Notes for whichever Customer or Account ActivityFeed's "Notes"
+   * filter is currently showing — same single-slot reasoning as
+   * `activities`/`emails`/`tasks` above. */
+  notes: Note[];
+  notesLoading: boolean;
+  notesError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -286,6 +307,9 @@ const initialState: CustomersState = {
   tasks: [],
   tasksLoading: false,
   tasksError: null,
+  notes: [],
+  notesLoading: false,
+  notesError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -488,6 +512,37 @@ export const fetchTasksForAccount = createAsyncThunk<
   }
 });
 
+// Powers ActivityFeed's "Notes" filter on the Organization Details
+// page's General tab — every organization-level Note for one
+// Customer.
+export const fetchNotesForCustomer = createAsyncThunk<
+  Note[],
+  number,
+  { rejectValue: string }
+>('customers/fetchNotesForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Note[]>(`/customers/${customerId}/notes/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load notes.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers ActivityFeed's "Notes" filter on the standalone Account
+// page — every account-level Note for one Account.
+export const fetchNotesForAccount = createAsyncThunk<
+  Note[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>('customers/fetchNotesForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Note[]>(`/customers/${customerId}/accounts/${accountId}/notes/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load notes.';
+    return rejectWithValue(message);
+  }
+});
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -545,6 +600,13 @@ const customersSlice = createSlice({
       state.tasks = [];
       state.tasksLoading = false;
       state.tasksError = null;
+    },
+    // Same reasoning as clearActivities/clearEmails/clearTasks above,
+    // for the "Notes" filter.
+    clearNotes(state) {
+      state.notes = [];
+      state.notesLoading = false;
+      state.notesError = null;
     },
   },
   extraReducers: (builder) => {
@@ -718,6 +780,35 @@ const customersSlice = createSlice({
         state.tasksLoading = false;
         state.tasksError = action.payload ?? 'Could not load tasks.';
       })
+      // fetchNotesForCustomer and fetchNotesForAccount share the same
+      // notes/notesLoading/notesError slots, same reasoning as the
+      // activities/emails/tasks slots above.
+      .addCase(fetchNotesForCustomer.pending, (state) => {
+        state.notesLoading = true;
+        state.notesError = null;
+        state.notes = [];
+      })
+      .addCase(fetchNotesForCustomer.fulfilled, (state, action) => {
+        state.notesLoading = false;
+        state.notes = action.payload;
+      })
+      .addCase(fetchNotesForCustomer.rejected, (state, action) => {
+        state.notesLoading = false;
+        state.notesError = action.payload ?? 'Could not load notes.';
+      })
+      .addCase(fetchNotesForAccount.pending, (state) => {
+        state.notesLoading = true;
+        state.notesError = null;
+        state.notes = [];
+      })
+      .addCase(fetchNotesForAccount.fulfilled, (state, action) => {
+        state.notesLoading = false;
+        state.notes = action.payload;
+      })
+      .addCase(fetchNotesForAccount.rejected, (state, action) => {
+        state.notesLoading = false;
+        state.notesError = action.payload ?? 'Could not load notes.';
+      })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -759,5 +850,5 @@ const customersSlice = createSlice({
   },
 });
 
-export const { clearActivities, clearEmails, clearTasks } = customersSlice.actions;
+export const { clearActivities, clearEmails, clearTasks, clearNotes } = customersSlice.actions;
 export default customersSlice.reducer;

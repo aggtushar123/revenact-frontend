@@ -19,6 +19,9 @@ import customersReducer, {
   fetchTasksForCustomer,
   fetchTasksForAccount,
   clearTasks,
+  fetchNotesForCustomer,
+  fetchNotesForAccount,
+  clearNotes,
 } from './customersSlice';
 
 function makeStore() {
@@ -808,6 +811,109 @@ describe('customersSlice', () => {
       const state = store.getState().customers;
       expect(state.tasks).toEqual([]);
       expect(state.tasksError).toBeNull();
+    });
+  });
+
+  describe('fetchNotesForCustomer / fetchNotesForAccount (ActivityFeed\'s Notes filter)', () => {
+    const orgNote = {
+      id: 1,
+      title: 'Call Notes: Product Feedback Session',
+      author_name: 'Edgar Holmes',
+      body: 'Customer expressed interest in AI-powered analytics.',
+      logged_at: '2026-03-04',
+      links: 2,
+    };
+    const accountNote = {
+      id: 2,
+      title: 'Commercial Negotiation Summary',
+      author_name: 'Edgar Holmes',
+      body: 'Customer requested 15% discount for 3-year commitment.',
+      logged_at: '2026-03-15',
+      links: 1,
+    };
+
+    it('fetchNotesForCustomer GETs /customers/<id>/notes/ and stores the result', async () => {
+      mockFetchOnce(200, [orgNote]);
+      const store = makeStore();
+
+      await store.dispatch(fetchNotesForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/notes/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.notes).toEqual([orgNote]);
+      expect(state.notesLoading).toBe(false);
+      expect(state.notesError).toBeNull();
+    });
+
+    it('fetchNotesForAccount GETs the nested account endpoint and stores the result', async () => {
+      mockFetchOnce(200, [accountNote]);
+      const store = makeStore();
+
+      await store.dispatch(fetchNotesForAccount({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/notes/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(store.getState().customers.notes).toEqual([accountNote]);
+    });
+
+    // Same regression shape as the Activities/Emails/Tasks leak-guards
+    // above — one account's notes must never bleed into another
+    // account's fetch.
+    it('notes for one account never leak into another account\'s fetch', async () => {
+      mockFetchOnce(200, [accountNote]);
+      const store = makeStore();
+      await store.dispatch(fetchNotesForAccount({ customerId: globex.id, accountId: 17 }));
+      expect(store.getState().customers.notes).toEqual([accountNote]);
+
+      const otherAccountNote = { ...orgNote, id: 3, title: 'Escalation Meeting Summary' };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [otherAccountNote] })
+      );
+      await store.dispatch(fetchNotesForAccount({ customerId: globex.id, accountId: 6 }));
+
+      expect(store.getState().customers.notes).toEqual([otherAccountNote]);
+    });
+
+    it('sets an error and leaves notes empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchNotesForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.notes).toEqual([]);
+      expect(state.notesError).toBe('Not found.');
+    });
+
+    it('clears a previous fetch\'s notes as soon as a new one starts', async () => {
+      mockFetchOnce(200, [orgNote]);
+      const store = makeStore();
+      await store.dispatch(fetchNotesForCustomer(globex.id));
+      expect(store.getState().customers.notes).toEqual([orgNote]);
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchNotesForCustomer(2));
+
+      expect(store.getState().customers.notes).toEqual([]);
+    });
+
+    it('clearNotes empties the slot outright (ActivityFeed\'s no-resolvable-id fallback)', async () => {
+      mockFetchOnce(200, [orgNote]);
+      const store = makeStore();
+      await store.dispatch(fetchNotesForCustomer(globex.id));
+      expect(store.getState().customers.notes).toEqual([orgNote]);
+
+      store.dispatch(clearNotes());
+
+      const state = store.getState().customers;
+      expect(state.notes).toEqual([]);
+      expect(state.notesError).toBeNull();
     });
   });
 });
