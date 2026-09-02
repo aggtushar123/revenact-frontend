@@ -417,7 +417,24 @@ function AccountsTab({ accounts, rawAccounts, customerId, isLoading, error }: Ac
                      <td colSpan={8} className="p-20 text-center text-[13px] font-medium text-ink-faint">No accounts for this organization yet.</td>
                    </tr>
                  ) : accounts.map((acc) => (
-                   <tr key={acc.id} className="hover:bg-accent-dim/20 border-b border-line-subtle transition-all cursor-pointer group" onClick={() => navigate(`/accounts/${acc.id}`)}>
+                   <tr
+                     key={acc.id}
+                     className="hover:bg-accent-dim/20 border-b border-line-subtle transition-all cursor-pointer group"
+                     onClick={() =>
+                       // The standalone /accounts/:id page (and its header,
+                       // see Navbar.tsx) still runs on ACCOUNTS_DATA mock
+                       // lookups keyed by the mock's own string ids, so a
+                       // real backend id never matches there. Passing the
+                       // already-known real name/org/logo through
+                       // navigation state at least gets the *header* right
+                       // when reached this way — a direct URL visit or
+                       // refresh still falls back to the mock, since
+                       // there's nothing to read state from then.
+                       navigate(`/accounts/${acc.id}`, {
+                         state: { accountName: acc.name, orgName: acc.orgName, logo: acc.logo },
+                       })
+                     }
+                   >
                      <td className="p-4"><input type="checkbox" className="rounded border-line" onClick={(e) => e.stopPropagation()} /></td>
                      <td className="p-4">
                         <div className="flex items-center gap-4">

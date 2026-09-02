@@ -48,17 +48,25 @@ export function Navbar() {
   const organization =
     orgId && selectedCustomer?.id === orgId ? mapCustomerToOrgRow(selectedCustomer) : null;
 
-  // Detect account details path. Falls back to ACCOUNTS_DATA[0] the same
-  // way pages/accounts/Details.tsx's own lookup does — that page is still
-  // on mock data addressed by string ids ('acc-1', ...), so a real
-  // backend id from the Accounts tab (see customers/Account) never
-  // matches. Without the fallback here, the page body would show the
-  // mock's first account while this header regressed to the generic
-  // path-based title below — matching them keeps the header and body
-  // consistent until this page gets wired to real data as its own pass.
+  // Detect account details path. pages/accounts/Details.tsx itself still
+  // runs on ACCOUNTS_DATA mock data (a real backend id from the Accounts
+  // tab never matches the mock's own 'acc-N' string ids) — but a click
+  // through from that real Accounts tab (see Details.tsx) carries the
+  // real account's name/org/logo via navigation `state`, so at least
+  // *this header* can show the org/account actually clicked rather than
+  // whatever the mock falls back to. A direct URL visit or a refresh has
+  // no state to read, so it still falls back to the mock's first entry,
+  // same as the page body below it.
   const accountMatch = location.pathname.match(/\/accounts\/([^/]+)/);
   const accountId = accountMatch ? accountMatch[1] : null;
-  const account = accountId ? ACCOUNTS_DATA.find(a => a.id === accountId) ?? ACCOUNTS_DATA[0] : null;
+  const accountNavState = location.state as
+    | { accountName: string; orgName: string; logo: string }
+    | null;
+  const account = accountId
+    ? accountNavState
+      ? { name: accountNavState.accountName, orgName: accountNavState.orgName, logo: accountNavState.logo }
+      : (ACCOUNTS_DATA.find((a) => a.id === accountId) ?? ACCOUNTS_DATA[0])
+    : null;
 
   const isOrganizations = location.pathname.startsWith('/organizations');
   const isCopilot = location.pathname === '/copilot';

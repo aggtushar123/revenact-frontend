@@ -63,7 +63,10 @@ const globex = {
   is_archived: false,
 };
 
-function renderNavbar(initialRoute = '/dashboard', selectedCustomer: typeof globex | null = null) {
+function renderNavbar(
+  initialRoute: string | { pathname: string; state?: unknown } = '/dashboard',
+  selectedCustomer: typeof globex | null = null
+) {
   const store = configureStore({
     reducer: { auth: authReducer, brain: brainReducer, customers: customersReducer },
     preloadedState: {
@@ -109,6 +112,7 @@ function renderNavbar(initialRoute = '/dashboard', selectedCustomer: typeof glob
           <Route path="/profile" element={<div>Profile Marker</div>} />
           <Route path="/login" element={<div>Login Marker</div>} />
           <Route path="/organizations/:id" element={<div>Details Marker</div>} />
+          <Route path="/accounts/:id" element={<div>Account Details Marker</div>} />
         </Routes>
       </MemoryRouter>
     </Provider>
@@ -203,5 +207,34 @@ describe('Navbar organization breadcrumb (/organizations/:id)', () => {
     renderNavbar('/organizations/11', globex);
 
     expect(screen.queryByRole('heading', { name: 'Globex Corp' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Navbar account breadcrumb (/accounts/:id)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the real account/org name from navigation state (a click-through from a real Accounts tab)', () => {
+    // Details.tsx's AccountsTab passes this through navigate()'s state
+    // when a row is clicked — see that file. The standalone Account page
+    // itself is still mock-data-only; this is just the header.
+    renderNavbar({
+      pathname: '/accounts/17',
+      state: { accountName: 'APAC Division', orgName: 'Kraft Heinz', logo: 'https://logo.clearbit.com/kraftheinz.com' },
+    });
+
+    expect(screen.getByRole('heading', { name: 'APAC Division' })).toBeInTheDocument();
+    expect(screen.getByText('Kraft Heinz')).toBeInTheDocument();
+  });
+
+  it('falls back to the mock data when reached without navigation state (a direct URL visit or refresh)', () => {
+    renderNavbar('/accounts/17');
+
+    expect(screen.queryByRole('heading', { name: 'APAC Division' })).not.toBeInTheDocument();
+    // Whatever ACCOUNTS_DATA[0] is — not asserting its exact name here,
+    // just that *some* account header renders instead of the header
+    // falling through to the generic path-based title.
+    expect(screen.queryByText('Accounts', { selector: 'h1' })).not.toBeInTheDocument();
   });
 });
