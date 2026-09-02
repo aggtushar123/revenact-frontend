@@ -8,16 +8,22 @@ import { formatDate, initials, HEALTH_COLORS, LIFECYCLE_LABELS, AI_PULSE_LABELS 
 // mapToOrgRow.ts for Customer/OrgRow, and for the same reason: swapping
 // mock data for real data didn't require rewriting that UI.
 //
-// `orgId`/`orgName`/`orgDomain` come from the parent Customer (already
-// fetched by Details.tsx for its own header/General tab) rather than
-// from the Account itself — an Account only carries a `customer` id, not
-// its parent's name, and its own `domain` is meant to fall back to the
-// parent's for the logo (see the backend Account model's docstring).
+// `orgId`/`orgName`/`orgDomain`/`orgAddress`/`orgEmail`/`orgPhone` come
+// from the parent Customer (already fetched by Details.tsx for its own
+// header/General tab) rather than from the Account itself — an Account
+// only carries a `customer` id, not its parent's name, and its own
+// `domain`/`address`/`email`/`phone` are meant to fall back to the
+// parent's when blank (see the backend Account model's docstring) —
+// this is what feeds ActivityFeed's Overview tab for a standalone
+// Account page.
 export function mapAccountToAccountRow(
   a: Account,
   orgId: number,
   orgName: string,
-  orgDomain: string
+  orgDomain: string,
+  orgAddress: string,
+  orgEmail: string,
+  orgPhone: string
 ): AccountRow {
   const arr = Number(a.arr);
   const nps = a.nps_score ?? 0;
@@ -31,6 +37,10 @@ export function mapAccountToAccountRow(
     orgName,
     logo: domain ? `https://logo.clearbit.com/${domain}` : '',
     revenactId: a.id,
+    domain: domain || undefined,
+    location: a.address || orgAddress || undefined,
+    email: a.email || orgEmail || undefined,
+    phone: a.phone || orgPhone || undefined,
     pulse: a.pulse,
     aiPulseScore: AI_PULSE_LABELS[a.ai_pulse_score] ?? '—',
     aiPulseReason: a.ai_pulse_reason || '-',

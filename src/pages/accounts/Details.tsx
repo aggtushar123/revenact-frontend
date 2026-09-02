@@ -144,10 +144,10 @@ export function AccountDetails() {
                   customerId={accountNavState?.account ? account.orgId : undefined}
                   healthColor="bg-success"
                   overviewInfo={{
-                    domain: `${account.name.toLowerCase().replace(/\s+/g, '')}.com`,
-                    location: 'London, UK',
-                    email: `contact@${account.name.toLowerCase().replace(/\s+/g, '')}.com`,
-                    phone: '+1 (800) 275-2273',
+                    domain: account.domain,
+                    location: account.location,
+                    email: account.email,
+                    phone: account.phone,
                   }}
                 />
               </div>

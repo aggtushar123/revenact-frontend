@@ -62,6 +62,11 @@ export interface OrgRow {
   createdBy: string;
   modifiedBy: string;
   nameAddress: string;
+  /** Shown on ActivityFeed's Overview tab — optional since the mock
+   * TABLE_DATA below (unused by any real page, kept only as historical
+   * fallback data) predates these fields. */
+  email?: string;
+  phone?: string;
   mrr: number;
   arr: number;
 }

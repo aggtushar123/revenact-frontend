@@ -23,6 +23,9 @@ function account(overrides: Partial<Account> = {}): Account {
     customer: 6,
     name: 'North America Enterprise',
     domain: '',
+    address: '',
+    email: '',
+    phone: '',
     owner: carl,
     created_at: '2026-08-31T00:00:00Z',
     updated_at: '2026-08-31T00:00:00Z',
@@ -41,12 +44,20 @@ function account(overrides: Partial<Account> = {}): Account {
 }
 
 describe('mapAccountToAccountRow', () => {
-  it('maps a fully-populated account, using its own domain for the logo', () => {
+  it('maps a fully-populated account, using its own domain/address/email/phone', () => {
     const row = mapAccountToAccountRow(
-      account({ domain: 'americas.apple.com' }),
+      account({
+        domain: 'americas.apple.com',
+        address: 'Austin, TX',
+        email: 'na-enterprise@apple.com',
+        phone: '+1 (512) 555-0199',
+      }),
       6,
       'Apple Inc',
-      'apple.com'
+      'apple.com',
+      'Cupertino, CA',
+      'contact@apple.com',
+      '+1 (408) 996-1010'
     );
 
     expect(row.orgId).toBe(6);
@@ -55,6 +66,10 @@ describe('mapAccountToAccountRow', () => {
     expect(row.orgName).toBe('Apple Inc');
     expect(row.logo).toBe('https://logo.clearbit.com/americas.apple.com');
     expect(row.revenactId).toBe(1);
+    expect(row.domain).toBe('americas.apple.com');
+    expect(row.location).toBe('Austin, TX');
+    expect(row.email).toBe('na-enterprise@apple.com');
+    expect(row.phone).toBe('+1 (512) 555-0199');
     expect(row.pulse).toEqual([1, 1, 1, 1, 0]);
     expect(row.aiPulseScore).toBe('Very Satisfied');
     expect(row.owner).toBe('Carl CSM');
@@ -72,10 +87,22 @@ describe('mapAccountToAccountRow', () => {
     expect(row.mrr).toBe(2800);
   });
 
-  it('falls back to the parent customer\'s domain when the account has none of its own', () => {
-    const row = mapAccountToAccountRow(account({ domain: '' }), 6, 'Apple Inc', 'apple.com');
+  it('falls back to the parent customer\'s domain/address/email/phone when the account has none of its own', () => {
+    const row = mapAccountToAccountRow(
+      account({ domain: '', address: '', email: '', phone: '' }),
+      6,
+      'Apple Inc',
+      'apple.com',
+      'Cupertino, CA',
+      'contact@apple.com',
+      '+1 (408) 996-1010'
+    );
 
     expect(row.logo).toBe('https://logo.clearbit.com/apple.com');
+    expect(row.domain).toBe('apple.com');
+    expect(row.location).toBe('Cupertino, CA');
+    expect(row.email).toBe('contact@apple.com');
+    expect(row.phone).toBe('+1 (408) 996-1010');
   });
 
   it('falls back gracefully when owner/scores/renewal are unset', () => {
@@ -90,7 +117,10 @@ describe('mapAccountToAccountRow', () => {
       }),
       6,
       'Apple Inc',
-      'apple.com'
+      'apple.com',
+      'Cupertino, CA',
+      'contact@apple.com',
+      '+1 (408) 996-1010'
     );
 
     expect(row.owner).toBe('Unassigned');
@@ -107,7 +137,10 @@ describe('mapAccountToAccountRow', () => {
       account({ lifecycle_stage: 'churn', health_score: '1.2', health_category: 'poor', nps_score: -100 }),
       6,
       'Apple Inc',
-      'apple.com'
+      'apple.com',
+      'Cupertino, CA',
+      'contact@apple.com',
+      '+1 (408) 996-1010'
     );
 
     expect(row.lifecycleStage).toBe('Churn');

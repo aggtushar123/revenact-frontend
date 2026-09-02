@@ -73,6 +73,8 @@ export function mapCustomerToOrgRow(c: Customer): OrgRow {
     createdBy: c.created_by?.name ?? 'System',
     modifiedBy: c.modified_by?.name ?? 'System',
     nameAddress: c.address || '-',
+    email: c.email || undefined,
+    phone: c.phone || undefined,
     mrr: Math.round(arr / 12),
     arr,
   };

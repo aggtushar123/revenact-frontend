@@ -13,6 +13,10 @@ export interface Customer {
   name: string;
   address: string;
   domain: string;
+  /** Contact info shown on ActivityFeed's Overview tab — not part of
+   * the original tableData.ts mock schema. */
+  email: string;
+  phone: string;
   owner: User | null;
   created_by: User | null;
   modified_by: User | null;
@@ -67,6 +71,12 @@ export interface Account {
   customer: number;
   name: string;
   domain: string;
+  /** Falls back to the parent Customer's own value when blank — see
+   * mapAccountToAccountRow.ts, which is where that fallback actually
+   * happens (not this type, and not the backend). */
+  address: string;
+  email: string;
+  phone: string;
   owner: User | null;
   created_at: string;
   updated_at: string;

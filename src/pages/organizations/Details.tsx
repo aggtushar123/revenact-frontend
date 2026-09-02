@@ -35,7 +35,17 @@ export function Details() {
   // customers/models.py:Account on the backend).
   const organization = selectedCustomer ? mapCustomerToOrgRow(selectedCustomer) : null;
   const accounts = organization
-    ? accountsForCustomer.map((a) => mapAccountToAccountRow(a, orgId, organization.org, organization.domain))
+    ? accountsForCustomer.map((a) =>
+        mapAccountToAccountRow(
+          a,
+          orgId,
+          organization.org,
+          organization.domain,
+          organization.nameAddress,
+          organization.email ?? '',
+          organization.phone ?? ''
+        )
+      )
     : [];
 
   const [activeTab, setActiveTab] = useState('General');
@@ -138,8 +148,8 @@ export function Details() {
                    overviewInfo={{
                      domain: organization.domain,
                      location: organization.nameAddress,
-                     email: `contact@${organization.domain}`,
-                     phone: '+1 (555) 000-0000',
+                     email: organization.email,
+                     phone: organization.phone,
                    }}
                  />
                </div>
