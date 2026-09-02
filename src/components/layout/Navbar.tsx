@@ -48,10 +48,17 @@ export function Navbar() {
   const organization =
     orgId && selectedCustomer?.id === orgId ? mapCustomerToOrgRow(selectedCustomer) : null;
 
-  // Detect account details path
+  // Detect account details path. Falls back to ACCOUNTS_DATA[0] the same
+  // way pages/accounts/Details.tsx's own lookup does — that page is still
+  // on mock data addressed by string ids ('acc-1', ...), so a real
+  // backend id from the Accounts tab (see customers/Account) never
+  // matches. Without the fallback here, the page body would show the
+  // mock's first account while this header regressed to the generic
+  // path-based title below — matching them keeps the header and body
+  // consistent until this page gets wired to real data as its own pass.
   const accountMatch = location.pathname.match(/\/accounts\/([^/]+)/);
   const accountId = accountMatch ? accountMatch[1] : null;
-  const account = accountId ? ACCOUNTS_DATA.find(a => a.id === accountId) : null;
+  const account = accountId ? ACCOUNTS_DATA.find(a => a.id === accountId) ?? ACCOUNTS_DATA[0] : null;
 
   const isOrganizations = location.pathname.startsWith('/organizations');
   const isCopilot = location.pathname === '/copilot';

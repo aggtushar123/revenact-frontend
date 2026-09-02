@@ -41,9 +41,13 @@ export function AccountDetails() {
 
   return (
     <div className="flex flex-col h-full bg-surface overflow-hidden">
-      {/* Tab Navigation */}
-      <div className="bg-surface border-b border-line-subtle px-6 flex items-center justify-between shrink-0 z-10">
-        <nav className="flex items-center gap-8 h-12 overflow-x-auto no-scrollbar whitespace-nowrap">
+      {/* Tab Navigation — same structure/spacing as the Organization
+          Details page's own tab nav (react-ts-app/src/pages/organizations/
+          Details.tsx), which this page previously diverged from: a taller
+          h-12 bar, an all-caps bold toggle label with no pill container,
+          and 18px icons instead of the shared 16px/p-2 convention. */}
+      <nav className="px-6 bg-surface border-b border-line-subtle flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-8 h-10 overflow-x-auto no-scrollbar whitespace-nowrap">
           {tabs.map((tab) => (
             <button
               key={tab.name}
@@ -63,26 +67,26 @@ export function AccountDetails() {
               )}
             </button>
           ))}
-        </nav>
+        </div>
 
-        <div className="flex items-center gap-5 pt-0.5">
-          <div className="flex items-center gap-2.5">
-            <span className="text-[11.5px] font-bold text-ink-faint uppercase tracking-widest mt-0.5">Enable new 360 UI</span>
+        <div className="flex items-center gap-4 py-2 shrink-0">
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-subtle/50 rounded-lg border border-line-subtle">
+            <span className="text-[12px] font-medium text-ink-muted">Enable new 360 UI</span>
             <button
               onClick={() => setIs360Enabled(!is360Enabled)}
-              className={`w-9 h-[21px] rounded-full relative transition-all duration-300 ${is360Enabled ? 'bg-accent' : 'bg-line'}`}
+              className={`w-8 h-4 rounded-full relative cursor-pointer transition-all duration-300 ${is360Enabled ? 'bg-accent' : 'bg-line'}`}
             >
-              <div className={`absolute top-[2.5px] w-4 h-4 bg-surface rounded-full shadow-sm transition-all duration-300 ${is360Enabled ? 'right-[2.5px]' : 'left-[2.5px]'}`} />
+              <div className={`absolute top-0.5 w-3 h-3 bg-surface rounded-full shadow-sm transition-all duration-300 ${is360Enabled ? 'right-0.5' : 'left-0.5'}`} />
             </button>
           </div>
 
-          <div className="h-6 w-px bg-subtle" />
-
-          <HeaderAction icon={<MessageCircle className="w-[18px] h-[18px]" />} />
-          <HeaderAction icon={<RefreshCw className="w-[18px] h-[18px]" />} />
-          <HeaderAction icon={<MoreHorizontal className="w-[18px] h-[18px]" />} />
+          <div className="flex items-center gap-1">
+            <HeaderAction icon={<MessageCircle className="w-4 h-4" />} />
+            <HeaderAction icon={<RefreshCw className="w-4 h-4" />} />
+            <HeaderAction icon={<MoreHorizontal className="w-4 h-4" />} />
+          </div>
         </div>
-      </div>
+      </nav>
 
       {/* Content */}
       <main className="flex-1 overflow-y-auto custom-scrollbar bg-subtle/50">
@@ -252,9 +256,12 @@ function AccountMetricsBanner({ account }: { account: typeof ACCOUNTS_DATA[0] })
   );
 }
 
+// Same "minimal" icon-button convention as the Organization Details
+// page's own IconButton — plain hover:bg-subtle, no border/accent-tint,
+// so the two pages' tab-nav rows read as the same component.
 function HeaderAction({ icon }: { icon: React.ReactNode }) {
   return (
-    <button className="p-1.5 hover:bg-subtle rounded-lg text-ink-faint transition-all border border-transparent hover:border-line-subtle hover:text-accent">
+    <button className="p-2 rounded-lg transition-colors text-ink-faint hover:text-ink-muted hover:bg-subtle">
       {icon}
     </button>
   );
