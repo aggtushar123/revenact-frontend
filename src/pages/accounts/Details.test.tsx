@@ -324,4 +324,51 @@ describe('AccountDetails page (/accounts/:id)', () => {
       expect(await screen.findByText('No notes found')).toBeInTheDocument();
     });
   });
+
+  describe('Tickets Feed (real Tickets, same wiring as Activities)', () => {
+    it('fetches and renders this account\'s own tickets, from its own nested endpoint', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () =>
+              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/tickets/`)
+                ? [
+                    {
+                      id: 1,
+                      ticket_number: 'TKT-2005',
+                      title: 'Usage dashboard not loading for APAC users',
+                      assignee_name: 'Engineering',
+                      status: 'in-progress',
+                      priority: 'high',
+                      opened_at: '2026-07-15',
+                      links: 1,
+                    },
+                  ]
+                : [],
+          })
+        )
+      );
+
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Tickets' }));
+
+      expect(await screen.findByText(/Usage dashboard not loading for APAC users/)).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/tickets/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('shows no tickets (not a stale or hardcoded set) when reached without navigation state', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: 'Tickets' }));
+
+      expect(await screen.findByText('No tickets found')).toBeInTheDocument();
+    });
+  });
 });

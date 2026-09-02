@@ -22,6 +22,9 @@ import customersReducer, {
   fetchNotesForCustomer,
   fetchNotesForAccount,
   clearNotes,
+  fetchTicketsForCustomer,
+  fetchTicketsForAccount,
+  clearTickets,
 } from './customersSlice';
 
 function makeStore() {
@@ -914,6 +917,113 @@ describe('customersSlice', () => {
       const state = store.getState().customers;
       expect(state.notes).toEqual([]);
       expect(state.notesError).toBeNull();
+    });
+  });
+
+  describe('fetchTicketsForCustomer / fetchTicketsForAccount (ActivityFeed\'s Tickets filter)', () => {
+    const orgTicket = {
+      id: 1,
+      ticket_number: 'TKT-1042',
+      title: 'Dashboard loading slow on large datasets',
+      assignee_name: 'Support Team',
+      status: 'in-progress',
+      priority: 'high',
+      opened_at: '2026-03-03',
+      links: 2,
+    };
+    const accountTicket = {
+      id: 2,
+      ticket_number: 'TKT-2003',
+      title: 'Mobile app login fails on iOS 18',
+      assignee_name: 'Engineering',
+      status: 'open',
+      priority: 'critical',
+      opened_at: '2026-03-29',
+      links: 0,
+    };
+
+    it('fetchTicketsForCustomer GETs /customers/<id>/tickets/ and stores the result', async () => {
+      mockFetchOnce(200, [orgTicket]);
+      const store = makeStore();
+
+      await store.dispatch(fetchTicketsForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/tickets/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.tickets).toEqual([orgTicket]);
+      expect(state.ticketsLoading).toBe(false);
+      expect(state.ticketsError).toBeNull();
+    });
+
+    it('fetchTicketsForAccount GETs the nested account endpoint and stores the result', async () => {
+      mockFetchOnce(200, [accountTicket]);
+      const store = makeStore();
+
+      await store.dispatch(fetchTicketsForAccount({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/tickets/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(store.getState().customers.tickets).toEqual([accountTicket]);
+    });
+
+    // Same regression shape as the Activities/Emails/Tasks/Notes
+    // leak-guards above — one account's tickets must never bleed into
+    // another account's fetch.
+    it('tickets for one account never leak into another account\'s fetch', async () => {
+      mockFetchOnce(200, [accountTicket]);
+      const store = makeStore();
+      await store.dispatch(fetchTicketsForAccount({ customerId: globex.id, accountId: 17 }));
+      expect(store.getState().customers.tickets).toEqual([accountTicket]);
+
+      const otherAccountTicket = { ...orgTicket, id: 3, title: 'Salesforce sync failure' };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => [otherAccountTicket] })
+      );
+      await store.dispatch(fetchTicketsForAccount({ customerId: globex.id, accountId: 6 }));
+
+      expect(store.getState().customers.tickets).toEqual([otherAccountTicket]);
+    });
+
+    it('sets an error and leaves tickets empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchTicketsForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.tickets).toEqual([]);
+      expect(state.ticketsError).toBe('Not found.');
+    });
+
+    it('clears a previous fetch\'s tickets as soon as a new one starts', async () => {
+      mockFetchOnce(200, [orgTicket]);
+      const store = makeStore();
+      await store.dispatch(fetchTicketsForCustomer(globex.id));
+      expect(store.getState().customers.tickets).toEqual([orgTicket]);
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchTicketsForCustomer(2));
+
+      expect(store.getState().customers.tickets).toEqual([]);
+    });
+
+    it('clearTickets empties the slot outright (ActivityFeed\'s no-resolvable-id fallback)', async () => {
+      mockFetchOnce(200, [orgTicket]);
+      const store = makeStore();
+      await store.dispatch(fetchTicketsForCustomer(globex.id));
+      expect(store.getState().customers.tickets).toEqual([orgTicket]);
+
+      store.dispatch(clearTickets());
+
+      const state = store.getState().customers;
+      expect(state.tickets).toEqual([]);
+      expect(state.ticketsError).toBeNull();
     });
   });
 });

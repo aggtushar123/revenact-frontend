@@ -147,6 +147,26 @@ export interface Note {
   links: number;
 }
 
+// Mirrors revenact-backend's TicketSerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Ticket. Field set was
+// reverse-engineered from the card, not dictated up front — see that
+// model's own docstring. `status`/`priority` values match the
+// frontend's own existing display-config keys exactly (e.g.
+// "in-progress"). `links` is a real count, shown on the card only
+// when greater than zero, same as Note. No `group` — the date-group
+// header is derived from `opened_at` at render time (see
+// TicketsTab.tsx).
+export interface Ticket {
+  id: number;
+  ticket_number: string;
+  title: string;
+  assignee_name: string;
+  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  opened_at: string;
+  links: number;
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -275,6 +295,12 @@ interface CustomersState {
   notes: Note[];
   notesLoading: boolean;
   notesError: string | null;
+  /** Tickets for whichever Customer or Account ActivityFeed's
+   * "Tickets" filter is currently showing — same single-slot
+   * reasoning as `activities`/`emails`/`tasks`/`notes` above. */
+  tickets: Ticket[];
+  ticketsLoading: boolean;
+  ticketsError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -310,6 +336,9 @@ const initialState: CustomersState = {
   notes: [],
   notesLoading: false,
   notesError: null,
+  tickets: [],
+  ticketsLoading: false,
+  ticketsError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -543,6 +572,37 @@ export const fetchNotesForAccount = createAsyncThunk<
   }
 });
 
+// Powers ActivityFeed's "Tickets" filter on the Organization Details
+// page's General tab — every organization-level Ticket for one
+// Customer.
+export const fetchTicketsForCustomer = createAsyncThunk<
+  Ticket[],
+  number,
+  { rejectValue: string }
+>('customers/fetchTicketsForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Ticket[]>(`/customers/${customerId}/tickets/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load tickets.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers ActivityFeed's "Tickets" filter on the standalone Account
+// page — every account-level Ticket for one Account.
+export const fetchTicketsForAccount = createAsyncThunk<
+  Ticket[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>('customers/fetchTicketsForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Ticket[]>(`/customers/${customerId}/accounts/${accountId}/tickets/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load tickets.';
+    return rejectWithValue(message);
+  }
+});
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -607,6 +667,13 @@ const customersSlice = createSlice({
       state.notes = [];
       state.notesLoading = false;
       state.notesError = null;
+    },
+    // Same reasoning as clearActivities/clearEmails/clearTasks/
+    // clearNotes above, for the "Tickets" filter.
+    clearTickets(state) {
+      state.tickets = [];
+      state.ticketsLoading = false;
+      state.ticketsError = null;
     },
   },
   extraReducers: (builder) => {
@@ -809,6 +876,35 @@ const customersSlice = createSlice({
         state.notesLoading = false;
         state.notesError = action.payload ?? 'Could not load notes.';
       })
+      // fetchTicketsForCustomer and fetchTicketsForAccount share the
+      // same tickets/ticketsLoading/ticketsError slots, same reasoning
+      // as the activities/emails/tasks/notes slots above.
+      .addCase(fetchTicketsForCustomer.pending, (state) => {
+        state.ticketsLoading = true;
+        state.ticketsError = null;
+        state.tickets = [];
+      })
+      .addCase(fetchTicketsForCustomer.fulfilled, (state, action) => {
+        state.ticketsLoading = false;
+        state.tickets = action.payload;
+      })
+      .addCase(fetchTicketsForCustomer.rejected, (state, action) => {
+        state.ticketsLoading = false;
+        state.ticketsError = action.payload ?? 'Could not load tickets.';
+      })
+      .addCase(fetchTicketsForAccount.pending, (state) => {
+        state.ticketsLoading = true;
+        state.ticketsError = null;
+        state.tickets = [];
+      })
+      .addCase(fetchTicketsForAccount.fulfilled, (state, action) => {
+        state.ticketsLoading = false;
+        state.tickets = action.payload;
+      })
+      .addCase(fetchTicketsForAccount.rejected, (state, action) => {
+        state.ticketsLoading = false;
+        state.ticketsError = action.payload ?? 'Could not load tickets.';
+      })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -850,5 +946,6 @@ const customersSlice = createSlice({
   },
 });
 
-export const { clearActivities, clearEmails, clearTasks, clearNotes } = customersSlice.actions;
+export const { clearActivities, clearEmails, clearTasks, clearNotes, clearTickets } =
+  customersSlice.actions;
 export default customersSlice.reducer;

@@ -27,23 +27,24 @@ import {
   fetchNotesForCustomer,
   fetchNotesForAccount,
   clearNotes,
+  fetchTicketsForCustomer,
+  fetchTicketsForAccount,
+  clearTickets,
   type Email,
 } from '../../features/customers/customersSlice';
 
 // ── Data sources ─────────────────────────────────────────────────────────────
 // Org data (original arrays — imported lazily to avoid mutating them).
-// Activities/Emails/Tasks/Notes aren't here — they're wired to real
-// backend models below, not this mock injection scheme (see
-// fetchActivitiesFor*/fetchEmailsFor*/fetchTasksFor*/fetchNotesFor*
-// above).
+// Activities/Emails/Tasks/Notes/Tickets aren't here — they're wired to
+// real backend models below, not this mock injection scheme (see
+// fetchActivitiesFor*/fetchEmailsFor*/fetchTasksFor*/fetchNotesFor*/
+// fetchTicketsFor* above).
 import {
-  TICKETS_DATA as ORG_TICKETS,
   CALENDAR_EVENTS_DATA as ORG_CALENDAR,
 } from '../organizations/activityData';
 
 // Account data
 import {
-  ACCOUNT_TICKETS_DATA,
   ACCOUNT_CALENDAR_EVENTS_DATA,
   ACCOUNT_ID_MAP,
 } from '../organizations/accountActivityData';
@@ -100,10 +101,10 @@ const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'T
 // (which reference those arrays directly) pick up account-specific data.
 // We restore the original org data after rendering.
 //
-// Covers Tickets/Calendar Events only — Activities/Emails/Tasks/Notes
+// Covers Calendar Events only — Activities/Emails/Tasks/Notes/Tickets
 // are wired to real backend models (fetchActivitiesFor*/
-// fetchEmailsFor*/fetchTasksFor*/fetchNotesFor* above), not this mock
-// scheme.
+// fetchEmailsFor*/fetchTasksFor*/fetchNotesFor*/fetchTicketsFor*
+// above), not this mock scheme.
 
 function injectAccountData(accountId: string) {
   const numId = ACCOUNT_ID_MAP[accountId] ?? 101;
@@ -114,7 +115,6 @@ function injectAccountData(accountId: string) {
     arr.splice(0, arr.length, ...data);
   };
 
-  swap(orgActivityData.TICKETS_DATA, ACCOUNT_TICKETS_DATA.filter(t => t.orgId === numId));
   swap(orgActivityData.CALENDAR_EVENTS_DATA, ACCOUNT_CALENDAR_EVENTS_DATA.filter(e => e.orgId === numId));
 
   return numId;
@@ -125,7 +125,6 @@ function restoreOrgData() {
     arr.splice(0, arr.length, ...data);
   };
 
-  swap(orgActivityData.TICKETS_DATA, ORG_TICKETS);
   swap(orgActivityData.CALENDAR_EVENTS_DATA, ORG_CALENDAR);
 }
 
@@ -155,6 +154,9 @@ export function ActivityFeed({
     notes,
     notesLoading,
     notesError,
+    tickets,
+    ticketsLoading,
+    ticketsError,
   } = useAppSelector((state) => state.customers);
 
   // Resolve numeric ID for tab components.
@@ -219,6 +221,19 @@ export function ActivityFeed({
       dispatch(fetchNotesForAccount({ customerId, accountId: Number(entityId) }));
     } else {
       dispatch(clearNotes());
+    }
+  }, [dispatch, entityType, entityId, customerId]);
+
+  // Tickets is wired to the real backend model the same way
+  // Activities/Emails/Tasks/Notes are above — same resolvability
+  // rules, same clear-on-no-real-id fallback.
+  useEffect(() => {
+    if (entityType === 'organization') {
+      dispatch(fetchTicketsForCustomer(Number(entityId)));
+    } else if (customerId !== undefined) {
+      dispatch(fetchTicketsForAccount({ customerId, accountId: Number(entityId) }));
+    } else {
+      dispatch(clearTickets());
     }
   }, [dispatch, entityType, entityId, customerId]);
 
@@ -310,7 +325,9 @@ export function ActivityFeed({
               {filter === 'Notes' && (
                 <NotesTab notes={notes} isLoading={notesLoading} error={notesError} />
               )}
-              {filter === 'Tickets' && <TicketsTab entityId={resolvedId} />}
+              {filter === 'Tickets' && (
+                <TicketsTab tickets={tickets} isLoading={ticketsLoading} error={ticketsError} />
+              )}
               {filter === 'Calendar Events' && <CalendarEventsTab entityId={resolvedId} />}
               {filter === 'Slack' && <SlackTab entityId={resolvedId} />}
 

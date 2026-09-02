@@ -111,6 +111,9 @@ function renderNavbar(
         notes: [],
         notesLoading: false,
         notesError: null,
+        tickets: [],
+        ticketsLoading: false,
+        ticketsError: null,
       },
     },
   });
