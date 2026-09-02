@@ -93,6 +93,9 @@ function renderNavbar(initialRoute = '/dashboard', selectedCustomer: typeof glob
         selectedCustomer,
         selectedCustomerLoading: false,
         selectedCustomerError: null,
+        accountsForCustomer: [],
+        accountsLoading: false,
+        accountsError: null,
       },
     },
   });

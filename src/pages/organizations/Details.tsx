@@ -2,14 +2,14 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { MessageSquare, RefreshCw, MoreHorizontal, CheckCircle, Globe, Mail, Phone, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, Sparkles, ExternalLink, Download, X } from 'lucide-react';
 import type { OrgRow } from '../../components/organizations/tableData';
-import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { CONTACTS_DATA } from '../../components/organizations/contactsData';
 import { ActivityFeed, PinnedAttributes } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchCustomerById } from '../../features/customers/customersSlice';
+import { fetchCustomerById, fetchAccountsForCustomer } from '../../features/customers/customersSlice';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
+import { mapAccountToAccountRow } from '../../features/customers/mapToAccountRow';
 
 
 
@@ -18,16 +18,23 @@ export function Details() {
   const { id } = useParams<{ id: string }>();
   const orgId = parseInt(id || '0', 10);
   const dispatch = useAppDispatch();
-  const { selectedCustomer, selectedCustomerError } = useAppSelector((state) => state.customers);
+  const { selectedCustomer, selectedCustomerError, accountsForCustomer, accountsLoading, accountsError } =
+    useAppSelector((state) => state.customers);
 
   useEffect(() => {
     dispatch(fetchCustomerById(orgId));
+    dispatch(fetchAccountsForCustomer(orgId));
   }, [dispatch, orgId]);
 
   // The General tab, PinnedAttributes panel, and ActivityFeed all render
-  // off this — Accounts/Contacts/etc. below still use their own mock data
-  // (ACCOUNTS_DATA/CONTACTS_DATA), which has no backend model yet.
+  // off this — Contacts/Pipelines/etc. below still use their own mock
+  // data (CONTACTS_DATA), which has no backend model yet. Accounts is now
+  // real too (one Customer has many Account rows — see
+  // customers/models.py:Account on the backend).
   const organization = selectedCustomer ? mapCustomerToOrgRow(selectedCustomer) : null;
+  const accounts = organization
+    ? accountsForCustomer.map((a) => mapAccountToAccountRow(a, orgId, organization.org, organization.domain))
+    : [];
 
   const [activeTab, setActiveTab] = useState('General');
   const [isPinnedOpen, setIsPinnedOpen] = useState(true);
@@ -35,7 +42,7 @@ export function Details() {
 
   const tabs = [
     { name: 'General', count: null },
-    { name: 'Accounts', count: ACCOUNTS_DATA.filter(a => a.orgId === orgId).length },
+    { name: 'Accounts', count: accounts.length },
     { name: 'Contacts', count: CONTACTS_DATA.filter(c => c.orgId === orgId).length },
     { name: 'Pipelines', count: 1 },
     { name: 'Custom Objects', count: 2 },
@@ -175,7 +182,9 @@ export function Details() {
             )}
           </div>
         )}
-        {activeTab === 'Accounts' && <AccountsTab orgId={orgId} />}
+        {activeTab === 'Accounts' && (
+          <AccountsTab accounts={accounts} isLoading={accountsLoading} error={accountsError} />
+        )}
         {activeTab === 'Contacts' && <ContactsTab orgId={orgId} />}
         {activeTab !== 'General' && activeTab !== 'Accounts' && activeTab !== 'Contacts' && (
           <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
@@ -315,9 +324,14 @@ function buildOrgAttributes(organization: OrgRow): AttributeDef[] {
 
 
 
-function AccountsTab({ orgId }: { orgId: number }) {
+interface AccountsTabProps {
+  accounts: AccountRow[];
+  isLoading: boolean;
+  error: string | null;
+}
+
+function AccountsTab({ accounts, isLoading, error }: AccountsTabProps) {
   const navigate = useNavigate();
-  const accounts = ACCOUNTS_DATA.filter(a => a.orgId === orgId);
 
   return (
     <div className="flex flex-col w-full h-full gap-4 max-w-7xl mx-auto">
@@ -370,7 +384,19 @@ function AccountsTab({ orgId }: { orgId: number }) {
                  </tr>
               </thead>
               <tbody>
-                 {accounts.map((acc) => (
+                 {error ? (
+                   <tr>
+                     <td colSpan={8} className="p-20 text-center text-[13px] font-medium text-danger">{error}</td>
+                   </tr>
+                 ) : isLoading && accounts.length === 0 ? (
+                   <tr>
+                     <td colSpan={8} className="p-20 text-center text-[13px] font-medium text-ink-faint">Loading accounts…</td>
+                   </tr>
+                 ) : accounts.length === 0 ? (
+                   <tr>
+                     <td colSpan={8} className="p-20 text-center text-[13px] font-medium text-ink-faint">No accounts for this organization yet.</td>
+                   </tr>
+                 ) : accounts.map((acc) => (
                    <tr key={acc.id} className="hover:bg-accent-dim/20 border-b border-line-subtle transition-all cursor-pointer group" onClick={() => navigate(`/accounts/${acc.id}`)}>
                      <td className="p-4"><input type="checkbox" className="rounded border-line" onClick={(e) => e.stopPropagation()} /></td>
                      <td className="p-4">

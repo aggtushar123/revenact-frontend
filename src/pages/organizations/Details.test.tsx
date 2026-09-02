@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
@@ -71,7 +72,10 @@ describe('Organization Details page (/organizations/:id)', () => {
   it('fetches the org by the id in the URL and renders its real data on the General tab', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => globex })
+      vi.fn((url: string) => {
+        const body = url.includes('/accounts/') ? [] : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      })
     );
 
     renderDetails('10');
@@ -82,6 +86,10 @@ describe('Organization Details page (/organizations/:id)', () => {
     expect(await screen.findAllByText('Onboarding')).toHaveLength(2);
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/customers/10/'),
+      expect.objectContaining({ method: 'GET' })
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/customers/10/accounts/'),
       expect.objectContaining({ method: 'GET' })
     );
   });
@@ -103,5 +111,86 @@ describe('Organization Details page (/organizations/:id)', () => {
     renderDetails('999');
 
     expect(await screen.findByText('Not found.')).toBeInTheDocument();
+  });
+
+  describe('Accounts tab (one Customer has many Accounts)', () => {
+    const account = {
+      id: 1,
+      customer: 10,
+      name: 'North America Enterprise',
+      domain: '',
+      owner: null,
+      created_at: '2026-08-31T00:00:00Z',
+      updated_at: '2026-08-31T00:00:00Z',
+      lifecycle_stage: 'live' as const,
+      health_score: '9.5',
+      health_category: 'good' as const,
+      pulse: [1, 1, 1, 1, 0],
+      ai_pulse_score: 'very_satisfied' as const,
+      ai_pulse_reason: 'Strong executive sponsorship.',
+      nps_score: 100,
+      csat_score: '100.00',
+      renewal_date: '2026-03-02',
+      arr: '33600.00',
+    };
+
+    async function openAccountsTab(accounts: unknown[]) {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) => {
+          const body = url.includes('/accounts/') ? accounts : globex;
+          return Promise.resolve({ ok: true, status: 200, json: async () => body });
+        })
+      );
+      renderDetails('10');
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
+    }
+
+    it('shows real accounts fetched for this organization, and reflects the count in the tab badge', async () => {
+      await openAccountsTab([account]);
+
+      expect(await screen.findByText('North America Enterprise')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Accounts\(1\)$/ })).toBeInTheDocument();
+    });
+
+    it('shows a loading state before the accounts fetch resolves', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) => {
+          if (url.includes('/accounts/')) return new Promise(() => {});
+          return Promise.resolve({ ok: true, status: 200, json: async () => globex });
+        })
+      );
+      renderDetails('10');
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
+
+      expect(await screen.findByText('Loading accounts…')).toBeInTheDocument();
+    });
+
+    it('shows an empty state when the organization has no accounts yet', async () => {
+      await openAccountsTab([]);
+
+      expect(await screen.findByText('No accounts for this organization yet.')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^Accounts\(0\)$/ })).toBeInTheDocument();
+    });
+
+    it('shows the backend error instead of crashing', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) => {
+          if (url.includes('/accounts/')) {
+            return Promise.resolve({ ok: false, status: 404, json: async () => ({ detail: 'Not found.' }) });
+          }
+          return Promise.resolve({ ok: true, status: 200, json: async () => globex });
+        })
+      );
+      renderDetails('10');
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
+
+      expect(await screen.findAllByText('Not found.')).not.toHaveLength(0);
+    });
   });
 });

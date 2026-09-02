@@ -5,6 +5,7 @@ import customersReducer, {
   fetchUpcomingRenewals,
   fetchCustomerStats,
   fetchCustomerById,
+  fetchAccountsForCustomer,
   createCustomer,
   updateCustomer,
 } from './customersSlice';
@@ -367,6 +368,69 @@ describe('customersSlice', () => {
       await store.dispatch(updateCustomer({ id: globex.id, name: 'Globex Renamed' }));
 
       expect(store.getState().customers.selectedCustomer).toEqual(renamed);
+    });
+  });
+
+  describe('fetchAccountsForCustomer (Details.tsx Accounts tab)', () => {
+    const account = {
+      id: 1,
+      customer: globex.id,
+      name: 'North America Enterprise',
+      domain: '',
+      owner: null,
+      created_at: '2026-08-31T00:00:00Z',
+      updated_at: '2026-08-31T00:00:00Z',
+      lifecycle_stage: 'live' as const,
+      health_score: '9.5',
+      health_category: 'good' as const,
+      pulse: [1, 1, 1, 1, 0],
+      ai_pulse_score: 'very_satisfied' as const,
+      ai_pulse_reason: '',
+      nps_score: 100,
+      csat_score: '100.00',
+      renewal_date: '2026-03-02',
+      arr: '33600.00',
+    };
+
+    it('GETs /customers/<id>/accounts/ and stores the plain array as accountsForCustomer', async () => {
+      mockFetchOnce(200, [account]);
+      const store = makeStore();
+
+      await store.dispatch(fetchAccountsForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.accountsForCustomer).toEqual([account]);
+      expect(state.accountsLoading).toBe(false);
+      expect(state.accountsError).toBeNull();
+    });
+
+    it('sets an error and leaves accountsForCustomer empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchAccountsForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.accountsForCustomer).toEqual([]);
+      expect(state.accountsError).toBe('Not found.');
+    });
+
+    it('clears a previous accountsForCustomer as soon as a new fetch starts', async () => {
+      mockFetchOnce(200, [account]);
+      const store = makeStore();
+      await store.dispatch(fetchAccountsForCustomer(globex.id));
+      expect(store.getState().customers.accountsForCustomer).toEqual([account]);
+
+      // Simulate navigating straight from this org's Accounts tab to
+      // another's — dispatch a second fetch without awaiting it yet.
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchAccountsForCustomer(2));
+
+      expect(store.getState().customers.accountsForCustomer).toEqual([]);
     });
   });
 });

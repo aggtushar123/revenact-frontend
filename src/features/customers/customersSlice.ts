@@ -58,6 +58,30 @@ export interface Customer {
   is_archived: boolean;
 }
 
+// Mirrors revenact-backend's AccountSerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Account. A named sub-account
+// under one Customer (one-to-many: a Customer can have any number of
+// these). Read-only for now — no write endpoint yet.
+export interface Account {
+  id: number;
+  customer: number;
+  name: string;
+  domain: string;
+  owner: User | null;
+  created_at: string;
+  updated_at: string;
+  lifecycle_stage: Customer['lifecycle_stage'];
+  health_score: string;
+  health_category: 'good' | 'average' | 'poor';
+  pulse: number[];
+  ai_pulse_score: 'very_satisfied' | 'satisfied' | 'moderate' | 'high_risk' | '';
+  ai_pulse_reason: string;
+  nps_score: number | null;
+  csat_score: string | null;
+  renewal_date: string | null;
+  arr: string;
+}
+
 // The subset of Customer fields the Add/Edit forms actually expose —
 // identity, ownership, lifecycle stage, and contract dates. Deliberately
 // excludes financials, product usage, and NPS/CSAT/health: per the
@@ -139,6 +163,13 @@ interface CustomersState {
   selectedCustomer: Customer | null;
   selectedCustomerLoading: boolean;
   selectedCustomerError: string | null;
+  /** Accounts for whichever customer Details.tsx's Accounts tab is
+   * currently showing — a single slot, same reasoning as
+   * selectedCustomer: only one organization's Accounts tab is ever on
+   * screen at a time. */
+  accountsForCustomer: Account[];
+  accountsLoading: boolean;
+  accountsError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -159,6 +190,9 @@ const initialState: CustomersState = {
   selectedCustomer: null,
   selectedCustomerLoading: false,
   selectedCustomerError: null,
+  accountsForCustomer: [],
+  accountsLoading: false,
+  accountsError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -216,6 +250,22 @@ export const fetchCustomerById = createAsyncThunk<Customer, number, { rejectValu
     }
   }
 );
+
+// Powers Details.tsx's Accounts tab — every Account under one Customer.
+// Read-only (see Account's own docstring); no pagination envelope, an
+// individual organization's account list is expected to stay small.
+export const fetchAccountsForCustomer = createAsyncThunk<
+  Account[],
+  number,
+  { rejectValue: string }
+>('customers/fetchAccountsForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Account[]>(`/customers/${customerId}/accounts/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load accounts.';
+    return rejectWithValue(message);
+  }
+});
 
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
@@ -317,6 +367,22 @@ const customersSlice = createSlice({
       .addCase(fetchCustomerById.rejected, (state, action) => {
         state.selectedCustomerLoading = false;
         state.selectedCustomerError = action.payload ?? 'Could not load this organization.';
+      })
+      .addCase(fetchAccountsForCustomer.pending, (state) => {
+        state.accountsLoading = true;
+        state.accountsError = null;
+        // Cleared for the same reason as selectedCustomer's own pending
+        // case — otherwise switching orgs briefly shows the previous
+        // org's accounts under the new one's tab.
+        state.accountsForCustomer = [];
+      })
+      .addCase(fetchAccountsForCustomer.fulfilled, (state, action) => {
+        state.accountsLoading = false;
+        state.accountsForCustomer = action.payload;
+      })
+      .addCase(fetchAccountsForCustomer.rejected, (state, action) => {
+        state.accountsLoading = false;
+        state.accountsError = action.payload ?? 'Could not load accounts.';
       })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
