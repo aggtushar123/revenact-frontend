@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { ActionBar } from '../../components/accounts/ActionBar';
 import { AccountsTable } from '../../components/accounts/AccountsTable';
+import { MetricsPanel } from '../../components/accounts/MetricsPanel';
 import { AccountFormModal } from '../organizations/AccountFormModal';
 import { fetchAllAccounts, fetchCustomers } from '../../features/customers/customersSlice';
 import type { Account } from '../../features/customers/customersSlice';
@@ -10,10 +11,9 @@ import type { AppDispatch, RootState } from '../../store';
 // Same "raw path in, paginated page out" pattern as the standalone
 // Contacts page's own List.tsx (fetchAllContacts) — see that page for
 // the debounced-search/offset-tracking reasoning this mirrors exactly.
-// No MetricsPanel/stats banner or checkbox bulk-select here — Account
-// has neither a stats endpoint nor a Delete capability yet (see
-// AccountListView's own docstring on the backend), so there's nothing
-// real to back either one.
+// No checkbox bulk-select here — Account has no Delete capability yet
+// (see AccountListView's own docstring on the backend), so there's
+// nothing real to back one.
 export function List() {
   const dispatch = useDispatch<AppDispatch>();
   const { customers, allAccounts, allAccountsCount, allAccountsNext, allAccountsPrevious, allAccountsLoading, allAccountsError } =
@@ -92,6 +92,8 @@ export function List() {
   return (
     <div className="flex flex-col h-full w-full bg-surface text-ink">
       <div className="flex flex-col flex-1 overflow-hidden p-6">
+        <MetricsPanel />
+
         <ActionBar
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}

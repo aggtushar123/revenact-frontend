@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -45,6 +45,30 @@ const emea = {
 
 const EMPTY_CUSTOMERS_PAGE = { count: 0, next: null, previous: null, results: [] };
 
+// Shaped like revenact-backend's real AccountStatsView response (see
+// docs/API_CONTRACTS.md -> GET /api/v1/accounts/stats/) — the
+// MetricsPanel's own fetch, independent of the table's own accounts
+// fetch, so every mock below needs to answer it explicitly rather than
+// letting it fall through to a branch meant for the accounts list.
+const EMPTY_STATS = {
+  health: {
+    good: { count: 0, mrr: 0, arr: 0 },
+    average: { count: 0, mrr: 0, arr: 0 },
+    poor: { count: 0, mrr: 0, arr: 0 },
+  },
+  nps: { promoters: 0, passives: 0, detractors: 0, score: 0 },
+  lifecycle: {
+    onboarding: { count: 0, mrr: 0, arr: 0 },
+    kickoff: { count: 0, mrr: 0, arr: 0 },
+    adoption: { count: 0, mrr: 0, arr: 0 },
+    live: { count: 0, mrr: 0, arr: 0 },
+    renewal: { count: 0, mrr: 0, arr: 0 },
+    expansion: { count: 0, mrr: 0, arr: 0 },
+    churn: { count: 0, mrr: 0, arr: 0 },
+    other: { count: 0, mrr: 0, arr: 0 },
+  },
+};
+
 // A route stub for each click-through destination — just enough to
 // assert "navigation actually happened", not to render the real page.
 function renderPage() {
@@ -79,6 +103,9 @@ function makeFetchMock({
 }) {
   const queue = [...accounts];
   return vi.fn((url: string) => {
+    if (typeof url === 'string' && url.endsWith('/accounts/stats/')) {
+      return Promise.resolve(jsonResponse(200, EMPTY_STATS));
+    }
     if (typeof url === 'string' && url.includes('/customers/') && !url.includes('/accounts/')) {
       return Promise.resolve(jsonResponse(200, customersPage));
     }
@@ -135,9 +162,12 @@ describe('Accounts List page (/accounts/list)', () => {
     renderPage();
     await screen.findByText('North America Enterprise');
 
-    expect(screen.getByText('0')).toBeInTheDocument();
-    expect(screen.getByText('N/A')).toBeInTheDocument();
-    expect(screen.getAllByText('$0')).toHaveLength(2); // MRR and ARR both real zeros
+    // Scoped to the table itself — the (now zeroed, since EMPTY_STATS)
+    // MetricsPanel above it also renders plenty of its own "0"s.
+    const table = within(screen.getByRole('table'));
+    expect(table.getByText('0')).toBeInTheDocument();
+    expect(table.getByText('N/A')).toBeInTheDocument();
+    expect(table.getAllByText('$0')).toHaveLength(2); // MRR and ARR both real zeros
   });
 
   it('shows the backend error message instead of crashing', async () => {
@@ -245,6 +275,9 @@ describe('Accounts List page (/accounts/list)', () => {
       if (method === 'GET' && url.endsWith('/auth/members/')) {
         return Promise.resolve(jsonResponse(200, []));
       }
+      if (method === 'GET' && url.endsWith('/accounts/stats/')) {
+        return Promise.resolve(jsonResponse(200, EMPTY_STATS));
+      }
       if (url.includes('/customers/') && !url.includes('/accounts/') && method === 'GET') {
         return Promise.resolve(
           jsonResponse(200, { count: 1, next: null, previous: null, results: [{ id: 6, name: 'Apple Inc' }] })
@@ -294,6 +327,9 @@ describe('Accounts List page (/accounts/list)', () => {
       const method = options?.method ?? 'GET';
       if (method === 'GET' && url.endsWith('/auth/members/')) {
         return Promise.resolve(jsonResponse(200, []));
+      }
+      if (method === 'GET' && url.endsWith('/accounts/stats/')) {
+        return Promise.resolve(jsonResponse(200, EMPTY_STATS));
       }
       if (url.includes('/customers/') && !url.includes('/accounts/') && method === 'GET') {
         return Promise.resolve(jsonResponse(200, EMPTY_CUSTOMERS_PAGE));

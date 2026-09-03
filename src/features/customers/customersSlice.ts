@@ -424,6 +424,14 @@ interface CustomersState {
   allAccountsPrevious: string | null;
   allAccountsLoading: boolean;
   allAccountsError: string | null;
+  /** Health/NPS/Lifecycle rollups across every Account the tenant has —
+   * backs the standalone Accounts page's own MetricsPanel. Reuses the
+   * `CustomerStats` type as-is (see that type's own comment) — same
+   * shape, since Account's health_category/lifecycle_stage are the
+   * exact same literal types as Customer's own. */
+  accountStats: CustomerStats | null;
+  accountStatsLoading: boolean;
+  accountStatsError: string | null;
   /** Activities for whichever Customer or Account ActivityFeed's
    * "Activities" filter is currently showing — a single slot, same
    * reasoning as selectedCustomer/accountsForCustomer: only one
@@ -552,6 +560,9 @@ const initialState: CustomersState = {
   allAccountsPrevious: null,
   allAccountsLoading: false,
   allAccountsError: null,
+  accountStats: null,
+  accountStatsLoading: false,
+  accountStatsError: null,
   activities: [],
   activitiesLoading: false,
   activitiesError: null,
@@ -724,6 +735,20 @@ export const fetchAllAccounts = createAsyncThunk<AccountsPage, string | void, { 
       return await apiFetch<AccountsPage>(url || '/accounts/');
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not load accounts.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Powers the standalone Accounts page's own MetricsPanel — same shape
+// as fetchCustomerStats above (reuses the CustomerStats type as-is).
+export const fetchAccountStats = createAsyncThunk<CustomerStats, void, { rejectValue: string }>(
+  'customers/fetchAccountStats',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<CustomerStats>('/accounts/stats/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load stats.';
       return rejectWithValue(message);
     }
   }
@@ -1557,6 +1582,18 @@ const customersSlice = createSlice({
       .addCase(fetchAllAccounts.rejected, (state, action) => {
         state.allAccountsLoading = false;
         state.allAccountsError = action.payload ?? 'Something went wrong.';
+      })
+      .addCase(fetchAccountStats.pending, (state) => {
+        state.accountStatsLoading = true;
+        state.accountStatsError = null;
+      })
+      .addCase(fetchAccountStats.fulfilled, (state, action) => {
+        state.accountStatsLoading = false;
+        state.accountStats = action.payload;
+      })
+      .addCase(fetchAccountStats.rejected, (state, action) => {
+        state.accountStatsLoading = false;
+        state.accountStatsError = action.payload ?? 'Could not load stats.';
       })
       // fetchActivitiesForCustomer and fetchActivitiesForAccount share the
       // same activities/activitiesLoading/activitiesError slots — only one
