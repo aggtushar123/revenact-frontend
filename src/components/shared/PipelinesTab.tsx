@@ -1,12 +1,14 @@
 import { useMemo, useState } from 'react';
-import { Target, DollarSign, Flame, CheckCircle2, ShieldAlert, Search, Plus } from 'lucide-react';
+import { Target, DollarSign, Flame, CheckCircle2, ShieldAlert, Search, Plus, LayoutGrid, List as ListIcon } from 'lucide-react';
 import { useAppDispatch } from '../../hooks';
 import {
   fetchOpportunitiesForCustomer,
   fetchOpportunitiesForAccount,
+  updateOpportunity,
   deleteOpportunity,
   fetchRisksForCustomer,
   fetchRisksForAccount,
+  updateRisk,
   deleteRisk,
 } from '../../features/customers/customersSlice';
 import { formatMoney, companyLabel } from '../../features/customers/formatters';
@@ -15,12 +17,13 @@ import { EntityAvatar } from './EntityAvatar';
 import { OpportunityFormModal } from '../pipelines/OpportunityFormModal';
 import { RiskFormModal } from '../pipelines/RiskFormModal';
 import { ConfirmDialog } from '../organizations/ConfirmDialog';
-
-const PRIORITY_COLORS = {
-  high: 'bg-danger-dim text-danger border-danger/40',
-  medium: 'bg-warning-dim text-warning border-warning/40',
-  low: 'bg-success-dim text-success border-success/40',
-};
+import { KanbanBoard } from '../pipelines/KanbanBoard';
+import {
+  OPPORTUNITY_STAGE_COLUMNS,
+  RISK_STAGE_COLUMNS,
+  PRIORITY_COLORS,
+  pipelineOrgLabel,
+} from '../pipelines/kanbanConfig';
 
 export interface PipelinesTabProps {
   opportunities: Opportunity[];
@@ -44,11 +47,6 @@ export interface PipelinesTabProps {
   accountId?: number;
 }
 
-function entityOrgLabel(e: Opportunity | Risk): string {
-  const label = companyLabel(e.companies);
-  return e.account_name ? `${label} • ${e.account_name}` : label;
-}
-
 // Shared between the Organization Details page's own Pipelines tab and
 // the standalone Account page's Pipelines tab — same shape either way
 // (only the fetch that populates `opportunities`/`risks` differs: every
@@ -56,10 +54,11 @@ function entityOrgLabel(e: Opportunity | Risk): string {
 // record for one Account — see fetchOpportunitiesForCustomer/
 // fetchOpportunitiesForAccount and their Risk equivalents in
 // customersSlice.ts), same "one shared component, not two page-local
-// copies" reasoning as ContactsTab. Unlike the standalone Pipelines
-// board (PipelinesPage.tsx), this is a compact table only — no Kanban
-// board — same "embedded Details-page tabs are tables, not boards"
-// convention as every other tab here (Contacts, Activities, ...).
+// copies" reasoning as ContactsTab. `activeView` toggles between this
+// compact table (the long-standing default here) and the same Kanban
+// board the standalone Pipelines board (PipelinesPage.tsx) itself
+// renders — see components/pipelines/KanbanBoard.tsx, shared by both
+// rather than a third copy of the same drag-and-drop columns.
 export function PipelinesTab({
   opportunities,
   opportunitiesLoading,
@@ -72,13 +71,16 @@ export function PipelinesTab({
 }: PipelinesTabProps) {
   const dispatch = useAppDispatch();
   const [activeSubTab, setActiveSubTab] = useState<'opportunities' | 'risks'>('opportunities');
+  const [activeView, setActiveView] = useState<'list' | 'board'>('list');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [isAddingOpportunity, setIsAddingOpportunity] = useState(false);
+  const [addOpportunityDefaultStage, setAddOpportunityDefaultStage] = useState<Opportunity['stage']>('discovery');
   const [editingOpportunity, setEditingOpportunity] = useState<Opportunity | null>(null);
   const [deletingOpportunity, setDeletingOpportunity] = useState<Opportunity | null>(null);
 
   const [isAddingRisk, setIsAddingRisk] = useState(false);
+  const [addRiskDefaultStage, setAddRiskDefaultStage] = useState<Risk['stage']>('open');
   const [editingRisk, setEditingRisk] = useState<Risk | null>(null);
   const [deletingRisk, setDeletingRisk] = useState<Risk | null>(null);
 
@@ -193,9 +195,27 @@ export function PipelinesTab({
               className="w-full pl-10 pr-4 py-2 bg-subtle/30 border border-line rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-accent/10 placeholder:text-ink-faint"
             />
           </div>
+          <div className="flex items-center gap-0.5 p-0.5 bg-subtle/50 border border-line-subtle rounded-lg shrink-0">
+            <button
+              onClick={() => setActiveView('list')}
+              aria-pressed={activeView === 'list'}
+              title="List view"
+              className={`p-1.5 rounded-md transition-colors ${activeView === 'list' ? 'bg-surface text-accent shadow-sm' : 'text-ink-faint hover:text-ink-muted'}`}
+            >
+              <ListIcon className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setActiveView('board')}
+              aria-pressed={activeView === 'board'}
+              title="Board view"
+              className={`p-1.5 rounded-md transition-colors ${activeView === 'board' ? 'bg-surface text-accent shadow-sm' : 'text-ink-faint hover:text-ink-muted'}`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+          </div>
           {activeSubTab === 'opportunities' ? (
             <button
-              onClick={() => setIsAddingOpportunity(true)}
+              onClick={() => { setAddOpportunityDefaultStage('discovery'); setIsAddingOpportunity(true); }}
               disabled={customerId === undefined}
               title={customerId === undefined ? 'Reload this page from a real Accounts tab link to add an opportunity.' : undefined}
               className="flex items-center gap-2 px-6 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent whitespace-nowrap"
@@ -205,7 +225,7 @@ export function PipelinesTab({
             </button>
           ) : (
             <button
-              onClick={() => setIsAddingRisk(true)}
+              onClick={() => { setAddRiskDefaultStage('open'); setIsAddingRisk(true); }}
               disabled={customerId === undefined}
               title={customerId === undefined ? 'Reload this page from a real Accounts tab link to add a risk.' : undefined}
               className="flex items-center gap-2 px-6 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent whitespace-nowrap"
@@ -216,7 +236,40 @@ export function PipelinesTab({
           )}
         </div>
 
-        {/* Table */}
+        {/* Board */}
+        {activeView === 'board' ? (
+          <div className="p-4">
+            {activeSubTab === 'opportunities' ? (
+              opportunitiesLoading && opportunities.length === 0 ? (
+                <div className="flex items-center justify-center min-h-[300px] text-[13px] font-medium text-ink-faint">Loading opportunities…</div>
+              ) : opportunitiesError ? (
+                <div className="flex items-center justify-center min-h-[300px] text-[13px] font-medium text-danger">{opportunitiesError}</div>
+              ) : (
+                <KanbanBoard
+                  columns={OPPORTUNITY_STAGE_COLUMNS}
+                  entities={filteredOpportunities}
+                  onCardClick={setEditingOpportunity}
+                  onAddClick={(stage) => { setAddOpportunityDefaultStage(stage); setIsAddingOpportunity(true); }}
+                  onMove={(id, stage) => dispatch(updateOpportunity({ id, stage }))}
+                  minHeight="400px"
+                />
+              )
+            ) : risksLoading && risks.length === 0 ? (
+              <div className="flex items-center justify-center min-h-[300px] text-[13px] font-medium text-ink-faint">Loading risks…</div>
+            ) : risksError ? (
+              <div className="flex items-center justify-center min-h-[300px] text-[13px] font-medium text-danger">{risksError}</div>
+            ) : (
+              <KanbanBoard
+                columns={RISK_STAGE_COLUMNS}
+                entities={filteredRisks}
+                onCardClick={setEditingRisk}
+                onAddClick={(stage) => { setAddRiskDefaultStage(stage); setIsAddingRisk(true); }}
+                onMove={(id, stage) => dispatch(updateRisk({ id, stage }))}
+                minHeight="400px"
+              />
+            )}
+          </div>
+        ) : (
         <div className="overflow-x-auto min-h-[400px]">
           <table className="w-full border-collapse">
             <thead>
@@ -247,7 +300,7 @@ export function PipelinesTab({
                       <td className="p-4">
                         <div className="flex items-center gap-2 min-w-0">
                           <EntityAvatar name={companyLabel(o.companies)} className="w-6 h-6 rounded-full text-[10px] shrink-0" />
-                          <span className="text-ink-muted font-medium truncate max-w-[160px]">{entityOrgLabel(o)}</span>
+                          <span className="text-ink-muted font-medium truncate max-w-[160px]">{pipelineOrgLabel(o)}</span>
                         </div>
                       </td>
                     )}
@@ -274,7 +327,7 @@ export function PipelinesTab({
                       <td className="p-4">
                         <div className="flex items-center gap-2 min-w-0">
                           <EntityAvatar name={companyLabel(r.companies)} className="w-6 h-6 rounded-full text-[10px] shrink-0" />
-                          <span className="text-ink-muted font-medium truncate max-w-[160px]">{entityOrgLabel(r)}</span>
+                          <span className="text-ink-muted font-medium truncate max-w-[160px]">{pipelineOrgLabel(r)}</span>
                         </div>
                       </td>
                     )}
@@ -324,12 +377,14 @@ export function PipelinesTab({
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       {isAddingOpportunity && (
         <OpportunityFormModal
           customerId={customerId}
           accountId={accountId}
+          defaultStage={addOpportunityDefaultStage}
           onClose={() => setIsAddingOpportunity(false)}
           onSaved={refetchOpportunities}
         />
@@ -363,6 +418,7 @@ export function PipelinesTab({
         <RiskFormModal
           customerId={customerId}
           accountId={accountId}
+          defaultStage={addRiskDefaultStage}
           onClose={() => setIsAddingRisk(false)}
           onSaved={refetchRisks}
         />

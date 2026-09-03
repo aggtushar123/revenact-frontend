@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Search, Plus, SlidersHorizontal, Pencil } from 'lucide-react';
 import { EntityAvatar } from '../../components/shared';
@@ -15,14 +15,15 @@ import {
   deleteRisk,
 } from '../../features/customers/customersSlice';
 import { formatMoney, companyLabel } from '../../features/customers/formatters';
+import { KanbanBoard } from '../../components/pipelines/KanbanBoard';
+import {
+  OPPORTUNITY_STAGE_COLUMNS,
+  RISK_STAGE_COLUMNS,
+  PRIORITY_COLORS,
+  pipelineOrgLabel,
+} from '../../components/pipelines/kanbanConfig';
 import type { Opportunity, Risk } from '../../features/customers/customersSlice';
 import type { AppDispatch, RootState } from '../../store';
-
-const PRIORITY_COLORS = {
-  high: 'bg-danger-dim text-danger border-danger/40',
-  medium: 'bg-warning-dim text-warning border-warning/40',
-  low: 'bg-success-dim text-success border-success/40',
-};
 
 // Same toggle-pill look/behavior as the Organizations page's own
 // MetricsPanel (COUNT/MRR/ARR) — a private local copy rather than an
@@ -43,167 +44,13 @@ function TabPill({ label, isActive, onClick }: { label: string; isActive: boolea
   );
 }
 
-// ─── Opportunities — real data ──────────────────────────────────────
-// Matches Opportunity.Stage on the backend exactly (services/customers/
-// models.py), same order as the board's own 6 Kanban columns.
-const STAGE_COLUMNS: { stage: Opportunity['stage']; title: string }[] = [
-  { stage: 'discovery', title: 'Discovery' },
-  { stage: 'qualification', title: 'Qualification' },
-  { stage: 'solution_validation', title: 'Solution Validation' },
-  { stage: 'proposal_price_review', title: 'Proposal / Price Review' },
-  { stage: 'negotiation', title: 'Negotiation' },
-  { stage: 'closed_won', title: 'Closed Won' },
-];
-
-function opportunityOrgLabel(o: Opportunity): string {
-  const label = companyLabel(o.companies);
-  return o.account_name ? `${label} • ${o.account_name}` : label;
-}
-
-function OpportunityCard({
-  opportunity,
-  onDragStart,
-  onClick,
-}: {
-  opportunity: Opportunity;
-  onDragStart: (e: React.DragEvent, id: number) => void;
-  onClick: () => void;
-}) {
-  return (
-    <div
-      draggable
-      onDragStart={e => onDragStart(e, opportunity.id)}
-      onClick={onClick}
-      className="bg-surface border border-line/80 rounded-lg p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:border-accent/40 transition-all duration-200 cursor-grab active:cursor-grabbing active:opacity-60 active:scale-[0.98] select-none"
-    >
-      <h4 className="text-[12.5px] font-bold text-ink leading-snug mb-2.5">{opportunity.title}</h4>
-      <div className="text-[12px] font-bold text-accent mb-3">MRR: ${formatMoney(opportunity.mrr)}</div>
-      <div className="flex items-center justify-between min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <EntityAvatar name={companyLabel(opportunity.companies)} className="w-5 h-5 rounded-full text-[9px]" />
-          <span className="text-[11.5px] text-ink-muted font-semibold truncate max-w-[120px]">{opportunityOrgLabel(opportunity)}</span>
-        </div>
-        <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold capitalize shrink-0 ${PRIORITY_COLORS[opportunity.priority]}`}>
-          {opportunity.priority}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function OpportunityColumn({
-  stage,
-  title,
-  opportunities,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onCardClick,
-  onAddClick,
-  isDragOver,
-}: {
-  stage: Opportunity['stage'];
-  title: string;
-  opportunities: Opportunity[];
-  onDragStart: (e: React.DragEvent, id: number) => void;
-  onDragOver: (e: React.DragEvent, stage: Opportunity['stage']) => void;
-  onDrop: (e: React.DragEvent, stage: Opportunity['stage']) => void;
-  onCardClick: (opportunity: Opportunity) => void;
-  onAddClick: (stage: Opportunity['stage']) => void;
-  isDragOver: boolean;
-}) {
-  return (
-    <div
-      className={`flex flex-col w-[220px] shrink-0 rounded-xl transition-colors duration-150 ${isDragOver ? 'bg-accent-dim/60' : 'bg-subtle/60'}`}
-      onDragOver={e => { e.preventDefault(); onDragOver(e, stage); }}
-      onDrop={e => onDrop(e, stage)}
-    >
-      <div className="px-3 pt-3 pb-2.5 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-[12.5px] font-bold text-ink-muted tracking-tight">{title}</span>
-          <span className="text-[11px] text-ink-faint font-bold">({opportunities.length})</span>
-        </div>
-        <button
-          onClick={() => onAddClick(stage)}
-          className="p-0.5 text-ink-faint hover:text-ink-muted transition-colors"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5px]" />
-        </button>
-      </div>
-
-      {isDragOver && (
-        <div className="mx-2 mb-2 h-1 bg-accent rounded-full opacity-60 transition-all" />
-      )}
-
-      <div className="flex flex-col gap-2.5 px-2 pb-3 flex-1 min-h-[60px]">
-        {opportunities.map(o => (
-          <OpportunityCard key={o.id} opportunity={o} onDragStart={onDragStart} onClick={() => onCardClick(o)} />
-        ))}
-        {opportunities.length === 0 && (
-          <div className="flex-1 border-2 border-dashed border-line rounded-lg flex items-center justify-center min-h-[80px] text-[12px] text-ink-faint font-semibold">
-            Drop here
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function OpportunityBoardView({
-  opportunities,
-  onCardClick,
-  onAddClick,
-}: {
-  opportunities: Opportunity[];
-  onCardClick: (opportunity: Opportunity) => void;
-  onAddClick: (stage: Opportunity['stage']) => void;
-}) {
-  const dispatch = useDispatch<AppDispatch>();
-  const [dragOverStage, setDragOverStage] = useState<Opportunity['stage'] | null>(null);
-  const draggingId = useRef<number | null>(null);
-
-  const handleDragStart = (_e: React.DragEvent, id: number) => {
-    draggingId.current = id;
-  };
-
-  const handleDragOver = (_e: React.DragEvent, stage: Opportunity['stage']) => {
-    setDragOverStage(stage);
-  };
-
-  const handleDrop = (_e: React.DragEvent, targetStage: Opportunity['stage']) => {
-    const id = draggingId.current;
-    draggingId.current = null;
-    setDragOverStage(null);
-    if (id === null) return;
-    const current = opportunities.find(o => o.id === id);
-    if (!current || current.stage === targetStage) return;
-    dispatch(updateOpportunity({ id, stage: targetStage }));
-  };
-
-  const handleDragEnd = () => {
-    draggingId.current = null;
-    setDragOverStage(null);
-  };
-
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: 'calc(100vh - 260px)' }} onDragEnd={handleDragEnd}>
-      {STAGE_COLUMNS.map(col => (
-        <OpportunityColumn
-          key={col.stage}
-          stage={col.stage}
-          title={col.title}
-          opportunities={opportunities.filter(o => o.stage === col.stage)}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onCardClick={onCardClick}
-          onAddClick={onAddClick}
-          isDragOver={dragOverStage === col.stage}
-        />
-      ))}
-    </div>
-  );
-}
+// The Kanban board itself (cards, columns, drag-and-drop) is shared
+// with the embedded Pipelines tab on the Organization/Account Details
+// pages — see components/pipelines/KanbanBoard.tsx. Only each entity's
+// own flat-table List view stays here, one per entity for the same
+// reason ContactsTable/OrganizationsTable aren't merged into one
+// generic table: the column sets genuinely differ (Stage/MRR/
+// Organization/Priority isn't reused by anything else).
 
 function OpportunityListView({
   opportunities,
@@ -239,7 +86,7 @@ function OpportunityListView({
               <td className="px-4 py-3.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <EntityAvatar name={companyLabel(o.companies)} className="w-6 h-6 rounded-full text-[10px]" />
-                  <span className="text-ink-muted font-medium truncate max-w-[140px]">{opportunityOrgLabel(o)}</span>
+                  <span className="text-ink-muted font-medium truncate max-w-[140px]">{pipelineOrgLabel(o)}</span>
                 </div>
               </td>
               <td className="px-4 py-3.5">
@@ -256,166 +103,6 @@ function OpportunityListView({
           )}
         </tbody>
       </table>
-    </div>
-  );
-}
-
-// ─── Risks — real data ──────────────────────────────────────────────
-// Matches Risk.Stage on the backend exactly (services/customers/
-// models.py), same order as the board's own 4 Kanban columns.
-const RISK_STAGE_COLUMNS: { stage: Risk['stage']; title: string }[] = [
-  { stage: 'open', title: 'Open' },
-  { stage: 'mitigated', title: 'Mitigated' },
-  { stage: 'realised', title: 'Realised' },
-  { stage: 'abandoned', title: 'Abandoned' },
-];
-
-function riskOrgLabel(r: Risk): string {
-  const label = companyLabel(r.companies);
-  return r.account_name ? `${label} • ${r.account_name}` : label;
-}
-
-function RiskCard({
-  risk,
-  onDragStart,
-  onClick,
-}: {
-  risk: Risk;
-  onDragStart: (e: React.DragEvent, id: number) => void;
-  onClick: () => void;
-}) {
-  return (
-    <div
-      draggable
-      onDragStart={e => onDragStart(e, risk.id)}
-      onClick={onClick}
-      className="bg-surface border border-line/80 rounded-lg p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:border-accent/40 transition-all duration-200 cursor-grab active:cursor-grabbing active:opacity-60 active:scale-[0.98] select-none"
-    >
-      <h4 className="text-[12.5px] font-bold text-ink leading-snug mb-2.5">{risk.title}</h4>
-      <div className="text-[12px] font-bold text-accent mb-3">MRR: ${formatMoney(risk.mrr)}</div>
-      <div className="flex items-center justify-between min-w-0">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <EntityAvatar name={companyLabel(risk.companies)} className="w-5 h-5 rounded-full text-[9px]" />
-          <span className="text-[11.5px] text-ink-muted font-semibold truncate max-w-[120px]">{riskOrgLabel(risk)}</span>
-        </div>
-        <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold capitalize shrink-0 ${PRIORITY_COLORS[risk.priority]}`}>
-          {risk.priority}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-function RiskColumn({
-  stage,
-  title,
-  risks,
-  onDragStart,
-  onDragOver,
-  onDrop,
-  onCardClick,
-  onAddClick,
-  isDragOver,
-}: {
-  stage: Risk['stage'];
-  title: string;
-  risks: Risk[];
-  onDragStart: (e: React.DragEvent, id: number) => void;
-  onDragOver: (e: React.DragEvent, stage: Risk['stage']) => void;
-  onDrop: (e: React.DragEvent, stage: Risk['stage']) => void;
-  onCardClick: (risk: Risk) => void;
-  onAddClick: (stage: Risk['stage']) => void;
-  isDragOver: boolean;
-}) {
-  return (
-    <div
-      className={`flex flex-col w-[220px] shrink-0 rounded-xl transition-colors duration-150 ${isDragOver ? 'bg-accent-dim/60' : 'bg-subtle/60'}`}
-      onDragOver={e => { e.preventDefault(); onDragOver(e, stage); }}
-      onDrop={e => onDrop(e, stage)}
-    >
-      <div className="px-3 pt-3 pb-2.5 flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2">
-          <span className="text-[12.5px] font-bold text-ink-muted tracking-tight">{title}</span>
-          <span className="text-[11px] text-ink-faint font-bold">({risks.length})</span>
-        </div>
-        <button
-          onClick={() => onAddClick(stage)}
-          className="p-0.5 text-ink-faint hover:text-ink-muted transition-colors"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5px]" />
-        </button>
-      </div>
-
-      {isDragOver && (
-        <div className="mx-2 mb-2 h-1 bg-accent rounded-full opacity-60 transition-all" />
-      )}
-
-      <div className="flex flex-col gap-2.5 px-2 pb-3 flex-1 min-h-[60px]">
-        {risks.map(r => (
-          <RiskCard key={r.id} risk={r} onDragStart={onDragStart} onClick={() => onCardClick(r)} />
-        ))}
-        {risks.length === 0 && (
-          <div className="flex-1 border-2 border-dashed border-line rounded-lg flex items-center justify-center min-h-[80px] text-[12px] text-ink-faint font-semibold">
-            Drop here
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function RiskBoardView({
-  risks,
-  onCardClick,
-  onAddClick,
-}: {
-  risks: Risk[];
-  onCardClick: (risk: Risk) => void;
-  onAddClick: (stage: Risk['stage']) => void;
-}) {
-  const dispatch = useDispatch<AppDispatch>();
-  const [dragOverStage, setDragOverStage] = useState<Risk['stage'] | null>(null);
-  const draggingId = useRef<number | null>(null);
-
-  const handleDragStart = (_e: React.DragEvent, id: number) => {
-    draggingId.current = id;
-  };
-
-  const handleDragOver = (_e: React.DragEvent, stage: Risk['stage']) => {
-    setDragOverStage(stage);
-  };
-
-  const handleDrop = (_e: React.DragEvent, targetStage: Risk['stage']) => {
-    const id = draggingId.current;
-    draggingId.current = null;
-    setDragOverStage(null);
-    if (id === null) return;
-    const current = risks.find(r => r.id === id);
-    if (!current || current.stage === targetStage) return;
-    dispatch(updateRisk({ id, stage: targetStage }));
-  };
-
-  const handleDragEnd = () => {
-    draggingId.current = null;
-    setDragOverStage(null);
-  };
-
-  return (
-    <div className="flex gap-3 overflow-x-auto pb-4" style={{ minHeight: 'calc(100vh - 260px)' }} onDragEnd={handleDragEnd}>
-      {RISK_STAGE_COLUMNS.map(col => (
-        <RiskColumn
-          key={col.stage}
-          stage={col.stage}
-          title={col.title}
-          risks={risks.filter(r => r.stage === col.stage)}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-          onCardClick={onCardClick}
-          onAddClick={onAddClick}
-          isDragOver={dragOverStage === col.stage}
-        />
-      ))}
     </div>
   );
 }
@@ -454,7 +141,7 @@ function RiskListView({
               <td className="px-4 py-3.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <EntityAvatar name={companyLabel(r.companies)} className="w-6 h-6 rounded-full text-[10px]" />
-                  <span className="text-ink-muted font-medium truncate max-w-[140px]">{riskOrgLabel(r)}</span>
+                  <span className="text-ink-muted font-medium truncate max-w-[140px]">{pipelineOrgLabel(r)}</span>
                 </div>
               </td>
               <td className="px-4 py-3.5">
@@ -643,7 +330,13 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
               {risksError}
             </div>
           ) : view === 'board' ? (
-            <RiskBoardView risks={filteredRisks} onCardClick={setEditingRisk} onAddClick={handleAddRiskClick} />
+            <KanbanBoard
+              columns={RISK_STAGE_COLUMNS}
+              entities={filteredRisks}
+              onCardClick={setEditingRisk}
+              onAddClick={handleAddRiskClick}
+              onMove={(id, stage) => dispatch(updateRisk({ id, stage }))}
+            />
           ) : (
             <RiskListView risks={filteredRisks} onRowClick={setEditingRisk} />
           )
@@ -656,10 +349,12 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
             {opportunitiesError}
           </div>
         ) : view === 'board' ? (
-          <OpportunityBoardView
-            opportunities={filteredOpportunities}
+          <KanbanBoard
+            columns={OPPORTUNITY_STAGE_COLUMNS}
+            entities={filteredOpportunities}
             onCardClick={setEditingOpportunity}
             onAddClick={handleAddClick}
+            onMove={(id, stage) => dispatch(updateOpportunity({ id, stage }))}
           />
         ) : (
           <OpportunityListView opportunities={filteredOpportunities} onRowClick={setEditingOpportunity} />

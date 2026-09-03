@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -727,6 +727,57 @@ describe('Organization Details page (/organizations/:id)', () => {
       expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
       expect(screen.getByText('Globex Corp')).toBeInTheDocument();
       expect(screen.getByText('Globex Corp • North America')).toBeInTheDocument();
+    });
+
+    it('the Board toggle switches to a Kanban board grouped by stage', async () => {
+      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp, accountLevelOpp], risks: [] }));
+
+      // List (the default) has no stage-column headers of its own —
+      // stage is just a per-row pill.
+      expect(screen.queryByText('Discovery')).not.toBeInTheDocument();
+
+      const user = userEvent.setup();
+      await user.click(screen.getByTitle('Board view'));
+
+      // Both opportunities are 'qualification' — same column, both
+      // cards still visible (not narrowed by drag state or anything).
+      expect(screen.getByText('Qualification')).toBeInTheDocument();
+      expect(screen.getByText('Renewal Expansion Opportunity')).toBeInTheDocument();
+      expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
+      // Every other stage column still renders, just empty — "Closed
+      // Won" isn't checked here since it collides with the summary
+      // banner's own "Closed Won" stat card title above the board.
+      expect(screen.getByText('Discovery')).toBeInTheDocument();
+      expect(screen.getByText('Negotiation')).toBeInTheDocument();
+    });
+
+    it('the Board toggle works for Risks too, grouped by its own 4 stages', async () => {
+      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp], risks: [orgRisk] }));
+      const user = userEvent.setup();
+      await user.click(screen.getByRole('button', { name: /^Risks/ }));
+      await user.click(screen.getByTitle('Board view'));
+
+      expect(screen.getByText('Open')).toBeInTheDocument();
+      expect(screen.getByText('Renewal Risk — Contract Expiry')).toBeInTheDocument();
+      expect(screen.getByText('Mitigated')).toBeInTheDocument();
+      expect(screen.getByText('Abandoned')).toBeInTheDocument();
+    });
+
+    it('clicking a column\'s own + opens Add with that column\'s stage preselected', async () => {
+      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp], risks: [] }));
+      const user = userEvent.setup();
+      await user.click(screen.getByTitle('Board view'));
+
+      // "Negotiation" column's own + button, not the toolbar's "Add
+      // Opportunity" (which defaults to Discovery).
+      // "Negotiation" text sits in an inner wrapper alongside the
+      // count pill; its own "+" button is a sibling one level up, in
+      // the column header row both share.
+      const negotiationHeader = screen.getByText('Negotiation').closest('div')!.parentElement!;
+      await user.click(within(negotiationHeader).getByRole('button'));
+
+      expect(await screen.findByRole('heading', { name: 'Add Opportunity' })).toBeInTheDocument();
+      expect(screen.getByRole('combobox', { name: /stage/i })).toHaveValue('negotiation');
     });
 
     it('adding an opportunity posts to /customers/10/opportunities/ (organization-level)', async () => {
