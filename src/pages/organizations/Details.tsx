@@ -212,7 +212,7 @@ export function Details() {
           />
         )}
         {activeTab === 'Contacts' && (
-          <ContactsTab contacts={contacts} isLoading={contactsLoading} error={contactsError} />
+          <ContactsTab contacts={contacts} isLoading={contactsLoading} error={contactsError} customerId={orgId} />
         )}
         {activeTab !== 'General' && activeTab !== 'Accounts' && activeTab !== 'Contacts' && (
           <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">

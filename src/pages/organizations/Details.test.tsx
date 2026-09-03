@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -373,6 +373,160 @@ describe('Organization Details page (/organizations/:id)', () => {
       expect.stringContaining('/customers/10/contacts/'),
       expect.objectContaining({ method: 'GET' })
     );
+  });
+
+  describe('Contacts tab search/Add/Edit/Delete', () => {
+    const sarahChen = {
+      id: 1,
+      name: 'Sarah Chen',
+      role: 'executive_sponsor',
+      role_display: 'Executive Sponsor',
+      email: 'sarah.chen@globex.example',
+      phone: '+1 (408) 555-0123',
+      status: 'active',
+      sentiment: 'positive',
+      last_contacted_at: '2026-08-31T00:00:00Z',
+      company_id: 10,
+      company_name: 'Globex Corp',
+      account_name: null,
+    };
+    const jamesWilson = {
+      ...sarahChen,
+      id: 2,
+      name: 'James Wilson',
+      role_display: 'Champion',
+      email: 'j.wilson@globex.example',
+    };
+
+    async function openContactsTab(fetchMock: ReturnType<typeof vi.fn>) {
+      vi.stubGlobal('fetch', fetchMock);
+      renderDetails('10');
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
+      await screen.findByText('Sarah Chen');
+      return user;
+    }
+
+    function baseFetchMock(contactsResponse: unknown) {
+      return vi.fn((url: string, options?: { method?: string; body?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'GET' && url.includes('/contacts/')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => contactsResponse });
+        }
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+          ? []
+          : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      });
+    }
+
+    it('filters the already-loaded contacts client-side as you type', async () => {
+      const user = await openContactsTab(baseFetchMock([sarahChen, jamesWilson]));
+      expect(screen.getByText('James Wilson')).toBeInTheDocument();
+
+      await user.type(screen.getByPlaceholderText('Search contacts by name, role or email...'), 'sarah');
+
+      expect(screen.queryByText('James Wilson')).not.toBeInTheDocument();
+      expect(screen.getByText('Sarah Chen')).toBeInTheDocument();
+    });
+
+    it('adding a contact posts to /customers/10/contacts/ (organization-level)', async () => {
+      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'POST' && url.endsWith('/customers/10/contacts/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            json: async () => ({ ...sarahChen, id: 99, name: 'New Person' }),
+          });
+        }
+        if (method === 'GET' && url.includes('/contacts/')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
+        }
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+          ? []
+          : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      });
+      const user = await openContactsTab(fetchMock);
+
+      await user.click(screen.getByRole('button', { name: 'Add Contact' }));
+      await user.type(screen.getByLabelText('Name *'), 'New Person');
+      await user.type(screen.getByLabelText('Email *'), 'new.person@globex.example');
+      const submitButton = screen
+        .getAllByRole('button', { name: 'Add Contact' })
+        .find((btn) => btn.closest('form'))!;
+      await user.click(submitButton);
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/customers/10/contacts/'),
+          expect.objectContaining({ method: 'POST' })
+        )
+      );
+    });
+
+    it('editing a contact PATCHes /api/v1/contacts/<id>/ and updates it in place', async () => {
+      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'PATCH' && url.endsWith('/contacts/1/')) {
+          const body = JSON.parse(options!.body!);
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...sarahChen, ...body }) });
+        }
+        if (method === 'GET' && url.includes('/contacts/')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
+        }
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+          ? []
+          : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      });
+      const user = await openContactsTab(fetchMock);
+
+      await user.click(screen.getByRole('button', { name: 'Actions for Sarah Chen' }));
+      await user.click(screen.getByRole('button', { name: 'Edit Contact' }));
+      const nameInput = screen.getByLabelText('Name *');
+      await user.clear(nameInput);
+      await user.type(nameInput, 'Sarah Chen-Wu');
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/contacts/1/'),
+          expect.objectContaining({ method: 'PATCH' })
+        )
+      );
+      expect(await screen.findByText('Sarah Chen-Wu')).toBeInTheDocument();
+    });
+
+    it('deleting a contact DELETEs /api/v1/contacts/<id>/ and removes the row', async () => {
+      const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'DELETE' && url.endsWith('/contacts/1/')) {
+          return Promise.resolve({ ok: true, status: 204, json: async () => null });
+        }
+        if (method === 'GET' && url.includes('/contacts/')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
+        }
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+          ? []
+          : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      });
+      const user = await openContactsTab(fetchMock);
+
+      await user.click(screen.getByRole('button', { name: 'Actions for Sarah Chen' }));
+      await user.click(screen.getByRole('button', { name: 'Delete Contact' }));
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/contacts/1/'),
+          expect.objectContaining({ method: 'DELETE' })
+        )
+      );
+      expect(screen.queryByText('Sarah Chen')).not.toBeInTheDocument();
+    });
   });
 
   it('shows a loading state before the fetch resolves', () => {

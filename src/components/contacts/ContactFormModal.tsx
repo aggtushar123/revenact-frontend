@@ -2,7 +2,11 @@ import { useId, useState, type FormEvent, type ReactNode } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useAppDispatch } from '../../hooks';
 import { ApiError } from '../../lib/apiClient';
-import { createContactForCustomer, updateContact } from '../../features/customers/customersSlice';
+import {
+  createContactForCustomer,
+  createContactForAccount,
+  updateContact,
+} from '../../features/customers/customersSlice';
 import type { Contact } from '../../features/customers/customersSlice';
 
 // Matches Contact.Role on the backend exactly (services/customers/
@@ -24,13 +28,19 @@ interface ContactFormModalProps {
   /** Present for Edit, omitted for Add. */
   contact?: Contact;
   /** Add-only: the Company (Customer) to create the new contact under
-   * — a fixed id when opened from a page that already has one (e.g. an
-   * Organization's own Contacts tab, in a future round), or picked from
+   * — a fixed id when opened from a page that already has one (the
+   * Organization Details page's own Contacts tab, or the standalone
+   * Account page's — see `accountId` below), or picked from
    * `companies` on the standalone /contacts/list page, which has no
    * single Customer of its own. Ignored for Edit — a Contact can't be
    * moved between parents (see ContactDetailView's own docstring on
    * the backend), so Company is shown read-only there instead. */
   customerId?: number;
+  /** Add-only: set together with a fixed `customerId` when opened from
+   * the standalone Account page's own Contacts tab — creates an
+   * account-level Contact (POST .../accounts/<accountId>/contacts/)
+   * instead of an organization-level one. Omitted everywhere else. */
+  accountId?: number;
   /** Add-only, and only when `customerId` isn't already fixed: every
    * company to choose from. */
   companies?: { id: number; name: string }[];
@@ -45,7 +55,14 @@ interface ContactFormModalProps {
   onSaved: () => void;
 }
 
-export function ContactFormModal({ contact, customerId, companies, onClose, onSaved }: ContactFormModalProps) {
+export function ContactFormModal({
+  contact,
+  customerId,
+  accountId,
+  companies,
+  onClose,
+  onSaved,
+}: ContactFormModalProps) {
   const dispatch = useAppDispatch();
   const isEdit = !!contact;
 
@@ -85,6 +102,11 @@ export function ContactFormModal({ contact, customerId, companies, onClose, onSa
         // No onSaved() — updateContact's own extraReducers already
         // patched every list this Contact could be showing in.
         await dispatch(updateContact({ id: contact.id, ...data })).unwrap();
+      } else if (accountId !== undefined) {
+        await dispatch(
+          createContactForAccount({ customerId: Number(selectedCompanyId), accountId, ...data })
+        ).unwrap();
+        onSaved();
       } else {
         await dispatch(
           createContactForCustomer({ customerId: Number(selectedCompanyId), ...data })

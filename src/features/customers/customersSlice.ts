@@ -890,6 +890,30 @@ export const createContactForCustomer = createAsyncThunk<
   }
 });
 
+// Adds an account-level Contact under `accountId` — used by the
+// standalone Account page's own Contacts tab's "Add Contact". Same
+// "caller refetches" reasoning as createContactForCustomer above (this
+// one's own caller is ContactsTab itself, via customerId/accountId
+// props it already has for exactly this reason).
+export const createContactForAccount = createAsyncThunk<
+  Contact,
+  { customerId: number; accountId: number } & ContactWritePayload & { name: string; email: string },
+  { rejectValue: string }
+>(
+  'customers/createContactForAccount',
+  async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Contact>(`/customers/${customerId}/accounts/${accountId}/contacts/`, {
+        method: 'POST',
+        body: data,
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not add contact.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // PATCH /api/v1/contacts/<id>/ — works for a Contact of either parent
 // shape (see ContactDetailView's own docstring); same "caller
 // refetches" reasoning as createContactForCustomer above.

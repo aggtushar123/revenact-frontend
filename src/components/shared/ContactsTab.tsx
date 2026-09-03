@@ -1,11 +1,39 @@
+import { useMemo, useState } from 'react';
 import { Layout, Sparkles, CheckCircle, MessageSquare, Search, Plus, Filter, Download, Mail, Phone, MoreHorizontal } from 'lucide-react';
+import { useAppDispatch } from '../../hooks';
+import {
+  fetchContactsForCustomer,
+  fetchContactsForAccount,
+  deleteContact,
+} from '../../features/customers/customersSlice';
 import { initials, capitalize, formatRelativeTime } from '../../features/customers/formatters';
 import type { Contact } from '../../features/customers/customersSlice';
+import { ContactFormModal } from '../contacts/ContactFormModal';
+import { ContactRowActionsPopover } from '../contacts/ContactRowActionsPopover';
+import { ConfirmDialog } from '../organizations/ConfirmDialog';
 
 export interface ContactsTabProps {
   contacts: Contact[];
   isLoading: boolean;
   error: string | null;
+  /** The parent Customer id — used for "Add Contact" (POST
+   * .../contacts/, or .../accounts/<accountId>/contacts/ when
+   * `accountId` is set below) and to refetch this list afterward. For
+   * the Organization Details page's own Contacts tab it's that
+   * organization's own id; for the standalone Account page's, it's the
+   * account's *parent* customer (an Account only carries a `customer`
+   * id, same reasoning as mapToAccountRow.ts's own `orgId` param).
+   * Undefined only for the Account page's own mock-data fallback (a
+   * direct URL visit/refresh with no real id to act against — same
+   * convention as ActivityFeed's own `customerId` prop) — "Add
+   * Contact" is disabled then rather than posting against a made-up
+   * id that might collide with an unrelated real Customer. */
+  customerId?: number;
+  /** Set only when mounted on the standalone Account page — "Add
+   * Contact" then creates an account-level Contact scoped to this
+   * specific account instead of an organization-level one. Omitted on
+   * the Organization Details page's own Contacts tab. */
+  accountId?: number;
 }
 
 // Shared between the Organization Details page's own Contacts tab and
@@ -15,7 +43,29 @@ export interface ContactsTabProps {
 // Contact for one Account — see fetchContactsForCustomer/
 // fetchContactsForAccount in customersSlice.ts), so this one component
 // renders both rather than each page keeping its own copy.
-export function ContactsTab({ contacts, isLoading, error }: ContactsTabProps) {
+export function ContactsTab({ contacts, isLoading, error, customerId, accountId }: ContactsTabProps) {
+  const dispatch = useAppDispatch();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAddingContact, setIsAddingContact] = useState(false);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [deletingContact, setDeletingContact] = useState<Contact | null>(null);
+  const [activeRowPopup, setActiveRowPopup] = useState<{ contact: Contact; style: React.CSSProperties } | null>(null);
+
+  // Client-side filter, not a server round-trip — this list is already
+  // fully loaded (the nested Customer/Account-scoped endpoints turn
+  // pagination off, see CustomerContactListView's own docstring),
+  // unlike the standalone /contacts/list page's server-side `?search=`.
+  const filteredContacts = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return contacts;
+    return contacts.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.role_display.toLowerCase().includes(q) ||
+        c.email.toLowerCase().includes(q)
+    );
+  }, [contacts, searchQuery]);
+
   const stats = {
     total: contacts.length,
     decisionMakers: contacts.filter(c =>
@@ -23,6 +73,27 @@ export function ContactsTab({ contacts, isLoading, error }: ContactsTabProps) {
     ).length,
     active: contacts.filter(c => c.status === 'active').length,
     positiveSentiment: contacts.filter(c => c.sentiment === 'positive').length,
+  };
+
+  // Add is the one mutation that needs an explicit refetch — Edit/
+  // Delete already patch `contacts` directly via updateContact/
+  // deleteContact's own extraReducers (same "caller refetches only for
+  // create" reasoning as the standalone /contacts/list page's own
+  // ContactFormModal usage).
+  const refetch = () => {
+    if (customerId === undefined) return;
+    if (accountId !== undefined) {
+      dispatch(fetchContactsForAccount({ customerId, accountId }));
+    } else {
+      dispatch(fetchContactsForCustomer(customerId));
+    }
+  };
+
+  const handleRowActionClick = (e: React.MouseEvent, contact: Contact) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const yOffset = rect.bottom > window.innerHeight - 150 ? rect.top - 100 : rect.bottom + 4;
+    setActiveRowPopup({ contact, style: { top: yOffset, right: window.innerWidth - rect.right } });
   };
 
   return (
@@ -40,10 +111,21 @@ export function ContactsTab({ contacts, isLoading, error }: ContactsTabProps) {
         <div className="p-4 border-b border-line-subtle bg-surface flex items-center justify-between gap-4">
            <div className="relative flex-1 max-w-2xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-              <input type="text" placeholder="Search contacts by name, role or email..." className="w-full pl-10 pr-4 py-2 bg-subtle/30 border border-line rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-accent/10 placeholder:text-ink-faint" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search contacts by name, role or email..."
+                className="w-full pl-10 pr-4 py-2 bg-subtle/30 border border-line rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-accent/10 placeholder:text-ink-faint"
+              />
            </div>
            <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-6 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-all">
+              <button
+                onClick={() => setIsAddingContact(true)}
+                disabled={customerId === undefined}
+                title={customerId === undefined ? 'Reload this page from a real Accounts tab link to add a contact.' : undefined}
+                className="flex items-center gap-2 px-6 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-accent"
+              >
                  <Plus className="w-4 h-4" />
                  Add Contact
               </button>
@@ -71,8 +153,8 @@ export function ContactsTab({ contacts, isLoading, error }: ContactsTabProps) {
                  </tr>
               </thead>
               <tbody>
-                 {contacts.map((contact) => (
-                   <tr key={contact.id} className="hover:bg-subtle border-b border-line-subtle transition-all cursor-pointer group">
+                 {filteredContacts.map((contact) => (
+                   <tr key={contact.id} className="hover:bg-subtle border-b border-line-subtle transition-all group">
                      <td className="p-4"><input type="checkbox" className="rounded" onClick={(e) => e.stopPropagation()} /></td>
                      <td className="p-4">
                         <div className="flex items-center gap-3">
@@ -119,12 +201,23 @@ export function ContactsTab({ contacts, isLoading, error }: ContactsTabProps) {
                            </div>
                         </div>
                      </td>
-                     <td className="p-4"><MoreHorizontal className="w-4 h-4 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity" /></td>
+                     <td className="p-4">
+                        <button
+                          type="button"
+                          aria-label={`Actions for ${contact.name}`}
+                          className="p-1 cursor-pointer hover:bg-line rounded-md transition-colors inline-block text-ink-faint opacity-0 group-hover:opacity-100 hover:text-ink-muted"
+                          onClick={(e) => handleRowActionClick(e, contact)}
+                        >
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                     </td>
                    </tr>
                  ))}
-                 {!isLoading && !error && contacts.length === 0 && (
+                 {!isLoading && !error && filteredContacts.length === 0 && (
                    <tr>
-                     <td colSpan={7} className="p-20 text-center text-ink-faint font-medium">No contacts found.</td>
+                     <td colSpan={7} className="p-20 text-center text-ink-faint font-medium">
+                       {contacts.length === 0 ? 'No contacts found.' : 'No contacts match your search.'}
+                     </td>
                    </tr>
                  )}
                  {isLoading && (
@@ -141,6 +234,53 @@ export function ContactsTab({ contacts, isLoading, error }: ContactsTabProps) {
            </table>
         </div>
       </div>
+
+      {isAddingContact && (
+        <ContactFormModal
+          customerId={customerId}
+          accountId={accountId}
+          onClose={() => setIsAddingContact(false)}
+          onSaved={refetch}
+        />
+      )}
+
+      {editingContact && (
+        <ContactFormModal
+          contact={editingContact}
+          onClose={() => setEditingContact(null)}
+          // Never actually called for an edit — see ContactFormModal's
+          // own prop doc — but still required by its type.
+          onSaved={() => {}}
+        />
+      )}
+
+      {deletingContact && (
+        <ConfirmDialog
+          title={`Delete ${deletingContact.name}?`}
+          message="This can't be undone."
+          confirmLabel="Delete"
+          danger
+          onConfirm={async () => {
+            await dispatch(deleteContact(deletingContact.id)).unwrap();
+          }}
+          onClose={() => setDeletingContact(null)}
+        />
+      )}
+
+      {activeRowPopup && (
+        <ContactRowActionsPopover
+          onClose={() => setActiveRowPopup(null)}
+          style={activeRowPopup.style}
+          onEdit={() => {
+            setEditingContact(activeRowPopup.contact);
+            setActiveRowPopup(null);
+          }}
+          onDelete={() => {
+            setDeletingContact(activeRowPopup.contact);
+            setActiveRowPopup(null);
+          }}
+        />
+      )}
     </div>
   );
 }

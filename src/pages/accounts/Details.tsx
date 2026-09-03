@@ -170,7 +170,13 @@ export function AccountDetails() {
             </div>
           </div>
         ) : activeTab === 'Contacts' ? (
-          <ContactsTab contacts={contacts} isLoading={contactsLoading} error={contactsError} />
+          <ContactsTab
+            contacts={contacts}
+            isLoading={contactsLoading}
+            error={contactsError}
+            customerId={accountNavState?.account ? account.orgId : undefined}
+            accountId={accountNavState?.account ? account.revenactId : undefined}
+          />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-ink-faint py-24 bg-surface m-6 rounded-3xl border-2 border-dashed border-line-subtle shadow-inner">
             <div className="w-20 h-20 bg-subtle rounded-[28px] flex items-center justify-center mb-6 shadow-xs border border-line-subtle">

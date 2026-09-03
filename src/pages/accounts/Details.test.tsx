@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -467,6 +467,156 @@ describe('AccountDetails page (/accounts/:id)', () => {
       await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
 
       expect(await screen.findByText('No contacts found.')).toBeInTheDocument();
+    });
+
+    it('disables "Add Contact" when reached without navigation state (no real account id to post against)', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
+      await screen.findByText('No contacts found.');
+
+      expect(screen.getByRole('button', { name: 'Add Contact' })).toBeDisabled();
+    });
+
+    const priyaNair = {
+      id: 1,
+      name: 'Priya Nair',
+      role: 'economic_buyer',
+      role_display: 'Economic Buyer',
+      email: 'priya.nair@kraftheinz.com',
+      phone: '+1 (312) 555-0202',
+      status: 'active',
+      sentiment: 'positive',
+      last_contacted_at: '2026-08-31T00:00:00Z',
+      company_id: 9,
+      company_name: 'Kraft Heinz',
+      account_name: 'APAC Division',
+    };
+    const lukasVermeer = {
+      ...priyaNair,
+      id: 2,
+      name: 'Lukas Vermeer',
+      role_display: 'Finance Manager',
+      email: 'lukas.vermeer@kraftheinz.com',
+    };
+    const contactsUrl = `/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/contacts/`;
+
+    async function openContactsTab(fetchMock: ReturnType<typeof vi.fn>) {
+      vi.stubGlobal('fetch', fetchMock);
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
+      await screen.findByText('Priya Nair');
+      return user;
+    }
+
+    it('filters the already-loaded contacts client-side as you type', async () => {
+      const fetchMock = vi.fn((url: string) =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => (url.includes(contactsUrl) ? [priyaNair, lukasVermeer] : []),
+        })
+      );
+      const user = await openContactsTab(fetchMock);
+      expect(screen.getByText('Lukas Vermeer')).toBeInTheDocument();
+
+      await user.type(screen.getByPlaceholderText('Search contacts by name, role or email...'), 'priya');
+
+      expect(screen.queryByText('Lukas Vermeer')).not.toBeInTheDocument();
+      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+    });
+
+    it('adding a contact posts to the account-level nested endpoint', async () => {
+      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'POST' && url.endsWith(contactsUrl)) {
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            json: async () => ({ ...priyaNair, id: 99, name: 'New Person' }),
+          });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => (url.includes(contactsUrl) ? [priyaNair] : []),
+        });
+      });
+      const user = await openContactsTab(fetchMock);
+
+      await user.click(screen.getByRole('button', { name: 'Add Contact' }));
+      await user.type(screen.getByLabelText('Name *'), 'New Person');
+      await user.type(screen.getByLabelText('Email *'), 'new.person@kraftheinz.com');
+      const submitButton = screen
+        .getAllByRole('button', { name: 'Add Contact' })
+        .find((btn) => btn.closest('form'))!;
+      await user.click(submitButton);
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining(contactsUrl),
+          expect.objectContaining({ method: 'POST' })
+        )
+      );
+    });
+
+    it('editing a contact PATCHes /api/v1/contacts/<id>/ and updates it in place', async () => {
+      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'PATCH' && url.endsWith('/contacts/1/')) {
+          const body = JSON.parse(options!.body!);
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...priyaNair, ...body }) });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => (url.includes(contactsUrl) ? [priyaNair] : []),
+        });
+      });
+      const user = await openContactsTab(fetchMock);
+
+      await user.click(screen.getByRole('button', { name: 'Actions for Priya Nair' }));
+      await user.click(screen.getByRole('button', { name: 'Edit Contact' }));
+      const nameInput = screen.getByLabelText('Name *');
+      await user.clear(nameInput);
+      await user.type(nameInput, 'Priya Nair-Kapoor');
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/contacts/1/'),
+          expect.objectContaining({ method: 'PATCH' })
+        )
+      );
+      expect(await screen.findByText('Priya Nair-Kapoor')).toBeInTheDocument();
+    });
+
+    it('deleting a contact DELETEs /api/v1/contacts/<id>/ and removes the row', async () => {
+      const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'DELETE' && url.endsWith('/contacts/1/')) {
+          return Promise.resolve({ ok: true, status: 204, json: async () => null });
+        }
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => (url.includes(contactsUrl) ? [priyaNair] : []),
+        });
+      });
+      const user = await openContactsTab(fetchMock);
+
+      await user.click(screen.getByRole('button', { name: 'Actions for Priya Nair' }));
+      await user.click(screen.getByRole('button', { name: 'Delete Contact' }));
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/contacts/1/'),
+          expect.objectContaining({ method: 'DELETE' })
+        )
+      );
+      expect(screen.queryByText('Priya Nair')).not.toBeInTheDocument();
     });
   });
 });
