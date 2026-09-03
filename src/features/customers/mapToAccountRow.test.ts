@@ -20,8 +20,7 @@ const carl = {
 function account(overrides: Partial<Account> = {}): Account {
   return {
     id: 1,
-    customer: 6,
-    customer_name: 'Apple Inc',
+    customers: [{ id: 6, name: 'Apple Inc' }],
     name: 'North America Enterprise',
     domain: '',
     address: '',
@@ -62,6 +61,7 @@ describe('mapAccountToAccountRow', () => {
     );
 
     expect(row.orgId).toBe(6);
+    expect(row.orgs).toEqual([{ id: 6, name: 'Apple Inc' }]);
     expect(row.id).toBe('1');
     expect(row.name).toBe('North America Enterprise');
     expect(row.orgName).toBe('Apple Inc');
@@ -147,5 +147,19 @@ describe('mapAccountToAccountRow', () => {
     expect(row.lifecycleStage).toBe('Churn');
     expect(row.health).toEqual({ val: 1.2, clr: 'bg-[var(--danger)]' });
     expect(row.nps).toBe('-100');
+  });
+
+  it('carries every linked Customer through as `orgs`, not just the first', () => {
+    const row = mapAccountToAccountRow(
+      account({ customers: [{ id: 6, name: 'Apple Inc' }, { id: 9, name: 'Kraft Heinz' }] }),
+      6,
+      'Apple Inc',
+      'apple.com',
+      'Cupertino, CA',
+      'contact@apple.com',
+      '+1 (408) 996-1010'
+    );
+
+    expect(row.orgs).toEqual([{ id: 6, name: 'Apple Inc' }, { id: 9, name: 'Kraft Heinz' }]);
   });
 });

@@ -9,6 +9,7 @@ import {
   updateOpportunity,
 } from '../../features/customers/customersSlice';
 import type { Opportunity } from '../../features/customers/customersSlice';
+import { companyLabel } from '../../features/customers/formatters';
 
 // Matches Opportunity.Stage on the backend exactly (services/customers/
 // models.py) — the board's own 6 Kanban columns, in the same order.
@@ -195,7 +196,7 @@ export function OpportunityFormModal({
             <div>
               <label className="block text-[12px] font-semibold text-ink-muted mb-1">Company</label>
               <p className="text-[13px] text-ink-faint px-3 py-2 bg-subtle/50 border border-line-subtle rounded-lg">
-                {opportunity.company_name}
+                {companyLabel(opportunity.companies)}
                 {opportunity.account_name ? ` • ${opportunity.account_name}` : ''}
               </p>
             </div>

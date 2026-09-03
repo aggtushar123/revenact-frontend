@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { Building, Pencil } from 'lucide-react';
-import { HEALTH_COLORS, LIFECYCLE_LABELS, initials } from '../../features/customers/formatters';
+import { HEALTH_COLORS, LIFECYCLE_LABELS, initials, companyLabel } from '../../features/customers/formatters';
 import { mapAccountToAccountRow } from '../../features/customers/mapToAccountRow';
 import type { Account } from '../../features/customers/customersSlice';
 
@@ -75,9 +75,18 @@ export function AccountsTable({
                         // domain/address/email/phone (not part of this
                         // flat endpoint's response), which fall back to
                         // blank the same way an unset Account-level
-                        // value already does.
+                        // value already does. mapAccountToAccountRow's
+                        // own orgId/orgName params expect a single
+                        // Customer -- the *first* linked one when
+                        // there's more than one (see this row's own
+                        // Organization column, which surfaces the rest
+                        // via companyLabel's "+N").
                         navigate(`/accounts/${a.id}`, {
-                          state: { account: mapAccountToAccountRow(a, a.customer, a.customer_name, '', '', '', '') },
+                          state: {
+                            account: mapAccountToAccountRow(
+                              a, a.customers[0]?.id ?? 0, a.customers[0]?.name ?? '', '', '', '', ''
+                            ),
+                          },
                         })
                       }
                     >
@@ -89,10 +98,15 @@ export function AccountsTable({
                 <td className="px-6 py-4 border-b border-line-subtle">
                   <div
                     className="flex items-center gap-2 text-ink-muted font-medium hover:text-accent cursor-pointer w-fit"
-                    onClick={() => navigate(`/organizations/${a.customer}`)}
+                    // Same "first linked Customer" convention as the
+                    // click-through above — companyLabel's own "+N"
+                    // surfaces that there's more than one without this
+                    // column needing its own dropdown.
+                    onClick={() => navigate(`/organizations/${a.customers[0]?.id}`)}
+                    title={a.customers.map((c) => c.name).join(', ')}
                   >
                     <Building className="w-3.5 h-3.5 text-ink-faint" />
-                    {a.customer_name}
+                    {companyLabel(a.customers)}
                   </div>
                 </td>
 

@@ -14,7 +14,7 @@ import {
   updateRisk,
   deleteRisk,
 } from '../../features/customers/customersSlice';
-import { formatMoney } from '../../features/customers/formatters';
+import { formatMoney, companyLabel } from '../../features/customers/formatters';
 import type { Opportunity, Risk } from '../../features/customers/customersSlice';
 import type { AppDispatch, RootState } from '../../store';
 
@@ -37,7 +37,8 @@ const STAGE_COLUMNS: { stage: Opportunity['stage']; title: string }[] = [
 ];
 
 function opportunityOrgLabel(o: Opportunity): string {
-  return o.account_name ? `${o.company_name} • ${o.account_name}` : o.company_name;
+  const label = companyLabel(o.companies);
+  return o.account_name ? `${label} • ${o.account_name}` : label;
 }
 
 function OpportunityCard({
@@ -60,7 +61,7 @@ function OpportunityCard({
       <div className="text-[12px] font-bold text-accent mb-3">MRR: ${formatMoney(opportunity.mrr)}</div>
       <div className="flex items-center justify-between min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <EntityAvatar name={opportunity.company_name} className="w-5 h-5 rounded-full text-[9px]" />
+          <EntityAvatar name={companyLabel(opportunity.companies)} className="w-5 h-5 rounded-full text-[9px]" />
           <span className="text-[11.5px] text-ink-muted font-semibold truncate max-w-[120px]">{opportunityOrgLabel(opportunity)}</span>
         </div>
         <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold capitalize shrink-0 ${PRIORITY_COLORS[opportunity.priority]}`}>
@@ -218,7 +219,7 @@ function OpportunityListView({
               <td className="px-4 py-3.5 font-bold text-ink-muted">${formatMoney(o.mrr)}</td>
               <td className="px-4 py-3.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <EntityAvatar name={o.company_name} className="w-6 h-6 rounded-full text-[10px]" />
+                  <EntityAvatar name={companyLabel(o.companies)} className="w-6 h-6 rounded-full text-[10px]" />
                   <span className="text-ink-muted font-medium truncate max-w-[140px]">{opportunityOrgLabel(o)}</span>
                 </div>
               </td>
@@ -251,7 +252,8 @@ const RISK_STAGE_COLUMNS: { stage: Risk['stage']; title: string }[] = [
 ];
 
 function riskOrgLabel(r: Risk): string {
-  return r.account_name ? `${r.company_name} • ${r.account_name}` : r.company_name;
+  const label = companyLabel(r.companies);
+  return r.account_name ? `${label} • ${r.account_name}` : label;
 }
 
 function RiskCard({
@@ -274,7 +276,7 @@ function RiskCard({
       <div className="text-[12px] font-bold text-accent mb-3">MRR: ${formatMoney(risk.mrr)}</div>
       <div className="flex items-center justify-between min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <EntityAvatar name={risk.company_name} className="w-5 h-5 rounded-full text-[9px]" />
+          <EntityAvatar name={companyLabel(risk.companies)} className="w-5 h-5 rounded-full text-[9px]" />
           <span className="text-[11.5px] text-ink-muted font-semibold truncate max-w-[120px]">{riskOrgLabel(risk)}</span>
         </div>
         <span className={`px-1.5 py-0.5 rounded border text-[10px] font-bold capitalize shrink-0 ${PRIORITY_COLORS[risk.priority]}`}>
@@ -432,7 +434,7 @@ function RiskListView({
               <td className="px-4 py-3.5 font-bold text-ink-muted">${formatMoney(r.mrr)}</td>
               <td className="px-4 py-3.5">
                 <div className="flex items-center gap-2 min-w-0">
-                  <EntityAvatar name={r.company_name} className="w-6 h-6 rounded-full text-[10px]" />
+                  <EntityAvatar name={companyLabel(r.companies)} className="w-6 h-6 rounded-full text-[10px]" />
                   <span className="text-ink-muted font-medium truncate max-w-[140px]">{riskOrgLabel(r)}</span>
                 </div>
               </td>

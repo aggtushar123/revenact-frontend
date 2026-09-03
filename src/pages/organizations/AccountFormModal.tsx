@@ -4,6 +4,7 @@ import { useAppDispatch } from '../../hooks';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import { createAccount, updateAccount } from '../../features/customers/customersSlice';
 import type { Account } from '../../features/customers/customersSlice';
+import { companyLabel } from '../../features/customers/formatters';
 import type { User } from '../../features/auth/authSlice';
 
 interface AccountFormModalProps {
@@ -97,8 +98,20 @@ export function AccountFormModal({ customerId, account, companies, onClose, onSa
     try {
       if (isEdit) {
         // No onSaved() — updateAccount's own extraReducers already
-        // patch every list this Account could be showing in.
-        await dispatch(updateAccount({ customerId: account.customer, id: account.id, ...data })).unwrap();
+        // patch every list this Account could be showing in. The
+        // nested update URL just needs *a* Customer this Account is
+        // linked to (AccountDetailView's own get_queryset accepts any
+        // one of them) — `customerId` when this modal already knows
+        // it (opened from the Organization Details page's own Accounts
+        // tab), else the account's own first linked Customer (opened
+        // from the standalone Accounts page, which doesn't fix one).
+        await dispatch(
+          updateAccount({
+            customerId: customerId ?? account.customers[0]?.id ?? 0,
+            id: account.id,
+            ...data,
+          })
+        ).unwrap();
       } else {
         const effectiveCustomerId = customerId ?? Number(selectedCompanyId);
         await dispatch(createAccount({ customerId: effectiveCustomerId, ...data })).unwrap();
@@ -138,7 +151,7 @@ export function AccountFormModal({ customerId, account, companies, onClose, onSa
             <div>
               <label className="block text-[12px] font-semibold text-ink-muted mb-1">Organization</label>
               <p className="text-[13px] text-ink-faint px-3 py-2 bg-subtle/50 border border-line-subtle rounded-lg">
-                {account.customer_name}
+                {companyLabel(account.customers)}
               </p>
             </div>
           ) : customerId === undefined ? (

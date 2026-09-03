@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MoreHorizontal, ArrowDownUp, Mail, Phone, Clock, Building } from 'lucide-react';
-import { capitalize, formatRelativeTime, initials } from '../../features/customers/formatters';
+import { capitalize, formatRelativeTime, initials, companyLabel } from '../../features/customers/formatters';
 import type { Contact } from '../../features/customers/customersSlice';
 import { ContactRowActionsPopover } from './ContactRowActionsPopover';
 
@@ -151,10 +151,11 @@ export function ContactsTable({
                 <td className="px-6 py-4 border-b border-line-subtle">
                    <div
                      className="flex items-center gap-2 text-ink-muted font-medium hover:text-accent cursor-pointer w-fit"
-                     onClick={() => navigate(`/organizations/${c.company_id}`)}
+                     onClick={() => navigate(`/organizations/${c.companies[0]?.id}`)}
+                     title={c.companies.map((co) => co.name).join(', ')}
                    >
                       <Building className="w-3.5 h-3.5 text-ink-faint" />
-                      {c.company_name}{c.account_name ? ` • ${c.account_name}` : ''}
+                      {companyLabel(c.companies)}{c.account_name ? ` • ${c.account_name}` : ''}
                    </div>
                 </td>
 

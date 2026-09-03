@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Mail, Phone, Building2, Clock, Pencil, Trash2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { fetchContactById, deleteContact } from '../../features/customers/customersSlice';
-import { initials, capitalize, formatRelativeTime } from '../../features/customers/formatters';
+import { initials, capitalize, formatRelativeTime, companyLabel } from '../../features/customers/formatters';
 import { ContactFormModal } from '../../components/contacts/ContactFormModal';
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 
@@ -96,8 +96,8 @@ export function ContactDetails() {
           <InfoCard
             icon={<Building2 className="w-4 h-4" />}
             label="Company"
-            value={contact.company_name}
-            onClick={() => navigate(`/organizations/${contact.company_id}`)}
+            value={companyLabel(contact.companies)}
+            onClick={() => navigate(`/organizations/${contact.companies[0]?.id}`)}
           />
           <InfoCard
             icon={<Building2 className="w-4 h-4" />}

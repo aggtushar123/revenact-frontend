@@ -8,6 +8,7 @@ import {
   updateContact,
 } from '../../features/customers/customersSlice';
 import type { Contact } from '../../features/customers/customersSlice';
+import { companyLabel } from '../../features/customers/formatters';
 
 // Matches Contact.Role on the backend exactly (services/customers/
 // models.py) — the serializer already sends a `role_display` for
@@ -213,7 +214,7 @@ export function ContactFormModal({
             <div>
               <label className="block text-[12px] font-semibold text-ink-muted mb-1">Company</label>
               <p className="text-[13px] text-ink-faint px-3 py-2 bg-subtle/50 border border-line-subtle rounded-lg">
-                {contact.company_name}
+                {companyLabel(contact.companies)}
                 {contact.account_name ? ` • ${contact.account_name}` : ''}
               </p>
             </div>

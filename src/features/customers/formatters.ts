@@ -40,6 +40,18 @@ export function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+// A Contact/Opportunity/Risk/Account's own `companies`/`customers` is
+// every ultimate parent Customer (see those types' own docstrings) —
+// almost always exactly one, but an account-level one's own Account
+// can now belong to more than one Customer at once (see the backend
+// Account model's own docstring). Renders "Acme Inc" for one, "Acme
+// Inc +1" for more, rather than silently dropping the others.
+export function companyLabel(companies: { id: number; name: string }[]): string {
+  if (companies.length === 0) return '—';
+  const [first, ...rest] = companies;
+  return rest.length > 0 ? `${first.name} +${rest.length}` : first.name;
+}
+
 // Contact.last_contacted_at is a real datetime (not the old mock's
 // frozen "2 hours ago" string) — this is what keeps the Contacts
 // tables' own display accurate as time passes instead of drifting

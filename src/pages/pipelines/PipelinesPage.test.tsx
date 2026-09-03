@@ -19,8 +19,7 @@ const discoveryOpp = {
   stage_display: 'Discovery',
   priority: 'low',
   priority_display: 'Low',
-  company_id: 6,
-  company_name: 'Shopify',
+  companies: [{ id: 6, name: 'Shopify' }],
   account_name: null,
 };
 
@@ -30,7 +29,7 @@ const negotiationOpp = {
   title: 'Payments API Upsell',
   stage: 'negotiation',
   stage_display: 'Negotiation',
-  company_name: 'Stripe',
+  companies: [{ id: 6, name: 'Stripe' }],
 };
 
 // Same reasoning, shaped exactly like revenact-backend's real
@@ -43,8 +42,7 @@ const openRisk = {
   stage_display: 'Open',
   priority: 'high',
   priority_display: 'High',
-  company_id: 8,
-  company_name: 'WeWork',
+  companies: [{ id: 8, name: 'WeWork' }],
   account_name: null,
 };
 
@@ -54,7 +52,7 @@ const mitigatedRisk = {
   title: 'Budget Freeze Risk',
   stage: 'mitigated',
   stage_display: 'Mitigated',
-  company_name: 'Oracle',
+  companies: [{ id: 8, name: 'Oracle' }],
 };
 
 const EMPTY_CUSTOMERS_PAGE = { count: 0, next: null, previous: null, results: [] };

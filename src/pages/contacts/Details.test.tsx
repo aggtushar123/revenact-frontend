@@ -19,8 +19,7 @@ const sarahChen = {
   status: 'active',
   sentiment: 'positive',
   last_contacted_at: '2026-08-31T00:00:00Z',
-  company_id: 6,
-  company_name: 'Apple Inc',
+  companies: [{ id: 6, name: 'Apple Inc' }],
   account_name: null,
 };
 

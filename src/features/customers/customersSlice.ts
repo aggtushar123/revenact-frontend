@@ -62,19 +62,29 @@ export interface Customer {
   is_archived: boolean;
 }
 
+// A Customer as referenced from an Account/Contact/Opportunity/Risk's
+// own `customers`/`companies` list — just enough to link and label it,
+// not the full Customer record.
+export interface CompanyRef {
+  id: number;
+  name: string;
+}
+
 // Mirrors revenact-backend's AccountSerializer field-for-field — see
 // docs/API_CONTRACTS.md -> customers -> Account. A named sub-account
-// under one Customer (one-to-many: a Customer can have any number of
-// these).
+// that can belong to any number of Customers at once (many-to-many, no
+// primary owner — see the backend Account model's own docstring for
+// why: joint ventures, shared subsidiaries serviced by vendor and
+// reseller, holding-company restructuring). Almost always exactly one
+// in practice.
 export interface Account {
   id: number;
-  customer: number;
-  /** The parent Customer's own name — only meaningful (and only
-   * actually needed) on the standalone Accounts page, which spans
-   * every Customer; harmless extra field everywhere else this
-   * interface is used, same reasoning as Contact/Opportunity/Risk's
-   * own `company_name`. */
-  customer_name: string;
+  /** Every Customer this Account belongs to — see this interface's own
+   * docstring. Only meaningful (and only actually needed) on the
+   * standalone Accounts page, which spans every Customer; harmless
+   * extra field everywhere else this interface is used, same reasoning
+   * as Contact/Opportunity/Risk's own `companies`. */
+  customers: CompanyRef[];
   name: string;
   domain: string;
   /** Falls back to the parent Customer's own value when blank — see
@@ -209,13 +219,17 @@ export interface CalendarEvent {
 // ActivityFeed), Contact backs its own sibling tab — the Organization
 // Details page's Contacts tab, the standalone Account page's Contacts
 // tab, and the global /contacts/list page — so it also carries
-// `company_id`/`company_name`/`account_name`, which those other
-// models don't need (their parent scope is always already known from
-// which endpoint fetched them; the global list page spans every
-// Customer/Account at once, so it can't assume that). `account_name`
-// is `null` for an organization-level contact. No `avatar` — derived
-// from `name` on the frontend, same as every other entity's avatar in
-// this codebase.
+// `companies`/`account_name`, which those other models don't need
+// (their parent scope is always already known from which endpoint
+// fetched them; the global list page spans every Customer/Account at
+// once, so it can't assume that). `companies` is every ultimate parent
+// Customer — plural (not a single `company_id`/`company_name`) since
+// an account-level contact's own Account can now belong to more than
+// one Customer at once (see the backend Account model's own
+// docstring); almost always exactly one in practice. `account_name` is
+// `null` for an organization-level contact. No `avatar` — derived from
+// `name` on the frontend, same as every other entity's avatar in this
+// codebase.
 export interface Contact {
   id: number;
   name: string;
@@ -227,8 +241,7 @@ export interface Contact {
   status: 'active' | 'inactive';
   sentiment: 'positive' | 'neutral' | 'negative';
   last_contacted_at: string | null;
-  company_id: number;
-  company_name: string;
+  companies: CompanyRef[];
   account_name: string | null;
 }
 
@@ -262,8 +275,11 @@ export interface ContactWritePayload {
 // see docs/API_CONTRACTS.md -> customers -> Opportunity. `stage` is
 // the standalone Pipelines board's own 6 Kanban columns; `avatar`-style
 // `orgColor`/`orgInitials` from the old mock aren't fields here at all
-// — EntityAvatar derives both from `company_name`/`account_name` on
-// the frontend, same as every other entity's avatar in this codebase.
+// — EntityAvatar derives both from `companies`/`account_name` on the
+// frontend, same as every other entity's avatar in this codebase.
+// `companies` is plural for the same reason as Contact's own field —
+// an account-level opportunity's own Account can now belong to more
+// than one Customer at once.
 export interface Opportunity {
   id: number;
   title: string;
@@ -273,8 +289,7 @@ export interface Opportunity {
   stage_display: string;
   priority: 'high' | 'medium' | 'low';
   priority_display: string;
-  company_id: number;
-  company_name: string;
+  companies: CompanyRef[];
   account_name: string | null;
 }
 
@@ -298,8 +313,7 @@ export interface Risk {
   stage_display: string;
   priority: 'high' | 'medium' | 'low';
   priority_display: string;
-  company_id: number;
-  company_name: string;
+  companies: CompanyRef[];
   account_name: string | null;
 }
 
@@ -315,14 +329,19 @@ export interface RiskWritePayload {
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
 // NPS/CSAT/ARR are meant to sync from other systems later, not be
-// hand-typed here. `customer` is never sent — the backend takes it from
-// the URL (see createAccount/updateAccount below).
+// hand-typed here. `customer_ids` is never sent from the quick Add/Edit
+// form — the backend always additively links the URL's own Customer
+// regardless (see AccountListCreateView.perform_create's own
+// docstring) — it exists here only for the standalone Account page's
+// own Organizations tab, which fully replaces the linked set when it
+// sends this field at all (see AccountSerializer's own docstring).
 export interface AccountWritePayload {
   name?: string;
   domain?: string;
   owner_id?: number | null;
   lifecycle_stage?: Account['lifecycle_stage'];
   renewal_date?: string | null;
+  customer_ids?: number[];
 }
 
 // The subset of Customer fields the Add/Edit forms actually expose —

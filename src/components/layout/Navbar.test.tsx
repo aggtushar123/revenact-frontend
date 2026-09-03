@@ -77,8 +77,7 @@ const sarahChen = {
   status: 'active' as const,
   sentiment: 'positive' as const,
   last_contacted_at: '2026-08-31T00:00:00Z',
-  company_id: 10,
-  company_name: 'Globex Corp',
+  companies: [{ id: 10, name: 'Globex Corp' }],
   account_name: null,
 };
 

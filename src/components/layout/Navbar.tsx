@@ -3,6 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ACCOUNTS_DATA } from '../organizations/accountsData';
 import type { AccountRow } from '../organizations/accountsData';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
+import { companyLabel } from '../../features/customers/formatters';
 import { EntityAvatar } from '../shared';
 import {
   ChevronLeft,
@@ -155,7 +156,7 @@ export function Navbar() {
                  <div className="flex items-center gap-3">
                     <h1 className="text-[16px] font-bold text-ink tracking-tight uppercase whitespace-nowrap">{contact.name}</h1>
                     <div className="w-px h-3.5 bg-line" />
-                    <span className="text-[13.5px] font-bold text-ink-faint tracking-widest uppercase truncate max-w-[140px]">{contact.company_name}</span>
+                    <span className="text-[13.5px] font-bold text-ink-faint tracking-widest uppercase truncate max-w-[140px]">{companyLabel(contact.companies)}</span>
                  </div>
               </div>
           </div>

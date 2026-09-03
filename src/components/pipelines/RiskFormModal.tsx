@@ -9,6 +9,7 @@ import {
   updateRisk,
 } from '../../features/customers/customersSlice';
 import type { Risk } from '../../features/customers/customersSlice';
+import { companyLabel } from '../../features/customers/formatters';
 
 // Matches Risk.Stage on the backend exactly (services/customers/
 // models.py) — the board's own 4 Risk Kanban columns, in the same order.
@@ -179,7 +180,7 @@ export function RiskFormModal({
             <div>
               <label className="block text-[12px] font-semibold text-ink-muted mb-1">Company</label>
               <p className="text-[13px] text-ink-faint px-3 py-2 bg-subtle/50 border border-line-subtle rounded-lg">
-                {risk.company_name}
+                {companyLabel(risk.companies)}
                 {risk.account_name ? ` • ${risk.account_name}` : ''}
               </p>
             </div>

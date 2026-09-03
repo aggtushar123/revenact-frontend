@@ -9,7 +9,7 @@ import {
   fetchRisksForAccount,
   deleteRisk,
 } from '../../features/customers/customersSlice';
-import { formatMoney } from '../../features/customers/formatters';
+import { formatMoney, companyLabel } from '../../features/customers/formatters';
 import type { Opportunity, Risk } from '../../features/customers/customersSlice';
 import { EntityAvatar } from './EntityAvatar';
 import { OpportunityFormModal } from '../pipelines/OpportunityFormModal';
@@ -45,7 +45,8 @@ export interface PipelinesTabProps {
 }
 
 function entityOrgLabel(e: Opportunity | Risk): string {
-  return e.account_name ? `${e.company_name} • ${e.account_name}` : e.company_name;
+  const label = companyLabel(e.companies);
+  return e.account_name ? `${label} • ${e.account_name}` : label;
 }
 
 // Shared between the Organization Details page's own Pipelines tab and
@@ -245,7 +246,7 @@ export function PipelinesTab({
                     {showAccountColumn && (
                       <td className="p-4">
                         <div className="flex items-center gap-2 min-w-0">
-                          <EntityAvatar name={o.company_name} className="w-6 h-6 rounded-full text-[10px] shrink-0" />
+                          <EntityAvatar name={companyLabel(o.companies)} className="w-6 h-6 rounded-full text-[10px] shrink-0" />
                           <span className="text-ink-muted font-medium truncate max-w-[160px]">{entityOrgLabel(o)}</span>
                         </div>
                       </td>
@@ -272,7 +273,7 @@ export function PipelinesTab({
                     {showAccountColumn && (
                       <td className="p-4">
                         <div className="flex items-center gap-2 min-w-0">
-                          <EntityAvatar name={r.company_name} className="w-6 h-6 rounded-full text-[10px] shrink-0" />
+                          <EntityAvatar name={companyLabel(r.companies)} className="w-6 h-6 rounded-full text-[10px] shrink-0" />
                           <span className="text-ink-muted font-medium truncate max-w-[160px]">{entityOrgLabel(r)}</span>
                         </div>
                       </td>

@@ -29,6 +29,15 @@ export interface AccountRow {
   location?: string;
   email?: string;
   phone?: string;
+  /** Every Customer this account is linked to (see the backend Account
+   * model's own docstring — a true many-to-many, no primary owner) —
+   * `orgId`/`orgName` above are just the first of these, kept for the
+   * call sites (ActivityFeed's overview, AccountMetricsBanner) that
+   * only ever needed a single label. Powers the standalone Account
+   * page's own Organizations tab, which lists every one of these
+   * rather than assuming there's only one. Optional since the mock
+   * ACCOUNTS_DATA below predates this field. */
+  orgs?: { id: number; name: string }[];
 }
 
 export const ACCOUNTS_DATA: AccountRow[] = [

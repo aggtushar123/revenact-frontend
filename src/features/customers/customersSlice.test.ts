@@ -394,7 +394,7 @@ describe('customersSlice', () => {
   describe('fetchAccountsForCustomer (Details.tsx Accounts tab)', () => {
     const account = {
       id: 1,
-      customer: globex.id,
+      customers: [{ id: globex.id, name: globex.name }],
       name: 'North America Enterprise',
       domain: '',
       owner: null,

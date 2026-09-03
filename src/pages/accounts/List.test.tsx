@@ -13,8 +13,7 @@ import { List } from './List';
 // docs/API_CONTRACTS.md -> customers -> Account).
 const northAmerica = {
   id: 1,
-  customer: 6,
-  customer_name: 'Apple Inc',
+  customers: [{ id: 6, name: 'Apple Inc' }],
   name: 'North America Enterprise',
   domain: '',
   address: '',
@@ -38,8 +37,7 @@ const northAmerica = {
 const emea = {
   ...northAmerica,
   id: 2,
-  customer: 7,
-  customer_name: 'Pizza Hut',
+  customers: [{ id: 7, name: 'Pizza Hut' }],
   name: 'EMEA',
 };
 

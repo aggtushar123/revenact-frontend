@@ -9,13 +9,18 @@ import { formatDate, initials, HEALTH_COLORS, LIFECYCLE_LABELS, AI_PULSE_LABELS 
 // mock data for real data didn't require rewriting that UI.
 //
 // `orgId`/`orgName`/`orgDomain`/`orgAddress`/`orgEmail`/`orgPhone` come
-// from the parent Customer (already fetched by Details.tsx for its own
-// header/General tab) rather than from the Account itself — an Account
-// only carries a `customer` id, not its parent's name, and its own
-// `domain`/`address`/`email`/`phone` are meant to fall back to the
-// parent's when blank (see the backend Account model's docstring) —
-// this is what feeds ActivityFeed's Overview tab for a standalone
-// Account page.
+// from a parent Customer (already fetched by Details.tsx for its own
+// header/General tab) rather than from the Account itself — the
+// *first* one, when there's more than one (see `orgs` below and the
+// backend Account model's own docstring on why an Account can now be
+// linked to several) — and its own `domain`/`address`/`email`/`phone`
+// are meant to fall back to that first parent's when blank (see the
+// backend Account model's docstring) — this is what feeds
+// ActivityFeed's Overview tab for a standalone Account page. `orgs` is
+// every linked Customer (straight off the real Account, not an arg —
+// unlike orgId/orgName it doesn't need a parent already fetched) —
+// powers the standalone Account page's own Organizations tab, which
+// lists all of them rather than assuming there's only one.
 export function mapAccountToAccountRow(
   a: Account,
   orgId: number,
@@ -35,6 +40,7 @@ export function mapAccountToAccountRow(
     id: String(a.id),
     name: a.name,
     orgName,
+    orgs: a.customers,
     logo: domain ? `https://logo.clearbit.com/${domain}` : '',
     revenactId: a.id,
     domain: domain || undefined,

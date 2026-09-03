@@ -19,11 +19,7 @@ import {
   fetchOpportunitiesForAccount,
   fetchRisksForAccount,
   clearPipelineData,
-  fetchCustomerById,
-  clearSelectedCustomer,
 } from '../../features/customers/customersSlice';
-import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
-import type { Customer } from '../../features/customers/customersSlice';
 
 export function AccountDetails() {
   const { id } = useParams<{ id: string }>();
@@ -39,9 +35,6 @@ export function AccountDetails() {
     pipelineRisks,
     pipelineRisksLoading,
     pipelineRisksError,
-    selectedCustomer,
-    selectedCustomerLoading,
-    selectedCustomerError,
   } = useAppSelector((state) => state.customers);
   const [activeTab, setActiveTab] = useState('General');
   const [is360Enabled, setIs360Enabled] = useState(true);
@@ -66,20 +59,19 @@ export function AccountDetails() {
       dispatch(fetchContactsForAccount({ customerId: account.orgId, accountId: account.revenactId }));
       dispatch(fetchOpportunitiesForAccount({ customerId: account.orgId, accountId: account.revenactId }));
       dispatch(fetchRisksForAccount({ customerId: account.orgId, accountId: account.revenactId }));
-      // Powers the Organizations tab below — an Account belongs to
-      // exactly one Customer, so this is always a single-record fetch,
-      // never a list.
-      dispatch(fetchCustomerById(account.orgId));
+      // The Organizations tab below needs nothing fetched of its own —
+      // `account.orgs` (every linked Customer, id+name) already rode
+      // along on the same nav-state AccountRow as everything else on
+      // this page (see mapAccountToAccountRow).
     } else {
       dispatch(clearContacts());
       dispatch(clearPipelineData());
-      dispatch(clearSelectedCustomer());
     }
   }, [dispatch, accountNavState, account]);
 
   const tabs = [
     { name: 'General', count: null },
-    { name: 'Organizations', count: 1 },
+    { name: 'Organizations', count: account.orgs?.length ?? 1 },
     { name: 'Contacts', count: contacts.length },
     { name: 'Pipelines', count: pipelineOpportunities.length + pipelineRisks.length },
     { name: 'Custom Objects', count: 0 },
@@ -202,13 +194,7 @@ export function AccountDetails() {
             </div>
           </div>
         ) : activeTab === 'Organizations' ? (
-          <OrganizationTab
-            account={account}
-            isRealAccount={!!accountNavState?.account}
-            customer={selectedCustomer}
-            isLoading={selectedCustomerLoading}
-            error={selectedCustomerError}
-          />
+          <OrganizationTab account={account} isRealAccount={!!accountNavState?.account} />
         ) : activeTab === 'Contacts' ? (
           <ContactsTab
             contacts={contacts}
@@ -371,19 +357,20 @@ function AccountMetricsBanner({ account }: { account: AccountRow }) {
 
 // ── Organizations tab ──────────────────────────────────────────────────────────
 
-// An Account belongs to exactly one Customer (see the backend Account
-// model's docstring) — so unlike every other tab on this page (Contacts/
-// Pipelines, both real lists), this is always a single-record "profile
-// card", not a table. Real data via fetchCustomerById(account.orgId),
-// same thunk/mapper (mapCustomerToOrgRow) the Organization Details page
-// itself already uses — reusing rather than re-deriving the health/NPS/
-// CSAT color and ARR-tiering logic a second time here.
+// An Account can belong to more than one Customer at once now (a true
+// many-to-many, no primary owner — see the backend Account model's own
+// docstring for why: joint ventures, shared subsidiaries serviced by
+// vendor and reseller, holding-company restructuring), so unlike a
+// single-record "profile card" this is a list of every organization
+// this Account is linked to. `account.orgs` (id+name only) already
+// rode along on the same nav-state AccountRow as everything else on
+// this page (see mapAccountToAccountRow) — no fetch of its own needed.
+// Each row is a click-through to that organization's own full Details
+// page, which already has the rich Health/NPS/CSAT/ARR profile; this
+// tab doesn't re-derive a second copy of it per linked org here.
 function OrganizationTab({
   account,
   isRealAccount,
-  customer,
-  isLoading,
-  error,
 }: {
   account: AccountRow;
   /** Whether `account` is real (reached via a real Accounts tab click-
@@ -391,9 +378,6 @@ function OrganizationTab({
    * same convention every other tab on this page already follows: no
    * real parent id, no real fetch, no click-through. */
   isRealAccount: boolean;
-  customer: Customer | null;
-  isLoading: boolean;
-  error: string | null;
 }) {
   const navigate = useNavigate();
 
@@ -409,98 +393,31 @@ function OrganizationTab({
     );
   }
 
-  if (isLoading && !customer) {
-    return (
-      <div className="flex items-center justify-center h-full text-[13px] font-medium text-ink-faint">
-        Loading organization…
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full text-[13px] font-medium text-danger">
-        {error}
-      </div>
-    );
-  }
-
-  if (!customer) return null;
-
-  const org = mapCustomerToOrgRow(customer);
-  const healthPct = (org.health.val / 10) * 100;
+  const orgs = account.orgs ?? [];
+  if (orgs.length === 0) return null;
 
   return (
     <div className="p-6 h-full overflow-y-auto custom-scrollbar">
-      <div
-        className="max-w-2xl bg-surface rounded-2xl border border-line-subtle shadow-sm p-6 cursor-pointer hover:border-accent/40 transition-all group"
-        onClick={() => navigate(`/organizations/${org.id}`)}
-      >
-        {/* Identity */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4 min-w-0">
-            <EntityAvatar name={org.org} logoUrl={org.logo} className="w-14 h-14 rounded-2xl border border-line-subtle shadow-xs" />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-[17px] font-bold text-ink group-hover:text-accent transition-colors truncate">{org.org}</span>
-                <ExternalLink className="w-4 h-4 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+      <div className="max-w-2xl flex flex-col gap-3">
+        {orgs.map((org) => (
+          <div
+            key={org.id}
+            className="bg-surface rounded-xl border border-line-subtle shadow-sm p-4 cursor-pointer hover:border-accent/40 transition-all group flex items-center justify-between"
+            onClick={() => navigate(`/organizations/${org.id}`)}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <EntityAvatar name={org.name} className="w-11 h-11 rounded-xl border border-line-subtle shadow-xs" />
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[14.5px] font-bold text-ink group-hover:text-accent transition-colors truncate">{org.name}</span>
+                  <ExternalLink className="w-3.5 h-3.5 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                </div>
+                <span className="text-[12px] font-medium text-ink-faint">Revenact ID {org.id}</span>
               </div>
-              <span className="text-[12px] font-medium text-ink-faint">
-                Revenact ID {org.id}{org.domain && org.domain !== '-' ? ` • ${org.domain}` : ''}
-              </span>
             </div>
+            <ChevronRight className="w-4 h-4 text-ink-faint shrink-0" />
           </div>
-          <span className="px-3 py-1 rounded-md bg-subtle border border-line-subtle text-[11.5px] font-bold text-ink-muted uppercase tracking-tight shrink-0">
-            {org.stage}
-          </span>
-        </div>
-
-        {/* Health / NPS / CSAT / ARR */}
-        <div className="grid grid-cols-4 gap-6 pt-5 border-t border-line-subtle">
-          <div className="flex items-center gap-3">
-            <div className="relative shrink-0" style={{ width: 44, height: 44 }}>
-              <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                <circle cx="18" cy="18" r="15.9155" fill="none" stroke="var(--bg-subtle)" strokeWidth="3.5" />
-                <circle
-                  cx="18" cy="18" r="15.9155" fill="none" stroke={org.health.clr} strokeWidth="3.5"
-                  strokeDasharray={`${healthPct} ${100 - healthPct}`} strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[11px] font-bold text-ink-faint uppercase tracking-widest">Health</span>
-              <span className="text-lg font-bold text-ink leading-tight">{org.health.val}</span>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold text-ink-faint uppercase tracking-widest">NPS</span>
-            <span className={`inline-flex w-fit ${org.npsColor} text-white px-2.5 py-1 rounded text-[12px] font-bold`}>{org.nps}</span>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold text-ink-faint uppercase tracking-widest">CSAT</span>
-            <span className={`inline-flex w-fit ${org.csatColor} text-white px-2.5 py-1 rounded text-[12px] font-bold`}>{org.csat}</span>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-bold text-ink-faint uppercase tracking-widest">ARR</span>
-            <span className="text-lg font-bold text-ink leading-tight">{formatArr(org.arr)}</span>
-          </div>
-        </div>
-
-        {/* Owner */}
-        <div className="flex items-center gap-2 mt-5 pt-5 border-t border-line-subtle">
-          {org.img ? (
-            <img src={org.img} alt={org.owner} className="w-7 h-7 rounded-full object-cover border border-line" />
-          ) : (
-            <div className={`w-7 h-7 rounded-full ${org.bg} text-white flex items-center justify-center font-bold text-[10px] shadow-sm`}>
-              {org.avatar}
-            </div>
-          )}
-          <span className="text-[12.5px] font-semibold text-ink-muted">{org.owner}</span>
-          <span className="text-[11px] text-ink-faint">Owner</span>
-        </div>
+        ))}
       </div>
     </div>
   );

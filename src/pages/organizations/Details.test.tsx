@@ -349,8 +349,7 @@ describe('Organization Details page (/organizations/:id)', () => {
                 status: 'active',
                 sentiment: 'positive',
                 last_contacted_at: '2026-08-31T00:00:00Z',
-                company_id: 10,
-                company_name: 'Globex Corp',
+                companies: [{ id: 10, name: 'Globex Corp' }],
                 account_name: null,
               },
             ],
@@ -386,8 +385,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       status: 'active',
       sentiment: 'positive',
       last_contacted_at: '2026-08-31T00:00:00Z',
-      company_id: 10,
-      company_name: 'Globex Corp',
+      companies: [{ id: 10, name: 'Globex Corp' }],
       account_name: null,
     };
     const jamesWilson = {
@@ -453,7 +451,7 @@ describe('Organization Details page (/organizations/:id)', () => {
           return Promise.resolve({
             ok: true,
             status: 200,
-            json: async () => [{ id: 17, name: 'North America', customer: 10 }],
+            json: async () => [{ id: 17, name: 'North America', customers: [{ id: 10, name: 'Globex Corp' }] }],
           });
         }
         if (method === 'POST' && url.endsWith('/customers/10/accounts/17/contacts/')) {
@@ -606,8 +604,7 @@ describe('Organization Details page (/organizations/:id)', () => {
                 stage_display: 'Qualification',
                 priority: 'high',
                 priority_display: 'High',
-                company_id: 10,
-                company_name: 'Globex Corp',
+                companies: [{ id: 10, name: 'Globex Corp' }],
                 account_name: null,
               },
             ],
@@ -626,8 +623,7 @@ describe('Organization Details page (/organizations/:id)', () => {
                 stage_display: 'Open',
                 priority: 'high',
                 priority_display: 'High',
-                company_id: 10,
-                company_name: 'Globex Corp',
+                companies: [{ id: 10, name: 'Globex Corp' }],
                 account_name: null,
               },
             ],
@@ -667,8 +663,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       stage_display: 'Qualification',
       priority: 'high',
       priority_display: 'High',
-      company_id: 10,
-      company_name: 'Globex Corp',
+      companies: [{ id: 10, name: 'Globex Corp' }],
       account_name: null,
     };
     const accountLevelOpp = {
@@ -685,8 +680,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       stage_display: 'Open',
       priority: 'high',
       priority_display: 'High',
-      company_id: 10,
-      company_name: 'Globex Corp',
+      companies: [{ id: 10, name: 'Globex Corp' }],
       account_name: null,
     };
 
@@ -914,7 +908,7 @@ describe('Organization Details page (/organizations/:id)', () => {
   describe('Accounts tab (one Customer has many Accounts)', () => {
     const account = {
       id: 1,
-      customer: 10,
+      customers: [{ id: 10, name: 'Globex Corp' }],
       name: 'North America Enterprise',
       domain: '',
       owner: null,
@@ -1027,7 +1021,13 @@ describe('Organization Details page (/organizations/:id)', () => {
           }
           if (method === 'POST' && url.endsWith('/customers/10/accounts/')) {
             const body = JSON.parse(options!.body!);
-            const created = { ...account, ...body, id: nextId++, customer: 10, owner: null };
+            const created = {
+              ...account,
+              ...body,
+              id: nextId++,
+              customers: [{ id: 10, name: 'Globex Corp' }],
+              owner: null,
+            };
             accounts = [created, ...accounts];
             return Promise.resolve({ ok: true, status: 201, json: async () => created });
           }
