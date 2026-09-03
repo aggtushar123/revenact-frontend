@@ -9,6 +9,12 @@ import type { User } from '../../features/auth/authSlice';
 interface OrganizationFormModalProps {
   /** Present for Edit, omitted for Add. */
   customer?: Customer;
+  /** Add-only default lifecycle stage — the Organizations board's own
+   * column "+" the user clicked (see pages/organizations/Board.tsx),
+   * same convention as OpportunityFormModal/RiskFormModal's own
+   * `defaultStage`. Never 'churn' — see LIFECYCLE_OPTIONS' own
+   * docstring on why that isn't a selectable option here. */
+  defaultLifecycleStage?: Customer['lifecycle_stage'];
   onClose: () => void;
 }
 
@@ -30,7 +36,7 @@ const LIFECYCLE_OPTIONS: { value: Customer['lifecycle_stage']; label: string }[]
   { value: 'other', label: 'Other' },
 ];
 
-export function OrganizationFormModal({ customer, onClose }: OrganizationFormModalProps) {
+export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose }: OrganizationFormModalProps) {
   const dispatch = useAppDispatch();
   const isEdit = !!customer;
 
@@ -39,7 +45,7 @@ export function OrganizationFormModal({ customer, onClose }: OrganizationFormMod
   const [address, setAddress] = useState(customer?.address ?? '');
   const [ownerId, setOwnerId] = useState<string>(customer?.owner ? String(customer.owner.id) : '');
   const [lifecycleStage, setLifecycleStage] = useState<Customer['lifecycle_stage']>(
-    customer?.lifecycle_stage ?? 'onboarding'
+    customer?.lifecycle_stage ?? defaultLifecycleStage ?? 'onboarding'
   );
   const [joinedDate, setJoinedDate] = useState(customer?.joined_date ?? '');
   const [renewalDate, setRenewalDate] = useState(customer?.renewal_date ?? '');

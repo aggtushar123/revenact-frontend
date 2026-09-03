@@ -17,7 +17,7 @@ import { EntityAvatar } from './EntityAvatar';
 import { OpportunityFormModal } from '../pipelines/OpportunityFormModal';
 import { RiskFormModal } from '../pipelines/RiskFormModal';
 import { ConfirmDialog } from '../organizations/ConfirmDialog';
-import { KanbanBoard } from '../pipelines/KanbanBoard';
+import { KanbanBoard, PipelineCardContent } from '../pipelines/KanbanBoard';
 import {
   OPPORTUNITY_STAGE_COLUMNS,
   RISK_STAGE_COLUMNS,
@@ -248,6 +248,7 @@ export function PipelinesTab({
                 <KanbanBoard
                   columns={OPPORTUNITY_STAGE_COLUMNS}
                   entities={filteredOpportunities}
+                  renderCard={PipelineCardContent}
                   onCardClick={setEditingOpportunity}
                   onAddClick={(stage) => { setAddOpportunityDefaultStage(stage); setIsAddingOpportunity(true); }}
                   onMove={(id, stage) => dispatch(updateOpportunity({ id, stage }))}
@@ -262,6 +263,7 @@ export function PipelinesTab({
               <KanbanBoard
                 columns={RISK_STAGE_COLUMNS}
                 entities={filteredRisks}
+                renderCard={PipelineCardContent}
                 onCardClick={setEditingRisk}
                 onAddClick={(stage) => { setAddRiskDefaultStage(stage); setIsAddingRisk(true); }}
                 onMove={(id, stage) => dispatch(updateRisk({ id, stage }))}

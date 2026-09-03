@@ -15,7 +15,7 @@ import {
   deleteRisk,
 } from '../../features/customers/customersSlice';
 import { formatMoney, companyLabel } from '../../features/customers/formatters';
-import { KanbanBoard } from '../../components/pipelines/KanbanBoard';
+import { KanbanBoard, PipelineCardContent } from '../../components/pipelines/KanbanBoard';
 import {
   OPPORTUNITY_STAGE_COLUMNS,
   RISK_STAGE_COLUMNS,
@@ -333,6 +333,7 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
             <KanbanBoard
               columns={RISK_STAGE_COLUMNS}
               entities={filteredRisks}
+              renderCard={PipelineCardContent}
               onCardClick={setEditingRisk}
               onAddClick={handleAddRiskClick}
               onMove={(id, stage) => dispatch(updateRisk({ id, stage }))}
@@ -352,6 +353,7 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
           <KanbanBoard
             columns={OPPORTUNITY_STAGE_COLUMNS}
             entities={filteredOpportunities}
+            renderCard={PipelineCardContent}
             onCardClick={setEditingOpportunity}
             onAddClick={handleAddClick}
             onMove={(id, stage) => dispatch(updateOpportunity({ id, stage }))}

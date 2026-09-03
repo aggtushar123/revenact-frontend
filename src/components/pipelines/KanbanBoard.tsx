@@ -1,38 +1,27 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { EntityAvatar } from '../shared/EntityAvatar';
 import { formatMoney, companyLabel } from '../../features/customers/formatters';
 import { PRIORITY_COLORS, pipelineOrgLabel } from './kanbanConfig';
 import type { PipelineCardEntity } from './kanbanConfig';
 
-// Shared Kanban rendering for both the standalone Pipelines board
-// (pages/pipelines/PipelinesPage.tsx) and the embedded Pipelines tab
-// (components/shared/PipelinesTab.tsx, on the Organization/Account
-// Details pages) — Opportunity and Risk cards were previously two
-// near-identical copies of the same card/column/drag-and-drop code
-// living only in PipelinesPage.tsx; extracted here once both needed a
-// second (embedded) home, same "one shared component, not page-local
-// copies" reasoning as ContactsTab/PipelinesTab themselves. Stage
-// columns/colors/labels live in ./kanbanConfig instead of here — a
-// file exporting a component can only export components (react-
-// refresh/only-export-components), not also that plain data.
+// Generic Kanban rendering shared by every stage-column board in the
+// app — originally just Opportunity/Risk (the standalone Pipelines
+// board, pages/pipelines/PipelinesPage.tsx, and the embedded Pipelines
+// tab, components/shared/PipelinesTab.tsx), now also the standalone
+// Organizations board (pages/organizations/Board.tsx, grouped by
+// lifecycle_stage instead of a pipeline stage) — same "one shared
+// component, not page-local copies" reasoning as ContactsTab/
+// PipelinesTab themselves. `renderCard` is the only entity-specific
+// part; column layout, drag-and-drop, and the "N in this column" count
+// are otherwise fully generic. Stage columns/colors/labels for the
+// pipeline case live in ./kanbanConfig instead of here — a file
+// exporting a component can only export components (react-refresh/
+// only-export-components), not also that plain data.
 
-function PipelineCard<T extends PipelineCardEntity>({
-  entity,
-  onDragStart,
-  onClick,
-}: {
-  entity: T;
-  onDragStart: (e: React.DragEvent, id: number) => void;
-  onClick: () => void;
-}) {
+export function PipelineCardContent(entity: PipelineCardEntity) {
   return (
-    <div
-      draggable
-      onDragStart={e => onDragStart(e, entity.id)}
-      onClick={onClick}
-      className="bg-surface border border-line/80 rounded-lg p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:border-accent/40 transition-all duration-200 cursor-grab active:cursor-grabbing active:opacity-60 active:scale-[0.98] select-none"
-    >
+    <>
       <h4 className="text-[12.5px] font-bold text-ink leading-snug mb-2.5">{entity.title}</h4>
       <div className="text-[12px] font-bold text-accent mb-3">MRR: ${formatMoney(entity.mrr)}</div>
       <div className="flex items-center justify-between min-w-0">
@@ -44,14 +33,39 @@ function PipelineCard<T extends PipelineCardEntity>({
           {entity.priority}
         </span>
       </div>
+    </>
+  );
+}
+
+function KanbanCard<T extends { id: number }>({
+  entity,
+  renderCard,
+  onDragStart,
+  onClick,
+}: {
+  entity: T;
+  renderCard: (entity: T) => ReactNode;
+  onDragStart: (e: React.DragEvent, id: number) => void;
+  onClick: () => void;
+}) {
+  return (
+    <div
+      draggable
+      onDragStart={e => onDragStart(e, entity.id)}
+      onClick={onClick}
+      className="bg-surface border border-line/80 rounded-lg p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-[0_4px_12px_rgba(0,0,0,0.08)] hover:border-accent/40 transition-all duration-200 cursor-grab active:cursor-grabbing active:opacity-60 active:scale-[0.98] select-none"
+    >
+      {renderCard(entity)}
     </div>
   );
 }
 
-function KanbanColumn<S extends string, T extends PipelineCardEntity>({
+function KanbanColumn<S extends string, T extends { id: number }>({
   stage,
   title,
+  disableAdd,
   entities,
+  renderCard,
   onDragStart,
   onDragOver,
   onDrop,
@@ -61,12 +75,20 @@ function KanbanColumn<S extends string, T extends PipelineCardEntity>({
 }: {
   stage: S;
   title: string;
+  /** This one column's own "+" is hidden even though the board's
+   * `onAddClick` is set — e.g. the Organizations board's own Churn
+   * column, which nothing can be directly added into (see Board.tsx's
+   * own docstring). */
+  disableAdd?: boolean;
   entities: T[];
+  renderCard: (entity: T) => ReactNode;
   onDragStart: (e: React.DragEvent, id: number) => void;
   onDragOver: (e: React.DragEvent, stage: S) => void;
   onDrop: (e: React.DragEvent, stage: S) => void;
   onCardClick: (entity: T) => void;
-  onAddClick: (stage: S) => void;
+  /** Omitted entirely (rather than a no-op) hides every column's own
+   * "+" — an add-per-stage action doesn't make sense for every board. */
+  onAddClick?: (stage: S) => void;
   isDragOver: boolean;
 }) {
   return (
@@ -80,12 +102,14 @@ function KanbanColumn<S extends string, T extends PipelineCardEntity>({
           <span className="text-[12.5px] font-bold text-ink-muted tracking-tight">{title}</span>
           <span className="text-[11px] text-ink-faint font-bold">({entities.length})</span>
         </div>
-        <button
-          onClick={() => onAddClick(stage)}
-          className="p-0.5 text-ink-faint hover:text-ink-muted transition-colors"
-        >
-          <Plus className="w-4 h-4 stroke-[2.5px]" />
-        </button>
+        {onAddClick && !disableAdd && (
+          <button
+            onClick={() => onAddClick(stage)}
+            className="p-0.5 text-ink-faint hover:text-ink-muted transition-colors"
+          >
+            <Plus className="w-4 h-4 stroke-[2.5px]" />
+          </button>
+        )}
       </div>
 
       {isDragOver && (
@@ -94,7 +118,7 @@ function KanbanColumn<S extends string, T extends PipelineCardEntity>({
 
       <div className="flex flex-col gap-2.5 px-2 pb-3 flex-1 min-h-[60px]">
         {entities.map(e => (
-          <PipelineCard key={e.id} entity={e} onDragStart={onDragStart} onClick={() => onCardClick(e)} />
+          <KanbanCard key={e.id} entity={e} renderCard={renderCard} onDragStart={onDragStart} onClick={() => onCardClick(e)} />
         ))}
         {entities.length === 0 && (
           <div className="flex-1 border-2 border-dashed border-line rounded-lg flex items-center justify-center min-h-[80px] text-[12px] text-ink-faint font-semibold">
@@ -106,14 +130,27 @@ function KanbanColumn<S extends string, T extends PipelineCardEntity>({
   );
 }
 
-export interface KanbanBoardProps<S extends string, T extends PipelineCardEntity & { stage: S }> {
-  columns: { stage: S; title: string }[];
+export interface KanbanBoardProps<S extends string, T extends { id: number; stage: S }> {
+  /** `disableAdd` hides that one column's own "+" even when `onAddClick`
+   * is set (see KanbanColumn's own docstring) — e.g. a stage nothing
+   * can be directly created into. */
+  columns: { stage: S; title: string; disableAdd?: boolean }[];
   entities: T[];
+  /** The card's own inner content — everything inside KanbanBoard's
+   * shared draggable/clickable card chrome (border, hover, shadow,
+   * cursor-grab). Use PipelineCardContent (above) for an Opportunity/
+   * Risk board, or a page-specific one for anything else. */
+  renderCard: (entity: T) => ReactNode;
   onCardClick: (entity: T) => void;
-  onAddClick: (stage: S) => void;
-  /** Drag a card to another column — PATCH the moved entity's own
+  /** Omit to hide every column's own "+" (an add-per-stage action
+   * doesn't make sense for every board — see KanbanColumn's own
+   * docstring). */
+  onAddClick?: (stage: S) => void;
+  /** Drag a card to another column — move the dragged entity's own
    * `stage`. Caller's own responsibility (dispatches updateOpportunity/
-   * updateRisk) since KanbanBoard doesn't know which thunk applies. */
+   * updateRisk/updateCustomer, or opens a dedicated modal first, as
+   * the Organizations board's own Churn column does) since KanbanBoard
+   * doesn't know which thunk (or extra confirmation) applies. */
   onMove: (id: number, stage: S) => void;
   /** Caps each column's own scroll area instead of the whole page's —
    * matches the standalone board's own `calc(100vh - 260px)`; an
@@ -121,9 +158,10 @@ export interface KanbanBoardProps<S extends string, T extends PipelineCardEntity
   minHeight?: string;
 }
 
-export function KanbanBoard<S extends string, T extends PipelineCardEntity & { stage: S }>({
+export function KanbanBoard<S extends string, T extends { id: number; stage: S }>({
   columns,
   entities,
+  renderCard,
   onCardClick,
   onAddClick,
   onMove,
@@ -162,7 +200,9 @@ export function KanbanBoard<S extends string, T extends PipelineCardEntity & { s
           key={col.stage}
           stage={col.stage}
           title={col.title}
+          disableAdd={col.disableAdd}
           entities={entities.filter(e => e.stage === col.stage)}
+          renderCard={renderCard}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
