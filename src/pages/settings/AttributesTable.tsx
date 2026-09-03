@@ -1,202 +1,146 @@
 import { useState } from 'react';
-import { 
-  ChevronDown, MoreHorizontal, 
-  GripVertical, Edit3, 
-  Mail, Calendar, DollarSign
+import {
+  ChevronDown, MoreHorizontal,
+  GripVertical, Edit3,
+  Type, Hash, Calendar, DollarSign, ToggleLeft, List as ListIcon, User,
 } from 'lucide-react';
+import { usagePercent, attributeProperties } from './organizationAttributes';
+import type { AttributeDef, AttributeType } from './organizationAttributes';
+import type { Customer } from '../../features/customers/customersSlice';
 
-interface Attribute {
-  displayName: string;
-  name: string;
-  description: string;
-  type: 'Text' | 'Date' | 'Currency';
-  properties: string[];
-  usage: number;
-  created: string;
+export interface AttributesTableProps {
+  /** Every organization currently loaded (see SettingsPage's own
+   * page-walking fetch) — Usage% below is computed from this, not a
+   * fabricated per-row number. */
+  customers: Customer[];
+  /** Attributes already filtered by the search box above — this
+   * component just renders whatever it's given, split into its own
+   * Custom/System sections. */
+  attributes: AttributeDef[];
 }
 
-const customAttributes: Attribute[] = [
-  { 
-    displayName: 'Name', 
-    name: 'name', 
-    description: 'Default', 
-    type: 'Text', 
-    properties: ['Required', 'UI Editable', 'Visible'], 
-    usage: 100, 
-    created: '14 Nov 10:30 AM' 
-  },
-  { 
-    displayName: 'Address', 
-    name: 'address', 
-    description: 'Default', 
-    type: 'Text', 
-    properties: ['UI Editable', 'Visible'], 
-    usage: 0, 
-    created: '14 Nov 10:30 AM' 
-  },
-  { 
-    displayName: 'Joined Date', 
-    name: 'date_joined', 
-    description: 'Default', 
-    type: 'Date', 
-    properties: ['UI Editable', 'Visible'], 
-    usage: 24, 
-    created: '14 Nov 10:30 AM' 
-  },
-  { 
-    displayName: 'Renewal Date', 
-    name: 'renewal_date', 
-    description: 'Default', 
-    type: 'Date', 
-    properties: ['UI Editable', 'Visible'], 
-    usage: 53, 
-    created: '14 Nov 10:30 AM' 
-  },
-  { 
-    displayName: 'Starting SaaS MRR', 
-    name: 'starting_saas_mrr', 
-    description: 'Default', 
-    type: 'Currency', 
-    properties: ['UI Editable', 'Visible'], 
-    usage: 14, 
-    created: '14 Nov 10:30 AM' 
-  },
-  { 
-    displayName: 'Expansion SaaS MRR', 
-    name: 'expansion_saas_mrr', 
-    description: 'Default', 
-    type: 'Currency', 
-    properties: ['Visible'], 
-    usage: 100, 
-    created: '14 Nov 10:30 AM' 
-  },
-];
+export function AttributesTable({ customers, attributes }: AttributesTableProps) {
+  const customAttributes = attributes.filter((a) => a.isCustom);
+  const systemAttributes = attributes.filter((a) => !a.isCustom);
 
-const systemAttributes: Attribute[] = [
-  { 
-    displayName: 'ID', 
-    name: 'id', 
-    description: 'System Generated', 
-    type: 'Text', 
-    properties: ['Required', 'Visible'], 
-    usage: 100, 
-    created: '14 Nov 10:30 AM' 
-  },
-  { 
-    displayName: 'Created At', 
-    name: 'created_at', 
-    description: 'System Generated', 
-    type: 'Date', 
-    properties: ['Visible'], 
-    usage: 100, 
-    created: '14 Nov 10:30 AM' 
-  },
-];
-
-export function AttributesTable() {
   return (
     <div className="flex flex-col gap-4">
-      <AttributeSection title="Custom Attributes" attributes={customAttributes} defaultOpen={true} />
-      <AttributeSection title="System Attributes" attributes={systemAttributes} defaultOpen={false} />
+      <AttributeSection title="Custom Attributes" attributes={customAttributes} customers={customers} defaultOpen={true} />
+      <AttributeSection title="System Attributes" attributes={systemAttributes} customers={customers} defaultOpen={false} />
     </div>
   );
 }
 
-function AttributeSection({ title, attributes, defaultOpen = true }: { title: string, attributes: Attribute[], defaultOpen?: boolean }) {
+function AttributeSection({
+  title,
+  attributes,
+  customers,
+  defaultOpen = true,
+}: {
+  title: string;
+  attributes: AttributeDef[];
+  customers: Customer[];
+  defaultOpen?: boolean;
+}) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
-    <div className="flex flex-col border border-gray-100 rounded-lg overflow-hidden bg-white shadow-sm transition-all duration-300">
-      <div 
+    <div className="flex flex-col border border-line-subtle rounded-lg overflow-hidden bg-surface shadow-sm transition-all duration-300">
+      <div
         onClick={() => setIsOpen(!isOpen)}
-        className="px-4 py-2 bg-gray-50/40 border-b border-gray-100 flex items-center gap-2 cursor-pointer hover:bg-gray-100/50 transition-colors group"
+        className="px-4 py-2 bg-subtle/40 border-b border-line-subtle flex items-center gap-2 cursor-pointer hover:bg-subtle/50 transition-colors group"
       >
         <div className={`transition-transform duration-200 ${isOpen ? '' : '-rotate-90'}`}>
-           <ChevronDown className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+           <ChevronDown className="w-4 h-4 text-ink-faint group-hover:text-accent transition-colors" />
         </div>
-        <h3 className="text-[12px] font-bold text-gray-700 select-none">{title}</h3>
-        <span className="text-[10px] bg-gray-100 text-gray-400 px-1.5 py-0.5 rounded font-bold ml-auto">{attributes.length}</span>
+        <h3 className="text-[12px] font-bold text-ink-muted select-none">{title}</h3>
+        <span className="text-[10px] bg-subtle text-ink-faint px-1.5 py-0.5 rounded font-bold ml-auto">{attributes.length}</span>
       </div>
-      
+
       <div className={`grid transition-all duration-300 ease-in-out ${isOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
         <div className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse min-w-[900px]">
               <thead>
-                <tr className="border-b border-gray-50 bg-gray-50/10">
-                  <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Display Name</th>
-                  <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Description</th>
-                  <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Attribute Properties</th>
-                  <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Usage</th>
-                  <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Created</th>
+                <tr className="border-b border-line-subtle bg-subtle/10">
+                  <th className="px-6 py-2 text-[10px] font-bold text-ink-faint uppercase tracking-wider">Display Name</th>
+                  <th className="px-6 py-2 text-[10px] font-bold text-ink-faint uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-2 text-[10px] font-bold text-ink-faint uppercase tracking-wider">Description</th>
+                  <th className="px-6 py-2 text-[10px] font-bold text-ink-faint uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-2 text-[10px] font-bold text-ink-faint uppercase tracking-wider">Attribute Properties</th>
+                  <th className="px-6 py-2 text-[10px] font-bold text-ink-faint uppercase tracking-wider">Usage</th>
                   <th className="px-6 py-2 w-8"></th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50/50">
-                {attributes.map((attr, idx) => (
-                  <tr key={idx} className="group hover:bg-indigo-50/10 transition-all cursor-default h-11">
-                    <td className="px-6 py-1.5">
-                      <div className="flex items-center gap-2">
-                        <GripVertical className="w-3.5 h-3.5 text-gray-200 group-hover:text-gray-300 transition-colors" />
-                        <div className="flex flex-col">
-                          <span className="text-[12px] font-semibold text-gray-700 flex items-center gap-1.5">
+              <tbody className="divide-y divide-line-subtle">
+                {attributes.map((attr) => {
+                  const usage = usagePercent(attr, customers);
+                  const properties = attributeProperties(attr);
+                  return (
+                    <tr key={attr.name} className="group hover:bg-accent-dim/10 transition-all cursor-default h-11">
+                      <td className="px-6 py-1.5">
+                        <div className="flex items-center gap-2">
+                          <GripVertical className="w-3.5 h-3.5 text-ink-faint/50 group-hover:text-ink-faint transition-colors" />
+                          <span className="text-[12px] font-semibold text-ink-muted flex items-center gap-1.5">
                             {attr.displayName}
-                            <Edit3 className="w-2.5 h-2.5 text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-indigo-600" />
+                            <Edit3 className="w-2.5 h-2.5 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:text-accent" />
                           </span>
-                          <span className="text-[10px] font-medium text-gray-400">{attr.description}</span>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-1.5">
-                      <span className="text-[11px] font-medium text-gray-500 font-mono">
-                        {attr.name}
-                      </span>
-                    </td>
-                    <td className="px-6 py-1.5 text-[11px] font-medium text-gray-400">Default</td>
-                    <td className="px-6 py-1.5">
-                      <div className="flex items-center gap-1.5">
-                        <AttributeTypeIcon type={attr.type} />
-                        <span className="text-[11px] font-semibold text-gray-600">{attr.type}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-1.5">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        {attr.properties.map(p => (
-                          <span 
-                            key={p} 
-                            className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${getPropertyColor(p)}`}
-                          >
-                            {p}
-                          </span>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-1.5">
-                      <div className="flex items-center gap-2.5 min-w-[100px]">
-                        <div className="flex-1 h-1 bg-gray-100 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full transition-all duration-1000 ${
-                              attr.usage === 100 ? 'bg-emerald-400' : 'bg-gray-300'
-                            }`} 
-                            style={{ width: `${attr.usage}%` }}
-                          />
+                      </td>
+                      <td className="px-6 py-1.5">
+                        <span className="text-[11px] font-medium text-ink-muted font-mono">
+                          {attr.name}
+                        </span>
+                      </td>
+                      <td className="px-6 py-1.5 text-[11px] font-medium text-ink-faint">
+                        {attr.isCustom ? 'Default' : 'System Generated'}
+                      </td>
+                      <td className="px-6 py-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <AttributeTypeIcon type={attr.type} />
+                          <span className="text-[11px] font-semibold text-ink-muted capitalize">{attr.type}</span>
                         </div>
-                        <span className="text-[10px] font-bold text-gray-500 w-7">{attr.usage}%</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-1.5 text-right whitespace-nowrap">
-                      <span className="text-[10px] font-bold text-gray-500 inline-block">{attr.created.split(' ').slice(0, 2).join(' ')}</span>
-                      <span className="text-[9px] font-medium text-gray-400 ml-1.5 uppercase">{attr.created.split(' ').slice(2).join(' ')}</span>
-                    </td>
-                    <td className="px-6 py-1.5">
-                      <button className="p-0.5 hover:bg-gray-100 rounded text-gray-400 transition-colors opacity-0 group-hover:opacity-100">
-                        <MoreHorizontal className="w-3.5 h-3.5" />
-                      </button>
+                      </td>
+                      <td className="px-6 py-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {properties.map((p) => (
+                            <span
+                              key={p}
+                              className={`px-1.5 py-0.5 rounded text-[9px] font-bold border ${getPropertyColor(p)}`}
+                            >
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-6 py-1.5">
+                        <div className="flex items-center gap-2.5 min-w-[100px]">
+                          <div className="flex-1 h-1 bg-subtle rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-1000 ${
+                                usage === 100 ? 'bg-success' : 'bg-line-strong'
+                              }`}
+                              style={{ width: `${usage}%` }}
+                            />
+                          </div>
+                          <span className="text-[10px] font-bold text-ink-muted w-7">{usage}%</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-1.5">
+                        <button className="p-0.5 hover:bg-subtle rounded text-ink-faint transition-colors opacity-0 group-hover:opacity-100">
+                          <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {attributes.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-6 text-center text-[11px] font-medium text-ink-faint">
+                      No attributes match your search.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -206,20 +150,24 @@ function AttributeSection({ title, attributes, defaultOpen = true }: { title: st
   );
 }
 
-function AttributeTypeIcon({ type }: { type: string }) {
+function AttributeTypeIcon({ type }: { type: AttributeType }) {
   switch (type) {
-    case 'Text': return <div className="p-0.5 bg-blue-50/50 text-blue-500 rounded"><Mail className="w-2.5 h-2.5" /></div>;
-    case 'Date': return <div className="p-0.5 bg-amber-50/50 text-amber-500 rounded"><Calendar className="w-2.5 h-2.5" /></div>;
-    case 'Currency': return <div className="p-0.5 bg-emerald-50/50 text-emerald-500 rounded"><DollarSign className="w-2.5 h-2.5" /></div>;
+    case 'text': return <div className="p-0.5 bg-info-dim/50 text-info rounded"><Type className="w-2.5 h-2.5" /></div>;
+    case 'number': return <div className="p-0.5 bg-info-dim/50 text-info rounded"><Hash className="w-2.5 h-2.5" /></div>;
+    case 'date': return <div className="p-0.5 bg-warning-dim/50 text-warning rounded"><Calendar className="w-2.5 h-2.5" /></div>;
+    case 'currency': return <div className="p-0.5 bg-success-dim/50 text-success rounded"><DollarSign className="w-2.5 h-2.5" /></div>;
+    case 'boolean': return <div className="p-0.5 bg-accent-dim/50 text-accent rounded"><ToggleLeft className="w-2.5 h-2.5" /></div>;
+    case 'select': return <div className="p-0.5 bg-accent-dim/50 text-accent rounded"><ListIcon className="w-2.5 h-2.5" /></div>;
+    case 'relation': return <div className="p-0.5 bg-ink-faint/20 text-ink-muted rounded"><User className="w-2.5 h-2.5" /></div>;
     default: return null;
   }
 }
 
 function getPropertyColor(prop: string) {
   switch (prop) {
-    case 'Required': return 'bg-rose-50 text-rose-500 border-rose-100/50';
-    case 'UI Editable': return 'bg-blue-50 text-blue-500 border-blue-100/50';
-    case 'Visible': return 'bg-orange-50 text-orange-500 border-orange-100/50';
-    default: return 'bg-gray-50 text-gray-500 border-gray-100/50';
+    case 'Required': return 'bg-danger-dim text-danger border-danger/30';
+    case 'UI Editable': return 'bg-info-dim text-info border-info/30';
+    case 'Visible': return 'bg-warning-dim text-warning border-warning/30';
+    default: return 'bg-subtle text-ink-muted border-line-subtle/50';
   }
 }
