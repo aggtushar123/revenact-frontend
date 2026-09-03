@@ -280,6 +280,31 @@ export interface OpportunityWritePayload {
   priority?: Opportunity['priority'];
 }
 
+// Mirrors revenact-backend's RiskSerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Risk. Field-for-field identical
+// to Opportunity above except `stage`, which is the board's own 4 Risk
+// Kanban columns rather than Opportunity's 6.
+export interface Risk {
+  id: number;
+  title: string;
+  mrr: string;
+  stage: 'open' | 'mitigated' | 'realised' | 'abandoned';
+  stage_display: string;
+  priority: 'high' | 'medium' | 'low';
+  priority_display: string;
+  company_id: number;
+  company_name: string;
+  account_name: string | null;
+}
+
+// The fields the Add/Edit Risk form actually exposes.
+export interface RiskWritePayload {
+  title?: string;
+  mrr?: string;
+  stage?: Risk['stage'];
+  priority?: Risk['priority'];
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -459,6 +484,12 @@ interface CustomersState {
   opportunities: Opportunity[];
   opportunitiesLoading: boolean;
   opportunitiesError: string | null;
+  /** Every Risk the caller's organisation owns — the standalone
+   * Pipelines board's own "Risks" tab, unpaginated, same reasoning as
+   * `opportunities` above (see RiskListView's own docstring). */
+  risks: Risk[];
+  risksLoading: boolean;
+  risksError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -518,6 +549,9 @@ const initialState: CustomersState = {
   opportunities: [],
   opportunitiesLoading: false,
   opportunitiesError: null,
+  risks: [],
+  risksLoading: false,
+  risksError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -1052,6 +1086,67 @@ export const deleteOpportunity = createAsyncThunk<number, number, { rejectValue:
   }
 );
 
+// Powers the standalone Pipelines board's own "Risks" tab — same
+// shape as fetchOpportunities above, field-for-field.
+export const fetchRisks = createAsyncThunk<Risk[], void, { rejectValue: string }>(
+  'customers/fetchRisks',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Risk[]>('/risks/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load risks.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Same `customerId`/`accountId` -> `customer_id`/`account_id` shape as
+// createOpportunity above, same reasoning throughout.
+export const createRisk = createAsyncThunk<
+  Risk,
+  { customerId?: number; accountId?: number } & RiskWritePayload & { title: string },
+  { rejectValue: string }
+>('customers/createRisk', async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
+  const body =
+    accountId !== undefined
+      ? { ...data, account_id: accountId }
+      : { ...data, customer_id: customerId };
+  try {
+    return await apiFetch<Risk>('/risks/', { method: 'POST', body });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not add risk.';
+    return rejectWithValue(message);
+  }
+});
+
+// PATCH /api/v1/risks/<id>/ — powers both the board's drag-and-drop
+// (stage only) and its full Edit form.
+export const updateRisk = createAsyncThunk<
+  Risk,
+  { id: number } & RiskWritePayload,
+  { rejectValue: string }
+>('customers/updateRisk', async ({ id, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Risk>(`/risks/${id}/`, { method: 'PATCH', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not update risk.';
+    return rejectWithValue(message);
+  }
+});
+
+export const deleteRisk = createAsyncThunk<number, number, { rejectValue: string }>(
+  'customers/deleteRisk',
+  async (id, { rejectWithValue }) => {
+    try {
+      await apiFetch<null>(`/risks/${id}/`, { method: 'DELETE' });
+      return id;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not delete risk.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -1519,6 +1614,31 @@ const customersSlice = createSlice({
       })
       .addCase(deleteOpportunity.fulfilled, (state, action) => {
         state.opportunities = state.opportunities.filter((o) => o.id !== action.payload);
+      })
+      .addCase(fetchRisks.pending, (state) => {
+        state.risksLoading = true;
+        state.risksError = null;
+      })
+      .addCase(fetchRisks.fulfilled, (state, action) => {
+        state.risksLoading = false;
+        state.risks = action.payload;
+      })
+      .addCase(fetchRisks.rejected, (state, action) => {
+        state.risksLoading = false;
+        state.risksError = action.payload ?? 'Could not load risks.';
+      })
+      // Same "no .rejected case, create/update/delete patch `risks`
+      // directly" reasoning as Opportunity above.
+      .addCase(createRisk.fulfilled, (state, action) => {
+        state.risks.unshift(action.payload);
+      })
+      .addCase(updateRisk.fulfilled, (state, action) => {
+        const updated = action.payload;
+        const index = state.risks.findIndex((r) => r.id === updated.id);
+        if (index !== -1) state.risks[index] = updated;
+      })
+      .addCase(deleteRisk.fulfilled, (state, action) => {
+        state.risks = state.risks.filter((r) => r.id !== action.payload);
       })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's

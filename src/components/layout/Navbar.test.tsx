@@ -155,6 +155,9 @@ function renderNavbar(
         opportunities: [],
         opportunitiesLoading: false,
         opportunitiesError: null,
+        risks: [],
+        risksLoading: false,
+        risksError: null,
       },
     },
   });
