@@ -419,6 +419,135 @@ describe('AccountDetails page (/accounts/:id)', () => {
     });
   });
 
+  describe('Organizations tab (an Account belongs to exactly one Customer)', () => {
+    // Minimal but real shape, matching revenact-backend's CustomerSerializer
+    // — see organizations/Details.test.tsx's own `globex` fixture.
+    const kraftHeinz = {
+      id: 9,
+      name: 'Kraft Heinz',
+      address: '',
+      domain: 'kraftheinz.com',
+      email: '',
+      phone: '',
+      owner: null,
+      created_by: null,
+      modified_by: null,
+      created_at: '2026-08-31T00:00:00Z',
+      updated_at: '2026-08-31T00:00:00Z',
+      lifecycle_stage: 'onboarding' as const,
+      health_score: '8.6',
+      health_category: 'good' as const,
+      pulse: [],
+      ai_pulse_score: 'moderate' as const,
+      ai_pulse_reason: '',
+      nps_score: -17,
+      csat_score: '47.80',
+      joined_date: null,
+      renewal_date: null,
+      contract_start_date: null,
+      contract_end_date: null,
+      arr_billed_at_account: '103200.00',
+      arr_billed_at_hq: '0.00',
+      implementation_fee: '0.00',
+      total_contract_value: '0.00',
+      total_forecasted_renewal_revenue: '0.00',
+      primary_product: '',
+      additional_products_count: null,
+      top_source_channel: '',
+      total_contracted_seats: null,
+      total_active_seats: null,
+      seat_utilization_percentage: null,
+      total_hires: null,
+      scope_web_app: '',
+      ces_percentage: null,
+      churn_date: null,
+      churn_reason: '',
+      churn_comment: '',
+      is_archived: false,
+    };
+
+    it('fetches and renders this account\'s own real parent organization, from GET /customers/<orgId>/', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => (url.endsWith('/customers/9/') ? kraftHeinz : []),
+          })
+        )
+      );
+
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Organizations/ }));
+
+      expect(await screen.findByText('Kraft Heinz')).toBeInTheDocument();
+      expect(screen.getByText('Onboarding')).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/customers/9/'),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('shows a fallback message (not real data) when reached without navigation state', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Organizations/ }));
+
+      expect(
+        await screen.findByText(/Reload this page from a real Accounts tab link/)
+      ).toBeInTheDocument();
+    });
+
+    it('shows the backend error instead of crashing', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          url.endsWith('/customers/9/')
+            ? Promise.resolve({ ok: false, status: 404, json: async () => ({ detail: 'Not found.' }) })
+            : Promise.resolve({ ok: true, status: 200, json: async () => [] })
+        )
+      );
+
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Organizations/ }));
+
+      expect(await screen.findByText('Not found.')).toBeInTheDocument();
+    });
+
+    it('clicking the organization card navigates to its Organization Details page', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => (url.endsWith('/customers/9/') ? kraftHeinz : []),
+          })
+        )
+      );
+
+      const store = configureStore({ reducer: { customers: customersReducer } });
+      render(
+        <Provider store={store}>
+          <MemoryRouter initialEntries={[{ pathname: '/accounts/17', state: { account: apacDivision } }]}>
+            <Routes>
+              <Route path="/accounts/:id" element={<AccountDetails />} />
+              <Route path="/organizations/:id" element={<div>ORG PAGE</div>} />
+            </Routes>
+          </MemoryRouter>
+        </Provider>
+      );
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Organizations/ }));
+      await user.click(await screen.findByText('Kraft Heinz'));
+
+      expect(await screen.findByText('ORG PAGE')).toBeInTheDocument();
+    });
+  });
+
   describe('Contacts tab (real Contacts, own nested endpoint — a sibling tab, not an ActivityFeed filter)', () => {
     it('fetches and renders this account\'s own contacts, from its own nested endpoint', async () => {
       vi.stubGlobal(

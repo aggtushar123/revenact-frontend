@@ -1474,6 +1474,15 @@ const customersSlice = createSlice({
       state.contactsLoading = false;
       state.contactsError = null;
     },
+    // Same reasoning as clearContacts above, for the standalone Account
+    // page's own Organizations tab — a mock-fallback account has no
+    // real parent Customer id to fetch, so any previously-fetched
+    // selectedCustomer needs clearing rather than showing stale data.
+    clearSelectedCustomer(state) {
+      state.selectedCustomer = null;
+      state.selectedCustomerLoading = false;
+      state.selectedCustomerError = null;
+    },
     // Same reasoning as clearContacts above, for the Organization/
     // Account Details page's own Pipelines tab.
     clearPipelineData(state) {
@@ -2048,6 +2057,7 @@ export const {
   clearTickets,
   clearCalendarEvents,
   clearContacts,
+  clearSelectedCustomer,
   clearPipelineData,
 } = customersSlice.actions;
 export default customersSlice.reducer;
