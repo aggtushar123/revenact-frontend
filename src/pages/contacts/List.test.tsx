@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
 import { List } from './List';
@@ -44,12 +44,18 @@ const ZERO_STATS = {
 
 const EMPTY_CUSTOMERS_PAGE = { count: 0, next: null, previous: null, results: [] };
 
+// A route stub for each click-through destination — just enough to
+// assert "navigation actually happened", not to render the real page.
 function renderPage() {
   const store = configureStore({ reducer: { customers: customersReducer } });
   render(
     <Provider store={store}>
-      <MemoryRouter>
-        <List />
+      <MemoryRouter initialEntries={['/contacts/list']}>
+        <Routes>
+          <Route path="/contacts/list" element={<List />} />
+          <Route path="/organizations/:id" element={<div>ORG PAGE</div>} />
+          <Route path="/contacts/:id" element={<div>CONTACT PAGE</div>} />
+        </Routes>
       </MemoryRouter>
     </Provider>
   );
@@ -208,5 +214,180 @@ describe('Contacts List page (/contacts/list)', () => {
     renderPage();
 
     expect(await screen.findByText('New')).toBeInTheDocument();
+  });
+
+  it('clicking the company name opens that organization\'s page', async () => {
+    const fetchMock = makeFetchMock({
+      contacts: [{ status: 200, body: { count: 1, next: null, previous: null, results: [sarahChen] } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await user.click(await screen.findByText('Apple Inc'));
+
+    expect(await screen.findByText('ORG PAGE')).toBeInTheDocument();
+  });
+
+  it('clicking the contact name opens that contact\'s page', async () => {
+    const fetchMock = makeFetchMock({
+      contacts: [{ status: 200, body: { count: 1, next: null, previous: null, results: [sarahChen] } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await user.click(await screen.findByText('Sarah Chen'));
+
+    expect(await screen.findByText('CONTACT PAGE')).toBeInTheDocument();
+  });
+
+  it('the header checkbox selects and deselects every row on the page', async () => {
+    const fetchMock = makeFetchMock({
+      contacts: [
+        { status: 200, body: { count: 2, next: null, previous: null, results: [sarahChen, jamesWilson] } },
+      ],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Sarah Chen');
+
+    const selectAll = screen.getByRole('checkbox', { name: 'Select all contacts on this page' });
+    await user.click(selectAll);
+
+    expect(screen.getByRole('checkbox', { name: 'Select Sarah Chen' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select James Wilson' })).toBeChecked();
+
+    await user.click(selectAll);
+    expect(screen.getByRole('checkbox', { name: 'Select Sarah Chen' })).not.toBeChecked();
+  });
+
+  it('adding a contact posts to /customers/<id>/contacts/ and refetches the list', async () => {
+    const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+      const method = options?.method ?? 'GET';
+      if (url.includes('/contacts/stats/')) return Promise.resolve(jsonResponse(200, ZERO_STATS));
+      if (url.includes('/customers/') && !url.includes('/contacts/') && method === 'GET') {
+        return Promise.resolve(
+          jsonResponse(200, {
+            count: 1,
+            next: null,
+            previous: null,
+            results: [{ id: 6, name: 'Apple Inc' }],
+          })
+        );
+      }
+      if (method === 'POST' && url.endsWith('/customers/6/contacts/')) {
+        return Promise.resolve(jsonResponse(201, { ...sarahChen, id: 99, name: 'New Person' }));
+      }
+      // Every GET /contacts/ (initial load, and the post-save refetch)
+      // returns the same page — the second call proving a refetch
+      // actually happened is what fetchMock.mock.calls asserts on below.
+      return Promise.resolve(
+        jsonResponse(200, { count: 1, next: null, previous: null, results: [sarahChen] })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Sarah Chen');
+    const contactsCallsBeforeAdd = fetchMock.mock.calls.filter(([url]) =>
+      String(url).endsWith('/contacts/')
+    ).length;
+
+    await user.click(screen.getByRole('button', { name: 'Add Contact' }));
+    await user.type(screen.getByLabelText('Name *'), 'New Person');
+    await user.selectOptions(screen.getByLabelText('Company *'), '6');
+    await user.type(screen.getByLabelText('Email *'), 'new.person@apple.com');
+    // Two "Add Contact" buttons exist once the modal is open (the
+    // ActionBar's own, and the modal's submit) — the submit button is
+    // the one inside the <form>.
+    const submitButton = screen
+      .getAllByRole('button', { name: 'Add Contact' })
+      .find((btn) => btn.closest('form'))!;
+    await user.click(submitButton);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/customers/6/contacts/'),
+        expect.objectContaining({ method: 'POST' })
+      )
+    );
+    await waitFor(() => {
+      const after = fetchMock.mock.calls.filter(([url]) => String(url).endsWith('/contacts/')).length;
+      expect(after).toBeGreaterThan(contactsCallsBeforeAdd);
+    });
+  });
+
+  it('editing a contact from the row menu PATCHes /api/v1/contacts/<id>/', async () => {
+    const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+      const method = options?.method ?? 'GET';
+      if (url.includes('/contacts/stats/')) return Promise.resolve(jsonResponse(200, ZERO_STATS));
+      if (url.includes('/customers/') && !url.includes('/contacts/')) {
+        return Promise.resolve(jsonResponse(200, EMPTY_CUSTOMERS_PAGE));
+      }
+      if (method === 'PATCH' && url.endsWith('/contacts/1/')) {
+        const body = JSON.parse(options!.body!);
+        return Promise.resolve(jsonResponse(200, { ...sarahChen, ...body }));
+      }
+      return Promise.resolve(
+        jsonResponse(200, { count: 1, next: null, previous: null, results: [sarahChen] })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Sarah Chen');
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Sarah Chen' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Contact' }));
+    const nameInput = screen.getByLabelText('Name *');
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Sarah Chen-Wu');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/contacts/1/'),
+        expect.objectContaining({ method: 'PATCH' })
+      )
+    );
+    expect(await screen.findByText('Sarah Chen-Wu')).toBeInTheDocument();
+  });
+
+  it('deleting a contact from the row menu DELETEs /api/v1/contacts/<id>/ and removes the row', async () => {
+    const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
+      const method = options?.method ?? 'GET';
+      if (url.includes('/contacts/stats/')) return Promise.resolve(jsonResponse(200, ZERO_STATS));
+      if (url.includes('/customers/') && !url.includes('/contacts/')) {
+        return Promise.resolve(jsonResponse(200, EMPTY_CUSTOMERS_PAGE));
+      }
+      if (method === 'DELETE' && url.endsWith('/contacts/1/')) {
+        return Promise.resolve({ ok: true, status: 204, json: async () => null });
+      }
+      return Promise.resolve(
+        jsonResponse(200, { count: 1, next: null, previous: null, results: [sarahChen] })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Sarah Chen');
+
+    await user.click(screen.getByRole('button', { name: 'Actions for Sarah Chen' }));
+    await user.click(screen.getByRole('button', { name: 'Delete Contact' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/contacts/1/'),
+        expect.objectContaining({ method: 'DELETE' })
+      )
+    );
+    expect(screen.queryByText('Sarah Chen')).not.toBeInTheDocument();
   });
 });

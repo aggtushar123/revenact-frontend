@@ -238,6 +238,20 @@ export interface ContactStats {
   growth_30d_pct: number | null;
 }
 
+// The fields the Add/Edit Contact form actually exposes — everything
+// ContactSerializer accepts except `customer`/`account` (never sent;
+// the create thunk's own URL establishes the parent, and a Contact
+// can't be moved between parents afterward — see ContactDetailView's
+// own docstring on the backend).
+export interface ContactWritePayload {
+  name?: string;
+  role?: Contact['role'];
+  email?: string;
+  phone?: string;
+  status?: Contact['status'];
+  sentiment?: Contact['sentiment'];
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -404,6 +418,12 @@ interface CustomersState {
   contactStats: ContactStats | null;
   contactStatsLoading: boolean;
   contactStatsError: string | null;
+  /** The single Contact the new /contacts/:id page is showing — same
+   * "separate from the paginated/scoped lists" reasoning as
+   * selectedCustomer vs. `customers`/`accountsForCustomer`. */
+  selectedContact: Contact | null;
+  selectedContactLoading: boolean;
+  selectedContactError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -457,6 +477,9 @@ const initialState: CustomersState = {
   contactStats: null,
   contactStatsLoading: false,
   contactStatsError: null,
+  selectedContact: null,
+  selectedContactLoading: false,
+  selectedContactError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -824,6 +847,74 @@ export const fetchContactStats = createAsyncThunk<ContactStats, void, { rejectVa
       return await apiFetch<ContactStats>('/contacts/stats/');
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not load contact stats.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Powers the new /contacts/:id page.
+export const fetchContactById = createAsyncThunk<Contact, number, { rejectValue: string }>(
+  'customers/fetchContactById',
+  async (id, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Contact>(`/contacts/${id}/`);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load this contact.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Adds an organization-level Contact under `customerId` — used both by
+// the Organization Details page's own Contacts tab (customerId fixed)
+// and the standalone /contacts/list page's "Add Contact" (customerId
+// picked from a dropdown; that page only ever creates org-level
+// Contacts, there's no account-picker on it). No extraReducers case:
+// unlike createAccount (which unshifts into the single
+// accountsForCustomer slot), a created Contact could belong to either
+// of two different slots (`contacts` or `allContacts`) depending on
+// which page is asking — simpler and just as correct for the caller
+// to refetch its own list after `.unwrap()` resolves, same as this
+// thunk's own error handling (surfaced via the thrown error, not
+// Redux state, matching AccountFormModal's own convention).
+export const createContactForCustomer = createAsyncThunk<
+  Contact,
+  { customerId: number } & ContactWritePayload & { name: string; email: string },
+  { rejectValue: string }
+>('customers/createContactForCustomer', async ({ customerId, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Contact>(`/customers/${customerId}/contacts/`, { method: 'POST', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not add contact.';
+    return rejectWithValue(message);
+  }
+});
+
+// PATCH /api/v1/contacts/<id>/ — works for a Contact of either parent
+// shape (see ContactDetailView's own docstring); same "caller
+// refetches" reasoning as createContactForCustomer above.
+export const updateContact = createAsyncThunk<
+  Contact,
+  { id: number } & ContactWritePayload,
+  { rejectValue: string }
+>('customers/updateContact', async ({ id, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Contact>(`/contacts/${id}/`, { method: 'PATCH', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not update contact.';
+    return rejectWithValue(message);
+  }
+});
+
+// DELETE /api/v1/contacts/<id>/ — same reasoning as updateContact above.
+export const deleteContact = createAsyncThunk<number, number, { rejectValue: string }>(
+  'customers/deleteContact',
+  async (id, { rejectWithValue }) => {
+    try {
+      await apiFetch<null>(`/contacts/${id}/`, { method: 'DELETE' });
+      return id;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not delete contact.';
       return rejectWithValue(message);
     }
   }
@@ -1231,6 +1322,42 @@ const customersSlice = createSlice({
       .addCase(fetchContactStats.rejected, (state, action) => {
         state.contactStatsLoading = false;
         state.contactStatsError = action.payload ?? 'Something went wrong.';
+      })
+      .addCase(fetchContactById.pending, (state) => {
+        state.selectedContactLoading = true;
+        state.selectedContactError = null;
+        // Cleared, not left stale — same reasoning as fetchCustomerById.
+        state.selectedContact = null;
+      })
+      .addCase(fetchContactById.fulfilled, (state, action) => {
+        state.selectedContactLoading = false;
+        state.selectedContact = action.payload;
+      })
+      .addCase(fetchContactById.rejected, (state, action) => {
+        state.selectedContactLoading = false;
+        state.selectedContactError = action.payload ?? 'Could not load this contact.';
+      })
+      // updateContact/deleteContact patch every list a Contact could be
+      // showing in (`contacts`, `allContacts`, `selectedContact`) rather
+      // than making the caller refetch — cheap and unambiguous, since an
+      // update/delete always targets a known id, unlike create (see
+      // createContactForCustomer's own docstring on why that one can't
+      // do the same). Their own rejections are shown inline in the
+      // form/confirm modal instead (same pattern as createAccount/
+      // updateAccount above) — no .rejected case needed here.
+      .addCase(updateContact.fulfilled, (state, action) => {
+        const updated = action.payload;
+        const inContacts = state.contacts.findIndex((c) => c.id === updated.id);
+        if (inContacts !== -1) state.contacts[inContacts] = updated;
+        const inAllContacts = state.allContacts.findIndex((c) => c.id === updated.id);
+        if (inAllContacts !== -1) state.allContacts[inAllContacts] = updated;
+        if (state.selectedContact?.id === updated.id) state.selectedContact = updated;
+      })
+      .addCase(deleteContact.fulfilled, (state, action) => {
+        const id = action.payload;
+        state.contacts = state.contacts.filter((c) => c.id !== id);
+        state.allContacts = state.allContacts.filter((c) => c.id !== id);
+        state.allContactsCount = Math.max(0, state.allContactsCount - 1);
       })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's

@@ -65,9 +65,27 @@ const globex = {
   is_archived: false,
 };
 
+// Minimal but real shape, matching revenact-backend's ContactSerializer
+// — see customersSlice.test.ts / docs/API_CONTRACTS.md -> Contact.
+const sarahChen = {
+  id: 1,
+  name: 'Sarah Chen',
+  role: 'executive_sponsor' as const,
+  role_display: 'Executive Sponsor',
+  email: 'sarah.chen@globex.com',
+  phone: '+1 (408) 555-0123',
+  status: 'active' as const,
+  sentiment: 'positive' as const,
+  last_contacted_at: '2026-08-31T00:00:00Z',
+  company_id: 10,
+  company_name: 'Globex Corp',
+  account_name: null,
+};
+
 function renderNavbar(
   initialRoute: string | { pathname: string; state?: unknown } = '/dashboard',
-  selectedCustomer: typeof globex | null = null
+  selectedCustomer: typeof globex | null = null,
+  selectedContact: typeof sarahChen | null = null
 ) {
   const store = configureStore({
     reducer: { auth: authReducer, brain: brainReducer, customers: customersReducer },
@@ -131,6 +149,9 @@ function renderNavbar(
         contactStats: null,
         contactStatsLoading: false,
         contactStatsError: null,
+        selectedContact,
+        selectedContactLoading: false,
+        selectedContactError: null,
       },
     },
   });
@@ -145,6 +166,7 @@ function renderNavbar(
           <Route path="/login" element={<div>Login Marker</div>} />
           <Route path="/organizations/:id" element={<div>Details Marker</div>} />
           <Route path="/accounts/:id" element={<div>Account Details Marker</div>} />
+          <Route path="/contacts/:id" element={<div>Contact Details Marker</div>} />
         </Routes>
       </MemoryRouter>
     </Provider>
@@ -291,5 +313,33 @@ describe('Navbar account breadcrumb (/accounts/:id)', () => {
     // just that *some* account header renders instead of the header
     // falling through to the generic path-based title.
     expect(screen.queryByText('Accounts', { selector: 'h1' })).not.toBeInTheDocument();
+  });
+});
+
+describe('Navbar contact breadcrumb (/contacts/:id)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('shows the real contact name once Details.tsx has loaded it into the store', () => {
+    // Navbar doesn't fetch this itself — it reads the same
+    // selectedContact that pages/contacts/Details.tsx's own
+    // fetchContactById() populates (see customersSlice.ts).
+    renderNavbar('/contacts/1', null, sarahChen);
+
+    expect(screen.getByRole('heading', { name: 'Sarah Chen' })).toBeInTheDocument();
+    expect(screen.getByText('Globex Corp')).toBeInTheDocument();
+  });
+
+  it('does not show a stale contact name for a different id than the one loaded', () => {
+    renderNavbar('/contacts/2', null, sarahChen);
+
+    expect(screen.queryByRole('heading', { name: 'Sarah Chen' })).not.toBeInTheDocument();
+  });
+
+  it('does not show a contact header on /contacts/list (not a numeric id)', () => {
+    renderNavbar('/contacts/list', null, sarahChen);
+
+    expect(screen.queryByRole('heading', { name: 'Sarah Chen' })).not.toBeInTheDocument();
   });
 });

@@ -11,9 +11,17 @@ interface ActionBarProps {
   /** Every company the tenant has — fetched for real (List.tsx dispatches
    * fetchCustomers for this), not the old hardcoded 3-company mock list. */
   companies: { id: number; name: string }[];
+  onAddContact: () => void;
 }
 
-export function ActionBar({ searchQuery, setSearchQuery, companyFilter, setCompanyFilter, companies }: ActionBarProps) {
+export function ActionBar({
+  searchQuery,
+  setSearchQuery,
+  companyFilter,
+  setCompanyFilter,
+  companies,
+  onAddContact,
+}: ActionBarProps) {
   return (
     <div className="flex items-center justify-between w-full mb-4">
       <div className="flex items-center gap-3 w-full max-w-[600px]">
@@ -47,7 +55,10 @@ export function ActionBar({ searchQuery, setSearchQuery, companyFilter, setCompa
       </div>
 
       <div className="flex items-center gap-2">
-        <button className="flex items-center gap-1.5 px-4 py-[8px] bg-accent hover:bg-accent-hover text-[#0D0F0E] text-[13px] font-semibold rounded-lg shadow-sm transition-colors tracking-wide">
+        <button
+          onClick={onAddContact}
+          className="flex items-center gap-1.5 px-4 py-[8px] bg-accent hover:bg-accent-hover text-[#0D0F0E] text-[13px] font-semibold rounded-lg shadow-sm transition-colors tracking-wide"
+        >
           <UserPlus className="w-4 h-4" /> Add Contact
         </button>
         <button className="flex items-center gap-1.5 px-3 py-[8px] bg-accent-dim border border-accent/30 text-accent hover:bg-accent-dim text-[13px] font-semibold rounded-lg shadow-sm transition-colors">

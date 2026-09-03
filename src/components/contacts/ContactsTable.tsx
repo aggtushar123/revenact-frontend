@@ -1,6 +1,9 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { MoreHorizontal, ArrowDownUp, Mail, Phone, Clock, Building } from 'lucide-react';
 import { capitalize, formatRelativeTime, initials } from '../../features/customers/formatters';
 import type { Contact } from '../../features/customers/customersSlice';
+import { ContactRowActionsPopover } from './ContactRowActionsPopover';
 
 interface ContactsTableProps {
   contacts: Contact[];
@@ -14,6 +17,14 @@ interface ContactsTableProps {
   hasPrevious: boolean;
   onNext: () => void;
   onPrevious: () => void;
+  /** Checkbox selection — lifted to List.tsx, the common parent, same
+   * reasoning as OrganizationsTable's own (a future bulk action could
+   * read it from there without this table needing to know about it). */
+  selectedIds: Set<number>;
+  onToggleSelect: (id: number) => void;
+  onToggleSelectAll: () => void;
+  onEditRequest: (contact: Contact) => void;
+  onDeleteRequest: (contact: Contact) => void;
 }
 
 // `contacts` is already just this one server-fetched, server-filtered
@@ -30,7 +41,23 @@ export function ContactsTable({
   hasPrevious,
   onNext,
   onPrevious,
+  selectedIds,
+  onToggleSelect,
+  onToggleSelectAll,
+  onEditRequest,
+  onDeleteRequest,
 }: ContactsTableProps) {
+  const navigate = useNavigate();
+  const [activeRowPopup, setActiveRowPopup] = useState<{ contact: Contact; style: React.CSSProperties } | null>(null);
+  const allOnPageSelected = contacts.length > 0 && contacts.every((c) => selectedIds.has(c.id));
+
+  const handleRowActionClick = (e: React.MouseEvent, contact: Contact) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const yOffset = rect.bottom > window.innerHeight - 150 ? rect.top - 100 : rect.bottom + 4;
+    setActiveRowPopup({ contact, style: { top: yOffset, right: window.innerWidth - rect.right } });
+  };
+
   const getSentimentColor = (sentiment: Contact['sentiment']) => {
     switch (sentiment) {
       case 'positive': return 'bg-success-dim text-success border-success/40';
@@ -51,7 +78,13 @@ export function ContactsTable({
             <tr>
               <th className="px-6 py-4 font-bold border-b border-line-subtle sticky left-0 z-20 bg-surface shadow-[1px_0_0_0_var(--border-default)]">
                 <div className="flex items-center gap-4">
-                  <div className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer hover:border-accent"></div>
+                  <input
+                    type="checkbox"
+                    aria-label="Select all contacts on this page"
+                    checked={allOnPageSelected}
+                    onChange={onToggleSelectAll}
+                    className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer accent-accent"
+                  />
                   <span className="flex items-center gap-1.5 cursor-pointer">Contact Name <ArrowDownUp className="w-[11px] h-[11px] text-ink-faint" /></span>
                 </div>
               </th>
@@ -88,15 +121,24 @@ export function ContactsTable({
 
           <tbody className="text-[13px] text-ink-muted whitespace-nowrap bg-surface relative z-0">
             {contacts.map((c) => (
-              <tr key={c.id} className="group hover:bg-subtle transition-colors cursor-pointer">
+              <tr key={c.id} className="group hover:bg-subtle transition-colors">
 
                 <td className="px-6 py-4 border-b border-line-subtle relative sticky left-0 z-10 bg-surface group-hover:bg-subtle shadow-[1px_0_0_0_var(--border-default)] transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer hover:border-accent bg-surface"></div>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${c.name}`}
+                      checked={selectedIds.has(c.id)}
+                      onChange={() => onToggleSelect(c.id)}
+                      className="w-[14px] h-[14px] rounded-[4px] border border-line shadow-sm cursor-pointer accent-accent"
+                    />
                     <div className="w-8 h-8 rounded-full bg-accent-dim text-accent flex items-center justify-center font-bold text-[11px] shadow-sm shrink-0 border border-accent/40">
                       {initials(c.name)}
                     </div>
-                    <span className="font-bold text-ink tracking-tight hover:text-accent hover:underline transition-colors">
+                    <span
+                      className="font-bold text-ink tracking-tight cursor-pointer hover:text-accent hover:underline transition-colors"
+                      onClick={() => navigate(`/contacts/${c.id}`)}
+                    >
                       {c.name}
                     </span>
                   </div>
@@ -107,7 +149,10 @@ export function ContactsTable({
                 </td>
 
                 <td className="px-6 py-4 border-b border-line-subtle">
-                   <div className="flex items-center gap-2 text-ink-muted font-medium hover:text-accent cursor-pointer">
+                   <div
+                     className="flex items-center gap-2 text-ink-muted font-medium hover:text-accent cursor-pointer w-fit"
+                     onClick={() => navigate(`/organizations/${c.company_id}`)}
+                   >
                       <Building className="w-3.5 h-3.5 text-ink-faint" />
                       {c.company_name}{c.account_name ? ` • ${c.account_name}` : ''}
                    </div>
@@ -144,9 +189,14 @@ export function ContactsTable({
                 </td>
 
                 <td className="px-3 py-4 border-b border-line-subtle sticky right-0 z-10 bg-surface group-hover:bg-subtle shadow-[-1px_0_0_0_var(--border-default)] transition-colors text-center">
-                  <div className="p-1.5 cursor-pointer hover:bg-line rounded-md transition-colors inline-block text-ink-faint hover:text-ink-muted">
+                  <button
+                    type="button"
+                    aria-label={`Actions for ${c.name}`}
+                    className="p-1.5 cursor-pointer hover:bg-line rounded-md transition-colors inline-block text-ink-faint hover:text-ink-muted"
+                    onClick={(e) => handleRowActionClick(e, c)}
+                  >
                     <MoreHorizontal className="w-5 h-5 mx-auto" />
-                  </div>
+                  </button>
                 </td>
 
               </tr>
@@ -191,6 +241,21 @@ export function ContactsTable({
           </button>
         </div>
       </div>
+
+      {activeRowPopup && (
+        <ContactRowActionsPopover
+          onClose={() => setActiveRowPopup(null)}
+          style={activeRowPopup.style}
+          onEdit={() => {
+            onEditRequest(activeRowPopup.contact);
+            setActiveRowPopup(null);
+          }}
+          onDelete={() => {
+            onDeleteRequest(activeRowPopup.contact);
+            setActiveRowPopup(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,8 @@ import { DashboardLayout } from './layouts/DashboardLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/auth/AdminRoute';
 import { Login } from './pages/auth/Login';
+import { ForgotPassword } from './pages/auth/ForgotPassword';
+import { ResetPassword } from './pages/auth/ResetPassword';
 import { Profile } from './pages/profile/Profile';
 import { UserManagement } from './pages/users/UserManagement';
 import { List } from './pages/organizations/List';
@@ -15,6 +17,7 @@ import { SettingsPage } from './pages/settings/SettingsPage';
 import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
 import { Integrations } from './pages/integrations/Integrations';
 import { List as ContactsList } from './pages/contacts/List';
+import { ContactDetails } from './pages/contacts/Details';
 import { PipelinesPage } from './pages/pipelines/PipelinesPage';
 import { useAppSelector } from './hooks';
 import { AdvanceDashboard } from './pages/dashboard/AdvanceDashboard';
@@ -45,8 +48,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public route */}
+        {/* Public routes */}
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Protected routes */}
         <Route path="/" element={
@@ -77,14 +82,14 @@ function App() {
               </Route>
               {/* Fallback for other tabs */}
               <Route path="*" element={
-                <div className="w-full h-full border-2 border-dashed border-gray-200/60 rounded-xl flex items-center justify-center bg-white/50 backdrop-blur-sm">
-                  <p className="text-gray-400 font-medium tracking-wide">Tab under development</p>
+                <div className="w-full h-full border-2 border-dashed border-line/60 rounded-xl flex items-center justify-center bg-surface/50 backdrop-blur-sm">
+                  <p className="text-ink-faint font-medium tracking-wide">Tab under development</p>
                 </div>
               } />
             </Route>
             <Route path="custom" element={
-              <div className="w-full h-full border-2 border-dashed border-gray-200/60 rounded-xl flex items-center justify-center bg-white/50 backdrop-blur-sm m-4 p-8">
-                <p className="text-gray-400 font-medium tracking-wide">Custom Dashboard (Beta) Coming Soon...</p>
+              <div className="w-full h-full border-2 border-dashed border-line/60 rounded-xl flex items-center justify-center bg-surface/50 backdrop-blur-sm m-4 p-8">
+                <p className="text-ink-faint font-medium tracking-wide">Custom Dashboard (Beta) Coming Soon...</p>
               </div>
             } />
           </Route>
@@ -121,6 +126,7 @@ function App() {
           <Route path="contacts">
             <Route index element={<Navigate to="list" replace />} />
             <Route path="list" element={<ContactsList />} />
+            <Route path=":id" element={<ContactDetails />} />
           </Route>
 
           <Route path="pipelines">
@@ -145,8 +151,8 @@ function App() {
           
           {/* Catch-all route to avoid losing layout on unimplemented tabs */}
           <Route path="*" element={
-            <div className="w-full h-full border-2 border-dashed border-gray-200/60 rounded-xl flex items-center justify-center bg-white/50 backdrop-blur-sm">
-              <p className="text-gray-400 font-medium tracking-wide">Under Construction</p>
+            <div className="w-full h-full border-2 border-dashed border-line/60 rounded-xl flex items-center justify-center bg-surface/50 backdrop-blur-sm">
+              <p className="text-ink-faint font-medium tracking-wide">Under Construction</p>
             </div>
           } />
         </Route>
