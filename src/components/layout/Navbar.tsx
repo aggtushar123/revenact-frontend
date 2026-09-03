@@ -79,6 +79,11 @@ export function Navbar() {
   const contact = contactId && selectedContact?.id === contactId ? selectedContact : null;
 
   const isOrganizations = location.pathname.startsWith('/organizations');
+  // Only /accounts/list and /accounts/board — never /accounts/:id,
+  // which the `account` branch above already claims first (checked
+  // earlier in the render chain below), same "detail page own header
+  // wins" ordering as isOrganizations vs. the `organization` branch.
+  const isAccountsList = location.pathname.startsWith('/accounts');
   const isCopilot = location.pathname === '/copilot';
   const isSettings = location.pathname.startsWith('/settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
@@ -194,6 +199,28 @@ export function Navbar() {
               </NavLink>
               <NavLink 
                 to="/organizations/board" 
+                className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-accent text-accent opacity-90' : 'border-transparent text-ink-muted hover:text-ink'}`}
+              >
+                Board
+              </NavLink>
+            </nav>
+          </>
+        ) : isAccountsList ? (
+          <>
+            <div className="flex items-center gap-1.5 cursor-pointer hover:bg-subtle py-1.5 px-2 -ml-2 rounded-md transition-colors">
+              <h1 className="text-[17px] font-bold text-ink tracking-tight">Accounts</h1>
+              <ChevronDown className="w-3.5 h-3.5 text-ink-muted stroke-[2.5px] mt-[1px]" />
+            </div>
+
+            <nav className="flex items-center gap-8 h-full mt-0.5 ml-2">
+              <NavLink
+                to="/accounts/list"
+                className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-accent text-accent opacity-90' : 'border-transparent text-ink-muted hover:text-ink'}`}
+              >
+                List
+              </NavLink>
+              <NavLink
+                to="/accounts/board"
                 className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-accent text-accent opacity-90' : 'border-transparent text-ink-muted hover:text-ink'}`}
               >
                 Board

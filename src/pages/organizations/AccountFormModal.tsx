@@ -23,6 +23,15 @@ interface AccountFormModalProps {
   /** Add-only, and only when `customerId` isn't already fixed: every
    * company to choose from. */
   companies?: { id: number; name: string }[];
+  /** Add-only default lifecycle stage — the standalone Accounts
+   * board's own column "+" the user clicked (see pages/accounts/
+   * Board.tsx), same convention as OpportunityFormModal/RiskFormModal/
+   * OrganizationFormModal's own `defaultStage`/`defaultLifecycleStage`.
+   * Unlike OrganizationFormModal's own dropdown, 'churn' is a valid
+   * value here too — Account has no dedicated churn-with-reason modal
+   * of its own (see AccountWritePayload's own docstring), so churning
+   * one is just this same plain lifecycle edit. */
+  defaultLifecycleStage?: Account['lifecycle_stage'];
   onClose: () => void;
   /** Called after a successful *create* only — createAccount doesn't
    * know which list (the Accounts tab's own `accountsForCustomer`, or
@@ -50,7 +59,14 @@ const LIFECYCLE_OPTIONS: { value: Account['lifecycle_stage']; label: string }[] 
   { value: 'other', label: 'Other' },
 ];
 
-export function AccountFormModal({ customerId, account, companies, onClose, onSaved }: AccountFormModalProps) {
+export function AccountFormModal({
+  customerId,
+  account,
+  companies,
+  defaultLifecycleStage,
+  onClose,
+  onSaved,
+}: AccountFormModalProps) {
   const dispatch = useAppDispatch();
   const isEdit = !!account;
 
@@ -59,7 +75,7 @@ export function AccountFormModal({ customerId, account, companies, onClose, onSa
   const [domain, setDomain] = useState(account?.domain ?? '');
   const [ownerId, setOwnerId] = useState<string>(account?.owner ? String(account.owner.id) : '');
   const [lifecycleStage, setLifecycleStage] = useState<Account['lifecycle_stage']>(
-    account?.lifecycle_stage ?? 'onboarding'
+    account?.lifecycle_stage ?? defaultLifecycleStage ?? 'onboarding'
   );
   const [renewalDate, setRenewalDate] = useState(account?.renewal_date ?? '');
 
