@@ -96,6 +96,16 @@ export function ContactsTab({ contacts, isLoading, error, customerId, accountId 
     setActiveRowPopup({ contact, style: { top: yOffset, right: window.innerWidth - rect.right } });
   };
 
+  // Only the Organization Details page's own Contacts tab (accountId
+  // undefined) rolls up more than one scope — its own organisation-
+  // level contacts *and* every account's individual ones (see
+  // CustomerContactListView's own docstring on the backend) — so only
+  // it needs a column to tell them apart. The standalone Account
+  // page's Contacts tab is always exactly one account's own, nothing
+  // to distinguish.
+  const showAccountColumn = accountId === undefined;
+  const columnCount = showAccountColumn ? 8 : 7;
+
   return (
     <div className="flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar p-6 pt-2">
       {/* Contacts Summary Banner */}
@@ -146,6 +156,9 @@ export function ContactsTab({ contacts, isLoading, error, customerId, accountId 
                     <th className="p-4 w-10"><input type="checkbox" className="rounded border-line-strong text-accent" /></th>
                     <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Contact</th>
                     <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Role</th>
+                    {showAccountColumn && (
+                      <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Account</th>
+                    )}
                     <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Status</th>
                     <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Sentiment</th>
                     <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Last Contacted</th>
@@ -172,6 +185,13 @@ export function ContactsTab({ contacts, isLoading, error, customerId, accountId 
                            {contact.role_display}
                         </span>
                      </td>
+                     {showAccountColumn && (
+                       <td className="p-4">
+                          <span className={`text-[13px] font-medium ${contact.account_name ? 'text-ink-muted' : 'text-ink-faint italic'}`}>
+                             {contact.account_name ?? 'Organization'}
+                          </span>
+                       </td>
+                     )}
                      <td className="p-4">
                         <div className="flex items-center gap-2">
                            <div className={`w-2 h-2 rounded-full ${contact.status === 'active' ? 'bg-success' : 'bg-line-strong'}`} />
@@ -215,19 +235,19 @@ export function ContactsTab({ contacts, isLoading, error, customerId, accountId 
                  ))}
                  {!isLoading && !error && filteredContacts.length === 0 && (
                    <tr>
-                     <td colSpan={7} className="p-20 text-center text-ink-faint font-medium">
+                     <td colSpan={columnCount} className="p-20 text-center text-ink-faint font-medium">
                        {contacts.length === 0 ? 'No contacts found.' : 'No contacts match your search.'}
                      </td>
                    </tr>
                  )}
                  {isLoading && (
                    <tr>
-                     <td colSpan={7} className="p-20 text-center text-ink-faint font-medium">Loading contacts…</td>
+                     <td colSpan={columnCount} className="p-20 text-center text-ink-faint font-medium">Loading contacts…</td>
                    </tr>
                  )}
                  {error && (
                    <tr>
-                     <td colSpan={7} className="p-20 text-center text-danger font-medium">{error}</td>
+                     <td colSpan={columnCount} className="p-20 text-center text-danger font-medium">{error}</td>
                    </tr>
                  )}
               </tbody>

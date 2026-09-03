@@ -1,7 +1,7 @@
-import { useId, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useAppDispatch } from '../../hooks';
-import { ApiError } from '../../lib/apiClient';
+import { apiFetch, ApiError } from '../../lib/apiClient';
 import {
   createContactForCustomer,
   createContactForAccount,
@@ -39,7 +39,14 @@ interface ContactFormModalProps {
   /** Add-only: set together with a fixed `customerId` when opened from
    * the standalone Account page's own Contacts tab — creates an
    * account-level Contact (POST .../accounts/<accountId>/contacts/)
-   * instead of an organization-level one. Omitted everywhere else. */
+   * instead of an organization-level one, and hides the Account picker
+   * below (already inside one specific account's own context, nothing
+   * to pick). Omitted everywhere else, which is what lets that picker
+   * show up on the Organization Details page's own Contacts tab and
+   * the standalone /contacts/list page — a Contact can be an
+   * organisation-level one *or* belong to one specific Account (see
+   * the Contact model's own docstring on the backend), and both of
+   * those surfaces can create either kind. */
   accountId?: number;
   /** Add-only, and only when `customerId` isn't already fixed: every
    * company to choose from. */
@@ -79,6 +86,49 @@ export function ContactFormModal({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // The Account picker below — every account under whichever company
+  // is currently in play (fixed via `customerId`, or picked from the
+  // dropdown above), refetched whenever that changes. Skipped entirely
+  // for Edit (Company/Account are both read-only there — see the JSX
+  // below) and when `accountId` is already fixed (the standalone
+  // Account page's own Add Contact — already inside one specific
+  // account's context, no picker needed).
+  const effectiveCompanyId = customerId ?? (selectedCompanyId ? Number(selectedCompanyId) : undefined);
+  const [accountOptions, setAccountOptions] = useState<{ id: number; name: string }[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+
+  useEffect(() => {
+    if (isEdit || accountId !== undefined || effectiveCompanyId === undefined) {
+      setAccountOptions([]);
+      return;
+    }
+    let cancelled = false;
+    apiFetch<{ id: number; name: string }[]>(`/customers/${effectiveCompanyId}/accounts/`)
+      .then((accounts) => {
+        // Defensive: AccountListCreateView really does return a plain
+        // array (pagination_class = None), but guard anyway rather
+        // than crash the whole modal on anything unexpected.
+        if (!cancelled) setAccountOptions(Array.isArray(accounts) ? accounts : []);
+      })
+      .catch(() => {
+        // A failed accounts fetch just means the picker shows no
+        // options beyond "Organization contact" — not worth blocking
+        // the whole form over, same reasoning as AccountFormModal's
+        // own owner-picker fetch.
+        if (!cancelled) setAccountOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isEdit, accountId, effectiveCompanyId]);
+
+  // The previously-picked account may not exist under a newly-picked
+  // company (on the standalone /contacts/list page, where Company
+  // itself is a dropdown) — reset rather than silently keep a stale id.
+  useEffect(() => {
+    setSelectedAccountId('');
+  }, [effectiveCompanyId]);
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -103,8 +153,22 @@ export function ContactFormModal({
         // patched every list this Contact could be showing in.
         await dispatch(updateContact({ id: contact.id, ...data })).unwrap();
       } else if (accountId !== undefined) {
+        // Already inside one specific account's own context (the
+        // standalone Account page's own Add Contact) — no picker was
+        // shown, so `accountId` here is the only account it could be.
         await dispatch(
           createContactForAccount({ customerId: Number(selectedCompanyId), accountId, ...data })
+        ).unwrap();
+        onSaved();
+      } else if (selectedAccountId) {
+        // The caller left Account on "Organization contact" or picked
+        // one from the dropdown above — a specific account was chosen.
+        await dispatch(
+          createContactForAccount({
+            customerId: Number(selectedCompanyId),
+            accountId: Number(selectedAccountId),
+            ...data,
+          })
         ).unwrap();
         onSaved();
       } else {
@@ -163,6 +227,23 @@ export function ContactFormModal({
               ))}
             </SelectField>
           ) : null}
+
+          {/* A Contact can be organisation-level or belong to one
+              specific Account (see the Contact model's own docstring
+              on the backend) — hidden for Edit (can't move between
+              parents) and when `accountId` is already fixed (the
+              standalone Account page's own Add Contact — already
+              inside one specific account, nothing to pick). */}
+          {!isEdit && accountId === undefined && effectiveCompanyId !== undefined && (
+            <SelectField label="Account (optional)" value={selectedAccountId} onChange={setSelectedAccountId}>
+              <option value="">Organization contact (no specific account)</option>
+              {accountOptions.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </SelectField>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <SelectField label="Role" value={role} onChange={(v) => setRole(v as Contact['role'])}>

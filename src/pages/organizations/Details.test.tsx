@@ -430,6 +430,66 @@ describe('Organization Details page (/organizations/:id)', () => {
       expect(screen.getByText('Sarah Chen')).toBeInTheDocument();
     });
 
+    it('shows both organisation-level and account-level contacts together, labeled by Account', async () => {
+      const accountLevelContact = {
+        ...jamesWilson,
+        id: 3,
+        name: 'Priya Nair',
+        account_name: 'North America',
+      };
+      await openContactsTab(baseFetchMock([sarahChen, accountLevelContact]));
+
+      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
+      // Sarah Chen (org-level, account_name: null) shows "Organization";
+      // Priya Nair (account-level) shows her account's own name.
+      expect(screen.getByText('Organization')).toBeInTheDocument();
+      expect(screen.getByText('North America')).toBeInTheDocument();
+    });
+
+    it('adding a contact with an Account picked posts to the account-level endpoint instead', async () => {
+      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'GET' && url.endsWith('/customers/10/accounts/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [{ id: 17, name: 'North America', customer: 10 }],
+          });
+        }
+        if (method === 'POST' && url.endsWith('/customers/10/accounts/17/contacts/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 201,
+            json: async () => ({ ...sarahChen, id: 99, name: 'New Person', account_name: 'North America' }),
+          });
+        }
+        if (method === 'GET' && url.includes('/contacts/')) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
+        }
+        const body = url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+          ? []
+          : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      });
+      const user = await openContactsTab(fetchMock);
+
+      await user.click(screen.getByRole('button', { name: 'Add Contact' }));
+      await user.type(screen.getByLabelText('Name *'), 'New Person');
+      await user.type(screen.getByLabelText('Email *'), 'new.person@globex.example');
+      await user.selectOptions(await screen.findByLabelText('Account (optional)'), '17');
+      const submitButton = screen
+        .getAllByRole('button', { name: 'Add Contact' })
+        .find((btn) => btn.closest('form'))!;
+      await user.click(submitButton);
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/customers/10/accounts/17/contacts/'),
+          expect.objectContaining({ method: 'POST' })
+        )
+      );
+    });
+
     it('adding a contact posts to /customers/10/contacts/ (organization-level)', async () => {
       const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
         const method = options?.method ?? 'GET';

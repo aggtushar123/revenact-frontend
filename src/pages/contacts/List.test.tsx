@@ -268,6 +268,12 @@ describe('Contacts List page (/contacts/list)', () => {
     const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
       const method = options?.method ?? 'GET';
       if (url.includes('/contacts/stats/')) return Promise.resolve(jsonResponse(200, ZERO_STATS));
+      // The Account picker's own fetch (ContactFormModal, once Company
+      // is picked) — a plain array, same shape as the real
+      // AccountListCreateView (pagination_class = None).
+      if (method === 'GET' && url.endsWith('/customers/6/accounts/')) {
+        return Promise.resolve(jsonResponse(200, []));
+      }
       if (url.includes('/customers/') && !url.includes('/contacts/') && method === 'GET') {
         return Promise.resolve(
           jsonResponse(200, {
