@@ -127,11 +127,42 @@ describe('Pipelines board — Opportunities tab', () => {
     expect(screen.getAllByText('(1)', { exact: true })).toHaveLength(2);
   });
 
+  it('the overview banner\'s MRR toggle sums MRR across every opportunity and risk', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/opportunities/')) {
+        return Promise.resolve(jsonResponse(200, [discoveryOpp, negotiationOpp]));
+      }
+      if (url.endsWith('/risks/')) {
+        return Promise.resolve(jsonResponse(200, [openRisk, mitigatedRisk]));
+      }
+      return Promise.resolve(jsonResponse(200, EMPTY_CUSTOMERS_PAGE));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+    await screen.findByText('Digital First Account Expansion');
+
+    // COUNT is the default — the banner's own Opportunities/Risks
+    // counts, not their $18500.00-a-piece MRR.
+    expect(screen.getAllByText('2', { exact: true })).toHaveLength(2);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'MRR' }));
+
+    // discoveryOpp + negotiationOpp = 18500 + 18500; openRisk +
+    // mitigatedRisk = 8500 + 8500 — summed, not just the first card's.
+    expect(screen.getByText('$37,000.00')).toBeInTheDocument();
+    expect(screen.getByText('$17,000.00')).toBeInTheDocument();
+  });
+
   it('shows the backend error instead of crashing', async () => {
     const fetchMock = makeFetchMock({ opportunities: [] });
     fetchMock.mockImplementation((url: string) => {
       if (url.endsWith('/opportunities/')) {
         return Promise.resolve(jsonResponse(500, { detail: 'Server error.' }));
+      }
+      if (url.endsWith('/risks/')) {
+        return Promise.resolve(jsonResponse(200, []));
       }
       return Promise.resolve(jsonResponse(200, EMPTY_CUSTOMERS_PAGE));
     });

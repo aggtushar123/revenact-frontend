@@ -24,6 +24,25 @@ const PRIORITY_COLORS = {
   low: 'bg-success-dim text-success border-success/40',
 };
 
+// Same toggle-pill look/behavior as the Organizations page's own
+// MetricsPanel (COUNT/MRR/ARR) — a private local copy rather than an
+// import since that one isn't exported and this only needs two states.
+function TabPill({ label, isActive, onClick }: { label: string; isActive: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={isActive}
+      className={`px-2 py-0.5 rounded border text-[10px] font-bold cursor-pointer transition-all duration-200 ${
+        isActive
+          ? 'text-accent bg-accent-dim border-accent/40 shadow-sm'
+          : 'text-ink-faint border-line bg-subtle hover:text-ink-muted'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 // ─── Opportunities — real data ──────────────────────────────────────
 // Matches Opportunity.Stage on the backend exactly (services/customers/
 // models.py), same order as the board's own 6 Kanban columns.
@@ -464,6 +483,9 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
     useSelector((state: RootState) => state.customers);
   const [activeSubTab, setActiveSubTab] = useState<'opportunities' | 'risks'>('opportunities');
   const [searchQuery, setSearchQuery] = useState('');
+  // Overview banner's own COUNT/MRR toggle — previously two static
+  // labels that did nothing; MRR never actually rendered.
+  const [overviewTab, setOverviewTab] = useState<'count' | 'mrr'>('count');
 
   const [isAdding, setIsAdding] = useState(false);
   const [addDefaultStage, setAddDefaultStage] = useState<Opportunity['stage']>('discovery');
@@ -487,6 +509,16 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
     () => customers.map((c) => ({ id: c.id, name: c.name })),
     [customers]
   );
+
+  // Overview banner's own totals — every opportunity/risk regardless of
+  // the search box above (same "unfiltered overall total" reasoning as
+  // MetricsPanel's own totalCount), so typing in Search never makes
+  // these numbers dip.
+  const totalOpportunityMrr = useMemo(
+    () => opportunities.reduce((sum, o) => sum + Number(o.mrr), 0),
+    [opportunities]
+  );
+  const totalRiskMrr = useMemo(() => risks.reduce((sum, r) => sum + Number(r.mrr), 0), [risks]);
 
   const filteredOpportunities = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -535,8 +567,8 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
           <div className="text-[11px] font-bold text-ink-faint uppercase tracking-widest mb-3 flex items-center gap-3">
             Pipelines Overview
             <span className="flex items-center gap-2 ml-1">
-              <span className="px-2 py-0.5 rounded border border-line text-[10px] font-bold text-ink-muted bg-subtle">COUNT</span>
-              <span className="px-2 py-0.5 rounded border border-line text-[10px] font-bold text-ink-faint bg-subtle">MRR</span>
+              <TabPill label="COUNT" isActive={overviewTab === 'count'} onClick={() => setOverviewTab('count')} />
+              <TabPill label="MRR" isActive={overviewTab === 'mrr'} onClick={() => setOverviewTab('mrr')} />
             </span>
           </div>
           <div className="flex items-center gap-10">
@@ -545,14 +577,18 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
                 <div className="w-2 h-2 rounded-full bg-success"></div>
                 <span className="text-[12px] font-bold text-ink-muted">Opportunities</span>
               </div>
-              <div className="text-[22px] font-bold text-ink leading-none">{opportunities.length}</div>
+              <div className="text-[22px] font-bold text-ink leading-none">
+                {overviewTab === 'count' ? opportunities.length : `$${formatMoney(String(totalOpportunityMrr))}`}
+              </div>
             </div>
             <div>
               <div className="flex items-center gap-1.5 mb-1">
                 <div className="w-2 h-2 rounded-full bg-danger"></div>
                 <span className="text-[12px] font-bold text-ink-muted">Risks</span>
               </div>
-              <div className="text-[22px] font-bold text-ink leading-none">{risks.length}</div>
+              <div className="text-[22px] font-bold text-ink leading-none">
+                {overviewTab === 'count' ? risks.length : `$${formatMoney(String(totalRiskMrr))}`}
+              </div>
             </div>
           </div>
         </div>
