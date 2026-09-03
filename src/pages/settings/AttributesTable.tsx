@@ -4,42 +4,43 @@ import {
   GripVertical, Edit3,
   Type, Hash, Calendar, DollarSign, ToggleLeft, List as ListIcon, User,
 } from 'lucide-react';
-import { usagePercent, attributeProperties } from './organizationAttributes';
-import type { AttributeDef, AttributeType } from './organizationAttributes';
-import type { Customer } from '../../features/customers/customersSlice';
+import { usagePercent, attributeProperties } from './attributeConfig';
+import type { AttributeDef, AttributeType } from './attributeConfig';
 
-export interface AttributesTableProps {
-  /** Every organization currently loaded (see SettingsPage's own
-   * page-walking fetch) — Usage% below is computed from this, not a
-   * fabricated per-row number. */
-  customers: Customer[];
+export interface AttributesTableProps<T> {
+  /** Every record of this entity currently loaded (see SettingsPage's
+   * own page-walking fetch) — Usage% below is computed from this, not
+   * a fabricated per-row number. */
+  entities: T[];
   /** Attributes already filtered by the search box above — this
    * component just renders whatever it's given, split into its own
-   * Custom/System sections. */
-  attributes: AttributeDef[];
+   * Custom/System sections. Generic over the entity type so this one
+   * table serves Organization (Customer) and Account alike — see
+   * organizationAttributes.ts/accountAttributes.ts. */
+  attributes: AttributeDef<T>[];
 }
 
-export function AttributesTable({ customers, attributes }: AttributesTableProps) {
+export function AttributesTable<T>({ entities, attributes }: AttributesTableProps<T>) {
   const customAttributes = attributes.filter((a) => a.isCustom);
   const systemAttributes = attributes.filter((a) => !a.isCustom);
 
   return (
     <div className="flex flex-col gap-4">
-      <AttributeSection title="Custom Attributes" attributes={customAttributes} customers={customers} defaultOpen={true} />
-      <AttributeSection title="System Attributes" attributes={systemAttributes} customers={customers} defaultOpen={false} />
+      <AttributeSection title="Custom Attributes" attributes={customAttributes} entities={entities} defaultOpen={true} />
+      <AttributeSection title="System Attributes" attributes={systemAttributes} entities={entities} defaultOpen={false} />
     </div>
   );
 }
 
-function AttributeSection({
+function AttributeSection<T>({
   title,
   attributes,
-  customers,
+  entities,
   defaultOpen = true,
 }: {
   title: string;
-  attributes: AttributeDef[];
-  customers: Customer[];
+  attributes: AttributeDef<T>[];
+  entities: T[];
   defaultOpen?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -74,7 +75,7 @@ function AttributeSection({
               </thead>
               <tbody className="divide-y divide-line-subtle">
                 {attributes.map((attr) => {
-                  const usage = usagePercent(attr, customers);
+                  const usage = usagePercent(attr, entities);
                   const properties = attributeProperties(attr);
                   return (
                     <tr key={attr.name} className="group hover:bg-accent-dim/10 transition-all cursor-default h-11">

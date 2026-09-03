@@ -1,4 +1,5 @@
 import type { Customer } from '../../features/customers/customersSlice';
+import type { AttributeDef } from './attributeConfig';
 
 // Every real field on revenact-backend's CustomerSerializer (see
 // docs/API_CONTRACTS.md -> customers -> Customer) — replaces the
@@ -10,23 +11,7 @@ import type { Customer } from '../../features/customers/customersSlice';
 // ChurnOrganizationModal), not a subjective guess; everything else is
 // read-only, server-computed, or (per those forms' own docstrings)
 // "meant to eventually sync from other systems" rather than hand-typed.
-
-export type AttributeType = 'text' | 'number' | 'date' | 'currency' | 'boolean' | 'select' | 'relation';
-
-export interface AttributeDef {
-  displayName: string;
-  name: string;
-  type: AttributeType;
-  isCustom: boolean;
-  /** Only `name` is actually required to create a Customer — see
-   * OrganizationFormModal's own required TextField, and the handful of
-   * fields that are always present on every row regardless (id/
-   * created_at/updated_at). */
-  required?: boolean;
-  getValue: (c: Customer) => unknown;
-}
-
-export const ORGANIZATION_ATTRIBUTES: AttributeDef[] = [
+export const ORGANIZATION_ATTRIBUTES: AttributeDef<Customer>[] = [
   // ── Custom (UI Editable) ──────────────────────────────────────────
   { displayName: 'Name', name: 'name', type: 'text', isCustom: true, required: true, getValue: (c) => c.name },
   { displayName: 'Domain', name: 'domain', type: 'text', isCustom: true, getValue: (c) => c.domain },
@@ -72,39 +57,3 @@ export const ORGANIZATION_ATTRIBUTES: AttributeDef[] = [
   { displayName: 'Scope: Web App', name: 'scope_web_app', type: 'text', isCustom: false, getValue: (c) => c.scope_web_app },
   { displayName: 'CES %', name: 'ces_percentage', type: 'number', isCustom: false, getValue: (c) => c.ces_percentage },
 ];
-
-// A deliberately approximate "has this ever actually been set" check,
-// not a strict null check — DecimalField-as-string financial fields
-// (arr_billed_at_account, etc.) default to "0.00" rather than null, so
-// a literal zero reads the same as "not yet entered" here. Good enough
-// for a Usage% heuristic; not meant to be exact for every field (a
-// customer whose real health score is a genuine 0.0 would undercount).
-function isFilled(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === 'boolean') return true;
-  if (typeof value === 'number') return value !== 0;
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (trimmed === '') return false;
-    const asNumber = Number(trimmed);
-    return Number.isNaN(asNumber) || asNumber !== 0;
-  }
-  if (Array.isArray(value)) return value.length > 0;
-  return true; // owner/created_by/modified_by — a non-null User record
-}
-
-// % of the given customers where this attribute is actually filled in
-// — real data, not the mock's own fabricated per-row percentages.
-export function usagePercent(attr: AttributeDef, customers: Customer[]): number {
-  if (customers.length === 0) return 0;
-  const filledCount = customers.filter((c) => isFilled(attr.getValue(c))).length;
-  return Math.round((filledCount / customers.length) * 100);
-}
-
-export function attributeProperties(attr: AttributeDef): string[] {
-  const props: string[] = [];
-  if (attr.required) props.push('Required');
-  if (attr.isCustom) props.push('UI Editable');
-  props.push('Visible');
-  return props;
-}

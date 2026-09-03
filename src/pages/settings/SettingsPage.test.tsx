@@ -171,7 +171,7 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
     expect(screen.getByText('Lifecycle Stage')).toBeInTheDocument();
   });
 
-  it('switching to a non-Organization sub-tab shows the placeholder instead of the table', async () => {
+  it('switching to a still-unwired sub-tab shows the placeholder instead of the table', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(() => Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] })))
@@ -181,9 +181,157 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
     render(<SettingsPage />);
     await screen.findByText('Custom Attributes');
 
-    await user.click(screen.getByRole('button', { name: 'Account' }));
+    // Account has its own real attributes table now too (see the
+    // "Account sub-tab" describe block below) -- Contact/Pipeline are
+    // the ones still unwired.
+    await user.click(screen.getByRole('button', { name: 'Contact' }));
 
     expect(screen.queryByText('Custom Attributes')).not.toBeInTheDocument();
     expect(screen.getByText(/under construction/i)).toBeInTheDocument();
+  });
+});
+
+// Minimal but real shape, matching revenact-backend's AccountSerializer
+// — see docs/API_CONTRACTS.md -> customers -> Account.
+const filledAccount = {
+  id: 1,
+  customers: [{ id: 6, name: 'Apple Inc' }],
+  name: 'North America Enterprise',
+  domain: 'na.acme.com',
+  address: 'Austin, TX',
+  email: 'na@acme.com',
+  phone: '+1 555 0100',
+  owner: { id: 1, name: 'Alice', email: 'alice@acme.io', avatar: '', role: 'admin', organisation: { id: 1, name: 'Acme', slug: 'acme' }, is_active: true },
+  created_at: '2026-08-31T00:00:00Z',
+  updated_at: '2026-08-31T00:00:00Z',
+  lifecycle_stage: 'live',
+  health_score: '9.5',
+  health_category: 'good',
+  pulse: [1, 1, 1, 1, 0],
+  ai_pulse_score: 'very_satisfied',
+  ai_pulse_reason: 'Strong engagement.',
+  nps_score: 100,
+  csat_score: '100.00',
+  renewal_date: '2026-03-02',
+  arr: '33600.00',
+};
+
+const blankAccount = {
+  ...filledAccount,
+  id: 2,
+  name: 'EMEA',
+  domain: '',
+  owner: null,
+  renewal_date: null,
+  arr: '0.00',
+};
+
+describe('SettingsPage — Data tab, Account sub-tab', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('fetches every account and renders real Custom/System attribute sections', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        jsonResponse(200, { count: 2, next: null, previous: null, results: [filledAccount, blankAccount] })
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Account' }));
+
+    expect(await screen.findByText('Custom Attributes')).toBeInTheDocument();
+    expect(screen.getByText('lifecycle_stage')).toBeInTheDocument();
+    // Account's own "Organizations" (customers) field, System not
+    // Custom -- no current form actually sends customer_ids.
+    expect(screen.getByText('Organizations')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/accounts/'), expect.anything());
+  });
+
+  it('walks every page of /accounts/ via `next`, not just the first', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/accounts/')) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            count: 2,
+            next: 'http://localhost:8000/api/v1/accounts/?page=2',
+            previous: null,
+            results: [filledAccount],
+          })
+        );
+      }
+      return Promise.resolve(
+        jsonResponse(200, { count: 2, next: null, previous: null, results: [blankAccount] })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Account' }));
+    await screen.findByText('Custom Attributes');
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v1/accounts/?page=2',
+        expect.anything()
+      )
+    );
+  });
+
+  it('computes a real Usage% from the fetched accounts, not a fabricated one', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        jsonResponse(200, { count: 2, next: null, previous: null, results: [filledAccount, blankAccount] })
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Account' }));
+    await screen.findByText('Domain');
+
+    // Domain: filledAccount has one, blankAccount's is '' -- 1 of 2 = 50%.
+    const domainRow = screen.getByText('Domain').closest('tr')!;
+    expect(domainRow.textContent).toContain('50%');
+
+    // Name: both set -- 2 of 2 = 100%.
+    const nameCell = screen.getAllByText('Name').find((el) => el.tagName === 'SPAN')!;
+    expect(nameCell.closest('tr')!.textContent).toContain('100%');
+  });
+
+  it('shows the backend error message instead of crashing', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, { detail: 'Server error.' }))));
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Account' }));
+
+    expect(await screen.findByText('Server error.')).toBeInTheDocument();
+  });
+
+  it('searching filters the attribute list by display name or field name', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(jsonResponse(200, { count: 1, next: null, previous: null, results: [filledAccount] }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Account' }));
+    await screen.findByText('Custom Attributes');
+    expect(screen.getByText('Lifecycle Stage')).toBeInTheDocument();
+
+    await user.type(
+      screen.getByPlaceholderText(/Search from \d+ account attributes/),
+      'lifecycle'
+    );
+
+    expect(screen.queryByText('Domain')).not.toBeInTheDocument();
+    expect(screen.getByText('Lifecycle Stage')).toBeInTheDocument();
   });
 });
