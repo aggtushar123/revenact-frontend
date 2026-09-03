@@ -9,3 +9,6 @@ export type { PinnedAttributesProps, AttributeDef, AttributeType } from './Pinne
 
 export { ContactsTab } from './ContactsTab';
 export type { ContactsTabProps } from './ContactsTab';
+
+export { PipelinesTab } from './PipelinesTab';
+export type { PipelinesTabProps } from './PipelinesTab';

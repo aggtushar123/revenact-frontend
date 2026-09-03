@@ -158,6 +158,12 @@ function renderNavbar(
         risks: [],
         risksLoading: false,
         risksError: null,
+        pipelineOpportunities: [],
+        pipelineOpportunitiesLoading: false,
+        pipelineOpportunitiesError: null,
+        pipelineRisks: [],
+        pipelineRisksLoading: false,
+        pipelineRisksError: null,
       },
     },
   });

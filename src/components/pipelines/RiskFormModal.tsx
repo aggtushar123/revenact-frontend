@@ -2,7 +2,12 @@ import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'reac
 import { X, AlertCircle } from 'lucide-react';
 import { useAppDispatch } from '../../hooks';
 import { apiFetch, ApiError } from '../../lib/apiClient';
-import { createRisk, updateRisk } from '../../features/customers/customersSlice';
+import {
+  createRisk,
+  createRiskForCustomer,
+  createRiskForAccount,
+  updateRisk,
+} from '../../features/customers/customersSlice';
 import type { Risk } from '../../features/customers/customersSlice';
 
 // Matches Risk.Stage on the backend exactly (services/customers/
@@ -21,16 +26,43 @@ interface RiskFormModalProps {
    * first column when opened from the board's own "Add Risk" button.
    * Ignored for Edit. */
   defaultStage?: Risk['stage'];
-  /** Every company to choose from — same reasoning as
-   * OpportunityFormModal's own `companies` prop. */
-  companies: { id: number; name: string }[];
+  /** Every company to choose from — only used when `customerId` isn't
+   * already fixed below, same reasoning as OpportunityFormModal's own
+   * `companies` prop. */
+  companies?: { id: number; name: string }[];
+  /** Add-only: a fixed Customer to create the new risk under — set when
+   * opened from the Organization/Account Details page's own Pipelines
+   * tab (see PipelinesTab.tsx), skipping the Company picker entirely,
+   * same as OpportunityFormModal's own `customerId` prop. Ignored for
+   * Edit. */
+  customerId?: number;
+  /** Add-only: set together with a fixed `customerId` when opened from
+   * the standalone Account page's own Pipelines tab — creates an
+   * account-level Risk instead of an organisation-level one, and hides
+   * the Account picker below (already inside one specific account's
+   * own context). */
+  accountId?: number;
   onClose: () => void;
   /** Edit-only: shows a "Delete" button that hands off to the caller,
    * same separation as OpportunityFormModal's own. */
   onDeleteRequest?: () => void;
+  /** Called after a successful *create* only, and only when this modal
+   * is scoped to a fixed `customerId`/`accountId` — same "caller
+   * refetches, the standalone board's own Add doesn't need it"
+   * reasoning as OpportunityFormModal's own `onSaved`. */
+  onSaved?: () => void;
 }
 
-export function RiskFormModal({ risk, defaultStage, companies, onClose, onDeleteRequest }: RiskFormModalProps) {
+export function RiskFormModal({
+  risk,
+  defaultStage,
+  companies,
+  customerId,
+  accountId,
+  onClose,
+  onDeleteRequest,
+  onSaved,
+}: RiskFormModalProps) {
   const dispatch = useAppDispatch();
   const isEdit = !!risk;
 
@@ -38,22 +70,24 @@ export function RiskFormModal({ risk, defaultStage, companies, onClose, onDelete
   const [mrr, setMrr] = useState(risk?.mrr ?? '');
   const [stage, setStage] = useState<Risk['stage']>(risk?.stage ?? defaultStage ?? 'open');
   const [priority, setPriority] = useState<Risk['priority']>(risk?.priority ?? 'medium');
-  const [selectedCompanyId, setSelectedCompanyId] = useState('');
+  const [selectedCompanyId, setSelectedCompanyId] = useState(customerId ? String(customerId) : '');
 
   // Same self-fetching Account picker as OpportunityFormModal — every
-  // account under whichever company is currently picked, so a new Risk
+  // account under whichever company is currently in play (fixed via
+  // `customerId`, or picked from the dropdown below), so a new Risk
   // can be organisation-level (left on "Organization") or tied to one
   // specific Account, same two-tier model.
+  const effectiveCompanyId = customerId ?? (selectedCompanyId ? Number(selectedCompanyId) : undefined);
   const [accountOptions, setAccountOptions] = useState<{ id: number; name: string }[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
 
   useEffect(() => {
-    if (isEdit || !selectedCompanyId) {
+    if (isEdit || accountId !== undefined || effectiveCompanyId === undefined) {
       setAccountOptions([]);
       return;
     }
     let cancelled = false;
-    apiFetch<{ id: number; name: string }[]>(`/customers/${selectedCompanyId}/accounts/`)
+    apiFetch<{ id: number; name: string }[]>(`/customers/${effectiveCompanyId}/accounts/`)
       .then((accounts) => {
         if (!cancelled) setAccountOptions(Array.isArray(accounts) ? accounts : []);
       })
@@ -63,11 +97,11 @@ export function RiskFormModal({ risk, defaultStage, companies, onClose, onDelete
     return () => {
       cancelled = true;
     };
-  }, [isEdit, selectedCompanyId]);
+  }, [isEdit, accountId, effectiveCompanyId]);
 
   useEffect(() => {
     setSelectedAccountId('');
-  }, [selectedCompanyId]);
+  }, [effectiveCompanyId]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +110,7 @@ export function RiskFormModal({ risk, defaultStage, companies, onClose, onDelete
     e.preventDefault();
     setError(null);
 
-    if (!isEdit && !selectedCompanyId) {
+    if (!isEdit && customerId === undefined && !selectedCompanyId) {
       setError('Pick a company.');
       return;
     }
@@ -84,13 +118,29 @@ export function RiskFormModal({ risk, defaultStage, companies, onClose, onDelete
     setIsSaving(true);
     const data = { title: title.trim(), mrr: mrr.trim() || '0', stage, priority };
     try {
-      // No manual refetch needed after any of these — createRisk/
-      // updateRisk/deleteRisk's own extraReducers already patch the
-      // one board-wide `risks` list directly, same reasoning as
-      // OpportunityFormModal.
       if (isEdit) {
+        // No onSaved() — updateRisk's own extraReducers already patch
+        // every list this Risk could be showing in.
         await dispatch(updateRisk({ id: risk.id, ...data })).unwrap();
+      } else if (customerId !== undefined) {
+        // Scoped to a fixed Customer/Account (the Details page's own
+        // Pipelines tab) — createRiskForCustomer/createRiskForAccount
+        // don't patch Redux themselves, so the caller refetches via
+        // onSaved() below.
+        if (accountId !== undefined) {
+          await dispatch(createRiskForAccount({ customerId, accountId, ...data })).unwrap();
+        } else if (selectedAccountId) {
+          await dispatch(
+            createRiskForAccount({ customerId, accountId: Number(selectedAccountId), ...data })
+          ).unwrap();
+        } else {
+          await dispatch(createRiskForCustomer({ customerId, ...data })).unwrap();
+        }
+        onSaved?.();
       } else if (selectedAccountId) {
+        // The standalone board's own Add — createRisk's own
+        // extraReducers already unshift straight into `risks`, no
+        // refetch needed.
         await dispatch(createRisk({ accountId: Number(selectedAccountId), ...data })).unwrap();
       } else {
         await dispatch(createRisk({ customerId: Number(selectedCompanyId), ...data })).unwrap();
@@ -133,31 +183,31 @@ export function RiskFormModal({ risk, defaultStage, companies, onClose, onDelete
                 {risk.account_name ? ` • ${risk.account_name}` : ''}
               </p>
             </div>
-          ) : (
-            <>
-              <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
-                <option value="">Select a company…</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </SelectField>
+          ) : customerId === undefined ? (
+            <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
+              <option value="">Select a company…</option>
+              {(companies ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </SelectField>
+          ) : null}
 
-              {/* A Risk can be organisation-level or belong to one
-                  specific Account — same two-tier model as
-                  Opportunity's own optional Account picker. */}
-              {selectedCompanyId && (
-                <SelectField label="Account (optional)" value={selectedAccountId} onChange={setSelectedAccountId}>
-                  <option value="">Organization risk (no specific account)</option>
-                  {accountOptions.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </SelectField>
-              )}
-            </>
+          {/* A Risk can be organisation-level or belong to one
+              specific Account — hidden for Edit (can't move between
+              parents) and when `accountId` is already fixed (the
+              standalone Account page's own Pipelines tab — already
+              inside one specific account, nothing to pick). */}
+          {!isEdit && accountId === undefined && effectiveCompanyId !== undefined && (
+            <SelectField label="Account (optional)" value={selectedAccountId} onChange={setSelectedAccountId}>
+              <option value="">Organization risk (no specific account)</option>
+              {accountOptions.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </SelectField>
           )}
 
           <div className="grid grid-cols-2 gap-3">

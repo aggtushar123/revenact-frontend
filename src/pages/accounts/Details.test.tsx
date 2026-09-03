@@ -619,4 +619,225 @@ describe('AccountDetails page (/accounts/:id)', () => {
       expect(screen.queryByText('Priya Nair')).not.toBeInTheDocument();
     });
   });
+
+  describe('Pipelines tab (real Opportunities/Risks, own nested endpoints — a sibling tab, not an ActivityFeed filter)', () => {
+    const opportunitiesUrl = `/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/opportunities/`;
+    const risksUrl = `/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/risks/`;
+
+    const seatExpansion = {
+      id: 1,
+      title: 'Seat Expansion — Q3 Rollout',
+      mrr: '16000.00',
+      stage: 'discovery',
+      stage_display: 'Discovery',
+      priority: 'medium',
+      priority_display: 'Medium',
+      company_id: 9,
+      company_name: 'Kraft Heinz',
+      account_name: 'APAC Division',
+    };
+    const regionalRisk = {
+      id: 1,
+      title: 'Regional Expansion Proposal Risk',
+      mrr: '17000.00',
+      stage: 'open',
+      stage_display: 'Open',
+      priority: 'medium',
+      priority_display: 'Medium',
+      company_id: 9,
+      company_name: 'Kraft Heinz',
+      account_name: 'APAC Division',
+    };
+
+    it('fetches and renders this account\'s own opportunities and risks, from their own nested endpoints', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) => {
+          if (url.includes(opportunitiesUrl)) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => [seatExpansion] });
+          }
+          if (url.includes(risksUrl)) {
+            return Promise.resolve({ ok: true, status: 200, json: async () => [regionalRisk] });
+          }
+          return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+        })
+      );
+
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
+
+      expect(await screen.findByText('Seat Expansion — Q3 Rollout')).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(opportunitiesUrl),
+        expect.objectContaining({ method: 'GET' })
+      );
+
+      await user.click(screen.getByRole('button', { name: /^Risks/ }));
+      expect(await screen.findByText('Regional Expansion Proposal Risk')).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(risksUrl),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('shows no opportunities (not a stale or hardcoded set) when reached without navigation state', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
+
+      expect(await screen.findByText('No opportunities found.')).toBeInTheDocument();
+    });
+
+    it('disables "Add Opportunity" when reached without navigation state (no real account id to post against)', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
+      await screen.findByText('No opportunities found.');
+
+      expect(screen.getByRole('button', { name: 'Add Opportunity' })).toBeDisabled();
+    });
+
+    async function openPipelinesTab(fetchMock: ReturnType<typeof vi.fn>) {
+      vi.stubGlobal('fetch', fetchMock);
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
+      await screen.findByText('Seat Expansion — Q3 Rollout');
+      return user;
+    }
+
+    it('adding an opportunity posts to the account-level nested endpoint, with no Account picker shown', async () => {
+      let opportunitiesData: unknown[] = [seatExpansion];
+      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'POST' && url.endsWith(opportunitiesUrl)) {
+          const created = { ...seatExpansion, id: 99, title: 'New Opp' };
+          opportunitiesData = [...opportunitiesData, created];
+          return Promise.resolve({ ok: true, status: 201, json: async () => created });
+        }
+        if (url.includes(opportunitiesUrl)) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => opportunitiesData });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      });
+      const user = await openPipelinesTab(fetchMock);
+
+      await user.click(screen.getByRole('button', { name: 'Add Opportunity' }));
+      // Already scoped to one specific account (accountId is fixed) —
+      // no Company/Account picker to interact with, unlike the
+      // Organization Details page's own Pipelines tab.
+      expect(screen.queryByLabelText('Company *')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Account (optional)')).not.toBeInTheDocument();
+      await user.type(screen.getByLabelText('Title *'), 'New Opp');
+      const submitButton = screen
+        .getAllByRole('button', { name: 'Add Opportunity' })
+        .find((btn) => btn.closest('form'))!;
+      await user.click(submitButton);
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining(opportunitiesUrl),
+          expect.objectContaining({ method: 'POST' })
+        )
+      );
+      expect(await screen.findByText('New Opp')).toBeInTheDocument();
+    });
+
+    it('editing an opportunity PATCHes /api/v1/opportunities/<id>/ and updates it in place', async () => {
+      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'PATCH' && url.endsWith('/opportunities/1/')) {
+          const body = JSON.parse(options!.body!);
+          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...seatExpansion, ...body }) });
+        }
+        if (url.includes(opportunitiesUrl)) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [seatExpansion] });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      });
+      const user = await openPipelinesTab(fetchMock);
+
+      await user.click(screen.getByText('Seat Expansion — Q3 Rollout'));
+      const titleInput = screen.getByLabelText('Title *');
+      await user.clear(titleInput);
+      await user.type(titleInput, 'Renamed Opportunity');
+      await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/opportunities/1/'),
+          expect.objectContaining({ method: 'PATCH' })
+        )
+      );
+      expect(await screen.findByText('Renamed Opportunity')).toBeInTheDocument();
+    });
+
+    it('deleting an opportunity from its edit modal DELETEs /api/v1/opportunities/<id>/ and removes the row', async () => {
+      const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'DELETE' && url.endsWith('/opportunities/1/')) {
+          return Promise.resolve({ ok: true, status: 204, json: async () => null });
+        }
+        if (url.includes(opportunitiesUrl)) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [seatExpansion] });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      });
+      const user = await openPipelinesTab(fetchMock);
+
+      await user.click(screen.getByText('Seat Expansion — Q3 Rollout'));
+      await user.click(screen.getByRole('button', { name: 'Delete' }));
+      const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
+      await user.click(confirmButtons[confirmButtons.length - 1]);
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining('/opportunities/1/'),
+          expect.objectContaining({ method: 'DELETE' })
+        )
+      );
+      expect(screen.queryByText('Seat Expansion — Q3 Rollout')).not.toBeInTheDocument();
+    });
+
+    it('switching to the Risks sub-tab shows risks instead, and Add Risk posts to the account-level nested endpoint', async () => {
+      let risksData: unknown[] = [regionalRisk];
+      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+        const method = options?.method ?? 'GET';
+        if (method === 'POST' && url.endsWith(risksUrl)) {
+          const created = { ...regionalRisk, id: 99, title: 'New Risk' };
+          risksData = [...risksData, created];
+          return Promise.resolve({ ok: true, status: 201, json: async () => created });
+        }
+        if (url.includes(opportunitiesUrl)) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => [seatExpansion] });
+        }
+        if (url.includes(risksUrl)) {
+          return Promise.resolve({ ok: true, status: 200, json: async () => risksData });
+        }
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      });
+      const user = await openPipelinesTab(fetchMock);
+
+      await user.click(screen.getByRole('button', { name: /^Risks/ }));
+      expect(await screen.findByText('Regional Expansion Proposal Risk')).toBeInTheDocument();
+      expect(screen.queryByText('Seat Expansion — Q3 Rollout')).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole('button', { name: 'Add Risk' }));
+      expect(screen.queryByLabelText('Company *')).not.toBeInTheDocument();
+      await user.type(screen.getByLabelText('Title *'), 'New Risk');
+      const submitButton = screen
+        .getAllByRole('button', { name: 'Add Risk' })
+        .find((btn) => btn.closest('form'))!;
+      await user.click(submitButton);
+
+      await waitFor(() =>
+        expect(fetchMock).toHaveBeenCalledWith(
+          expect.stringContaining(risksUrl),
+          expect.objectContaining({ method: 'POST' })
+        )
+      );
+      expect(await screen.findByText('New Risk')).toBeInTheDocument();
+    });
+  });
 });

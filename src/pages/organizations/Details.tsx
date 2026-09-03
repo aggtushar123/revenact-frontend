@@ -3,10 +3,16 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { MessageSquare, RefreshCw, MoreHorizontal, Globe, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, ExternalLink, Download, X } from 'lucide-react';
 import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchCustomerById, fetchAccountsForCustomer, fetchContactsForCustomer } from '../../features/customers/customersSlice';
+import {
+  fetchCustomerById,
+  fetchAccountsForCustomer,
+  fetchContactsForCustomer,
+  fetchOpportunitiesForCustomer,
+  fetchRisksForCustomer,
+} from '../../features/customers/customersSlice';
 import type { Account } from '../../features/customers/customersSlice';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
 import { mapAccountToAccountRow } from '../../features/customers/mapToAccountRow';
@@ -28,19 +34,27 @@ export function Details() {
     contacts,
     contactsLoading,
     contactsError,
+    pipelineOpportunities,
+    pipelineOpportunitiesLoading,
+    pipelineOpportunitiesError,
+    pipelineRisks,
+    pipelineRisksLoading,
+    pipelineRisksError,
   } = useAppSelector((state) => state.customers);
 
   useEffect(() => {
     dispatch(fetchCustomerById(orgId));
     dispatch(fetchAccountsForCustomer(orgId));
     dispatch(fetchContactsForCustomer(orgId));
+    dispatch(fetchOpportunitiesForCustomer(orgId));
+    dispatch(fetchRisksForCustomer(orgId));
   }, [dispatch, orgId]);
 
-  // The General tab, PinnedAttributes panel, ActivityFeed, and Contacts
-  // tab all render off this now — Pipelines/Custom Objects/etc. below
-  // still have no backend model. Accounts/Contacts are real (one
-  // Customer has many Account/Contact rows — see
-  // customers/models.py:Account/Contact on the backend).
+  // The General tab, PinnedAttributes panel, ActivityFeed, Contacts tab,
+  // and Pipelines tab all render off this now — Custom Objects/etc.
+  // below still have no backend model. Accounts/Contacts/Opportunity/
+  // Risk are real (one Customer has many Account/Contact/Opportunity/
+  // Risk rows — see customers/models.py on the backend).
   const organization = selectedCustomer ? mapCustomerToOrgRow(selectedCustomer) : null;
   const accounts = organization
     ? accountsForCustomer.map((a) =>
@@ -64,7 +78,7 @@ export function Details() {
     { name: 'General', count: null },
     { name: 'Accounts', count: accounts.length },
     { name: 'Contacts', count: contacts.length },
-    { name: 'Pipelines', count: 1 },
+    { name: 'Pipelines', count: pipelineOpportunities.length + pipelineRisks.length },
     { name: 'Custom Objects', count: 2 },
     { name: 'Success Plans', count: null },
     { name: 'Canvas List', count: null },
@@ -214,7 +228,18 @@ export function Details() {
         {activeTab === 'Contacts' && (
           <ContactsTab contacts={contacts} isLoading={contactsLoading} error={contactsError} customerId={orgId} />
         )}
-        {activeTab !== 'General' && activeTab !== 'Accounts' && activeTab !== 'Contacts' && (
+        {activeTab === 'Pipelines' && (
+          <PipelinesTab
+            opportunities={pipelineOpportunities}
+            opportunitiesLoading={pipelineOpportunitiesLoading}
+            opportunitiesError={pipelineOpportunitiesError}
+            risks={pipelineRisks}
+            risksLoading={pipelineRisksLoading}
+            risksError={pipelineRisksError}
+            customerId={orgId}
+          />
+        )}
+        {activeTab !== 'General' && activeTab !== 'Accounts' && activeTab !== 'Contacts' && activeTab !== 'Pipelines' && (
           <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
             <Layout className="w-12 h-12 text-ink-faint mb-2" />
             <span className="text-sm font-bold text-ink-muted uppercase tracking-widest">{activeTab} Coming Soon</span>

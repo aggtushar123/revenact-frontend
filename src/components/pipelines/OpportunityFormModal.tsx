@@ -2,7 +2,12 @@ import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'reac
 import { X, AlertCircle } from 'lucide-react';
 import { useAppDispatch } from '../../hooks';
 import { apiFetch, ApiError } from '../../lib/apiClient';
-import { createOpportunity, updateOpportunity } from '../../features/customers/customersSlice';
+import {
+  createOpportunity,
+  createOpportunityForCustomer,
+  createOpportunityForAccount,
+  updateOpportunity,
+} from '../../features/customers/customersSlice';
 import type { Opportunity } from '../../features/customers/customersSlice';
 
 // Matches Opportunity.Stage on the backend exactly (services/customers/
@@ -23,24 +28,52 @@ interface OpportunityFormModalProps {
    * first column when opened from the board's own "Add Opportunity"
    * button. Ignored for Edit. */
   defaultStage?: Opportunity['stage'];
-  /** Every company to choose from — the standalone Pipelines board has
-   * no single Customer of its own, same reasoning as the standalone
-   * Contacts page's own ContactFormModal usage. */
-  companies: { id: number; name: string }[];
+  /** Every company to choose from — only used when `customerId` isn't
+   * already fixed below (the standalone board, which has no single
+   * Customer of its own, same reasoning as ContactFormModal's own
+   * `companies` prop). */
+  companies?: { id: number; name: string }[];
+  /** Add-only: a fixed Customer to create the new opportunity under —
+   * set when opened from the Organization/Account Details page's own
+   * Pipelines tab (see PipelinesTab.tsx), skipping the Company picker
+   * entirely, same as ContactFormModal's own `customerId` prop.
+   * Ignored for Edit. */
+  customerId?: number;
+  /** Add-only: set together with a fixed `customerId` when opened from
+   * the standalone Account page's own Pipelines tab — creates an
+   * account-level Opportunity instead of an organisation-level one,
+   * and hides the Account picker below (already inside one specific
+   * account's own context). */
+  accountId?: number;
   onClose: () => void;
   /** Edit-only: shows a "Delete" button that hands off to the caller
    * (PipelinesPage.tsx opens its own ConfirmDialog for it) rather than
    * this modal deleting directly — same separation as the standalone
    * Contact Details page's own Edit/Delete. */
   onDeleteRequest?: () => void;
+  /** Called after a successful *create* only, and only when this modal
+   * is scoped to a fixed `customerId`/`accountId` (the Details page's
+   * own Pipelines tab) — createOpportunityForCustomer/
+   * createOpportunityForAccount don't know which scoped list
+   * (`pipelineOpportunities`) to patch, so the caller refetches its own
+   * list instead, same "caller refetches" reasoning as
+   * ContactFormModal's own `onSaved`. The standalone board's own Add
+   * (no `customerId`/`accountId` given) uses `createOpportunity`
+   * instead, which already patches Redux directly via its own
+   * extraReducers — `onSaved` is never called then, and both of that
+   * board's own call sites omit the prop entirely. */
+  onSaved?: () => void;
 }
 
 export function OpportunityFormModal({
   opportunity,
   defaultStage,
   companies,
+  customerId,
+  accountId,
   onClose,
   onDeleteRequest,
+  onSaved,
 }: OpportunityFormModalProps) {
   const dispatch = useAppDispatch();
   const isEdit = !!opportunity;
@@ -51,22 +84,24 @@ export function OpportunityFormModal({
     opportunity?.stage ?? defaultStage ?? 'discovery'
   );
   const [priority, setPriority] = useState<Opportunity['priority']>(opportunity?.priority ?? 'medium');
-  const [selectedCompanyId, setSelectedCompanyId] = useState('');
+  const [selectedCompanyId, setSelectedCompanyId] = useState(customerId ? String(customerId) : '');
 
   // Same self-fetching Account picker as ContactFormModal — every
-  // account under whichever company is currently picked, so a new
+  // account under whichever company is currently in play (fixed via
+  // `customerId`, or picked from the dropdown below), so a new
   // Opportunity can be organisation-level (left on "Organization") or
   // tied to one specific Account, same two-tier model as Contact.
+  const effectiveCompanyId = customerId ?? (selectedCompanyId ? Number(selectedCompanyId) : undefined);
   const [accountOptions, setAccountOptions] = useState<{ id: number; name: string }[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState('');
 
   useEffect(() => {
-    if (isEdit || !selectedCompanyId) {
+    if (isEdit || accountId !== undefined || effectiveCompanyId === undefined) {
       setAccountOptions([]);
       return;
     }
     let cancelled = false;
-    apiFetch<{ id: number; name: string }[]>(`/customers/${selectedCompanyId}/accounts/`)
+    apiFetch<{ id: number; name: string }[]>(`/customers/${effectiveCompanyId}/accounts/`)
       .then((accounts) => {
         if (!cancelled) setAccountOptions(Array.isArray(accounts) ? accounts : []);
       })
@@ -76,11 +111,11 @@ export function OpportunityFormModal({
     return () => {
       cancelled = true;
     };
-  }, [isEdit, selectedCompanyId]);
+  }, [isEdit, accountId, effectiveCompanyId]);
 
   useEffect(() => {
     setSelectedAccountId('');
-  }, [selectedCompanyId]);
+  }, [effectiveCompanyId]);
 
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +124,7 @@ export function OpportunityFormModal({
     e.preventDefault();
     setError(null);
 
-    if (!isEdit && !selectedCompanyId) {
+    if (!isEdit && customerId === undefined && !selectedCompanyId) {
       setError('Pick a company.');
       return;
     }
@@ -97,14 +132,29 @@ export function OpportunityFormModal({
     setIsSaving(true);
     const data = { title: title.trim(), mrr: mrr.trim() || '0', stage, priority };
     try {
-      // No manual refetch needed after any of these — createOpportunity/
-      // updateOpportunity/deleteOpportunity's own extraReducers already
-      // patch the one board-wide `opportunities` list directly (unlike
-      // Contact, there's only ever the one list an Opportunity could
-      // land in, so the create case can do this safely too).
       if (isEdit) {
+        // No onSaved() — updateOpportunity's own extraReducers already
+        // patch every list this Opportunity could be showing in.
         await dispatch(updateOpportunity({ id: opportunity.id, ...data })).unwrap();
+      } else if (customerId !== undefined) {
+        // Scoped to a fixed Customer/Account (the Details page's own
+        // Pipelines tab) — createOpportunityForCustomer/
+        // createOpportunityForAccount don't patch Redux themselves, so
+        // the caller refetches via onSaved() below.
+        if (accountId !== undefined) {
+          await dispatch(createOpportunityForAccount({ customerId, accountId, ...data })).unwrap();
+        } else if (selectedAccountId) {
+          await dispatch(
+            createOpportunityForAccount({ customerId, accountId: Number(selectedAccountId), ...data })
+          ).unwrap();
+        } else {
+          await dispatch(createOpportunityForCustomer({ customerId, ...data })).unwrap();
+        }
+        onSaved?.();
       } else if (selectedAccountId) {
+        // The standalone board's own Add — createOpportunity's own
+        // extraReducers already unshift straight into `opportunities`,
+        // no refetch needed.
         await dispatch(createOpportunity({ accountId: Number(selectedAccountId), ...data })).unwrap();
       } else {
         await dispatch(createOpportunity({ customerId: Number(selectedCompanyId), ...data })).unwrap();
@@ -149,31 +199,31 @@ export function OpportunityFormModal({
                 {opportunity.account_name ? ` • ${opportunity.account_name}` : ''}
               </p>
             </div>
-          ) : (
-            <>
-              <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
-                <option value="">Select a company…</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </SelectField>
+          ) : customerId === undefined ? (
+            <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
+              <option value="">Select a company…</option>
+              {(companies ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </SelectField>
+          ) : null}
 
-              {/* An Opportunity can be organisation-level or belong to
-                  one specific Account — same two-tier model as
-                  Contact's own optional Account picker. */}
-              {selectedCompanyId && (
-                <SelectField label="Account (optional)" value={selectedAccountId} onChange={setSelectedAccountId}>
-                  <option value="">Organization opportunity (no specific account)</option>
-                  {accountOptions.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </SelectField>
-              )}
-            </>
+          {/* An Opportunity can be organisation-level or belong to
+              one specific Account — hidden for Edit (can't move
+              between parents) and when `accountId` is already fixed
+              (the standalone Account page's own Pipelines tab —
+              already inside one specific account, nothing to pick). */}
+          {!isEdit && accountId === undefined && effectiveCompanyId !== undefined && (
+            <SelectField label="Account (optional)" value={selectedAccountId} onChange={setSelectedAccountId}>
+              <option value="">Organization opportunity (no specific account)</option>
+              {accountOptions.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.name}
+                </option>
+              ))}
+            </SelectField>
           )}
 
           <div className="grid grid-cols-2 gap-3">

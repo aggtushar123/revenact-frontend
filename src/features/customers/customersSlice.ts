@@ -490,6 +490,22 @@ interface CustomersState {
   risks: Risk[];
   risksLoading: boolean;
   risksError: string | null;
+  /** The Organization/Account Details page's own "Pipelines" tab —
+   * either this Customer's own rolled-up Opportunities (organisation-
+   * level and every one of its Accounts', see CustomerOpportunityListView's
+   * own docstring) or one specific Account's own, same "one slot reused
+   * for whichever scope is currently open, never both at once" pattern
+   * as `contacts` above. Deliberately separate from `opportunities`
+   * above — that one is the *global*, cross-Customer list the
+   * standalone Pipelines board fetches; this is always scoped to a
+   * single Customer or Account. */
+  pipelineOpportunities: Opportunity[];
+  pipelineOpportunitiesLoading: boolean;
+  pipelineOpportunitiesError: string | null;
+  /** Same as `pipelineOpportunities` above, for Risks. */
+  pipelineRisks: Risk[];
+  pipelineRisksLoading: boolean;
+  pipelineRisksError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -552,6 +568,12 @@ const initialState: CustomersState = {
   risks: [],
   risksLoading: false,
   risksError: null,
+  pipelineOpportunities: [],
+  pipelineOpportunitiesLoading: false,
+  pipelineOpportunitiesError: null,
+  pipelineRisks: [],
+  pipelineRisksLoading: false,
+  pipelineRisksError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -1147,6 +1169,151 @@ export const deleteRisk = createAsyncThunk<number, number, { rejectValue: string
   }
 );
 
+// Powers the Organization Details page's own Pipelines tab — every
+// Opportunity rolled up for one Customer (organisation-level and every
+// one of its Accounts' — see CustomerOpportunityListView's own
+// docstring), same reasoning as fetchContactsForCustomer above.
+export const fetchOpportunitiesForCustomer = createAsyncThunk<
+  Opportunity[],
+  number,
+  { rejectValue: string }
+>('customers/fetchOpportunitiesForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Opportunity[]>(`/customers/${customerId}/opportunities/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load opportunities.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers the standalone Account page's own Pipelines tab — every
+// account-level Opportunity for one Account.
+export const fetchOpportunitiesForAccount = createAsyncThunk<
+  Opportunity[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>(
+  'customers/fetchOpportunitiesForAccount',
+  async ({ customerId, accountId }, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Opportunity[]>(
+        `/customers/${customerId}/accounts/${accountId}/opportunities/`
+      );
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load opportunities.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Adds an organization-level Opportunity under `customerId` — used by
+// the Organization Details page's own Pipelines tab. No extraReducers
+// case, same "caller refetches" reasoning as createContactForCustomer
+// — this thunk doesn't know whether the caller is a scoped Details-page
+// tab (`pipelineOpportunities`) or something else, so it can't safely
+// patch a specific slot itself.
+export const createOpportunityForCustomer = createAsyncThunk<
+  Opportunity,
+  { customerId: number } & OpportunityWritePayload & { title: string },
+  { rejectValue: string }
+>(
+  'customers/createOpportunityForCustomer',
+  async ({ customerId, ...data }, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Opportunity>(`/customers/${customerId}/opportunities/`, {
+        method: 'POST',
+        body: data,
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not add opportunity.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Adds an account-level Opportunity under `accountId` — used by the
+// standalone Account page's own Pipelines tab. Same "caller refetches"
+// reasoning as createOpportunityForCustomer above.
+export const createOpportunityForAccount = createAsyncThunk<
+  Opportunity,
+  { customerId: number; accountId: number } & OpportunityWritePayload & { title: string },
+  { rejectValue: string }
+>(
+  'customers/createOpportunityForAccount',
+  async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Opportunity>(
+        `/customers/${customerId}/accounts/${accountId}/opportunities/`,
+        { method: 'POST', body: data }
+      );
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not add opportunity.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Same shape as fetchOpportunitiesForCustomer/fetchOpportunitiesForAccount
+// above, for Risks.
+export const fetchRisksForCustomer = createAsyncThunk<Risk[], number, { rejectValue: string }>(
+  'customers/fetchRisksForCustomer',
+  async (customerId, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Risk[]>(`/customers/${customerId}/risks/`);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load risks.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const fetchRisksForAccount = createAsyncThunk<
+  Risk[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>('customers/fetchRisksForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Risk[]>(`/customers/${customerId}/accounts/${accountId}/risks/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load risks.';
+    return rejectWithValue(message);
+  }
+});
+
+// Same shape as createOpportunityForCustomer/createOpportunityForAccount
+// above, for Risks.
+export const createRiskForCustomer = createAsyncThunk<
+  Risk,
+  { customerId: number } & RiskWritePayload & { title: string },
+  { rejectValue: string }
+>('customers/createRiskForCustomer', async ({ customerId, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Risk>(`/customers/${customerId}/risks/`, { method: 'POST', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not add risk.';
+    return rejectWithValue(message);
+  }
+});
+
+export const createRiskForAccount = createAsyncThunk<
+  Risk,
+  { customerId: number; accountId: number } & RiskWritePayload & { title: string },
+  { rejectValue: string }
+>(
+  'customers/createRiskForAccount',
+  async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Risk>(`/customers/${customerId}/accounts/${accountId}/risks/`, {
+        method: 'POST',
+        body: data,
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not add risk.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -1233,6 +1400,16 @@ const customersSlice = createSlice({
       state.contacts = [];
       state.contactsLoading = false;
       state.contactsError = null;
+    },
+    // Same reasoning as clearContacts above, for the Organization/
+    // Account Details page's own Pipelines tab.
+    clearPipelineData(state) {
+      state.pipelineOpportunities = [];
+      state.pipelineOpportunitiesLoading = false;
+      state.pipelineOpportunitiesError = null;
+      state.pipelineRisks = [];
+      state.pipelineRisksLoading = false;
+      state.pipelineRisksError = null;
     },
   },
   extraReducers: (builder) => {
@@ -1608,13 +1785,56 @@ const customersSlice = createSlice({
         state.opportunities.unshift(action.payload);
       })
       .addCase(updateOpportunity.fulfilled, (state, action) => {
+        // Patches both the standalone board's own `opportunities` and
+        // the Details page's own scoped `pipelineOpportunities` — this
+        // thunk is shared by both surfaces (see OpportunityFormModal's
+        // own docstring), and either list could be showing this
+        // Opportunity, same "patch every slot it could be in" reasoning
+        // as updateContact above.
         const updated = action.payload;
         const index = state.opportunities.findIndex((o) => o.id === updated.id);
         if (index !== -1) state.opportunities[index] = updated;
+        const pipelineIndex = state.pipelineOpportunities.findIndex((o) => o.id === updated.id);
+        if (pipelineIndex !== -1) state.pipelineOpportunities[pipelineIndex] = updated;
       })
       .addCase(deleteOpportunity.fulfilled, (state, action) => {
         state.opportunities = state.opportunities.filter((o) => o.id !== action.payload);
+        state.pipelineOpportunities = state.pipelineOpportunities.filter(
+          (o) => o.id !== action.payload
+        );
       })
+      .addCase(fetchOpportunitiesForCustomer.pending, (state) => {
+        state.pipelineOpportunitiesLoading = true;
+        state.pipelineOpportunitiesError = null;
+      })
+      .addCase(fetchOpportunitiesForCustomer.fulfilled, (state, action) => {
+        state.pipelineOpportunitiesLoading = false;
+        state.pipelineOpportunities = action.payload;
+      })
+      .addCase(fetchOpportunitiesForCustomer.rejected, (state, action) => {
+        state.pipelineOpportunitiesLoading = false;
+        state.pipelineOpportunitiesError = action.payload ?? 'Could not load opportunities.';
+      })
+      // fetchOpportunitiesForCustomer/fetchOpportunitiesForAccount share
+      // the one `pipelineOpportunities` slot, same reasoning as
+      // fetchContactsForCustomer/fetchContactsForAccount above.
+      .addCase(fetchOpportunitiesForAccount.pending, (state) => {
+        state.pipelineOpportunitiesLoading = true;
+        state.pipelineOpportunitiesError = null;
+      })
+      .addCase(fetchOpportunitiesForAccount.fulfilled, (state, action) => {
+        state.pipelineOpportunitiesLoading = false;
+        state.pipelineOpportunities = action.payload;
+      })
+      .addCase(fetchOpportunitiesForAccount.rejected, (state, action) => {
+        state.pipelineOpportunitiesLoading = false;
+        state.pipelineOpportunitiesError = action.payload ?? 'Could not load opportunities.';
+      })
+      // createOpportunityForCustomer/createOpportunityForAccount's own
+      // rejections are shown inline in the form instead — no .rejected
+      // case needed, and no .fulfilled case either: PipelinesTab
+      // refetches its own `pipelineOpportunities` after a successful
+      // create (see createOpportunityForCustomer's own docstring).
       .addCase(fetchRisks.pending, (state) => {
         state.risksLoading = true;
         state.risksError = null;
@@ -1633,12 +1853,41 @@ const customersSlice = createSlice({
         state.risks.unshift(action.payload);
       })
       .addCase(updateRisk.fulfilled, (state, action) => {
+        // Same "patch every slot it could be in" reasoning as
+        // updateOpportunity above.
         const updated = action.payload;
         const index = state.risks.findIndex((r) => r.id === updated.id);
         if (index !== -1) state.risks[index] = updated;
+        const pipelineIndex = state.pipelineRisks.findIndex((r) => r.id === updated.id);
+        if (pipelineIndex !== -1) state.pipelineRisks[pipelineIndex] = updated;
       })
       .addCase(deleteRisk.fulfilled, (state, action) => {
         state.risks = state.risks.filter((r) => r.id !== action.payload);
+        state.pipelineRisks = state.pipelineRisks.filter((r) => r.id !== action.payload);
+      })
+      .addCase(fetchRisksForCustomer.pending, (state) => {
+        state.pipelineRisksLoading = true;
+        state.pipelineRisksError = null;
+      })
+      .addCase(fetchRisksForCustomer.fulfilled, (state, action) => {
+        state.pipelineRisksLoading = false;
+        state.pipelineRisks = action.payload;
+      })
+      .addCase(fetchRisksForCustomer.rejected, (state, action) => {
+        state.pipelineRisksLoading = false;
+        state.pipelineRisksError = action.payload ?? 'Could not load risks.';
+      })
+      .addCase(fetchRisksForAccount.pending, (state) => {
+        state.pipelineRisksLoading = true;
+        state.pipelineRisksError = null;
+      })
+      .addCase(fetchRisksForAccount.fulfilled, (state, action) => {
+        state.pipelineRisksLoading = false;
+        state.pipelineRisks = action.payload;
+      })
+      .addCase(fetchRisksForAccount.rejected, (state, action) => {
+        state.pipelineRisksLoading = false;
+        state.pipelineRisksError = action.payload ?? 'Could not load risks.';
       })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
@@ -1689,5 +1938,6 @@ export const {
   clearTickets,
   clearCalendarEvents,
   clearContacts,
+  clearPipelineData,
 } = customersSlice.actions;
 export default customersSlice.reducer;

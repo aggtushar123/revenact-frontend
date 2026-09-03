@@ -9,16 +9,32 @@ import {
 } from 'lucide-react';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { ActivityFeed, PinnedAttributes, ContactsTab } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, ContactsTab, PipelinesTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchContactsForAccount, clearContacts } from '../../features/customers/customersSlice';
+import {
+  fetchContactsForAccount,
+  clearContacts,
+  fetchOpportunitiesForAccount,
+  fetchRisksForAccount,
+  clearPipelineData,
+} from '../../features/customers/customersSlice';
 
 export function AccountDetails() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const dispatch = useAppDispatch();
-  const { contacts, contactsLoading, contactsError } = useAppSelector((state) => state.customers);
+  const {
+    contacts,
+    contactsLoading,
+    contactsError,
+    pipelineOpportunities,
+    pipelineOpportunitiesLoading,
+    pipelineOpportunitiesError,
+    pipelineRisks,
+    pipelineRisksLoading,
+    pipelineRisksError,
+  } = useAppSelector((state) => state.customers);
   const [activeTab, setActiveTab] = useState('General');
   const [is360Enabled, setIs360Enabled] = useState(true);
   const [isPinnedOpen, setIsPinnedOpen] = useState(true);
@@ -40,8 +56,11 @@ export function AccountDetails() {
   useEffect(() => {
     if (accountNavState?.account) {
       dispatch(fetchContactsForAccount({ customerId: account.orgId, accountId: account.revenactId }));
+      dispatch(fetchOpportunitiesForAccount({ customerId: account.orgId, accountId: account.revenactId }));
+      dispatch(fetchRisksForAccount({ customerId: account.orgId, accountId: account.revenactId }));
     } else {
       dispatch(clearContacts());
+      dispatch(clearPipelineData());
     }
   }, [dispatch, accountNavState, account]);
 
@@ -49,7 +68,7 @@ export function AccountDetails() {
     { name: 'General', count: null },
     { name: 'Organizations', count: 1 },
     { name: 'Contacts', count: contacts.length },
-    { name: 'Pipelines', count: 3 },
+    { name: 'Pipelines', count: pipelineOpportunities.length + pipelineRisks.length },
     { name: 'Custom Objects', count: 0 },
     { name: 'Success Plans', count: null },
     { name: 'Canvas List', count: null },
@@ -174,6 +193,17 @@ export function AccountDetails() {
             contacts={contacts}
             isLoading={contactsLoading}
             error={contactsError}
+            customerId={accountNavState?.account ? account.orgId : undefined}
+            accountId={accountNavState?.account ? account.revenactId : undefined}
+          />
+        ) : activeTab === 'Pipelines' ? (
+          <PipelinesTab
+            opportunities={pipelineOpportunities}
+            opportunitiesLoading={pipelineOpportunitiesLoading}
+            opportunitiesError={pipelineOpportunitiesError}
+            risks={pipelineRisks}
+            risksLoading={pipelineRisksLoading}
+            risksError={pipelineRisksError}
             customerId={accountNavState?.account ? account.orgId : undefined}
             accountId={accountNavState?.account ? account.revenactId : undefined}
           />
