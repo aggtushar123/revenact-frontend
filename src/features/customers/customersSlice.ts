@@ -252,6 +252,34 @@ export interface ContactWritePayload {
   sentiment?: Contact['sentiment'];
 }
 
+// Mirrors revenact-backend's OpportunitySerializer field-for-field —
+// see docs/API_CONTRACTS.md -> customers -> Opportunity. `stage` is
+// the standalone Pipelines board's own 6 Kanban columns; `avatar`-style
+// `orgColor`/`orgInitials` from the old mock aren't fields here at all
+// — EntityAvatar derives both from `company_name`/`account_name` on
+// the frontend, same as every other entity's avatar in this codebase.
+export interface Opportunity {
+  id: number;
+  title: string;
+  mrr: string;
+  stage: 'discovery' | 'qualification' | 'solution_validation' | 'proposal_price_review' |
+    'negotiation' | 'closed_won';
+  stage_display: string;
+  priority: 'high' | 'medium' | 'low';
+  priority_display: string;
+  company_id: number;
+  company_name: string;
+  account_name: string | null;
+}
+
+// The fields the Add/Edit Opportunity form actually exposes.
+export interface OpportunityWritePayload {
+  title?: string;
+  mrr?: string;
+  stage?: Opportunity['stage'];
+  priority?: Opportunity['priority'];
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -424,6 +452,13 @@ interface CustomersState {
   selectedContact: Contact | null;
   selectedContactLoading: boolean;
   selectedContactError: string | null;
+  /** Every Opportunity the caller's organisation owns — the standalone
+   * Pipelines board's own "Opportunities" tab, unpaginated (a Kanban
+   * board needs every card in every column at once, see
+   * OpportunityListView's own docstring on the backend). */
+  opportunities: Opportunity[];
+  opportunitiesLoading: boolean;
+  opportunitiesError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -480,6 +515,9 @@ const initialState: CustomersState = {
   selectedContact: null,
   selectedContactLoading: false,
   selectedContactError: null,
+  opportunities: [],
+  opportunitiesLoading: false,
+  opportunitiesError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -944,6 +982,76 @@ export const deleteContact = createAsyncThunk<number, number, { rejectValue: str
   }
 );
 
+// Powers the standalone Pipelines board's own "Opportunities" tab —
+// every Opportunity the caller's organisation owns, org-level and
+// account-level alike. Unpaginated (see OpportunityListView's own
+// docstring) — a plain array, not a paginated envelope like
+// fetchAllContacts.
+export const fetchOpportunities = createAsyncThunk<Opportunity[], void, { rejectValue: string }>(
+  'customers/fetchOpportunities',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Opportunity[]>('/opportunities/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load opportunities.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// `customerId`/`accountId` — exactly one — become `customer_id`/
+// `account_id` in the POST body; neither is a real OpportunitySerializer
+// field, OpportunityListView's own perform_create reads them straight
+// off the request to resolve which parent to create under (see that
+// view's own docstring on the backend). Unlike createContactForCustomer,
+// this thunk's own extraReducers can safely unshift the result straight
+// into `opportunities` — there's only the one board-wide list to land
+// in, not two possible slots.
+export const createOpportunity = createAsyncThunk<
+  Opportunity,
+  { customerId?: number; accountId?: number } & OpportunityWritePayload & { title: string },
+  { rejectValue: string }
+>('customers/createOpportunity', async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
+  const body =
+    accountId !== undefined
+      ? { ...data, account_id: accountId }
+      : { ...data, customer_id: customerId };
+  try {
+    return await apiFetch<Opportunity>('/opportunities/', { method: 'POST', body });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not add opportunity.';
+    return rejectWithValue(message);
+  }
+});
+
+// PATCH /api/v1/opportunities/<id>/ — powers both the board's drag-
+// and-drop (stage only) and its full Edit form.
+export const updateOpportunity = createAsyncThunk<
+  Opportunity,
+  { id: number } & OpportunityWritePayload,
+  { rejectValue: string }
+>('customers/updateOpportunity', async ({ id, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Opportunity>(`/opportunities/${id}/`, { method: 'PATCH', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not update opportunity.';
+    return rejectWithValue(message);
+  }
+});
+
+export const deleteOpportunity = createAsyncThunk<number, number, { rejectValue: string }>(
+  'customers/deleteOpportunity',
+  async (id, { rejectWithValue }) => {
+    try {
+      await apiFetch<null>(`/opportunities/${id}/`, { method: 'DELETE' });
+      return id;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not delete opportunity.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -1382,6 +1490,35 @@ const customersSlice = createSlice({
         state.contacts = state.contacts.filter((c) => c.id !== id);
         state.allContacts = state.allContacts.filter((c) => c.id !== id);
         state.allContactsCount = Math.max(0, state.allContactsCount - 1);
+      })
+      .addCase(fetchOpportunities.pending, (state) => {
+        state.opportunitiesLoading = true;
+        state.opportunitiesError = null;
+      })
+      .addCase(fetchOpportunities.fulfilled, (state, action) => {
+        state.opportunitiesLoading = false;
+        state.opportunities = action.payload;
+      })
+      .addCase(fetchOpportunities.rejected, (state, action) => {
+        state.opportunitiesLoading = false;
+        state.opportunitiesError = action.payload ?? 'Could not load opportunities.';
+      })
+      // createOpportunity/updateOpportunity/deleteOpportunity's own
+      // rejections are shown inline in the form/board instead (same
+      // pattern as Contact's own create/update/delete) — no .rejected
+      // case needed for any of them here. Unlike Contact, create can
+      // safely patch `opportunities` directly too — there's only the
+      // one board-wide list an Opportunity could land in.
+      .addCase(createOpportunity.fulfilled, (state, action) => {
+        state.opportunities.unshift(action.payload);
+      })
+      .addCase(updateOpportunity.fulfilled, (state, action) => {
+        const updated = action.payload;
+        const index = state.opportunities.findIndex((o) => o.id === updated.id);
+        if (index !== -1) state.opportunities[index] = updated;
+      })
+      .addCase(deleteOpportunity.fulfilled, (state, action) => {
+        state.opportunities = state.opportunities.filter((o) => o.id !== action.payload);
       })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's

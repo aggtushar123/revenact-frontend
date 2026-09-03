@@ -152,6 +152,9 @@ function renderNavbar(
         selectedContact,
         selectedContactLoading: false,
         selectedContactError: null,
+        opportunities: [],
+        opportunitiesLoading: false,
+        opportunitiesError: null,
       },
     },
   });
