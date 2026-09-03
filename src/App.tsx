@@ -135,7 +135,7 @@ function App() {
           </Route>
 
           <Route path="pipelines">
-            <Route index element={<Navigate to="board" replace />} />
+            <Route index element={<Navigate to="list" replace />} />
             <Route path="list" element={<PipelinesPage view="list" />} />
             <Route path="board" element={<PipelinesPage view="board" />} />
           </Route>
