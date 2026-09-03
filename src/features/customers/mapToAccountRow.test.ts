@@ -21,6 +21,7 @@ function account(overrides: Partial<Account> = {}): Account {
   return {
     id: 1,
     customer: 6,
+    customer_name: 'Apple Inc',
     name: 'North America Enterprise',
     domain: '',
     address: '',

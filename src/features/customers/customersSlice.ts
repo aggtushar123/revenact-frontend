@@ -69,6 +69,12 @@ export interface Customer {
 export interface Account {
   id: number;
   customer: number;
+  /** The parent Customer's own name — only meaningful (and only
+   * actually needed) on the standalone Accounts page, which spans
+   * every Customer; harmless extra field everywhere else this
+   * interface is used, same reasoning as Contact/Opportunity/Risk's
+   * own `company_name`. */
+  customer_name: string;
   name: string;
   domain: string;
   /** Falls back to the parent Customer's own value when blank — see
@@ -407,6 +413,17 @@ interface CustomersState {
   accountsForCustomer: Account[];
   accountsLoading: boolean;
   accountsError: string | null;
+  /** Powers the standalone Accounts page (`/accounts/list`) — every
+   * Account across every Customer the tenant has, paginated. Same
+   * "raw path in, paginated page out" shape as `allContacts`, and
+   * deliberately separate from `accountsForCustomer` above for the
+   * same reason `allContacts` is separate from `contacts`. */
+  allAccounts: Account[];
+  allAccountsCount: number;
+  allAccountsNext: string | null;
+  allAccountsPrevious: string | null;
+  allAccountsLoading: boolean;
+  allAccountsError: string | null;
   /** Activities for whichever Customer or Account ActivityFeed's
    * "Activities" filter is currently showing — a single slot, same
    * reasoning as selectedCustomer/accountsForCustomer: only one
@@ -529,6 +546,12 @@ const initialState: CustomersState = {
   accountsForCustomer: [],
   accountsLoading: false,
   accountsError: null,
+  allAccounts: [],
+  allAccountsCount: 0,
+  allAccountsNext: null,
+  allAccountsPrevious: null,
+  allAccountsLoading: false,
+  allAccountsError: null,
   activities: [],
   activitiesLoading: false,
   activitiesError: null,
@@ -680,6 +703,31 @@ export const updateAccount = createAsyncThunk<
     return rejectWithValue(message);
   }
 });
+
+interface AccountsPage {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Account[];
+}
+
+// Powers the standalone Accounts page (/accounts/list) — spans every
+// Customer the tenant owns, unlike fetchAccountsForCustomer above. Same
+// "raw path in, paginated page out" shape as fetchAllContacts: pass a
+// full `/accounts/?search=...&company=...` path for a fresh filtered
+// fetch, or one of the response's own next/previous links to page
+// through it.
+export const fetchAllAccounts = createAsyncThunk<AccountsPage, string | void, { rejectValue: string }>(
+  'customers/fetchAllAccounts',
+  async (url, { rejectWithValue }) => {
+    try {
+      return await apiFetch<AccountsPage>(url || '/accounts/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load accounts.';
+      return rejectWithValue(message);
+    }
+  }
+);
 
 // Powers ActivityFeed's "Activities" filter on the Organization Details
 // page's General tab — every organization-level Activity for one
@@ -1495,6 +1543,21 @@ const customersSlice = createSlice({
         state.accountsLoading = false;
         state.accountsError = action.payload ?? 'Could not load accounts.';
       })
+      .addCase(fetchAllAccounts.pending, (state) => {
+        state.allAccountsLoading = true;
+        state.allAccountsError = null;
+      })
+      .addCase(fetchAllAccounts.fulfilled, (state, action) => {
+        state.allAccountsLoading = false;
+        state.allAccounts = action.payload.results;
+        state.allAccountsCount = action.payload.count;
+        state.allAccountsNext = action.payload.next;
+        state.allAccountsPrevious = action.payload.previous;
+      })
+      .addCase(fetchAllAccounts.rejected, (state, action) => {
+        state.allAccountsLoading = false;
+        state.allAccountsError = action.payload ?? 'Something went wrong.';
+      })
       // fetchActivitiesForCustomer and fetchActivitiesForAccount share the
       // same activities/activitiesLoading/activitiesError slots — only one
       // of the two is ever in flight at a time, same reasoning as the
@@ -1918,14 +1981,24 @@ const customersSlice = createSlice({
         }
       })
       // createAccount/updateAccount's own rejections are shown inline in
-      // their modal form instead, same pattern as above.
-      .addCase(createAccount.fulfilled, (state, action) => {
-        state.accountsForCustomer.unshift(action.payload);
-      })
+      // their modal form instead, same pattern as above. No .fulfilled
+      // case for createAccount — now that there are two possible lists
+      // an Account could land in (the Organization Details page's own
+      // `accountsForCustomer`, or the standalone Accounts page's own
+      // `allAccounts`), this thunk doesn't know which one to patch, so
+      // both callers refetch their own list instead via AccountFormModal's
+      // own `onSaved`, same "caller refetches" reasoning as Contact's
+      // own createContactForCustomer.
       .addCase(updateAccount.fulfilled, (state, action) => {
+        // Update can safely patch both directly, though — it never adds
+        // a new entry, only replaces an existing one by id if present,
+        // same "patch every slot it could be in" reasoning as
+        // updateContact/updateOpportunity/updateRisk.
         const updated = action.payload;
-        const index = state.accountsForCustomer.findIndex((a) => a.id === updated.id);
-        if (index !== -1) state.accountsForCustomer[index] = updated;
+        const inAccountsForCustomer = state.accountsForCustomer.findIndex((a) => a.id === updated.id);
+        if (inAccountsForCustomer !== -1) state.accountsForCustomer[inAccountsForCustomer] = updated;
+        const inAllAccounts = state.allAccounts.findIndex((a) => a.id === updated.id);
+        if (inAllAccounts !== -1) state.allAccounts[inAllAccounts] = updated;
       });
   },
 });

@@ -50,15 +50,18 @@ export function Navbar() {
   const organization =
     orgId && selectedCustomer?.id === orgId ? mapCustomerToOrgRow(selectedCustomer) : null;
 
-  // Detect account details path. pages/accounts/Details.tsx itself still
-  // falls back to ACCOUNTS_DATA mock data on a direct visit/refresh (a
-  // real backend id from the Accounts tab never matches the mock's own
-  // 'acc-N' string ids) — but a click through from that real Accounts
-  // tab (see organizations/Details.tsx) carries the real AccountRow via
-  // navigation `state`, the same one that page's own body now renders,
-  // so this header shows the org/account actually clicked instead of
-  // whatever the mock falls back to.
-  const accountMatch = location.pathname.match(/\/accounts\/([^/]+)/);
+  // Detect account details path (/accounts/:id — not /accounts/list,
+  // which \d+ excludes, same reasoning as the Contacts breadcrumb
+  // below). pages/accounts/Details.tsx itself still falls back to
+  // ACCOUNTS_DATA mock data on a direct visit/refresh (a real backend
+  // id from the Accounts tab never matches the mock's own 'acc-N'
+  // string ids) — but a click through from that real Accounts tab (see
+  // organizations/Details.tsx, or the standalone Accounts list page)
+  // carries the real AccountRow via navigation `state`, the same one
+  // that page's own body now renders, so this header shows the
+  // org/account actually clicked instead of whatever the mock falls
+  // back to.
+  const accountMatch = location.pathname.match(/\/accounts\/(\d+)/);
   const accountId = accountMatch ? accountMatch[1] : null;
   const accountNavState = location.state as { account: AccountRow } | null;
   const account = accountId

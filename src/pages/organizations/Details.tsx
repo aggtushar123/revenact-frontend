@@ -391,9 +391,17 @@ interface AccountsTabProps {
 
 function AccountsTab({ accounts, rawAccounts, customerId, isLoading, error }: AccountsTabProps) {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
   const editingAccount = rawAccounts.find((a) => a.id === editingAccountId) ?? null;
+
+  // createAccount doesn't know which list (this tab's own
+  // `accountsForCustomer`, or the standalone Accounts page's own
+  // `allAccounts`) to land a newly-created Account in, so this tab
+  // refetches its own list after a successful Add — same "caller
+  // refetches" reasoning as ContactsTab's own refetch.
+  const refetch = () => dispatch(fetchAccountsForCustomer(customerId));
 
   return (
     <div className="flex flex-col w-full h-full gap-4 max-w-7xl mx-auto">
@@ -557,7 +565,7 @@ function AccountsTab({ accounts, rawAccounts, customerId, isLoading, error }: Ac
       </div>
 
       {showAddModal && (
-        <AccountFormModal customerId={customerId} onClose={() => setShowAddModal(false)} />
+        <AccountFormModal customerId={customerId} onClose={() => setShowAddModal(false)} onSaved={refetch} />
       )}
       {editingAccount && (
         <AccountFormModal

@@ -7,15 +7,30 @@ import type { Account } from '../../features/customers/customersSlice';
 import type { User } from '../../features/auth/authSlice';
 
 interface AccountFormModalProps {
-  /** The organization this account belongs to (for Add) or already
-   * belongs to (for Edit) — addresses the nested /customers/<id>/accounts/
-   * URL. Never sent as part of the write payload itself; the backend
-   * takes it from the URL, same as Customer takes `organisation` from
-   * the caller rather than the request body. */
-  customerId: number;
+  /** The organization this account belongs to — fixed when opened from
+   * the Organization Details page's own Accounts tab (already inside
+   * one specific organisation's context), addressing the nested
+   * /customers/<id>/accounts/ URL directly. Omitted on the standalone
+   * Accounts page, which shows a Company picker instead (built from
+   * `companies`) — same `customerId?`/`companies?` duality as
+   * ContactFormModal. Never sent as part of the write payload itself;
+   * the backend takes it from the URL, same as Customer takes
+   * `organisation` from the caller rather than the request body. */
+  customerId?: number;
   /** Present for Edit, omitted for Add. */
   account?: Account;
+  /** Add-only, and only when `customerId` isn't already fixed: every
+   * company to choose from. */
+  companies?: { id: number; name: string }[];
   onClose: () => void;
+  /** Called after a successful *create* only — createAccount doesn't
+   * know which list (the Accounts tab's own `accountsForCustomer`, or
+   * the standalone Accounts page's own `allAccounts`) to land in, so
+   * the caller refetches its own list instead, same "caller refetches"
+   * reasoning as ContactFormModal's own `onSaved`. Edit never calls
+   * this — updateAccount's own extraReducers already patch both lists
+   * directly. */
+  onSaved?: () => void;
 }
 
 // Same product decision as OrganizationFormModal: only what's editable
@@ -34,10 +49,11 @@ const LIFECYCLE_OPTIONS: { value: Account['lifecycle_stage']; label: string }[] 
   { value: 'other', label: 'Other' },
 ];
 
-export function AccountFormModal({ customerId, account, onClose }: AccountFormModalProps) {
+export function AccountFormModal({ customerId, account, companies, onClose, onSaved }: AccountFormModalProps) {
   const dispatch = useAppDispatch();
   const isEdit = !!account;
 
+  const [selectedCompanyId, setSelectedCompanyId] = useState(customerId ? String(customerId) : '');
   const [name, setName] = useState(account?.name ?? '');
   const [domain, setDomain] = useState(account?.domain ?? '');
   const [ownerId, setOwnerId] = useState<string>(account?.owner ? String(account.owner.id) : '');
@@ -64,6 +80,12 @@ export function AccountFormModal({ customerId, account, onClose }: AccountFormMo
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!isEdit && customerId === undefined && !selectedCompanyId) {
+      setError('Pick a company.');
+      return;
+    }
+
     setIsSaving(true);
     const data = {
       name: name.trim(),
@@ -74,9 +96,13 @@ export function AccountFormModal({ customerId, account, onClose }: AccountFormMo
     };
     try {
       if (isEdit) {
-        await dispatch(updateAccount({ customerId, id: account.id, ...data })).unwrap();
+        // No onSaved() — updateAccount's own extraReducers already
+        // patch every list this Account could be showing in.
+        await dispatch(updateAccount({ customerId: account.customer, id: account.id, ...data })).unwrap();
       } else {
-        await dispatch(createAccount({ customerId, ...data })).unwrap();
+        const effectiveCustomerId = customerId ?? Number(selectedCompanyId);
+        await dispatch(createAccount({ customerId: effectiveCustomerId, ...data })).unwrap();
+        onSaved?.();
       }
       onClose();
     } catch (err) {
@@ -108,6 +134,24 @@ export function AccountFormModal({ customerId, account, onClose }: AccountFormMo
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {isEdit ? (
+            <div>
+              <label className="block text-[12px] font-semibold text-ink-muted mb-1">Organization</label>
+              <p className="text-[13px] text-ink-faint px-3 py-2 bg-subtle/50 border border-line-subtle rounded-lg">
+                {account.customer_name}
+              </p>
+            </div>
+          ) : customerId === undefined ? (
+            <SelectField label="Organization" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
+              <option value="">Select an organization…</option>
+              {(companies ?? []).map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </SelectField>
+          ) : null}
+
           <TextField label="Name" value={name} onChange={setName} required autoFocus />
           <TextField label="Domain" value={domain} onChange={setDomain} placeholder="na.acme.com" />
           <div className="grid grid-cols-2 gap-3">
@@ -208,11 +252,13 @@ function SelectField({
   label,
   value,
   onChange,
+  required,
   children,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  required?: boolean;
   children: ReactNode;
 }) {
   const id = useId();
@@ -220,6 +266,7 @@ function SelectField({
     <div>
       <label htmlFor={id} className="block text-[12px] font-semibold text-ink-muted mb-1">
         {label}
+        {required && <span className="text-danger"> *</span>}
       </label>
       <select
         id={id}

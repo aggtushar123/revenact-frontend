@@ -454,7 +454,7 @@ describe('customersSlice', () => {
     });
 
     describe('createAccount/updateAccount (Add/Edit Account)', () => {
-      it('createAccount POSTs to /customers/<id>/accounts/ and unshifts the result', async () => {
+      it('createAccount POSTs to /customers/<id>/accounts/', async () => {
         mockFetchOnce(200, [account]);
         const store = makeStore();
         await store.dispatch(fetchAccountsForCustomer(globex.id));
@@ -468,7 +468,14 @@ describe('customersSlice', () => {
           expect.stringContaining(`/customers/${globex.id}/accounts/`),
           expect.objectContaining({ method: 'POST', body: JSON.stringify({ name: 'EMEA' }) })
         );
-        expect(store.getState().customers.accountsForCustomer).toEqual([created, account]);
+        // No auto-patch here — now that an Account could land in either
+        // accountsForCustomer (this Organization Details page's own
+        // Accounts tab) or the standalone Accounts page's own
+        // allAccounts, createAccount doesn't know which; the caller
+        // refetches its own list instead (see AccountFormModal's own
+        // onSaved), same "caller refetches" reasoning as
+        // createContactForCustomer.
+        expect(store.getState().customers.accountsForCustomer).toEqual([account]);
       });
 
       it('updateAccount PATCHes /customers/<id>/accounts/<id>/ and replaces the matching entry in place', async () => {

@@ -11,6 +11,7 @@ import { List } from './pages/organizations/List';
 import { Board } from './pages/organizations/Board';
 import { Details as OrganizationDetails } from './pages/organizations/Details';
 import { AccountDetails } from './pages/accounts/Details';
+import { List as AccountsList } from './pages/accounts/List';
 import { CopilotIndex } from './pages/copilot/Index';
 import { CreateScenario } from './pages/scenarios/CreateScenario';
 import { SettingsPage } from './pages/settings/SettingsPage';
@@ -101,7 +102,11 @@ function App() {
             <Route path=":id" element={<OrganizationDetails />} />
           </Route>
 
-          <Route path="accounts/:id" element={<AccountDetails />} />
+          <Route path="accounts">
+            <Route index element={<Navigate to="list" replace />} />
+            <Route path="list" element={<AccountsList />} />
+            <Route path=":id" element={<AccountDetails />} />
+          </Route>
 
           <Route path="copilot" element={<CopilotIndex />} />
           <Route path="scenarios/create" element={<CreateScenario />} />

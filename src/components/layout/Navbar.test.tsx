@@ -119,6 +119,12 @@ function renderNavbar(
         accountsForCustomer: [],
         accountsLoading: false,
         accountsError: null,
+        allAccounts: [],
+        allAccountsCount: 0,
+        allAccountsNext: null,
+        allAccountsPrevious: null,
+        allAccountsLoading: false,
+        allAccountsError: null,
         activities: [],
         activitiesLoading: false,
         activitiesError: null,
@@ -325,6 +331,12 @@ describe('Navbar account breadcrumb (/accounts/:id)', () => {
     // just that *some* account header renders instead of the header
     // falling through to the generic path-based title.
     expect(screen.queryByText('Accounts', { selector: 'h1' })).not.toBeInTheDocument();
+  });
+
+  it('does not show an account header on /accounts/list (not a numeric id)', () => {
+    renderNavbar('/accounts/list');
+
+    expect(screen.queryByRole('heading', { name: 'APAC Division' })).not.toBeInTheDocument();
   });
 });
 
