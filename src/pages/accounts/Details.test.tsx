@@ -418,4 +418,55 @@ describe('AccountDetails page (/accounts/:id)', () => {
       expect(await screen.findByText('No calendar events')).toBeInTheDocument();
     });
   });
+
+  describe('Contacts tab (real Contacts, own nested endpoint — a sibling tab, not an ActivityFeed filter)', () => {
+    it('fetches and renders this account\'s own contacts, from its own nested endpoint', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn((url: string) =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () =>
+              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/contacts/`)
+                ? [
+                    {
+                      id: 1,
+                      name: 'Priya Nair',
+                      role: 'economic_buyer',
+                      role_display: 'Economic Buyer',
+                      email: 'priya.nair@kraftheinz.com',
+                      phone: '+1 (312) 555-0202',
+                      status: 'active',
+                      sentiment: 'positive',
+                      last_contacted_at: '2026-08-31T00:00:00Z',
+                      company_id: 9,
+                      company_name: 'Kraft Heinz',
+                      account_name: 'APAC Division',
+                    },
+                  ]
+                : [],
+          })
+        )
+      );
+
+      renderAccountDetails({ account: apacDivision });
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
+
+      expect(await screen.findByText('Priya Nair')).toBeInTheDocument();
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/contacts/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('shows no contacts (not a stale or hardcoded set) when reached without navigation state', async () => {
+      renderAccountDetails();
+      const user = userEvent.setup();
+      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
+
+      expect(await screen.findByText('No contacts found.')).toBeInTheDocument();
+    });
+  });
 });

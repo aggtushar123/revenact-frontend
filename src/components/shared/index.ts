@@ -6,3 +6,6 @@ export type { EntityAvatarProps } from './EntityAvatar';
 
 export { PinnedAttributes } from './PinnedAttributes';
 export type { PinnedAttributesProps, AttributeDef, AttributeType } from './PinnedAttributes';
+
+export { ContactsTab } from './ContactsTab';
+export type { ContactsTabProps } from './ContactsTab';

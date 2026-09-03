@@ -6,6 +6,7 @@
 // lifecycle mean the same thing as a Customer's, just at a finer grain —
 // see the backend's Account model docstring).
 
+import { formatDistanceToNowStrict } from 'date-fns';
 import type { Customer } from './customersSlice';
 import type { LifecycleCategory } from '../../components/organizations/tableData';
 
@@ -33,6 +34,19 @@ export function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
   const letters = (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '');
   return letters.toUpperCase() || '?';
+}
+
+export function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+// Contact.last_contacted_at is a real datetime (not the old mock's
+// frozen "2 hours ago" string) — this is what keeps the Contacts
+// tables' own display accurate as time passes instead of drifting
+// stale the way a stored string would.
+export function formatRelativeTime(iso: string | null): string {
+  if (!iso) return '—';
+  return `${formatDistanceToNowStrict(new Date(iso))} ago`;
 }
 
 export const HEALTH_COLORS: Record<Customer['health_category'], string> = {

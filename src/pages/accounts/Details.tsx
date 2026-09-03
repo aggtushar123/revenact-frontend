@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import {
   RefreshCw,
@@ -9,12 +9,16 @@ import {
 } from 'lucide-react';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { ActivityFeed, PinnedAttributes } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, ContactsTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { fetchContactsForAccount, clearContacts } from '../../features/customers/customersSlice';
 
 export function AccountDetails() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const dispatch = useAppDispatch();
+  const { contacts, contactsLoading, contactsError } = useAppSelector((state) => state.customers);
   const [activeTab, setActiveTab] = useState('General');
   const [is360Enabled, setIs360Enabled] = useState(true);
   const [isPinnedOpen, setIsPinnedOpen] = useState(true);
@@ -29,10 +33,22 @@ export function AccountDetails() {
   const accountNavState = location.state as { account: AccountRow } | null;
   const account = accountNavState?.account ?? ACCOUNTS_DATA.find((a) => a.id === id) ?? ACCOUNTS_DATA[0];
 
+  // Same "only fetch real data when reached with a real, already-known
+  // parent customer id" convention as ActivityFeed's own `customerId`
+  // prop (see this component's JSX below) — a mock-fallback account has
+  // no real customer/account id pair to fetch Contacts for.
+  useEffect(() => {
+    if (accountNavState?.account) {
+      dispatch(fetchContactsForAccount({ customerId: account.orgId, accountId: account.revenactId }));
+    } else {
+      dispatch(clearContacts());
+    }
+  }, [dispatch, accountNavState, account]);
+
   const tabs = [
     { name: 'General', count: null },
     { name: 'Organizations', count: 1 },
-    { name: 'Contacts', count: 6 },
+    { name: 'Contacts', count: contacts.length },
     { name: 'Pipelines', count: 3 },
     { name: 'Custom Objects', count: 0 },
     { name: 'Success Plans', count: null },
@@ -153,6 +169,8 @@ export function AccountDetails() {
               </div>
             </div>
           </div>
+        ) : activeTab === 'Contacts' ? (
+          <ContactsTab contacts={contacts} isLoading={contactsLoading} error={contactsError} />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-ink-faint py-24 bg-surface m-6 rounded-3xl border-2 border-dashed border-line-subtle shadow-inner">
             <div className="w-20 h-20 bg-subtle rounded-[28px] flex items-center justify-center mb-6 shadow-xs border border-line-subtle">

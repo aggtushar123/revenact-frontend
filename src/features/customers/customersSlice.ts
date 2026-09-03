@@ -197,6 +197,47 @@ export interface CalendarEvent {
   attendee_count: number;
 }
 
+// Mirrors revenact-backend's ContactSerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Contact. Unlike Activity/
+// Email/Task/Note/Ticket/CalendarEvent above (each one filter within
+// ActivityFeed), Contact backs its own sibling tab — the Organization
+// Details page's Contacts tab, the standalone Account page's Contacts
+// tab, and the global /contacts/list page — so it also carries
+// `company_id`/`company_name`/`account_name`, which those other
+// models don't need (their parent scope is always already known from
+// which endpoint fetched them; the global list page spans every
+// Customer/Account at once, so it can't assume that). `account_name`
+// is `null` for an organization-level contact. No `avatar` — derived
+// from `name` on the frontend, same as every other entity's avatar in
+// this codebase.
+export interface Contact {
+  id: number;
+  name: string;
+  role: 'executive_sponsor' | 'champion' | 'economic_buyer' | 'technical_lead' |
+    'decision_maker' | 'influencer' | 'finance_manager' | 'other';
+  role_display: string;
+  email: string;
+  phone: string;
+  status: 'active' | 'inactive';
+  sentiment: 'positive' | 'neutral' | 'negative';
+  last_contacted_at: string | null;
+  company_id: number;
+  company_name: string;
+  account_name: string | null;
+}
+
+// Mirrors revenact-backend's ContactStatsView response exactly — see
+// docs/API_CONTRACTS.md -> GET /api/v1/contacts/stats/.
+export interface ContactStats {
+  total: number;
+  active: number;
+  sentiment: { positive: number; neutral: number; negative: number };
+  sentiment_pct: { positive: number; neutral: number; negative: number };
+  /** null (not 0) when there were no contacts yet 30 days ago — a
+   * percentage change off a zero base is undefined, not zero. */
+  growth_30d_pct: number | null;
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -338,6 +379,31 @@ interface CustomersState {
   calendarEvents: CalendarEvent[];
   calendarEventsLoading: boolean;
   calendarEventsError: string | null;
+  /** Contacts for whichever Customer or Account's own Contacts tab is
+   * currently showing — same single-slot reasoning as `activities`/
+   * `emails`/`tasks`/`notes`/`tickets`/`calendarEvents` above, even
+   * though Contact is its own sibling tab rather than an ActivityFeed
+   * filter (see Contact model's own docstring). */
+  contacts: Contact[];
+  contactsLoading: boolean;
+  contactsError: string | null;
+  /** The global, paginated, searchable/company-filterable contact list
+   * for the standalone /contacts/list page — separate from `contacts`
+   * above the same way `customers` (the Organizations list) is
+   * separate from `selectedCustomer`: this page isn't scoped to one
+   * Customer/Account at all. */
+  allContacts: Contact[];
+  allContactsCount: number;
+  allContactsNext: string | null;
+  allContactsPrevious: string | null;
+  allContactsLoading: boolean;
+  allContactsError: string | null;
+  /** Total/Active/Sentiment/Growth rollups for the standalone
+   * /contacts/list page's MetricsPanel — null until the first fetch
+   * resolves, same reasoning as `stats` (Customer's own). */
+  contactStats: ContactStats | null;
+  contactStatsLoading: boolean;
+  contactStatsError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -379,6 +445,18 @@ const initialState: CustomersState = {
   calendarEvents: [],
   calendarEventsLoading: false,
   calendarEventsError: null,
+  contacts: [],
+  contactsLoading: false,
+  contactsError: null,
+  allContacts: [],
+  allContactsCount: 0,
+  allContactsNext: null,
+  allContactsPrevious: null,
+  allContactsLoading: false,
+  allContactsError: null,
+  contactStats: null,
+  contactStatsLoading: false,
+  contactStatsError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -679,6 +757,78 @@ export const fetchCalendarEventsForAccount = createAsyncThunk<
   }
 );
 
+// Powers the Organization Details page's own Contacts tab — every
+// organization-level Contact for one Customer.
+export const fetchContactsForCustomer = createAsyncThunk<
+  Contact[],
+  number,
+  { rejectValue: string }
+>('customers/fetchContactsForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Contact[]>(`/customers/${customerId}/contacts/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load contacts.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers the standalone Account page's own Contacts tab — every
+// account-level Contact for one Account.
+export const fetchContactsForAccount = createAsyncThunk<
+  Contact[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>(
+  'customers/fetchContactsForAccount',
+  async ({ customerId, accountId }, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Contact[]>(
+        `/customers/${customerId}/accounts/${accountId}/contacts/`
+      );
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load contacts.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+interface ContactsPage {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Contact[];
+}
+
+// Powers the standalone /contacts/list page — spans every Customer/
+// Account the tenant owns, unlike the two entity-scoped thunks above.
+// Same "raw path in, paginated page out" shape as fetchCustomers: pass
+// a full `/contacts/?search=...&company=...` path for a fresh
+// filtered fetch, or one of the response's own next/previous links to
+// page through it, same reasoning as fetchCustomers's own docstring.
+export const fetchAllContacts = createAsyncThunk<ContactsPage, string | void, { rejectValue: string }>(
+  'customers/fetchAllContacts',
+  async (url, { rejectWithValue }) => {
+    try {
+      return await apiFetch<ContactsPage>(url || '/contacts/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load contacts.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const fetchContactStats = createAsyncThunk<ContactStats, void, { rejectValue: string }>(
+  'customers/fetchContactStats',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<ContactStats>('/contacts/stats/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load contact stats.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -757,6 +907,14 @@ const customersSlice = createSlice({
       state.calendarEvents = [];
       state.calendarEventsLoading = false;
       state.calendarEventsError = null;
+    },
+    // Same reasoning as clearActivities/clearEmails/clearTasks/
+    // clearNotes/clearTickets/clearCalendarEvents above, for a
+    // Customer/Account's own Contacts tab.
+    clearContacts(state) {
+      state.contacts = [];
+      state.contactsLoading = false;
+      state.contactsError = null;
     },
   },
   extraReducers: (builder) => {
@@ -1018,6 +1176,62 @@ const customersSlice = createSlice({
         state.calendarEventsLoading = false;
         state.calendarEventsError = action.payload ?? 'Could not load calendar events.';
       })
+      // fetchContactsForCustomer and fetchContactsForAccount share the
+      // same contacts/contactsLoading/contactsError slots, same
+      // reasoning as the other feed filters' slots above.
+      .addCase(fetchContactsForCustomer.pending, (state) => {
+        state.contactsLoading = true;
+        state.contactsError = null;
+        state.contacts = [];
+      })
+      .addCase(fetchContactsForCustomer.fulfilled, (state, action) => {
+        state.contactsLoading = false;
+        state.contacts = action.payload;
+      })
+      .addCase(fetchContactsForCustomer.rejected, (state, action) => {
+        state.contactsLoading = false;
+        state.contactsError = action.payload ?? 'Could not load contacts.';
+      })
+      .addCase(fetchContactsForAccount.pending, (state) => {
+        state.contactsLoading = true;
+        state.contactsError = null;
+        state.contacts = [];
+      })
+      .addCase(fetchContactsForAccount.fulfilled, (state, action) => {
+        state.contactsLoading = false;
+        state.contacts = action.payload;
+      })
+      .addCase(fetchContactsForAccount.rejected, (state, action) => {
+        state.contactsLoading = false;
+        state.contactsError = action.payload ?? 'Could not load contacts.';
+      })
+      .addCase(fetchAllContacts.pending, (state) => {
+        state.allContactsLoading = true;
+        state.allContactsError = null;
+      })
+      .addCase(fetchAllContacts.fulfilled, (state, action) => {
+        state.allContactsLoading = false;
+        state.allContacts = action.payload.results;
+        state.allContactsCount = action.payload.count;
+        state.allContactsNext = action.payload.next;
+        state.allContactsPrevious = action.payload.previous;
+      })
+      .addCase(fetchAllContacts.rejected, (state, action) => {
+        state.allContactsLoading = false;
+        state.allContactsError = action.payload ?? 'Something went wrong.';
+      })
+      .addCase(fetchContactStats.pending, (state) => {
+        state.contactStatsLoading = true;
+        state.contactStatsError = null;
+      })
+      .addCase(fetchContactStats.fulfilled, (state, action) => {
+        state.contactStatsLoading = false;
+        state.contactStats = action.payload;
+      })
+      .addCase(fetchContactStats.rejected, (state, action) => {
+        state.contactStatsLoading = false;
+        state.contactStatsError = action.payload ?? 'Something went wrong.';
+      })
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -1066,5 +1280,6 @@ export const {
   clearNotes,
   clearTickets,
   clearCalendarEvents,
+  clearContacts,
 } = customersSlice.actions;
 export default customersSlice.reducer;

@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MessageSquare, RefreshCw, MoreHorizontal, CheckCircle, Globe, Mail, Phone, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, Sparkles, ExternalLink, Download, X } from 'lucide-react';
+import { MessageSquare, RefreshCw, MoreHorizontal, Globe, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, ExternalLink, Download, X } from 'lucide-react';
 import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { CONTACTS_DATA } from '../../components/organizations/contactsData';
-import { ActivityFeed, PinnedAttributes, EntityAvatar } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchCustomerById, fetchAccountsForCustomer } from '../../features/customers/customersSlice';
+import { fetchCustomerById, fetchAccountsForCustomer, fetchContactsForCustomer } from '../../features/customers/customersSlice';
 import type { Account } from '../../features/customers/customersSlice';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
 import { mapAccountToAccountRow } from '../../features/customers/mapToAccountRow';
@@ -20,19 +19,28 @@ export function Details() {
   const { id } = useParams<{ id: string }>();
   const orgId = parseInt(id || '0', 10);
   const dispatch = useAppDispatch();
-  const { selectedCustomer, selectedCustomerError, accountsForCustomer, accountsLoading, accountsError } =
-    useAppSelector((state) => state.customers);
+  const {
+    selectedCustomer,
+    selectedCustomerError,
+    accountsForCustomer,
+    accountsLoading,
+    accountsError,
+    contacts,
+    contactsLoading,
+    contactsError,
+  } = useAppSelector((state) => state.customers);
 
   useEffect(() => {
     dispatch(fetchCustomerById(orgId));
     dispatch(fetchAccountsForCustomer(orgId));
+    dispatch(fetchContactsForCustomer(orgId));
   }, [dispatch, orgId]);
 
-  // The General tab, PinnedAttributes panel, and ActivityFeed all render
-  // off this — Contacts/Pipelines/etc. below still use their own mock
-  // data (CONTACTS_DATA), which has no backend model yet. Accounts is now
-  // real too (one Customer has many Account rows — see
-  // customers/models.py:Account on the backend).
+  // The General tab, PinnedAttributes panel, ActivityFeed, and Contacts
+  // tab all render off this now — Pipelines/Custom Objects/etc. below
+  // still have no backend model. Accounts/Contacts are real (one
+  // Customer has many Account/Contact rows — see
+  // customers/models.py:Account/Contact on the backend).
   const organization = selectedCustomer ? mapCustomerToOrgRow(selectedCustomer) : null;
   const accounts = organization
     ? accountsForCustomer.map((a) =>
@@ -55,7 +63,7 @@ export function Details() {
   const tabs = [
     { name: 'General', count: null },
     { name: 'Accounts', count: accounts.length },
-    { name: 'Contacts', count: CONTACTS_DATA.filter(c => c.orgId === orgId).length },
+    { name: 'Contacts', count: contacts.length },
     { name: 'Pipelines', count: 1 },
     { name: 'Custom Objects', count: 2 },
     { name: 'Success Plans', count: null },
@@ -203,7 +211,9 @@ export function Details() {
             error={accountsError}
           />
         )}
-        {activeTab === 'Contacts' && <ContactsTab orgId={orgId} />}
+        {activeTab === 'Contacts' && (
+          <ContactsTab contacts={contacts} isLoading={contactsLoading} error={contactsError} />
+        )}
         {activeTab !== 'General' && activeTab !== 'Accounts' && activeTab !== 'Contacts' && (
           <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
             <Layout className="w-12 h-12 text-ink-faint mb-2" />
@@ -546,141 +556,6 @@ function HeaderCell({ label }: { label: string }) {
           </div>
        </div>
     </th>
-  );
-}
-
-function ContactsTab({ orgId }: { orgId: number }) {
-  const contacts = CONTACTS_DATA.filter(c => c.orgId === orgId);
-  
-  const stats = {
-    total: contacts.length,
-    decisionMakers: contacts.filter(c => c.role === 'Executive Sponsor' || c.role === 'Decision Maker' || c.role === 'Economic Buyer').length,
-    active: contacts.filter(c => c.status === 'Active').length,
-    positiveSentiment: contacts.filter(c => c.sentiment === 'Positive').length
-  };
-
-  return (
-    <div className="flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar p-6 pt-2">
-      {/* Contacts Summary Banner */}
-      <div className="max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-4 gap-4 bg-surface p-4 rounded-2xl border border-line-subtle shadow-sm shrink-0">
-        <ContactStatCard title="Total Contacts" value={stats.total.toString()} subtext="Across all departments" icon={<Layout className="w-4 h-4 text-accent" />} />
-        <ContactStatCard title="Decision Makers" value={stats.decisionMakers.toString()} subtext="High influence" icon={<Sparkles className="w-4 h-4 text-accent" />} />
-        <ContactStatCard title="Active Users" value={stats.active.toString()} subtext="Logged in last 30d" icon={<CheckCircle className="w-4 h-4 text-success" />} />
-        <ContactStatCard title="Avg Sentiment" value={`${stats.total > 0 ? Math.round((stats.positiveSentiment / stats.total) * 100) : 0}%`} subtext="Positive feedback" icon={<MessageSquare className="w-4 h-4 text-info" />} />
-      </div>
-
-      {/* Action Bar & Table */}
-      <div className="max-w-7xl w-full mx-auto bg-surface rounded-2xl border border-line-subtle shadow-sm flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-line-subtle bg-surface flex items-center justify-between gap-4">
-           <div className="relative flex-1 max-w-2xl">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-              <input type="text" placeholder="Search contacts by name, role or email..." className="w-full pl-10 pr-4 py-2 bg-subtle/30 border border-line rounded-lg text-[13px] focus:outline-none focus:ring-1 focus:ring-accent/10 placeholder:text-ink-faint" />
-           </div>
-           <div className="flex items-center gap-3">
-              <button className="flex items-center gap-2 px-6 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-all">
-                 <Plus className="w-4 h-4" />
-                 Add Contact
-              </button>
-              <button className="p-2 border border-line rounded-lg text-ink-faint hover:bg-subtle transition-colors">
-                 <Filter className="w-4 h-4" />
-              </button>
-              <button className="p-2 border border-line rounded-lg text-ink-faint hover:bg-subtle transition-colors">
-                 <Download className="w-4 h-4" />
-              </button>
-           </div>
-        </div>
-
-        {/* Contacts Table */}
-        <div className="overflow-x-auto min-h-[400px]">
-           <table className="w-full border-collapse">
-              <thead>
-                 <tr className="bg-surface border-b border-line-subtle">
-                    <th className="p-4 w-10"><input type="checkbox" className="rounded border-line-strong text-accent" /></th>
-                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Contact</th>
-                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Role</th>
-                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Status</th>
-                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Sentiment</th>
-                    <th className="p-4 text-left text-[11px] font-bold text-ink-faint uppercase tracking-wider">Last Contacted</th>
-                    <th className="p-4 text-center w-10"></th>
-                 </tr>
-              </thead>
-              <tbody>
-                 {contacts.map((contact) => (
-                   <tr key={contact.id} className="hover:bg-subtle border-b border-line-subtle transition-all cursor-pointer group">
-                     <td className="p-4"><input type="checkbox" className="rounded" onClick={(e) => e.stopPropagation()} /></td>
-                     <td className="p-4">
-                        <div className="flex items-center gap-3">
-                           <div className="w-9 h-9 rounded-full bg-accent-dim border border-accent/30 flex items-center justify-center text-[12px] font-bold text-accent shadow-xs">
-                              {contact.avatar}
-                           </div>
-                           <div className="flex flex-col">
-                              <span className="text-[13.5px] font-bold text-ink group-hover:text-accent transition-colors">{contact.name}</span>
-                              <span className="text-[11px] font-medium text-ink-faint lowercase">{contact.email}</span>
-                           </div>
-                        </div>
-                     </td>
-                     <td className="p-4">
-                        <span className="px-2.5 py-1 rounded-md bg-subtle border border-line-subtle text-[11.5px] font-bold text-ink-muted uppercase tracking-tight">
-                           {contact.role}
-                        </span>
-                     </td>
-                     <td className="p-4">
-                        <div className="flex items-center gap-2">
-                           <div className={`w-2 h-2 rounded-full ${contact.status === 'Active' ? 'bg-success' : 'bg-line-strong'}`} />
-                           <span className={`text-[13px] font-medium ${contact.status === 'Active' ? 'text-ink-muted' : 'text-ink-faint'}`}>{contact.status}</span>
-                        </div>
-                     </td>
-                     <td className="p-4">
-                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[11px] font-bold ${
-                          contact.sentiment === 'Positive' ? 'bg-success-dim border-success/30 text-success' :
-                          contact.sentiment === 'Negative' ? 'bg-danger-dim border-danger/30 text-danger' :
-                          'bg-warning-dim border-warning/30 text-warning'
-                        }`}>
-                           <div className={`w-1.5 h-1.5 rounded-full ${
-                             contact.sentiment === 'Positive' ? 'bg-success' :
-                             contact.sentiment === 'Negative' ? 'bg-danger' :
-                             'bg-warning'
-                           }`} />
-                           {contact.sentiment}
-                        </div>
-                     </td>
-                     <td className="p-4">
-                        <div className="flex flex-col">
-                           <span className="text-[13px] font-bold text-ink-muted">{contact.lastContacted}</span>
-                           <div className="flex items-center gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Mail className="w-3 h-3 text-accent hover:text-accent cursor-pointer" />
-                              <Phone className="w-3 h-3 text-accent hover:text-accent cursor-pointer" />
-                           </div>
-                        </div>
-                     </td>
-                     <td className="p-4"><MoreHorizontal className="w-4 h-4 text-ink-faint opacity-0 group-hover:opacity-100 transition-opacity" /></td>
-                   </tr>
-                 ))}
-                 {contacts.length === 0 && (
-                   <tr>
-                     <td colSpan={7} className="p-20 text-center text-ink-faint font-medium">No contacts found for this organization.</td>
-                   </tr>
-                 )}
-              </tbody>
-           </table>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ContactStatCard({ title, value, subtext, icon }: { title: string, value: string, subtext: string, icon: React.ReactNode }) {
-  return (
-    <div className="flex items-start gap-4">
-      <div className="p-3 bg-subtle rounded-xl border border-line-subtle">
-        {icon}
-      </div>
-      <div className="flex flex-col">
-        <span className="text-[11px] font-bold text-ink-faint uppercase tracking-widest leading-none mb-1">{title}</span>
-        <span className="text-[20px] font-bold text-ink leading-tight">{value}</span>
-        <span className="text-[11px] font-medium text-ink-faint pt-0.5">{subtext}</span>
-      </div>
-    </div>
   );
 }
 

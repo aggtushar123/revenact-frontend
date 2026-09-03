@@ -73,7 +73,7 @@ describe('Organization Details page (/organizations/:id)', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
-        const body = url.includes('/accounts/') || (url.includes('/activities/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/')))))) ? [] : globex;
+        const body = url.includes('/accounts/') || (url.includes('/activities/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')))))) ? [] : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
       })
     );
@@ -114,7 +114,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/'))))) ? [] : globex;
+        const body = url.includes('/accounts/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))))) ? [] : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
       })
     );
@@ -151,7 +151,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/'))))
+        const body = url.includes('/accounts/') || url.includes('/activities/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))))
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -189,7 +189,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/')))
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')))
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -228,7 +228,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || (url.includes('/tickets/') || url.includes('/calendar-events/'))
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -269,7 +269,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/calendar-events/')
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/calendar-events/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -310,7 +310,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/')
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -326,6 +326,51 @@ describe('Organization Details page (/organizations/:id)', () => {
     expect(screen.getByText('3 attendees')).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('/customers/10/calendar-events/'),
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('fetches and renders this organization\'s own real contacts on the Contacts tab', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('/contacts/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                id: 1,
+                name: 'Sarah Chen',
+                role: 'executive_sponsor',
+                role_display: 'Executive Sponsor',
+                email: 'sarah.chen@globex.example',
+                phone: '+1 (408) 555-0123',
+                status: 'active',
+                sentiment: 'positive',
+                last_contacted_at: '2026-08-31T00:00:00Z',
+                company_id: 10,
+                company_name: 'Globex Corp',
+                account_name: null,
+              },
+            ],
+          });
+        }
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+          ? []
+          : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      })
+    );
+
+    renderDetails('10');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
+
+    expect(await screen.findByText('Sarah Chen')).toBeInTheDocument();
+    expect(screen.getByText('Executive Sponsor')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/customers/10/contacts/'),
       expect.objectContaining({ method: 'GET' })
     );
   });
