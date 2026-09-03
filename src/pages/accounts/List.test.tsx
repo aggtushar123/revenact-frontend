@@ -106,6 +106,40 @@ describe('Accounts List page (/accounts/list)', () => {
     expect(screen.getByText('Showing 1-1 of 1 accounts')).toBeInTheDocument();
   });
 
+  it('renders real NPS/CSAT/MRR/ARR, not placeholders', async () => {
+    const fetchMock = makeFetchMock({
+      accounts: [{ status: 200, body: { count: 1, next: null, previous: null, results: [northAmerica] } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+    await screen.findByText('North America Enterprise');
+
+    // nps_score: 100 -> "+100"; csat_score: "100.00" -> "100%";
+    // arr: "33600.00" -> mrr = round(33600 / 12) = 2800 -> "$3K",
+    // arr itself -> "$34K" (same $K tiering as the standalone Account
+    // page's own formatArr).
+    expect(screen.getByText('+100')).toBeInTheDocument();
+    expect(screen.getByText('100%')).toBeInTheDocument();
+    expect(screen.getByText('$3K')).toBeInTheDocument();
+    expect(screen.getByText('$34K')).toBeInTheDocument();
+  });
+
+  it('shows "0"/"N/A" (not a fabricated real-looking value) when NPS/CSAT are unset', async () => {
+    const noScores = { ...northAmerica, nps_score: null, csat_score: null, arr: '0.00' };
+    const fetchMock = makeFetchMock({
+      accounts: [{ status: 200, body: { count: 1, next: null, previous: null, results: [noScores] } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+    await screen.findByText('North America Enterprise');
+
+    expect(screen.getByText('0')).toBeInTheDocument();
+    expect(screen.getByText('N/A')).toBeInTheDocument();
+    expect(screen.getAllByText('$0')).toHaveLength(2); // MRR and ARR both real zeros
+  });
+
   it('shows the backend error message instead of crashing', async () => {
     const fetchMock = makeFetchMock({
       accounts: [{ status: 500, body: { detail: 'Server error.' } }],

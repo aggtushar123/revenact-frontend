@@ -1,8 +1,19 @@
 import { useNavigate } from 'react-router-dom';
 import { Building, Pencil } from 'lucide-react';
-import { HEALTH_COLORS, LIFECYCLE_LABELS, initials } from '../../features/customers/formatters';
+import { HEALTH_COLORS, LIFECYCLE_LABELS, initials, npsColor, csatColor } from '../../features/customers/formatters';
 import { mapAccountToAccountRow } from '../../features/customers/mapToAccountRow';
 import type { Account } from '../../features/customers/customersSlice';
+
+// Same $K/$M tiering as AccountsMetricsBanner's fmtCur (organizations/
+// Details.tsx), MetricsPanel's formatCurrency, and the standalone
+// Account page's own formatArr (accounts/Details.tsx) — kept as its
+// own local copy here rather than a new shared export, matching how
+// those three already each keep their own copy rather than sharing one.
+function formatArr(arr: number): string {
+  if (arr >= 1_000_000) return `$${(arr / 1_000_000).toFixed(1)}M`;
+  if (arr >= 1_000) return `$${(arr / 1_000).toFixed(0)}K`;
+  return `$${arr}`;
+}
 
 interface AccountsTableProps {
   accounts: Account[];
@@ -50,6 +61,10 @@ export function AccountsTable({
               <th className="px-6 py-4 font-bold border-b border-line-subtle">Owner</th>
               <th className="px-6 py-4 font-bold border-b border-line-subtle">Lifecycle Stage</th>
               <th className="px-6 py-4 font-bold border-b border-line-subtle">Health</th>
+              <th className="px-6 py-4 font-bold border-b border-line-subtle text-center">NPS</th>
+              <th className="px-6 py-4 font-bold border-b border-line-subtle text-center">CSAT</th>
+              <th className="px-6 py-4 font-bold border-b border-line-subtle">MRR</th>
+              <th className="px-6 py-4 font-bold border-b border-line-subtle">ARR</th>
               <th className="px-3 py-4 font-bold border-b border-line-subtle sticky right-0 z-30 bg-surface shadow-[-1px_0_0_0_var(--border-default)]">
                 <span className="sr-only">Actions</span>
               </th>
@@ -57,7 +72,17 @@ export function AccountsTable({
           </thead>
 
           <tbody className="text-[13px] text-ink-muted whitespace-nowrap bg-surface relative z-0">
-            {accounts.map((a) => (
+            {accounts.map((a) => {
+              // Same null-handling as mapToAccountRow.ts/mapToOrgRow.ts:
+              // a missing NPS/CSAT reads as "0"/"N/A", not a fabricated
+              // real-looking value; ARR is always a real number (0 for a
+              // freshly-added account is legitimate, not "missing").
+              const nps = a.nps_score;
+              const csat = a.csat_score !== null ? parseFloat(a.csat_score) : null;
+              const arr = Number(a.arr);
+              const mrr = Math.round(arr / 12);
+
+              return (
               <tr key={a.id} className="group hover:bg-subtle transition-colors">
                 <td className="px-6 py-4 border-b border-line-subtle relative sticky left-0 z-10 bg-surface group-hover:bg-subtle shadow-[1px_0_0_0_var(--border-default)] transition-colors">
                   <div className="flex items-center gap-3">
@@ -113,6 +138,30 @@ export function AccountsTable({
                   </div>
                 </td>
 
+                <td className="px-6 py-4 border-b border-line-subtle">
+                  <div className="flex justify-center w-full">
+                    <div className={`${npsColor(nps ?? 0)} text-white px-3 py-1 rounded text-[12px] font-bold min-w-[56px] text-center`}>
+                      {nps === null ? '0' : `${nps > 0 ? '+' : ''}${nps}`}
+                    </div>
+                  </div>
+                </td>
+
+                <td className="px-6 py-4 border-b border-line-subtle">
+                  <div className="flex justify-center w-full">
+                    <div className={`${csat === null ? 'bg-line-strong' : csatColor(csat)} text-white px-3 py-1 rounded text-[12px] font-bold min-w-[56px] text-center`}>
+                      {csat === null ? 'N/A' : `${csat}%`}
+                    </div>
+                  </div>
+                </td>
+
+                <td className="px-6 py-4 border-b border-line-subtle text-ink-muted font-semibold">
+                  {formatArr(mrr)}
+                </td>
+
+                <td className="px-6 py-4 border-b border-line-subtle text-ink-muted font-semibold">
+                  {formatArr(arr)}
+                </td>
+
                 <td className="px-3 py-4 border-b border-line-subtle sticky right-0 z-10 bg-surface group-hover:bg-subtle shadow-[-1px_0_0_0_var(--border-default)] transition-colors text-center">
                   <button
                     type="button"
@@ -127,20 +176,21 @@ export function AccountsTable({
                   </button>
                 </td>
               </tr>
-            ))}
+              );
+            })}
             {!isLoading && !error && accounts.length === 0 && (
               <tr>
-                <td colSpan={6} className="p-20 text-center text-ink-faint font-medium">No accounts found.</td>
+                <td colSpan={10} className="p-20 text-center text-ink-faint font-medium">No accounts found.</td>
               </tr>
             )}
             {isLoading && (
               <tr>
-                <td colSpan={6} className="p-20 text-center text-ink-faint font-medium">Loading accounts…</td>
+                <td colSpan={10} className="p-20 text-center text-ink-faint font-medium">Loading accounts…</td>
               </tr>
             )}
             {error && (
               <tr>
-                <td colSpan={6} className="p-20 text-center text-danger font-medium">{error}</td>
+                <td colSpan={10} className="p-20 text-center text-danger font-medium">{error}</td>
               </tr>
             )}
           </tbody>
