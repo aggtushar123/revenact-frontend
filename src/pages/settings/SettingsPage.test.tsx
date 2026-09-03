@@ -181,10 +181,10 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
     render(<SettingsPage />);
     await screen.findByText('Custom Attributes');
 
-    // Account/Contact have their own real attributes tables now too
-    // (see their own describe blocks below) -- Pipeline is the one
-    // still unwired.
-    await user.click(screen.getByRole('button', { name: 'Pipeline' }));
+    // Account/Contact/Pipeline have their own real attributes tables
+    // now too (see their own describe blocks below) -- Custom Objects
+    // is the one still unwired.
+    await user.click(screen.getByRole('button', { name: /Custom Objects/ }));
 
     expect(screen.queryByText('Custom Attributes')).not.toBeInTheDocument();
     expect(screen.getByText(/under construction/i)).toBeInTheDocument();
@@ -465,5 +465,142 @@ describe('SettingsPage — Data tab, Contact sub-tab', () => {
 
     expect(screen.queryByText('Email')).not.toBeInTheDocument();
     expect(screen.getByText('Sentiment')).toBeInTheDocument();
+  });
+});
+
+// Minimal but real shape, matching revenact-backend's Opportunity/Risk
+// serializers — see docs/API_CONTRACTS.md -> customers -> Opportunity/
+// Risk. Unlike Organization/Account/Contact, /opportunities/ and
+// /risks/ return a plain array, not a paginated envelope (see
+// OpportunityListView/RiskListView's own docstrings) — no `next` to
+// walk here.
+const filledOpportunity = {
+  id: 1,
+  title: 'Renewal Expansion',
+  mrr: '30000.00',
+  stage: 'qualification',
+  stage_display: 'Qualification',
+  priority: 'high',
+  priority_display: 'High',
+  companies: [{ id: 6, name: 'Apple Inc' }],
+  account_name: null,
+};
+
+const blankOpportunity = {
+  ...filledOpportunity,
+  id: 2,
+  title: 'Seat Expansion',
+  mrr: '0.00',
+  account_name: 'North America',
+};
+
+const filledRisk = {
+  id: 1,
+  title: 'Contract Expiry Risk',
+  mrr: '8500.00',
+  stage: 'open',
+  stage_display: 'Open',
+  priority: 'high',
+  priority_display: 'High',
+  companies: [{ id: 6, name: 'Apple Inc' }],
+  account_name: null,
+};
+
+describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('defaults to Opportunities and fetches the real, unpaginated endpoint', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/opportunities/')) {
+        return Promise.resolve(jsonResponse(200, [filledOpportunity, blankOpportunity]));
+      }
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Pipeline' }));
+
+    expect(await screen.findByText('Custom Attributes')).toBeInTheDocument();
+    expect(screen.getByText('stage_display')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/opportunities/'), expect.anything());
+  });
+
+  it('switching to the Risks toggle fetches /risks/ and shows its own attributes', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/risks/')) return Promise.resolve(jsonResponse(200, [filledRisk]));
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Pipeline' }));
+    await screen.findByText('Custom Attributes');
+
+    await user.click(screen.getByRole('button', { name: 'Risks' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/risks/'), expect.anything())
+    );
+    expect(screen.getByPlaceholderText('Search from 9 risk attributes')).toBeInTheDocument();
+  });
+
+  it('computes a real Usage% from the fetched opportunities, not a fabricated one', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/opportunities/')) {
+        return Promise.resolve(jsonResponse(200, [filledOpportunity, blankOpportunity]));
+      }
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Pipeline' }));
+    await screen.findByText('MRR');
+
+    // MRR: filledOpportunity has one, blankOpportunity's is '0.00' -- 1 of 2 = 50%.
+    const mrrRow = screen.getByText('MRR').closest('tr')!;
+    expect(mrrRow.textContent).toContain('50%');
+
+    // Title: both set -- 2 of 2 = 100%.
+    const titleRow = screen.getByText('Title').closest('tr')!;
+    expect(titleRow.textContent).toContain('100%');
+  });
+
+  it('shows the backend error message instead of crashing', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, { detail: 'Server error.' }))));
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Pipeline' }));
+
+    expect(await screen.findByText('Server error.')).toBeInTheDocument();
+  });
+
+  it('searching filters the attribute list by display name or field name', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/opportunities/')) return Promise.resolve(jsonResponse(200, [filledOpportunity]));
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Pipeline' }));
+    await screen.findByText('Custom Attributes');
+    expect(screen.getByText('Priority')).toBeInTheDocument();
+
+    await user.type(
+      screen.getByPlaceholderText(/Search from \d+ opportunity attributes/),
+      'priority'
+    );
+
+    expect(screen.queryByText('Stage')).not.toBeInTheDocument();
+    expect(screen.getByText('Priority')).toBeInTheDocument();
   });
 });

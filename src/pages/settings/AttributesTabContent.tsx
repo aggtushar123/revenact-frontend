@@ -3,9 +3,13 @@ import { AttributesTable } from './AttributesTable';
 import type { AttributeDef } from './attributeConfig';
 
 export interface AttributesTabContentProps<T> {
-  /** Lowercase, plural-friendly noun used in the search placeholder/
-   * loading text — "organization"/"account". */
+  /** Lowercase noun used in the search placeholder — "organization"/
+   * "account"/"opportunity". */
   entityLabel: string;
+  /** Lowercase plural, for the loading text — defaults to
+   * `${entityLabel}s`, which is wrong for "opportunity" (not
+   * "opportunitys"), so that one passes "opportunities" explicitly. */
+  pluralLabel?: string;
   /** The real backend model name this mirrors, shown in the disabled
    * Add Attribute button's own tooltip — "Customer"/"Account". */
   modelName: string;
@@ -28,6 +32,7 @@ export interface AttributesTabContentProps<T> {
 // entity.
 export function AttributesTabContent<T>({
   entityLabel,
+  pluralLabel = `${entityLabel}s`,
   modelName,
   attributes,
   allAttributes,
@@ -74,7 +79,7 @@ export function AttributesTabContent<T>({
       <div className="flex-1 overflow-y-auto px-8 pb-8 scrollbar-thin scrollbar-thumb-line">
          {isLoading && entities.length === 0 ? (
            <div className="flex items-center justify-center h-full text-[13px] font-medium text-ink-faint">
-             Loading {entityLabel}s…
+             Loading {pluralLabel}…
            </div>
          ) : error ? (
            <div className="flex items-center justify-center h-full text-[13px] font-medium text-danger">{error}</div>

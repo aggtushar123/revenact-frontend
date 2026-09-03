@@ -5,9 +5,10 @@ import { SettingPlaceholder } from './SettingPlaceholder';
 import { ORGANIZATION_ATTRIBUTES } from './organizationAttributes';
 import { ACCOUNT_ATTRIBUTES } from './accountAttributes';
 import { CONTACT_ATTRIBUTES } from './contactAttributes';
+import { OPPORTUNITY_ATTRIBUTES, RISK_ATTRIBUTES } from './pipelineAttributes';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import type { AttributeDef } from './attributeConfig';
-import type { Customer, Account, Contact } from '../../features/customers/customersSlice';
+import type { Customer, Account, Contact, Opportunity, Risk } from '../../features/customers/customersSlice';
 
 interface Page<T> {
   count: number;
@@ -25,7 +26,7 @@ interface Page<T> {
 // this settings page. Fine at dev-tenant scale; a tenant with
 // thousands of records would make this an expensive one-time fetch
 // per visit to the tab.
-async function fetchAll<T>(endpoint: string): Promise<T[]> {
+async function fetchAllPages<T>(endpoint: string): Promise<T[]> {
   const all: T[] = [];
   let url: string | undefined = endpoint;
   while (url) {
@@ -37,9 +38,11 @@ async function fetchAll<T>(endpoint: string): Promise<T[]> {
 }
 
 // One entity's own "every record, loaded once while its sub-tab is
-// active" state — factored out once a third sub-tab (Contact) needed
-// the exact same load/loading/error dance as Organization/Account.
-function useAllEntities<T>(endpoint: string, entityLabel: string, enabled: boolean) {
+// active" state — `fetcher` is either fetchAllPages (Customer/Account/
+// Contact, all genuinely paginated) or a bare apiFetch<T[]> (Opportunity/
+// Risk — see OpportunityListView/RiskListView's own docstrings on why
+// those two endpoints return a plain array, not a paginated envelope).
+function useAllEntities<T>(fetcher: () => Promise<T[]>, entityLabel: string, enabled: boolean) {
   const [entities, setEntities] = useState<T[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +55,7 @@ function useAllEntities<T>(endpoint: string, entityLabel: string, enabled: boole
       setIsLoading(true);
       setError(null);
       try {
-        const all = await fetchAll<T>(endpoint);
+        const all = await fetcher();
         if (!cancelled) setEntities(all);
       } catch (err) {
         if (!cancelled) setError(err instanceof ApiError ? err.message : `Could not load ${entityLabel}s.`);
@@ -65,7 +68,7 @@ function useAllEntities<T>(endpoint: string, entityLabel: string, enabled: boole
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- endpoint/entityLabel are constant per call site
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetcher/entityLabel are constant per call site
   }, [enabled]);
 
   return { entities, isLoading, error };
@@ -81,16 +84,29 @@ function filterAttributes<T>(attributes: AttributeDef<T>[], query: string): Attr
 
 export function SettingsPage() {
   const [activeSubTab, setActiveSubTab] = useState('Organization');
+  const [pipelineEntity, setPipelineEntity] = useState<'Opportunities' | 'Risks'>('Opportunities');
   const [searchQuery, setSearchQuery] = useState('');
 
   const subTabs = ['Organization', 'Account', 'Contact', 'Pipeline', 'Custom Objects (2/3)'];
 
   const { entities: organizations, isLoading: orgLoading, error: orgError } =
-    useAllEntities<Customer>('/customers/', 'organization', activeSubTab === 'Organization');
+    useAllEntities<Customer>(() => fetchAllPages('/customers/'), 'organization', activeSubTab === 'Organization');
   const { entities: accounts, isLoading: accountLoading, error: accountError } =
-    useAllEntities<Account>('/accounts/', 'account', activeSubTab === 'Account');
+    useAllEntities<Account>(() => fetchAllPages('/accounts/'), 'account', activeSubTab === 'Account');
   const { entities: contacts, isLoading: contactLoading, error: contactError } =
-    useAllEntities<Contact>('/contacts/', 'contact', activeSubTab === 'Contact');
+    useAllEntities<Contact>(() => fetchAllPages('/contacts/'), 'contact', activeSubTab === 'Contact');
+  const { entities: opportunities, isLoading: opportunityLoading, error: opportunityError } =
+    useAllEntities<Opportunity>(
+      () => apiFetch<Opportunity[]>('/opportunities/'),
+      'opportunity',
+      activeSubTab === 'Pipeline' && pipelineEntity === 'Opportunities'
+    );
+  const { entities: risks, isLoading: riskLoading, error: riskError } =
+    useAllEntities<Risk>(
+      () => apiFetch<Risk[]>('/risks/'),
+      'risk',
+      activeSubTab === 'Pipeline' && pipelineEntity === 'Risks'
+    );
 
   const filteredOrgAttributes = useMemo(
     () => filterAttributes(ORGANIZATION_ATTRIBUTES, searchQuery),
@@ -102,6 +118,14 @@ export function SettingsPage() {
   );
   const filteredContactAttributes = useMemo(
     () => filterAttributes(CONTACT_ATTRIBUTES, searchQuery),
+    [searchQuery]
+  );
+  const filteredOpportunityAttributes = useMemo(
+    () => filterAttributes(OPPORTUNITY_ATTRIBUTES, searchQuery),
+    [searchQuery]
+  );
+  const filteredRiskAttributes = useMemo(
+    () => filterAttributes(RISK_ATTRIBUTES, searchQuery),
     [searchQuery]
   );
 
@@ -166,6 +190,54 @@ export function SettingsPage() {
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
             />
+          ) : activeSubTab === 'Pipeline' ? (
+            <>
+              {/* Opportunities/Risks — the Pipelines board's own two
+                  entities, same sub-tab convention as that board itself
+                  (pages/pipelines/PipelinesPage.tsx) rather than one
+                  combined list, which would collide on field names
+                  (stage/priority/mrr exist, distinctly, on both). */}
+              <div className="px-8 pb-3 flex items-center gap-4 border-b border-line-subtle shrink-0">
+                <button
+                  onClick={() => setPipelineEntity('Opportunities')}
+                  className={`pb-2.5 text-[13px] font-bold border-b-2 transition-colors ${pipelineEntity === 'Opportunities' ? 'text-accent border-accent' : 'text-ink-faint border-transparent hover:text-ink-muted'}`}
+                >
+                  Opportunities
+                </button>
+                <button
+                  onClick={() => setPipelineEntity('Risks')}
+                  className={`pb-2.5 text-[13px] font-bold border-b-2 transition-colors ${pipelineEntity === 'Risks' ? 'text-accent border-accent' : 'text-ink-faint border-transparent hover:text-ink-muted'}`}
+                >
+                  Risks
+                </button>
+              </div>
+              {pipelineEntity === 'Opportunities' ? (
+                <AttributesTabContent
+                  entityLabel="opportunity"
+                  pluralLabel="opportunities"
+                  modelName="Opportunity"
+                  attributes={filteredOpportunityAttributes}
+                  allAttributes={OPPORTUNITY_ATTRIBUTES}
+                  entities={opportunities}
+                  isLoading={opportunityLoading}
+                  error={opportunityError}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                />
+              ) : (
+                <AttributesTabContent
+                  entityLabel="risk"
+                  modelName="Risk"
+                  attributes={filteredRiskAttributes}
+                  allAttributes={RISK_ATTRIBUTES}
+                  entities={risks}
+                  isLoading={riskLoading}
+                  error={riskError}
+                  searchQuery={searchQuery}
+                  setSearchQuery={setSearchQuery}
+                />
+              )}
+            </>
           ) : (
             <SettingPlaceholder title={activeSubTab} />
           )}
