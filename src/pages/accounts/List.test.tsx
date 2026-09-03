@@ -133,7 +133,7 @@ describe('Accounts List page (/accounts/list)', () => {
     expect(screen.getByText('Showing 1-1 of 1 accounts')).toBeInTheDocument();
   });
 
-  it('renders real NPS/CSAT/MRR/ARR, not placeholders', async () => {
+  it('renders real CSAT, not a placeholder', async () => {
     const fetchMock = makeFetchMock({
       accounts: [{ status: 200, body: { count: 1, next: null, previous: null, results: [northAmerica] } }],
     });
@@ -142,18 +142,13 @@ describe('Accounts List page (/accounts/list)', () => {
     renderPage();
     await screen.findByText('North America Enterprise');
 
-    // nps_score: 100 -> "+100"; csat_score: "100.00" -> "100%";
-    // arr: "33600.00" -> mrr = round(33600 / 12) = 2800 -> "$3K",
-    // arr itself -> "$34K" (same $K tiering as the standalone Account
-    // page's own formatArr).
-    expect(screen.getByText('+100')).toBeInTheDocument();
+    // csat_score: "100.00" -> "100%". NPS/MRR/ARR are aggregated in the
+    // MetricsPanel above instead of shown per-row.
     expect(screen.getByText('100%')).toBeInTheDocument();
-    expect(screen.getByText('$3K')).toBeInTheDocument();
-    expect(screen.getByText('$34K')).toBeInTheDocument();
   });
 
-  it('shows "0"/"N/A" (not a fabricated real-looking value) when NPS/CSAT are unset', async () => {
-    const noScores = { ...northAmerica, nps_score: null, csat_score: null, arr: '0.00' };
+  it('shows "N/A" (not a fabricated real-looking value) when CSAT is unset', async () => {
+    const noScores = { ...northAmerica, csat_score: null };
     const fetchMock = makeFetchMock({
       accounts: [{ status: 200, body: { count: 1, next: null, previous: null, results: [noScores] } }],
     });
@@ -162,12 +157,10 @@ describe('Accounts List page (/accounts/list)', () => {
     renderPage();
     await screen.findByText('North America Enterprise');
 
-    // Scoped to the table itself — the (now zeroed, since EMPTY_STATS)
-    // MetricsPanel above it also renders plenty of its own "0"s.
+    // Scoped to the table itself — the MetricsPanel above it also
+    // renders its own numbers.
     const table = within(screen.getByRole('table'));
-    expect(table.getByText('0')).toBeInTheDocument();
     expect(table.getByText('N/A')).toBeInTheDocument();
-    expect(table.getAllByText('$0')).toHaveLength(2); // MRR and ARR both real zeros
   });
 
   it('shows the backend error message instead of crashing', async () => {
