@@ -4,9 +4,10 @@ import { GlobalConfigSidebar } from './GlobalConfigSidebar';
 import { SettingPlaceholder } from './SettingPlaceholder';
 import { ORGANIZATION_ATTRIBUTES } from './organizationAttributes';
 import { ACCOUNT_ATTRIBUTES } from './accountAttributes';
+import { CONTACT_ATTRIBUTES } from './contactAttributes';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import type { AttributeDef } from './attributeConfig';
-import type { Customer, Account } from '../../features/customers/customersSlice';
+import type { Customer, Account, Contact } from '../../features/customers/customersSlice';
 
 interface Page<T> {
   count: number;
@@ -18,11 +19,12 @@ interface Page<T> {
 // Walks every page of the given endpoint — Usage% needs the real,
 // whole-tenant fill rate, not just whatever the first page happens to
 // contain. There's no dedicated backend aggregate for "per-field fill
-// rate" the way CustomerStatsView/AccountStatsView have for health/
-// NPS/lifecycle, so this walks pages client-side as the pragmatic
-// alternative rather than building one just for this settings page.
-// Fine at dev-tenant scale; a tenant with thousands of records would
-// make this an expensive one-time fetch per visit to the tab.
+// rate" the way CustomerStatsView/AccountStatsView/ContactStatsView
+// have for health/NPS/lifecycle/sentiment, so this walks pages client-
+// side as the pragmatic alternative rather than building one just for
+// this settings page. Fine at dev-tenant scale; a tenant with
+// thousands of records would make this an expensive one-time fetch
+// per visit to the tab.
 async function fetchAll<T>(endpoint: string): Promise<T[]> {
   const all: T[] = [];
   let url: string | undefined = endpoint;
@@ -32,6 +34,41 @@ async function fetchAll<T>(endpoint: string): Promise<T[]> {
     url = page.next ?? undefined;
   }
   return all;
+}
+
+// One entity's own "every record, loaded once while its sub-tab is
+// active" state — factored out once a third sub-tab (Contact) needed
+// the exact same load/loading/error dance as Organization/Account.
+function useAllEntities<T>(endpoint: string, entityLabel: string, enabled: boolean) {
+  const [entities, setEntities] = useState<T[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+    let cancelled = false;
+
+    async function load() {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const all = await fetchAll<T>(endpoint);
+        if (!cancelled) setEntities(all);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof ApiError ? err.message : `Could not load ${entityLabel}s.`);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- endpoint/entityLabel are constant per call site
+  }, [enabled]);
+
+  return { entities, isLoading, error };
 }
 
 function filterAttributes<T>(attributes: AttributeDef<T>[], query: string): AttributeDef<T>[] {
@@ -48,59 +85,12 @@ export function SettingsPage() {
 
   const subTabs = ['Organization', 'Account', 'Contact', 'Pipeline', 'Custom Objects (2/3)'];
 
-  const [organizations, setOrganizations] = useState<Customer[]>([]);
-  const [orgLoading, setOrgLoading] = useState(false);
-  const [orgError, setOrgError] = useState<string | null>(null);
-
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [accountLoading, setAccountLoading] = useState(false);
-  const [accountError, setAccountError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (activeSubTab !== 'Organization') return;
-    let cancelled = false;
-
-    async function loadAllOrganizations() {
-      setOrgLoading(true);
-      setOrgError(null);
-      try {
-        const all = await fetchAll<Customer>('/customers/');
-        if (!cancelled) setOrganizations(all);
-      } catch (err) {
-        if (!cancelled) setOrgError(err instanceof ApiError ? err.message : 'Could not load organizations.');
-      } finally {
-        if (!cancelled) setOrgLoading(false);
-      }
-    }
-
-    loadAllOrganizations();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeSubTab]);
-
-  useEffect(() => {
-    if (activeSubTab !== 'Account') return;
-    let cancelled = false;
-
-    async function loadAllAccounts() {
-      setAccountLoading(true);
-      setAccountError(null);
-      try {
-        const all = await fetchAll<Account>('/accounts/');
-        if (!cancelled) setAccounts(all);
-      } catch (err) {
-        if (!cancelled) setAccountError(err instanceof ApiError ? err.message : 'Could not load accounts.');
-      } finally {
-        if (!cancelled) setAccountLoading(false);
-      }
-    }
-
-    loadAllAccounts();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeSubTab]);
+  const { entities: organizations, isLoading: orgLoading, error: orgError } =
+    useAllEntities<Customer>('/customers/', 'organization', activeSubTab === 'Organization');
+  const { entities: accounts, isLoading: accountLoading, error: accountError } =
+    useAllEntities<Account>('/accounts/', 'account', activeSubTab === 'Account');
+  const { entities: contacts, isLoading: contactLoading, error: contactError } =
+    useAllEntities<Contact>('/contacts/', 'contact', activeSubTab === 'Contact');
 
   const filteredOrgAttributes = useMemo(
     () => filterAttributes(ORGANIZATION_ATTRIBUTES, searchQuery),
@@ -108,6 +98,10 @@ export function SettingsPage() {
   );
   const filteredAccountAttributes = useMemo(
     () => filterAttributes(ACCOUNT_ATTRIBUTES, searchQuery),
+    [searchQuery]
+  );
+  const filteredContactAttributes = useMemo(
+    () => filterAttributes(CONTACT_ATTRIBUTES, searchQuery),
     [searchQuery]
   );
 
@@ -157,6 +151,18 @@ export function SettingsPage() {
               entities={accounts}
               isLoading={accountLoading}
               error={accountError}
+              searchQuery={searchQuery}
+              setSearchQuery={setSearchQuery}
+            />
+          ) : activeSubTab === 'Contact' ? (
+            <AttributesTabContent
+              entityLabel="contact"
+              modelName="Contact"
+              attributes={filteredContactAttributes}
+              allAttributes={CONTACT_ATTRIBUTES}
+              entities={contacts}
+              isLoading={contactLoading}
+              error={contactError}
               searchQuery={searchQuery}
               setSearchQuery={setSearchQuery}
             />

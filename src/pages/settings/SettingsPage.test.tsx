@@ -181,10 +181,10 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
     render(<SettingsPage />);
     await screen.findByText('Custom Attributes');
 
-    // Account has its own real attributes table now too (see the
-    // "Account sub-tab" describe block below) -- Contact/Pipeline are
-    // the ones still unwired.
-    await user.click(screen.getByRole('button', { name: 'Contact' }));
+    // Account/Contact have their own real attributes tables now too
+    // (see their own describe blocks below) -- Pipeline is the one
+    // still unwired.
+    await user.click(screen.getByRole('button', { name: 'Pipeline' }));
 
     expect(screen.queryByText('Custom Attributes')).not.toBeInTheDocument();
     expect(screen.getByText(/under construction/i)).toBeInTheDocument();
@@ -333,5 +333,137 @@ describe('SettingsPage — Data tab, Account sub-tab', () => {
 
     expect(screen.queryByText('Domain')).not.toBeInTheDocument();
     expect(screen.getByText('Lifecycle Stage')).toBeInTheDocument();
+  });
+});
+
+// Minimal but real shape, matching revenact-backend's ContactSerializer
+// — see docs/API_CONTRACTS.md -> customers -> Contact.
+const filledContact = {
+  id: 1,
+  name: 'Sarah Chen',
+  role: 'executive_sponsor',
+  role_display: 'Executive Sponsor',
+  email: 'sarah.chen@acme.io',
+  phone: '+1 555 0100',
+  status: 'active',
+  sentiment: 'positive',
+  last_contacted_at: '2026-08-31T00:00:00Z',
+  companies: [{ id: 6, name: 'Apple Inc' }],
+  account_name: null,
+};
+
+const blankContact = {
+  ...filledContact,
+  id: 2,
+  name: 'James Wilson',
+  phone: '',
+  last_contacted_at: null,
+};
+
+describe('SettingsPage — Data tab, Contact sub-tab', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('fetches every contact and renders real Custom/System attribute sections', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        jsonResponse(200, { count: 2, next: null, previous: null, results: [filledContact, blankContact] })
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Contact' }));
+
+    expect(await screen.findByText('Custom Attributes')).toBeInTheDocument();
+    expect(screen.getByText('sentiment')).toBeInTheDocument();
+    expect(screen.getByText('Companies')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/contacts/'), expect.anything());
+  });
+
+  it('walks every page of /contacts/ via `next`, not just the first', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.endsWith('/contacts/')) {
+        return Promise.resolve(
+          jsonResponse(200, {
+            count: 2,
+            next: 'http://localhost:8000/api/v1/contacts/?page=2',
+            previous: null,
+            results: [filledContact],
+          })
+        );
+      }
+      return Promise.resolve(
+        jsonResponse(200, { count: 2, next: null, previous: null, results: [blankContact] })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Contact' }));
+    await screen.findByText('Custom Attributes');
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        'http://localhost:8000/api/v1/contacts/?page=2',
+        expect.anything()
+      )
+    );
+  });
+
+  it('computes a real Usage% from the fetched contacts, not a fabricated one', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(
+        jsonResponse(200, { count: 2, next: null, previous: null, results: [filledContact, blankContact] })
+      )
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Contact' }));
+    await screen.findByText('Phone');
+
+    // Phone: filledContact has one, blankContact's is '' -- 1 of 2 = 50%.
+    const phoneRow = screen.getByText('Phone').closest('tr')!;
+    expect(phoneRow.textContent).toContain('50%');
+
+    // Name: both set -- 2 of 2 = 100%.
+    const nameCell = screen.getAllByText('Name').find((el) => el.tagName === 'SPAN')!;
+    expect(nameCell.closest('tr')!.textContent).toContain('100%');
+  });
+
+  it('shows the backend error message instead of crashing', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, { detail: 'Server error.' }))));
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Contact' }));
+
+    expect(await screen.findByText('Server error.')).toBeInTheDocument();
+  });
+
+  it('searching filters the attribute list by display name or field name', async () => {
+    const fetchMock = vi.fn(() =>
+      Promise.resolve(jsonResponse(200, { count: 1, next: null, previous: null, results: [filledContact] }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    render(<SettingsPage />);
+    await user.click(screen.getByRole('button', { name: 'Contact' }));
+    await screen.findByText('Custom Attributes');
+    expect(screen.getByText('Sentiment')).toBeInTheDocument();
+
+    await user.type(
+      screen.getByPlaceholderText(/Search from \d+ contact attributes/),
+      'sentiment'
+    );
+
+    expect(screen.queryByText('Email')).not.toBeInTheDocument();
+    expect(screen.getByText('Sentiment')).toBeInTheDocument();
   });
 });
