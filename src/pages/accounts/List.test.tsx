@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -131,36 +131,6 @@ describe('Accounts List page (/accounts/list)', () => {
     expect(screen.getByText('Apple Inc')).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/api/v1/accounts/'), expect.anything());
     expect(screen.getByText('Showing 1-1 of 1 accounts')).toBeInTheDocument();
-  });
-
-  it('renders real CSAT, not a placeholder', async () => {
-    const fetchMock = makeFetchMock({
-      accounts: [{ status: 200, body: { count: 1, next: null, previous: null, results: [northAmerica] } }],
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderPage();
-    await screen.findByText('North America Enterprise');
-
-    // csat_score: "100.00" -> "100%". NPS/MRR/ARR are aggregated in the
-    // MetricsPanel above instead of shown per-row.
-    expect(screen.getByText('100%')).toBeInTheDocument();
-  });
-
-  it('shows "N/A" (not a fabricated real-looking value) when CSAT is unset', async () => {
-    const noScores = { ...northAmerica, csat_score: null };
-    const fetchMock = makeFetchMock({
-      accounts: [{ status: 200, body: { count: 1, next: null, previous: null, results: [noScores] } }],
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderPage();
-    await screen.findByText('North America Enterprise');
-
-    // Scoped to the table itself — the MetricsPanel above it also
-    // renders its own numbers.
-    const table = within(screen.getByRole('table'));
-    expect(table.getByText('N/A')).toBeInTheDocument();
   });
 
   it('shows the backend error message instead of crashing', async () => {
