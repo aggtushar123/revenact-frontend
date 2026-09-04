@@ -1,3 +1,4 @@
+import type { CurrencyCode } from '../../features/auth/authSlice';
 
 export type ColumnId =
   | 'organization' | 'revenactId' | 'owner' | 'lifecycleStage' | 'health' | 'pulse'
@@ -69,6 +70,13 @@ export interface OrgRow {
   phone?: string;
   mrr: number;
   arr: number;
+  /** This row's own contract currency (Customer.currency, Tier 1) — `arr`/
+   * `mrr` above are raw numbers in *this* currency, not the org's
+   * reporting one. Compact/card displays elsewhere (e.g. the Organizations
+   * board's own Kanban cards) format `arr` with this, not useOrgCurrency().
+   * Optional for the same reason `email`/`phone` above are: the mock
+   * TABLE_DATA below (unused by any real page) predates this field. */
+  currency?: CurrencyCode;
 }
 
 export const ALL_COLUMNS: ColumnDef[] = [

@@ -225,6 +225,14 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
             <TabPill label="ARR" isActive={healthTab === 'arr'} onClick={() => setHealthTab('arr')} />
           </div>
           {statsError && <span className="text-[10px] font-medium text-danger normal-case">Couldn't load</span>}
+          {healthTab !== 'count' && !!stats?.unconverted_count && (
+            <span
+              className="text-[10px] font-medium text-warning normal-case"
+              title={`${stats.unconverted_count} organization${stats.unconverted_count === 1 ? '' : 's'} excluded — no exchange rate set for their currency (Settings > Currency).`}
+            >
+              {stats.unconverted_count} excluded
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-5">
           <div className="flex gap-5">
@@ -279,6 +287,14 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
             <TabPill label="ARR" isActive={lifecycleTab === 'arr'} onClick={() => setLifecycleTab('arr')} />
           </div>
           {statsError && <span className="text-[10px] font-medium text-danger normal-case">Couldn't load</span>}
+          {lifecycleTab !== 'count' && !!stats?.unconverted_count && (
+            <span
+              className="text-[10px] font-medium text-warning normal-case"
+              title={`${stats.unconverted_count} organization${stats.unconverted_count === 1 ? '' : 's'} excluded — no exchange rate set for their currency (Settings > Currency).`}
+            >
+              {stats.unconverted_count} excluded
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-4">
           {/* Bar chart */}

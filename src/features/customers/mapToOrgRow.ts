@@ -1,5 +1,4 @@
 import type { Customer } from './customersSlice';
-import type { CurrencyCode } from '../auth/authSlice';
 import type { OrgRow } from '../../components/organizations/tableData';
 import {
   formatDate,
@@ -24,7 +23,12 @@ import {
 // "(Mid-Market)" tier suffix on lifecycle stage) — those are derived here
 // from real fields rather than fabricated from nothing.
 
-export function mapCustomerToOrgRow(c: Customer, currency: CurrencyCode): OrgRow {
+// currency (Tier 1) now lives on the Customer itself — arrAccount/arrHQ/
+// etc. below are formatted in *this customer's own* currency, not the
+// org's reporting one (see Customer.currency's own docstring). A single
+// mixed-currency table is the intended result: each row is internally
+// consistent, labeled by its own currency symbol.
+export function mapCustomerToOrgRow(c: Customer): OrgRow {
   const arr = Number(c.arr_billed_at_account);
   const nps = c.nps_score ?? 0;
   const csat = c.csat_score !== null ? parseFloat(c.csat_score) : null;
@@ -52,11 +56,11 @@ export function mapCustomerToOrgRow(c: Customer, currency: CurrencyCode): OrgRow
     csatColor: csat === null ? 'bg-line-strong' : csatColor(csat),
     joined: formatDate(c.joined_date),
     renewal: formatDate(c.renewal_date),
-    arrAccount: formatMoney(c.arr_billed_at_account, currency),
-    arrHQ: formatMoney(c.arr_billed_at_hq, currency),
-    implFee: formatMoney(c.implementation_fee, currency),
-    tcv: formatMoney(c.total_contract_value, currency),
-    tcvRenewal: formatMoney(c.total_forecasted_renewal_revenue, currency),
+    arrAccount: formatMoney(c.arr_billed_at_account, c.currency),
+    arrHQ: formatMoney(c.arr_billed_at_hq, c.currency),
+    implFee: formatMoney(c.implementation_fee, c.currency),
+    tcv: formatMoney(c.total_contract_value, c.currency),
+    tcvRenewal: formatMoney(c.total_forecasted_renewal_revenue, c.currency),
     contractStart: formatDate(c.contract_start_date),
     contractEnd: formatDate(c.contract_end_date),
     productsUtilized: { primary: c.primary_product || '-', additional: c.additional_products_count },
@@ -78,5 +82,6 @@ export function mapCustomerToOrgRow(c: Customer, currency: CurrencyCode): OrgRow
     phone: c.phone || undefined,
     mrr: Math.round(arr / 12),
     arr,
+    currency: c.currency,
   };
 }

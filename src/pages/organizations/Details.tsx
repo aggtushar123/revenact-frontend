@@ -6,7 +6,7 @@ import type { AccountRow } from '../../components/organizations/accountsData';
 import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
-import { formatCompactMoney } from '../../features/customers/formatters';
+import { formatCompactMoney, formatMoney } from '../../features/customers/formatters';
 import {
   fetchCustomerById,
   fetchAccountsForCustomer,
@@ -42,7 +42,6 @@ export function Details() {
     pipelineRisksLoading,
     pipelineRisksError,
   } = useAppSelector((state) => state.customers);
-  const currency = useOrgCurrency();
 
   useEffect(() => {
     dispatch(fetchCustomerById(orgId));
@@ -57,7 +56,7 @@ export function Details() {
   // below still have no backend model. Accounts/Contacts/Opportunity/
   // Risk are real (one Customer has many Account/Contact/Opportunity/
   // Risk rows — see customers/models.py on the backend).
-  const organization = selectedCustomer ? mapCustomerToOrgRow(selectedCustomer, currency) : null;
+  const organization = selectedCustomer ? mapCustomerToOrgRow(selectedCustomer) : null;
   const accounts = organization
     ? accountsForCustomer.map((a) =>
         mapAccountToAccountRow(
@@ -209,8 +208,8 @@ export function Details() {
                       <AttrModalItem label="Location" value={organization.nameAddress} />
                       <AttrModalItem label="Owner" value={organization.owner} />
                       <AttrModalItem label="Next Renewal" value={organization.renewal} />
-                      <AttrModalItem label="MRR" value={`$${organization.mrr.toLocaleString()}`} />
-                      <AttrModalItem label="ARR" value={`$${organization.arr.toLocaleString()}`} />
+                      <AttrModalItem label="MRR" value={formatMoney(organization.mrr, organization.currency ?? 'USD')} />
+                      <AttrModalItem label="ARR" value={formatMoney(organization.arr, organization.currency ?? 'USD')} />
                     </div>
                   </div>
                 </div>

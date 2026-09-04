@@ -10,7 +10,6 @@ import { EntityAvatar } from '../../components/shared';
 import { fetchCustomers, updateCustomer } from '../../features/customers/customersSlice';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
 import { formatCompactMoney } from '../../features/customers/formatters';
-import { useOrgCurrency } from '../../hooks';
 import type { LifecycleCategory } from '../../components/organizations/tableData';
 import type { CurrencyCode } from '../../features/auth/authSlice';
 import type { AppDispatch, RootState } from '../../store';
@@ -48,17 +47,17 @@ interface OrgCardEntity {
   logo: string;
   health: { val: number; clr: string };
   arr: number;
+  /** This org's own contract currency (Customer.currency, Tier 1) — arr
+   * above is a raw number in *this* currency, not the org's reporting
+   * one (see OrgRow's own docstring in tableData.ts). */
+  currency: CurrencyCode;
   owner: string;
   avatar: string;
   img?: string;
   bg: string;
 }
 
-// Plain function passed as KanbanBoard's renderCard prop (called directly
-// as renderCard(entity), not rendered as JSX) — can't call useOrgCurrency()
-// itself, so currency comes in as an explicit param, threaded by Board()'s
-// own renderCard={(entity) => OrgCardContent(entity, currency)} closure.
-function OrgCardContent(entity: OrgCardEntity, currency: CurrencyCode) {
+function OrgCardContent(entity: OrgCardEntity) {
   return (
     <>
       <div className="flex items-center gap-2 mb-2.5 min-w-0">
@@ -70,7 +69,7 @@ function OrgCardContent(entity: OrgCardEntity, currency: CurrencyCode) {
           <span className={`w-1.5 h-1.5 rounded-full ${entity.health.clr}`} />
           <span className="text-[11px] font-bold text-ink-muted">Health {entity.health.val}</span>
         </div>
-        <span className="text-[11.5px] font-bold text-accent">{formatCompactMoney(entity.arr, currency)}</span>
+        <span className="text-[11.5px] font-bold text-accent">{formatCompactMoney(entity.arr, entity.currency)}</span>
       </div>
       <div className="flex items-center gap-1.5 min-w-0">
         {entity.img ? (
@@ -90,7 +89,6 @@ export function Board() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
   const { customers, totalCount, isLoading, error } = useSelector((state: RootState) => state.customers);
-  const currency = useOrgCurrency();
 
   // Same debounced-search convention as List.tsx's own — a separate
   // fetch of every (unpaginated in spirit, but see below) matching
@@ -113,7 +111,7 @@ export function Board() {
   const [addDefaultStage, setAddDefaultStage] = useState<LifecycleCategory>('onboarding');
   const [churnTarget, setChurnTarget] = useState<{ id: number; name: string } | null>(null);
 
-  const rows = useMemo(() => customers.map((c) => mapCustomerToOrgRow(c, currency)), [customers, currency]);
+  const rows = useMemo(() => customers.map((c) => mapCustomerToOrgRow(c)), [customers]);
 
   const entities: OrgCardEntity[] = useMemo(
     () =>
@@ -124,6 +122,7 @@ export function Board() {
         logo: r.logo,
         health: r.health,
         arr: r.arr,
+        currency: r.currency ?? 'USD',
         owner: r.owner,
         avatar: r.avatar,
         img: r.img,
@@ -181,7 +180,7 @@ export function Board() {
             <KanbanBoard
               columns={LIFECYCLE_COLUMNS}
               entities={entities}
-              renderCard={(entity) => OrgCardContent(entity, currency)}
+              renderCard={OrgCardContent}
               onCardClick={(e) => navigate(`/organizations/${e.id}`)}
               onAddClick={(stage) => { setAddDefaultStage(stage); setIsAdding(true); }}
               onMove={handleMove}

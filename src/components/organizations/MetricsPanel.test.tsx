@@ -243,6 +243,48 @@ describe('MetricsPanel Health/NPS/Lifecycle sections', () => {
     expect(screen.getByTitle('churn: 6')).toBeInTheDocument();
   });
 
+  it('shows an "excluded" caveat on MRR/ARR when some customers have no configured exchange rate', async () => {
+    const statsWithUnconverted = {
+      health: {
+        good: { count: 1, mrr: 100, arr: 1200 },
+        average: { count: 0, mrr: 0, arr: 0 },
+        poor: { count: 0, mrr: 0, arr: 0 },
+      },
+      nps: { promoters: 0, passives: 0, detractors: 0, score: 0 },
+      lifecycle: {
+        onboarding: { count: 0, mrr: 0, arr: 0 },
+        kickoff: { count: 0, mrr: 0, arr: 0 },
+        adoption: { count: 0, mrr: 0, arr: 0 },
+        live: { count: 1, mrr: 100, arr: 1200 },
+        renewal: { count: 0, mrr: 0, arr: 0 },
+        churn: { count: 0, mrr: 0, arr: 0 },
+        expansion: { count: 0, mrr: 0, arr: 0 },
+        other: { count: 0, mrr: 0, arr: 0 },
+      },
+      unconverted_count: 2,
+    };
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/customers/stats/')) return Promise.resolve(jsonResponse(200, statsWithUnconverted));
+      return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPanel();
+    await screen.findByText('1'); // Health: Good count, before switching tabs
+
+    // COUNT tab (default) never shows the caveat — every customer is
+    // counted regardless of whether its currency converts.
+    expect(screen.queryByText(/excluded/)).not.toBeInTheDocument();
+
+    const mrrButtons = screen.getAllByRole('button', { name: 'MRR' });
+    await user.click(mrrButtons[0]); // Health section's own toggle
+    expect(screen.getAllByText('2 excluded').length).toBeGreaterThan(0);
+
+    await user.click(mrrButtons[1]); // Lifecycle Stages section's own toggle
+    expect(screen.getAllByText('2 excluded').length).toBe(2);
+  });
+
   it('shows a small error note on each section when stats fail to load, without crashing', async () => {
     vi.stubGlobal(
       'fetch',

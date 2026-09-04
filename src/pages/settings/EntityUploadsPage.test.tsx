@@ -119,6 +119,33 @@ describe('EntityUploadsPage', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('auto-maps a Currency column and sends the coerced code, skipping unrecognized values', async () => {
+    const fetchMock = vi.fn((_url: string, options?: { body?: string }) => {
+      const body = options?.body ? JSON.parse(options.body) : {};
+      return Promise.resolve(jsonResponse(201, { id: 1, name: body.name }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    // Lowercase codes are accepted case-insensitively; "Monopoly Money"
+    // isn't a real currency and is silently left off that row's payload
+    // (same "malformed value skipped, row still imports" rule as dates).
+    const file = csvFile('Name,Currency\nGlobex EU,eur\nInitech,Monopoly Money');
+    await user.upload(screen.getByLabelText(/Click to choose a CSV file/), file);
+    await screen.findByText('orgs.csv — 2 rows');
+
+    const currencySelect = screen.getAllByRole('combobox')[1] as HTMLSelectElement;
+    expect(currencySelect.value).toBe('currency');
+
+    await user.click(screen.getByRole('button', { name: 'Import 2 Organizations' }));
+
+    expect(await screen.findByText('2 created')).toBeInTheDocument();
+    const [firstCall, secondCall] = fetchMock.mock.calls as [string, { body: string }][];
+    expect(JSON.parse(firstCall[1].body)).toEqual({ name: 'Globex EU', currency: 'EUR' });
+    expect(JSON.parse(secondCall[1].body)).toEqual({ name: 'Initech' });
+  });
+
   it('rejects a file with no data rows', async () => {
     const user = userEvent.setup();
     renderPage();

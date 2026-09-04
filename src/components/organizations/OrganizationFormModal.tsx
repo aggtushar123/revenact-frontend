@@ -1,10 +1,11 @@
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
 import { X, AlertCircle } from 'lucide-react';
-import { useAppDispatch } from '../../hooks';
+import { useAppDispatch, useOrgCurrency } from '../../hooks';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import { createCustomer, updateCustomer } from '../../features/customers/customersSlice';
+import { CURRENCY_OPTIONS } from '../../features/customers/formatters';
 import type { Customer } from '../../features/customers/customersSlice';
-import type { User } from '../../features/auth/authSlice';
+import type { User, CurrencyCode } from '../../features/auth/authSlice';
 
 interface OrganizationFormModalProps {
   /** Present for Edit, omitted for Add. */
@@ -20,10 +21,14 @@ interface OrganizationFormModalProps {
 
 // Deliberately not the full ~30-field schema: only what's editable while
 // an organisation is being onboarded and as the relationship evolves —
-// identity, ownership, lifecycle stage, and contract dates. Financials,
-// product usage, and NPS/CSAT/health are meant to eventually sync from
-// other systems (billing, usage tracking, surveys), not be hand-typed
-// here. Churn has its own dedicated action/modal (captures churn_date/
+// identity, ownership, lifecycle stage, currency, and contract dates.
+// Financials, product usage, and NPS/CSAT/health are meant to eventually
+// sync from other systems (billing, usage tracking, surveys), not be
+// hand-typed here — currency is the exception among "money-adjacent"
+// fields: it's the denomination those financials sync in as, not a
+// financial figure itself, so it's set the same real, hand-set way as
+// lifecycle stage (see Customer.currency's own backend docstring).
+// Churn has its own dedicated action/modal (captures churn_date/
 // reason/comment together) — "Churn" is deliberately not a selectable
 // option in this form's own lifecycle dropdown.
 const LIFECYCLE_OPTIONS: { value: Customer['lifecycle_stage']; label: string }[] = [
@@ -38,6 +43,7 @@ const LIFECYCLE_OPTIONS: { value: Customer['lifecycle_stage']; label: string }[]
 
 export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose }: OrganizationFormModalProps) {
   const dispatch = useAppDispatch();
+  const orgCurrency = useOrgCurrency();
   const isEdit = !!customer;
 
   const [name, setName] = useState(customer?.name ?? '');
@@ -47,6 +53,11 @@ export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose
   const [lifecycleStage, setLifecycleStage] = useState<Customer['lifecycle_stage']>(
     customer?.lifecycle_stage ?? defaultLifecycleStage ?? 'onboarding'
   );
+  // A new organization defaults to the org's own currency (same as the
+  // backend's own CustomerSerializer.create() default) — editable here
+  // for the US-HQ-org-billing-one-customer-in-EUR case (see
+  // Customer.currency's own docstring).
+  const [currency, setCurrency] = useState<CurrencyCode>(customer?.currency ?? orgCurrency);
   const [joinedDate, setJoinedDate] = useState(customer?.joined_date ?? '');
   const [renewalDate, setRenewalDate] = useState(customer?.renewal_date ?? '');
   const [contractStartDate, setContractStartDate] = useState(customer?.contract_start_date ?? '');
@@ -77,6 +88,7 @@ export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose
       address: address.trim(),
       owner_id: ownerId ? Number(ownerId) : null,
       lifecycle_stage: lifecycleStage,
+      currency,
       joined_date: joinedDate || null,
       renewal_date: renewalDate || null,
       contract_start_date: contractStartDate || null,
@@ -144,6 +156,17 @@ export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose
               ))}
             </SelectField>
           </div>
+          <SelectField
+            label="Currency"
+            value={currency}
+            onChange={(v) => setCurrency(v as CurrencyCode)}
+          >
+            {CURRENCY_OPTIONS.map((opt) => (
+              <option key={opt.code} value={opt.code}>
+                {opt.code} — {opt.label} ({opt.symbol})
+              </option>
+            ))}
+          </SelectField>
           <TextField label="Joined Date" value={joinedDate} onChange={setJoinedDate} type="date" />
           <div className="grid grid-cols-3 gap-3">
             <TextField label="Renewal Date" value={renewalDate} onChange={setRenewalDate} type="date" />

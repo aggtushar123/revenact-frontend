@@ -32,6 +32,8 @@ const globex = {
   renewal_date: null,
   contract_start_date: null,
   contract_end_date: null,
+  currency: 'USD' as const,
+  currency_display: 'US Dollar ($)',
   arr_billed_at_account: '0.00',
   arr_billed_at_hq: '0.00',
   implementation_fee: '0.00',

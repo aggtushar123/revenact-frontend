@@ -43,6 +43,8 @@ function appleCustomer(overrides: Partial<Customer> = {}): Customer {
     renewal_date: '2026-03-02',
     contract_start_date: '2024-10-26',
     contract_end_date: '2025-08-12',
+    currency: 'USD',
+    currency_display: 'US Dollar ($)',
     arr_billed_at_account: '51200.00',
     arr_billed_at_hq: '128300.00',
     implementation_fee: '70000.00',
@@ -67,7 +69,7 @@ function appleCustomer(overrides: Partial<Customer> = {}): Customer {
 
 describe('mapCustomerToOrgRow', () => {
   it('maps a fully-populated customer to match the table columns exactly', () => {
-    const row = mapCustomerToOrgRow(appleCustomer(), 'USD');
+    const row = mapCustomerToOrgRow(appleCustomer());
 
     expect(row.org).toBe('Apple Inc');
     expect(row.id).toBe(6);
@@ -83,6 +85,7 @@ describe('mapCustomerToOrgRow', () => {
     expect(row.csatColor).toBe('bg-[var(--success)]');
     expect(row.joined).toBe('19 Oct 2024');
     expect(row.renewal).toBe('2 Mar 2026');
+    expect(row.currency).toBe('USD');
     expect(row.arrAccount).toBe('$51,200.00');
     expect(row.arrHQ).toBe('$128,300.00');
     expect(row.totalSeatUtilization).toBe('84.11%');
@@ -116,8 +119,7 @@ describe('mapCustomerToOrgRow', () => {
         scope_web_app: '',
         email: '',
         phone: '',
-      }),
-      'USD'
+      })
     );
 
     expect(row.owner).toBe('Unassigned');
@@ -148,8 +150,7 @@ describe('mapCustomerToOrgRow', () => {
         churn_date: '2025-01-31',
         churn_reason: 'Budget Cut',
         churn_comment: 'Leadership restructuring led to budget realignment.',
-      }),
-      'USD'
+      })
     );
 
     expect(row.stage).toBe('Churn');
@@ -161,14 +162,18 @@ describe('mapCustomerToOrgRow', () => {
     expect(row.churnComment).toBe('Leadership restructuring led to budget realignment.');
   });
 
-  it('formats money per the org currency, with no decimal places for JPY', () => {
-    const usd = mapCustomerToOrgRow(appleCustomer(), 'USD');
+  it("formats money per this customer's own currency, with no decimal places for JPY", () => {
+    const usd = mapCustomerToOrgRow(appleCustomer());
     expect(usd.arrAccount).toBe('$51,200.00');
+    expect(usd.currency).toBe('USD');
 
     // JPY's minor unit is 0 — Intl.NumberFormat handles that
     // automatically (see formatMoney in ./formatters.ts), unlike the
-    // old hardcoded-2-decimals preview this replaced.
-    const jpy = mapCustomerToOrgRow(appleCustomer(), 'JPY');
+    // old hardcoded-2-decimals preview this replaced. A customer's own
+    // currency (Tier 1) drives this now, not a value passed in from
+    // outside — see this file's own docstring.
+    const jpy = mapCustomerToOrgRow(appleCustomer({ currency: 'JPY', currency_display: 'Japanese Yen (¥)' }));
     expect(jpy.arrAccount).toBe('¥51,200');
+    expect(jpy.currency).toBe('JPY');
   });
 });

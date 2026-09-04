@@ -2,11 +2,12 @@ import { useMemo, useRef, useState } from 'react';
 import { UploadCloud, CheckCircle2, XCircle, RotateCcw } from 'lucide-react';
 import { useAppDispatch } from '../../hooks';
 import { createCustomer } from '../../features/customers/customersSlice';
-import { LIFECYCLE_LABELS } from '../../features/customers/formatters';
+import { LIFECYCLE_LABELS, CURRENCY_OPTIONS } from '../../features/customers/formatters';
 import { parseCsv } from './csvParser';
 import { ApiError } from '../../lib/apiClient';
 import type { CustomerWritePayload } from '../../features/customers/customersSlice';
 import type { LifecycleCategory } from '../../components/organizations/tableData';
+import type { CurrencyCode } from '../../features/auth/authSlice';
 
 // Backs Settings > Entity Uploads (Navbar.tsx's own /settings/entity-uploads
 // tab, unrouted until now) — CSV bulk-create for Organizations. No new
@@ -20,7 +21,15 @@ import type { LifecycleCategory } from '../../components/organizations/tableData
 // what OrganizationFormModal's own field set already maps cleanly to)
 // — Accounts/Contacts import is a natural, structurally identical
 // follow-up, not built here.
-type FieldKey = 'name' | 'domain' | 'address' | 'lifecycle_stage' | 'joined_date' | 'renewal_date' | 'skip';
+type FieldKey =
+  | 'name'
+  | 'domain'
+  | 'address'
+  | 'lifecycle_stage'
+  | 'currency'
+  | 'joined_date'
+  | 'renewal_date'
+  | 'skip';
 
 const FIELD_OPTIONS: { value: FieldKey; label: string }[] = [
   { value: 'skip', label: '— Skip this column —' },
@@ -28,6 +37,7 @@ const FIELD_OPTIONS: { value: FieldKey; label: string }[] = [
   { value: 'domain', label: 'Domain' },
   { value: 'address', label: 'Address' },
   { value: 'lifecycle_stage', label: 'Lifecycle Stage' },
+  { value: 'currency', label: 'Currency' },
   { value: 'joined_date', label: 'Joined Date (YYYY-MM-DD)' },
   { value: 'renewal_date', label: 'Renewal Date (YYYY-MM-DD)' },
 ];
@@ -36,6 +46,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LIFECYCLE_BY_LABEL: Record<string, LifecycleCategory> = Object.fromEntries(
   Object.entries(LIFECYCLE_LABELS).map(([value, label]) => [label.toLowerCase(), value as LifecycleCategory])
 );
+const CURRENCY_CODES = new Set(CURRENCY_OPTIONS.map((c) => c.code));
 
 function guessField(header: string): FieldKey {
   const h = header.trim().toLowerCase();
@@ -43,6 +54,7 @@ function guessField(header: string): FieldKey {
   if (h === 'domain') return 'domain';
   if (h === 'address') return 'address';
   if (h.includes('lifecycle') || h.includes('stage')) return 'lifecycle_stage';
+  if (h.includes('currency')) return 'currency';
   if (h.includes('joined')) return 'joined_date';
   if (h.includes('renewal')) return 'renewal_date';
   return 'skip';
@@ -53,6 +65,18 @@ function coerceLifecycleStage(raw: string): LifecycleCategory | undefined {
   if (!v) return undefined;
   if (v in LIFECYCLE_LABELS) return v as LifecycleCategory;
   return LIFECYCLE_BY_LABEL[v];
+}
+
+// Accepts the raw 3-letter code case-insensitively (e.g. "usd" -> "USD")
+// — unlike lifecycle stage there's no display-label variant to also
+// accept, currency codes are already what a spreadsheet would contain.
+// Unrecognized -> undefined, same "silently skip this one field" rule as
+// coerceLifecycleStage/malformed dates: the row still imports, just
+// without that field set, so the backend's own org-currency default
+// applies (see CustomerSerializer.create()).
+function coerceCurrency(raw: string): CurrencyCode | undefined {
+  const v = raw.trim().toUpperCase();
+  return CURRENCY_CODES.has(v as CurrencyCode) ? (v as CurrencyCode) : undefined;
 }
 
 interface RowResult {
@@ -121,6 +145,9 @@ export function EntityUploadsPage() {
       if (field === 'lifecycle_stage') {
         const stage = coerceLifecycleStage(raw);
         if (stage) payload.lifecycle_stage = stage;
+      } else if (field === 'currency') {
+        const currency = coerceCurrency(raw);
+        if (currency) payload.currency = currency;
       } else if (field === 'joined_date' || field === 'renewal_date') {
         if (DATE_RE.test(raw)) payload[field] = raw;
       } else {

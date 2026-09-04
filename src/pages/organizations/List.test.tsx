@@ -34,6 +34,8 @@ const globex = {
   renewal_date: '2026-01-01',
   contract_start_date: '2024-01-01',
   contract_end_date: '2026-01-01',
+  currency: 'USD' as const,
+  currency_display: 'US Dollar ($)',
   arr_billed_at_account: '60000.00',
   arr_billed_at_hq: '60000.00',
   implementation_fee: '10000.00',
@@ -56,7 +58,7 @@ const globex = {
 
 const initech = { ...globex, id: 2, name: 'Initech' };
 
-function renderPage(defaultLifecycleStage = '') {
+function renderPage(defaultLifecycleStage = '', currency: 'USD' | 'EUR' = 'USD') {
   // ActionBar (rendered by List) now reads state.auth.user's own
   // organisation for Global Presets' default lifecycle stage — needs
   // the slice present even for tests that don't exercise that path.
@@ -74,8 +76,8 @@ function renderPage(defaultLifecycleStage = '') {
             id: 1,
             name: 'Acme Inc',
             slug: 'acme-inc',
-            currency: 'USD' as const,
-            currency_display: 'US Dollar ($)',
+            currency,
+            currency_display: currency === 'USD' ? 'US Dollar ($)' : 'Euro (€)',
             default_lifecycle_stage: defaultLifecycleStage,
             ai_agent_enabled: true,
             ai_agent_tone: 'professional' as const,
@@ -320,6 +322,37 @@ describe('Organizations List page — Add/Edit/Churn/Archive', () => {
     await user.click(screen.getByRole('button', { name: /Add Organization/ }));
 
     expect(await screen.findByLabelText('Lifecycle Stage')).toHaveValue('adoption');
+  });
+
+  it("Add Organization pre-selects the org's own currency (Tier 1)", async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([]));
+    const user = userEvent.setup();
+
+    renderPage('', 'EUR');
+    await screen.findByText('No organizations yet.');
+
+    await user.click(screen.getByRole('button', { name: /Add Organization/ }));
+
+    expect(await screen.findByLabelText('Currency')).toHaveValue('EUR');
+  });
+
+  it('adding an organization sends its own chosen currency, distinct from the org default', async () => {
+    const fetchMock = makeMutationFetchMock([]);
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage('', 'USD');
+    await screen.findByText('No organizations yet.');
+
+    await user.click(screen.getByRole('button', { name: /Add Organization/ }));
+    await user.type(screen.getByLabelText('Name *'), 'Globex EU');
+    await user.selectOptions(screen.getByLabelText('Currency'), 'EUR');
+    await user.click(screen.getByRole('button', { name: 'Create Organization' }));
+
+    await screen.findByText('Globex EU');
+    const postCall = fetchMock.mock.calls.find(([, o]: [string, { method?: string }?]) => o?.method === 'POST')!;
+    const body = JSON.parse((postCall[1] as { body: string }).body);
+    expect(body.currency).toBe('EUR');
   });
 
   it('editing an organization prefills the form and PATCHes the change', async () => {

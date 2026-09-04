@@ -67,8 +67,8 @@ interface LifecycleRow {
   renewal: string;
 }
 
-function customerToRow(c: Customer, currency: CurrencyCode): LifecycleRow {
-  const r = mapCustomerToOrgRow(c, currency);
+function customerToRow(c: Customer): LifecycleRow {
+  const r = mapCustomerToOrgRow(c);
   return {
     id: `c${r.id}`,
     name: r.org,
@@ -139,7 +139,7 @@ export function LifecyclePage() {
 
   const rows = useMemo(() => {
     const mapped = entityTab === 'organizations'
-      ? customers.map((c) => customerToRow(c, currency))
+      ? customers.map(customerToRow)
       : accounts.map((a) => accountToRow(a, currency));
     const filtered = selectedStage ? mapped.filter((r) => r.lifecycleCategory === selectedStage) : mapped;
     const order: Record<LifecycleCategory, number> = {
@@ -206,6 +206,12 @@ export function LifecyclePage() {
       </div>
 
       {activeStatsError && <p className="text-[12.5px] text-danger">{activeStatsError}</p>}
+      {metricTab !== 'count' && !!activeStats?.unconverted_count && (
+        <p className="text-[12.5px] text-warning">
+          {activeStats.unconverted_count} organization{activeStats.unconverted_count === 1 ? '' : 's'} excluded from
+          the totals below — no exchange rate set for their currency (Settings &gt; Currency).
+        </p>
+      )}
 
       {/* Forward funnel */}
       <div className="flex items-stretch gap-1 overflow-x-auto pb-1">

@@ -41,6 +41,8 @@ function customer(overrides: Record<string, unknown>) {
     renewal_date: null,
     contract_start_date: null,
     contract_end_date: null,
+    currency: 'USD',
+    currency_display: 'US Dollar ($)',
     arr_billed_at_account: '0.00',
     arr_billed_at_hq: '0.00',
     implementation_fee: '0.00',
@@ -198,6 +200,30 @@ describe('HealthPage', () => {
 
     const goodCard = screen.getByText('Good').closest('button')!;
     expect(within(goodCard).getByText('$20.0K')).toBeInTheDocument();
+  });
+
+  it('shows an "excluded" caveat on MRR only, only for Organizations, when some customers lack a configured exchange rate', async () => {
+    const statsWithUnconverted = { ...STATS, unconverted_count: 3 };
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/customers/stats/')) return Promise.resolve(jsonResponse(200, statsWithUnconverted));
+      if (url.includes('/accounts/stats/')) return Promise.resolve(jsonResponse(200, ACCOUNT_STATS));
+      if (url.includes('/accounts/')) return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
+      return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText('Good');
+    expect(screen.queryByText(/excluded/)).not.toBeInTheDocument(); // COUNT tab (default)
+
+    await user.click(screen.getByRole('button', { name: /mrr/i }));
+    expect(await screen.findByText(/3 organizations excluded/)).toBeInTheDocument();
+
+    // Accounts has no currency of its own — AccountStats never carries
+    // unconverted_count, so switching there never shows this caveat.
+    await user.click(screen.getByRole('button', { name: /^accounts$/i }));
+    expect(screen.queryByText(/excluded/)).not.toBeInTheDocument();
   });
 
   it('renders the real NPS breakdown', async () => {

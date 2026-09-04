@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiFetch, ApiError } from '../../lib/apiClient';
-import type { User } from '../auth/authSlice';
+import type { User, CurrencyCode } from '../auth/authSlice';
 
 // Mirrors revenact-backend's CustomerSerializer field-for-field — see
 // revenact-backend/docs/API_CONTRACTS.md -> customers. One of a *tenant's*
@@ -42,6 +42,12 @@ export interface Customer {
   renewal_date: string | null;
   contract_start_date: string | null;
   contract_end_date: string | null;
+  /** This customer's own contract currency — independent of
+   * Organisation.currency (the tenant's own reporting currency, see
+   * authSlice.ts). Defaults to the org's currency at creation unless
+   * explicitly overridden (see backend CustomerSerializer.create()). */
+  currency: CurrencyCode;
+  currency_display: string;
   arr_billed_at_account: string;
   arr_billed_at_hq: string;
   implementation_fee: string;
@@ -363,6 +369,7 @@ export interface CustomerWritePayload {
   renewal_date?: string | null;
   contract_start_date?: string | null;
   contract_end_date?: string | null;
+  currency?: CurrencyCode;
   churn_date?: string | null;
   churn_reason?: string;
   churn_comment?: string;
@@ -389,6 +396,13 @@ export interface CustomerStats {
   health: Record<Customer['health_category'], StatsBucket>;
   nps: { promoters: number; passives: number; detractors: number; score: number };
   lifecycle: Record<Customer['lifecycle_stage'], StatsBucket>;
+  /** How many customers were counted but excluded from every mrr/arr sum
+   * above because their own currency has no configured FxRate — see
+   * CurrencyPage.tsx's Exchange Rates section. Optional (not just 0)
+   * because this same type is reused for GET /accounts/stats/, whose
+   * response has no such field at all — Account has no currency of its
+   * own (see mapToAccountRow.ts), so nothing there is ever unconverted. */
+  unconverted_count?: number;
 }
 
 interface CustomersState {

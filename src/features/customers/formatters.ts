@@ -13,6 +13,23 @@ import type { CurrencyCode } from '../auth/authSlice';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// Single source of truth for "every currency this app supports" — used by
+// both Settings > Currency's own picker and OrganizationFormModal's Add/Edit
+// Organization currency field (Tier 1's per-Customer contract currency).
+// `symbol` is cosmetic (just for the dropdown option text, e.g. "USD — US
+// Dollar ($)") — actual money formatting always goes through
+// formatMoney/formatCompactMoney below, which get the real symbol/decimal
+// rules from Intl.NumberFormat, not this list.
+export const CURRENCY_OPTIONS: { code: CurrencyCode; label: string; symbol: string }[] = [
+  { code: 'USD', label: 'US Dollar', symbol: '$' },
+  { code: 'EUR', label: 'Euro', symbol: '€' },
+  { code: 'GBP', label: 'British Pound', symbol: '£' },
+  { code: 'INR', label: 'Indian Rupee', symbol: '₹' },
+  { code: 'CAD', label: 'Canadian Dollar', symbol: 'C$' },
+  { code: 'AUD', label: 'Australian Dollar', symbol: 'A$' },
+  { code: 'JPY', label: 'Japanese Yen', symbol: '¥' },
+];
+
 // Formats a "YYYY-MM-DD" date-only string without going through `Date`
 // (which would apply the local timezone and can shift the day).
 export function formatDate(iso: string | null): string {
