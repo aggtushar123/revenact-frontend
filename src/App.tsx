@@ -14,6 +14,7 @@ import { AccountDetails } from './pages/accounts/Details';
 import { List as AccountsList } from './pages/accounts/List';
 import { Board as AccountsBoard } from './pages/accounts/Board';
 import { CopilotIndex } from './pages/copilot/Index';
+import { LifecyclePage } from './pages/lifecycle/LifecyclePage';
 import { CreateScenario } from './pages/scenarios/CreateScenario';
 import { ScenariosList } from './pages/scenarios/ScenariosList';
 import { SettingsPage } from './pages/settings/SettingsPage';
@@ -112,6 +113,8 @@ function App() {
           </Route>
 
           <Route path="copilot" element={<CopilotIndex />} />
+
+          <Route path="lifecycle" element={<LifecyclePage />} />
 
           <Route path="scenarios">
             <Route index element={<ScenariosList />} />
