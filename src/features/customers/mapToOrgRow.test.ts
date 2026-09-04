@@ -67,7 +67,7 @@ function appleCustomer(overrides: Partial<Customer> = {}): Customer {
 
 describe('mapCustomerToOrgRow', () => {
   it('maps a fully-populated customer to match the table columns exactly', () => {
-    const row = mapCustomerToOrgRow(appleCustomer());
+    const row = mapCustomerToOrgRow(appleCustomer(), 'USD');
 
     expect(row.org).toBe('Apple Inc');
     expect(row.id).toBe(6);
@@ -83,8 +83,8 @@ describe('mapCustomerToOrgRow', () => {
     expect(row.csatColor).toBe('bg-[var(--success)]');
     expect(row.joined).toBe('19 Oct 2024');
     expect(row.renewal).toBe('2 Mar 2026');
-    expect(row.arrAccount).toBe('51,200.00');
-    expect(row.arrHQ).toBe('128,300.00');
+    expect(row.arrAccount).toBe('$51,200.00');
+    expect(row.arrHQ).toBe('$128,300.00');
     expect(row.totalSeatUtilization).toBe('84.11%');
     expect(row.cesPercentage).toBe('98%');
     expect(row.domain).toBe('apple.com');
@@ -116,7 +116,8 @@ describe('mapCustomerToOrgRow', () => {
         scope_web_app: '',
         email: '',
         phone: '',
-      })
+      }),
+      'USD'
     );
 
     expect(row.owner).toBe('Unassigned');
@@ -147,7 +148,8 @@ describe('mapCustomerToOrgRow', () => {
         churn_date: '2025-01-31',
         churn_reason: 'Budget Cut',
         churn_comment: 'Leadership restructuring led to budget realignment.',
-      })
+      }),
+      'USD'
     );
 
     expect(row.stage).toBe('Churn');
@@ -157,5 +159,16 @@ describe('mapCustomerToOrgRow', () => {
     expect(row.churnDate).toBe('31 Jan 2025');
     expect(row.churnReason).toBe('Budget Cut');
     expect(row.churnComment).toBe('Leadership restructuring led to budget realignment.');
+  });
+
+  it('formats money per the org currency, with no decimal places for JPY', () => {
+    const usd = mapCustomerToOrgRow(appleCustomer(), 'USD');
+    expect(usd.arrAccount).toBe('$51,200.00');
+
+    // JPY's minor unit is 0 — Intl.NumberFormat handles that
+    // automatically (see formatMoney in ./formatters.ts), unlike the
+    // old hardcoded-2-decimals preview this replaced.
+    const jpy = mapCustomerToOrgRow(appleCustomer(), 'JPY');
+    expect(jpy.arrAccount).toBe('¥51,200');
   });
 });

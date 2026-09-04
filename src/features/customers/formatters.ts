@@ -9,6 +9,7 @@
 import { formatDistanceToNowStrict } from 'date-fns';
 import type { Customer } from './customersSlice';
 import type { LifecycleCategory } from '../../components/organizations/tableData';
+import type { CurrencyCode } from '../auth/authSlice';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -20,9 +21,29 @@ export function formatDate(iso: string | null): string {
   return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
-export function formatMoney(val: string | null | undefined): string {
+// Full precision, e.g. "$1,234.56" / "¥12,345" (JPY's minor unit is 0 —
+// Intl handles that automatically, so this doesn't need a currency-specific
+// special case). Currency-aware replacement for the old formatMoney(val),
+// which returned a bare "1,234.56" and left every caller to prepend "$" by
+// hand — some (Organizations table) didn't, which was its own bug.
+export function formatMoney(val: string | number | null | undefined, currency: CurrencyCode): string {
   const n = Number(val ?? 0);
-  return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(n);
+}
+
+// Compact/tiered, e.g. "$1.8M" / "$450.0K" — for stat cards, Kanban cards,
+// and other tight spaces that can't fit full precision. Single source of
+// truth for K/M tiering, replacing what used to be 8 independently
+// hand-rolled (and already-drifted — some did .toFixed(0) on the K-tier,
+// others .toFixed(1)) copies of this exact logic.
+export function formatCompactMoney(val: string | number | null | undefined, currency: CurrencyCode): string {
+  const n = Number(val ?? 0);
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency,
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(n);
 }
 
 export function formatPercent(val: string | number | null | undefined): string {

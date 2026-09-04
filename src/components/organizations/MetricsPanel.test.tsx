@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
+import authReducer from '../../features/auth/authSlice';
 import { MetricsPanel } from './MetricsPanel';
 
 // Integration tier (see the `testing` skill): the Renewal card is the one
@@ -94,7 +95,37 @@ function makeFetchMock(responsesByWindow: Record<number, unknown>) {
 }
 
 function renderPanel() {
-  const store = configureStore({ reducer: { customers: customersReducer } });
+  const store = configureStore({
+    reducer: { customers: customersReducer, auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role: 'admin' as const,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency: 'USD' as const,
+            currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '',
+            ai_agent_enabled: true,
+            ai_agent_tone: 'professional' as const,
+            ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={['/organizations']}>

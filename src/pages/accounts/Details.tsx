@@ -12,7 +12,8 @@ import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
+import { formatCompactMoney } from '../../features/customers/formatters';
 import {
   fetchContactsForAccount,
   clearContacts,
@@ -230,16 +231,6 @@ export function AccountDetails() {
 
 // ── Metrics Banner ─────────────────────────────────────────────────────────────
 
-// Same tiering as AccountsMetricsBanner's fmtCur (organizations/Details.tsx)
-// and MetricsPanel's formatCurrency. Always computed, no "missing" fallback
-// placeholder — `arr` a real, always-present number (0 for a freshly-added
-// account is a legitimate value, not a signal to show a made-up "$1.2M").
-function formatArr(arr: number): string {
-  if (arr >= 1_000_000) return `$${(arr / 1_000_000).toFixed(1)}M`;
-  if (arr >= 1_000) return `$${(arr / 1_000).toFixed(0)}K`;
-  return `$${arr}`;
-}
-
 // Same unified glass-strip pattern as the organizations list's own
 // MetricsPanel and the parent Organization Details page's own
 // MetricsBanner (react-ts-app/src/pages/organizations/Details.tsx) — one
@@ -255,6 +246,7 @@ function formatArr(arr: number): string {
 // single-entity MetricsBanner already does (a single account has one
 // NPS score, not a real distribution across many respondents).
 function AccountMetricsBanner({ account }: { account: AccountRow }) {
+  const currency = useOrgCurrency();
   const healthScore = account.health.val;
   const healthPct = (healthScore / 10) * 100;
   const npsScore = account.npsValue;
@@ -349,7 +341,7 @@ function AccountMetricsBanner({ account }: { account: AccountRow }) {
       {/* Total ARR */}
       <div className="flex flex-col px-5 py-4 min-w-[130px] justify-center">
         <span className="text-[13px] font-semibold text-ink tracking-wide mb-2">Total ARR</span>
-        <span className="text-xl font-bold text-ink leading-tight">{formatArr(account.arr)}</span>
+        <span className="text-xl font-bold text-ink leading-tight">{formatCompactMoney(account.arr, currency)}</span>
       </div>
     </div>
   );

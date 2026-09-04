@@ -5,7 +5,8 @@ import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
+import { formatCompactMoney } from '../../features/customers/formatters';
 import {
   fetchCustomerById,
   fetchAccountsForCustomer,
@@ -41,6 +42,7 @@ export function Details() {
     pipelineRisksLoading,
     pipelineRisksError,
   } = useAppSelector((state) => state.customers);
+  const currency = useOrgCurrency();
 
   useEffect(() => {
     dispatch(fetchCustomerById(orgId));
@@ -55,7 +57,7 @@ export function Details() {
   // below still have no backend model. Accounts/Contacts/Opportunity/
   // Risk are real (one Customer has many Account/Contact/Opportunity/
   // Risk rows — see customers/models.py on the backend).
-  const organization = selectedCustomer ? mapCustomerToOrgRow(selectedCustomer) : null;
+  const organization = selectedCustomer ? mapCustomerToOrgRow(selectedCustomer, currency) : null;
   const accounts = organization
     ? accountsForCustomer.map((a) =>
         mapAccountToAccountRow(
@@ -603,6 +605,7 @@ function IconButton({ icon, minimal = false }: { icon: React.ReactNode, minimal?
 
 function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
   type MetricTab = 'count' | 'mrr' | 'arr';
+  const currency = useOrgCurrency();
   const [healthTab, setHealthTab] = useState<MetricTab>('count');
   const [lifecycleTab, setLifecycleTab] = useState<MetricTab>('count');
 
@@ -686,12 +689,8 @@ function AccountsMetricsBanner({ accounts }: { accounts: AccountRow[] }) {
     return Math.round(totalPulse / accounts.length);
   }, [accounts]);
 
-  // Format currency helper — same as MetricsPanel
-  const fmtCur = (val: number) => {
-    if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`;
-    if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}K`;
-    return `$${val}`;
-  };
+  // Format currency helper — same shared formatCompactMoney as MetricsPanel
+  const fmtCur = (val: number) => formatCompactMoney(val, currency);
 
   const getHealthVal = (cat: 'good' | 'average' | 'poor') => {
     const val = health[cat][healthTab];

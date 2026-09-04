@@ -15,6 +15,7 @@ import {
   deleteRisk,
 } from '../../features/customers/customersSlice';
 import { formatMoney, companyLabel } from '../../features/customers/formatters';
+import { useOrgCurrency } from '../../hooks';
 import { KanbanBoard, PipelineCardContent } from '../../components/pipelines/KanbanBoard';
 import {
   OPPORTUNITY_STAGE_COLUMNS,
@@ -59,6 +60,7 @@ function OpportunityListView({
   opportunities: Opportunity[];
   onRowClick: (opportunity: Opportunity) => void;
 }) {
+  const currency = useOrgCurrency();
   return (
     <div className="bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden">
       <table className="w-full text-[13px]">
@@ -82,7 +84,7 @@ function OpportunityListView({
               <td className="px-4 py-3.5">
                 <span className="px-2.5 py-1 rounded-full bg-accent-dim text-accent text-[11.5px] font-bold">{o.stage_display}</span>
               </td>
-              <td className="px-4 py-3.5 font-bold text-ink-muted">${formatMoney(o.mrr)}</td>
+              <td className="px-4 py-3.5 font-bold text-ink-muted">{formatMoney(o.mrr, currency)}</td>
               <td className="px-4 py-3.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <EntityAvatar name={companyLabel(o.companies)} className="w-6 h-6 rounded-full text-[10px]" />
@@ -114,6 +116,7 @@ function RiskListView({
   risks: Risk[];
   onRowClick: (risk: Risk) => void;
 }) {
+  const currency = useOrgCurrency();
   return (
     <div className="bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden">
       <table className="w-full text-[13px]">
@@ -137,7 +140,7 @@ function RiskListView({
               <td className="px-4 py-3.5">
                 <span className="px-2.5 py-1 rounded-full bg-accent-dim text-accent text-[11.5px] font-bold">{r.stage_display}</span>
               </td>
-              <td className="px-4 py-3.5 font-bold text-ink-muted">${formatMoney(r.mrr)}</td>
+              <td className="px-4 py-3.5 font-bold text-ink-muted">{formatMoney(r.mrr, currency)}</td>
               <td className="px-4 py-3.5">
                 <div className="flex items-center gap-2 min-w-0">
                   <EntityAvatar name={companyLabel(r.companies)} className="w-6 h-6 rounded-full text-[10px]" />
@@ -168,6 +171,7 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
   const dispatch = useDispatch<AppDispatch>();
   const { opportunities, opportunitiesLoading, opportunitiesError, risks, risksLoading, risksError, customers } =
     useSelector((state: RootState) => state.customers);
+  const currency = useOrgCurrency();
   const [activeSubTab, setActiveSubTab] = useState<'opportunities' | 'risks'>('opportunities');
   const [searchQuery, setSearchQuery] = useState('');
   // Overview banner's own COUNT/MRR toggle — previously two static
@@ -265,7 +269,7 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
                 <span className="text-[12px] font-bold text-ink-muted">Opportunities</span>
               </div>
               <div className="text-[22px] font-bold text-ink leading-none">
-                {overviewTab === 'count' ? opportunities.length : `$${formatMoney(String(totalOpportunityMrr))}`}
+                {overviewTab === 'count' ? opportunities.length : formatMoney(totalOpportunityMrr, currency)}
               </div>
             </div>
             <div>
@@ -274,7 +278,7 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
                 <span className="text-[12px] font-bold text-ink-muted">Risks</span>
               </div>
               <div className="text-[22px] font-bold text-ink leading-none">
-                {overviewTab === 'count' ? risks.length : `$${formatMoney(String(totalRiskMrr))}`}
+                {overviewTab === 'count' ? risks.length : formatMoney(totalRiskMrr, currency)}
               </div>
             </div>
           </div>
@@ -333,7 +337,7 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
             <KanbanBoard
               columns={RISK_STAGE_COLUMNS}
               entities={filteredRisks}
-              renderCard={PipelineCardContent}
+              renderCard={(entity) => PipelineCardContent(entity, currency)}
               onCardClick={setEditingRisk}
               onAddClick={handleAddRiskClick}
               onMove={(id, stage) => dispatch(updateRisk({ id, stage }))}
@@ -353,7 +357,7 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
           <KanbanBoard
             columns={OPPORTUNITY_STAGE_COLUMNS}
             entities={filteredOpportunities}
-            renderCard={PipelineCardContent}
+            renderCard={(entity) => PipelineCardContent(entity, currency)}
             onCardClick={setEditingOpportunity}
             onAddClick={handleAddClick}
             onMove={(id, stage) => dispatch(updateOpportunity({ id, stage }))}

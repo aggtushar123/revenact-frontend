@@ -1,4 +1,5 @@
 import type { Customer } from './customersSlice';
+import type { CurrencyCode } from '../auth/authSlice';
 import type { OrgRow } from '../../components/organizations/tableData';
 import {
   formatDate,
@@ -23,7 +24,7 @@ import {
 // "(Mid-Market)" tier suffix on lifecycle stage) — those are derived here
 // from real fields rather than fabricated from nothing.
 
-export function mapCustomerToOrgRow(c: Customer): OrgRow {
+export function mapCustomerToOrgRow(c: Customer, currency: CurrencyCode): OrgRow {
   const arr = Number(c.arr_billed_at_account);
   const nps = c.nps_score ?? 0;
   const csat = c.csat_score !== null ? parseFloat(c.csat_score) : null;
@@ -51,11 +52,11 @@ export function mapCustomerToOrgRow(c: Customer): OrgRow {
     csatColor: csat === null ? 'bg-line-strong' : csatColor(csat),
     joined: formatDate(c.joined_date),
     renewal: formatDate(c.renewal_date),
-    arrAccount: formatMoney(c.arr_billed_at_account),
-    arrHQ: formatMoney(c.arr_billed_at_hq),
-    implFee: formatMoney(c.implementation_fee),
-    tcv: formatMoney(c.total_contract_value),
-    tcvRenewal: formatMoney(c.total_forecasted_renewal_revenue),
+    arrAccount: formatMoney(c.arr_billed_at_account, currency),
+    arrHQ: formatMoney(c.arr_billed_at_hq, currency),
+    implFee: formatMoney(c.implementation_fee, currency),
+    tcv: formatMoney(c.total_contract_value, currency),
+    tcvRenewal: formatMoney(c.total_forecasted_renewal_revenue, currency),
     contractStart: formatDate(c.contract_start_date),
     contractEnd: formatDate(c.contract_end_date),
     productsUtilized: { primary: c.primary_product || '-', additional: c.additional_products_count },

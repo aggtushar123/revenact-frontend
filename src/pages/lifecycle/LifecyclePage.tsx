@@ -1,13 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ChevronRight, GitBranch, TrendingDown, TrendingUp } from 'lucide-react';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
 import { useAllEntities } from '../../hooks/useAllEntities';
 import { fetchAccountStats, fetchCustomerStats } from '../../features/customers/customersSlice';
 import { fetchAllPages } from '../../lib/apiClient';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
-import { LIFECYCLE_LABELS, HEALTH_COLORS, formatDate, formatMoney, companyLabel } from '../../features/customers/formatters';
+import {
+  LIFECYCLE_LABELS,
+  HEALTH_COLORS,
+  formatDate,
+  formatMoney,
+  formatCompactMoney,
+  companyLabel,
+} from '../../features/customers/formatters';
 import { EntityAvatar } from '../../components/shared';
 import type { Account, Customer } from '../../features/customers/customersSlice';
+import type { CurrencyCode } from '../../features/auth/authSlice';
 import type { LifecycleCategory } from '../../components/organizations/tableData';
 
 // The real journey every organization's (and, since Accounts carry the
@@ -41,12 +49,6 @@ const STAGE_COLORS: Record<LifecycleCategory, { text: string; bg: string; bar: s
   other: { text: 'text-ink-faint', bg: 'bg-subtle', bar: 'bg-line-strong' },
 };
 
-function formatCompactMoney(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
-}
-
 // One row shape both Customer and Account map into, so the table below
 // doesn't need to branch per cell — `company` is only ever set for an
 // Account (which org(s) it belongs to — see the backend Account
@@ -65,8 +67,8 @@ interface LifecycleRow {
   renewal: string;
 }
 
-function customerToRow(c: Customer): LifecycleRow {
-  const r = mapCustomerToOrgRow(c);
+function customerToRow(c: Customer, currency: CurrencyCode): LifecycleRow {
+  const r = mapCustomerToOrgRow(c, currency);
   return {
     id: `c${r.id}`,
     name: r.org,
@@ -82,7 +84,7 @@ function customerToRow(c: Customer): LifecycleRow {
   };
 }
 
-function accountToRow(a: Account): LifecycleRow {
+function accountToRow(a: Account, currency: CurrencyCode): LifecycleRow {
   return {
     id: `a${a.id}`,
     name: a.name,
@@ -93,7 +95,7 @@ function accountToRow(a: Account): LifecycleRow {
     health: { val: Number(a.health_score), clr: HEALTH_COLORS[a.health_category] },
     lifecycleCategory: a.lifecycle_stage,
     stageLabel: LIFECYCLE_LABELS[a.lifecycle_stage] ?? 'Other',
-    arr: formatMoney(a.arr),
+    arr: formatMoney(a.arr, currency),
     renewal: formatDate(a.renewal_date),
   };
 }
@@ -103,6 +105,7 @@ export function LifecyclePage() {
   const { stats, statsLoading, statsError, accountStats, accountStatsLoading, accountStatsError } = useAppSelector(
     (state) => state.customers
   );
+  const currency = useOrgCurrency();
   const [entityTab, setEntityTab] = useState<EntityTab>('organizations');
   const [metricTab, setMetricTab] = useState<MetricTab>('count');
   const [selectedStage, setSelectedStage] = useState<LifecycleCategory | null>(null);
@@ -135,18 +138,20 @@ export function LifecyclePage() {
   }, [activeStats]);
 
   const rows = useMemo(() => {
-    const mapped = entityTab === 'organizations' ? customers.map(customerToRow) : accounts.map(accountToRow);
+    const mapped = entityTab === 'organizations'
+      ? customers.map((c) => customerToRow(c, currency))
+      : accounts.map((a) => accountToRow(a, currency));
     const filtered = selectedStage ? mapped.filter((r) => r.lifecycleCategory === selectedStage) : mapped;
     const order: Record<LifecycleCategory, number> = {
       onboarding: 0, kickoff: 1, adoption: 2, live: 3, renewal: 4, expansion: 5, churn: 6, other: 7,
     };
     return [...filtered].sort((a, b) => order[a.lifecycleCategory] - order[b.lifecycleCategory]);
-  }, [entityTab, customers, accounts, selectedStage]);
+  }, [entityTab, customers, accounts, selectedStage, currency]);
 
   function metricValue(stage: LifecycleCategory): string {
     if (!activeStats) return '—';
     const bucket = activeStats.lifecycle[stage];
-    return metricTab === 'count' ? String(bucket.count) : formatCompactMoney(bucket.mrr);
+    return metricTab === 'count' ? String(bucket.count) : formatCompactMoney(bucket.mrr, currency);
   }
 
   function toggleStage(stage: LifecycleCategory) {
@@ -338,7 +343,7 @@ export function LifecyclePage() {
                         <span className="text-[13px] font-medium text-ink-muted">{row.health.val}</span>
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-[13px] font-medium text-ink-muted">${row.arr}</td>
+                    <td className="px-5 py-3 text-[13px] font-medium text-ink-muted">{row.arr}</td>
                     <td className="px-5 py-3 text-[13px] font-medium text-ink-muted">{row.renewal}</td>
                   </tr>
                 ))}

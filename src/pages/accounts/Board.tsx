@@ -7,9 +7,11 @@ import { AccountFormModal } from '../organizations/AccountFormModal';
 import { KanbanBoard } from '../../components/pipelines/KanbanBoard';
 import { EntityAvatar } from '../../components/shared';
 import { fetchAllAccounts, fetchCustomers, updateAccount } from '../../features/customers/customersSlice';
-import { HEALTH_COLORS, companyLabel } from '../../features/customers/formatters';
+import { HEALTH_COLORS, companyLabel, formatCompactMoney } from '../../features/customers/formatters';
 import { mapAccountToAccountRow } from '../../features/customers/mapToAccountRow';
+import { useOrgCurrency } from '../../hooks';
 import type { Account } from '../../features/customers/customersSlice';
+import type { CurrencyCode } from '../../features/auth/authSlice';
 import type { AppDispatch, RootState } from '../../store';
 
 // Real data, grouped by lifecycle_stage — the standalone Accounts
@@ -38,15 +40,6 @@ const LIFECYCLE_COLUMNS: { stage: Account['lifecycle_stage']; title: string }[] 
   { stage: 'other', title: 'Other' },
 ];
 
-// Same K/M tiering as the Organizations board's own formatArr (and the
-// standalone Account page's own) — a narrow 220px Kanban card has no
-// room for "$1,750,000.00" the way the table's own ARR column does.
-function formatArr(arr: number): string {
-  if (arr >= 1_000_000) return `$${(arr / 1_000_000).toFixed(1)}M`;
-  if (arr >= 1_000) return `$${(arr / 1_000).toFixed(0)}K`;
-  return `$${arr}`;
-}
-
 interface AccountCardEntity {
   id: number;
   stage: Account['lifecycle_stage'];
@@ -58,7 +51,11 @@ interface AccountCardEntity {
   orgLabel: string;
 }
 
-function AccountCardContent(entity: AccountCardEntity) {
+// Plain function passed as KanbanBoard's renderCard prop (called directly
+// as renderCard(entity), not rendered as JSX) — can't call useOrgCurrency()
+// itself, so currency comes in as an explicit param, threaded by Board()'s
+// own renderCard={(entity) => AccountCardContent(entity, currency)} closure.
+function AccountCardContent(entity: AccountCardEntity, currency: CurrencyCode) {
   return (
     <>
       <div className="flex items-center gap-2 mb-2.5 min-w-0">
@@ -74,7 +71,7 @@ function AccountCardContent(entity: AccountCardEntity) {
           <span className={`w-1.5 h-1.5 rounded-full ${entity.health.clr}`} />
           <span className="text-[11px] font-bold text-ink-muted">Health {entity.health.val}</span>
         </div>
-        <span className="text-[11.5px] font-bold text-accent">{formatArr(entity.arr)}</span>
+        <span className="text-[11.5px] font-bold text-accent">{formatCompactMoney(entity.arr, currency)}</span>
       </div>
       <div className="flex items-center justify-between gap-2 min-w-0">
         <span className="text-[11px] text-ink-faint font-medium truncate">{entity.owner}</span>
@@ -90,6 +87,7 @@ export function Board() {
   const { customers, allAccounts, allAccountsLoading, allAccountsError } = useSelector(
     (state: RootState) => state.customers
   );
+  const currency = useOrgCurrency();
 
   // Same debounced-search + company-filter convention as List.tsx's own.
   const [searchQuery, setSearchQuery] = useState('');
@@ -181,7 +179,7 @@ export function Board() {
             <KanbanBoard
               columns={LIFECYCLE_COLUMNS}
               entities={entities}
-              renderCard={AccountCardContent}
+              renderCard={(entity) => AccountCardContent(entity, currency)}
               onCardClick={(entity) => {
                 const account = allAccounts.find((a) => a.id === entity.id);
                 if (!account) return;

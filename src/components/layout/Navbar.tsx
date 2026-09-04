@@ -17,7 +17,7 @@ import {
   User as UserIcon,
   LogOut
 } from 'lucide-react';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
 import { logout } from '../../features/auth/authSlice';
 
 export function Navbar() {
@@ -25,6 +25,7 @@ export function Navbar() {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
+  const currency = useOrgCurrency();
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
 
@@ -49,7 +50,7 @@ export function Navbar() {
   const orgId = orgDetailMatch ? parseInt(orgDetailMatch[1], 10) : null;
   const selectedCustomer = useAppSelector((state) => state.customers.selectedCustomer);
   const organization =
-    orgId && selectedCustomer?.id === orgId ? mapCustomerToOrgRow(selectedCustomer) : null;
+    orgId && selectedCustomer?.id === orgId ? mapCustomerToOrgRow(selectedCustomer, currency) : null;
 
   // Detect account details path (/accounts/:id — not /accounts/list,
   // which \d+ excludes, same reasoning as the Contacts breadcrumb

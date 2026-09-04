@@ -3,6 +3,8 @@ import type { ReactNode } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import type { HealthCategory, LifecycleCategory } from '../organizations/tableData';
 import { fetchAccountStats } from '../../features/customers/customersSlice';
+import { formatCompactMoney } from '../../features/customers/formatters';
+import { useOrgCurrency } from '../../hooks';
 import type { AppDispatch, RootState } from '../../store';
 
 type MetricTab = 'count' | 'mrr' | 'arr';
@@ -79,12 +81,6 @@ function MetricItem({ color, label, value, formatted }: { color: string; label: 
   );
 }
 
-function formatCurrency(val: number): string {
-  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`;
-  if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}K`;
-  return `$${val}`;
-}
-
 const ZERO_BUCKET = { count: 0, mrr: 0, arr: 0 };
 
 // Same Health/NPS/Lifecycle rollup sections as the Organizations page's
@@ -106,6 +102,7 @@ export function MetricsPanel() {
 
   const dispatch = useDispatch<AppDispatch>();
   const { accountStats, accountStatsError } = useSelector((state: RootState) => state.customers);
+  const currency = useOrgCurrency();
 
   useEffect(() => {
     dispatch(fetchAccountStats());
@@ -170,7 +167,7 @@ export function MetricsPanel() {
   const getHealthValue = (cat: HealthCategory) => {
     const val = healthMetrics[cat][healthTab];
     if (healthTab === 'count') return val.toString();
-    return formatCurrency(val);
+    return formatCompactMoney(val, currency);
   };
 
   const totalCount = healthMetrics.good.count + healthMetrics.average.count + healthMetrics.poor.count;
@@ -261,7 +258,7 @@ export function MetricsPanel() {
                       height: `${heightPct}%`,
                       backgroundColor: val > 0 ? lifecycleColors[stage] : 'var(--border-default)',
                     }}
-                    title={`${stage}: ${lifecycleTab === 'count' ? val : formatCurrency(val)}`}
+                    title={`${stage}: ${lifecycleTab === 'count' ? val : formatCompactMoney(val, currency)}`}
                   />
                 );
               })}

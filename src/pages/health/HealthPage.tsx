@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Smile, Meh, Frown, ThumbsUp, Minus, ThumbsDown } from 'lucide-react';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
 import { useAllEntities } from '../../hooks/useAllEntities';
 import { fetchAccountStats, fetchCustomerStats } from '../../features/customers/customersSlice';
 import { fetchAllPages } from '../../lib/apiClient';
@@ -11,9 +11,11 @@ import {
   HEALTH_COLORS as HEALTH_DOT_COLORS,
   npsColor,
   companyLabel,
+  formatCompactMoney,
 } from '../../features/customers/formatters';
 import { EntityAvatar } from '../../components/shared';
 import type { Account, Customer } from '../../features/customers/customersSlice';
+import type { CurrencyCode } from '../../features/auth/authSlice';
 import type { HealthCategory } from '../../components/organizations/tableData';
 
 // Real health signals already live on both Customer and Account (see
@@ -48,12 +50,6 @@ const AI_PULSE_COLORS: Record<string, { text: string; bg: string }> = {
   high_risk: { text: 'text-danger', bg: 'bg-danger-dim' },
 };
 
-function formatCompactMoney(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(0)}`;
-}
-
 // One row shape both Customer and Account map into — `company` is only
 // ever set for an Account (which org(s) it belongs to).
 interface HealthRow {
@@ -71,8 +67,8 @@ interface HealthRow {
   npsColorClass: string;
 }
 
-function customerToRow(c: Customer): HealthRow {
-  const r = mapCustomerToOrgRow(c);
+function customerToRow(c: Customer, currency: CurrencyCode): HealthRow {
+  const r = mapCustomerToOrgRow(c, currency);
   return {
     id: `c${r.id}`,
     name: r.org,
@@ -112,6 +108,7 @@ export function HealthPage() {
   const { stats, statsLoading, statsError, accountStats, accountStatsLoading, accountStatsError } = useAppSelector(
     (state) => state.customers
   );
+  const currency = useOrgCurrency();
   const [entityTab, setEntityTab] = useState<EntityTab>('organizations');
   const [metricTab, setMetricTab] = useState<MetricTab>('count');
   const [selectedCategory, setSelectedCategory] = useState<HealthCategory | null>(null);
@@ -156,16 +153,16 @@ export function HealthPage() {
   }, [entityTab, customers, accounts]);
 
   const rows = useMemo(() => {
-    const mapped = entityTab === 'organizations' ? customers.map(customerToRow) : accounts.map(accountToRow);
+    const mapped = entityTab === 'organizations' ? customers.map((c) => customerToRow(c, currency)) : accounts.map(accountToRow);
     const filtered = selectedCategory ? mapped.filter((r) => r.healthCategory === selectedCategory) : mapped;
     const order: Record<HealthCategory, number> = { poor: 0, average: 1, good: 2 };
     return [...filtered].sort((a, b) => order[a.healthCategory] - order[b.healthCategory] || a.health.val - b.health.val);
-  }, [entityTab, customers, accounts, selectedCategory]);
+  }, [entityTab, customers, accounts, selectedCategory, currency]);
 
   function metricValue(category: HealthCategory): string {
     if (!activeStats) return '—';
     const bucket = activeStats.health[category];
-    return metricTab === 'count' ? String(bucket.count) : formatCompactMoney(bucket.mrr);
+    return metricTab === 'count' ? String(bucket.count) : formatCompactMoney(bucket.mrr, currency);
   }
 
   function toggleCategory(category: HealthCategory) {

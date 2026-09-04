@@ -2,16 +2,15 @@ import { useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { updateOrganisation } from '../../features/auth/authSlice';
+import { formatMoney } from '../../features/customers/formatters';
 import { ApiError } from '../../lib/apiClient';
 import type { CurrencyCode } from '../../features/auth/authSlice';
 
-// Backs Settings > Currency (Navbar.tsx's own /settings/currency tab,
-// unrouted until now). Real, admin-gated persistence via
-// Organisation.currency (see revenact-backend's own model docstring) —
-// but deliberately just the setting itself: nothing in the app yet
-// renders a symbol conditionally on it, every money value elsewhere is
-// still a hardcoded "$". That's real, separate work; this page doesn't
-// pretend otherwise.
+// Backs Settings > Currency (Navbar.tsx's own /settings/currency tab).
+// Real, admin-gated persistence via Organisation.currency (see
+// revenact-backend's own model docstring). The preview below dogfoods
+// the same currency-aware formatMoney() (features/customers/
+// formatters.ts) that now backs every money value across the app.
 const CURRENCY_OPTIONS: { code: CurrencyCode; label: string; symbol: string }[] = [
   { code: 'USD', label: 'US Dollar', symbol: '$' },
   { code: 'EUR', label: 'Euro', symbol: '€' },
@@ -33,7 +32,6 @@ export function CurrencyPage() {
 
   const savedCurrency = user?.organisation.currency ?? 'USD';
   const isDirty = selected !== savedCurrency;
-  const preview = CURRENCY_OPTIONS.find((c) => c.code === selected) ?? CURRENCY_OPTIONS[0];
 
   async function handleSave() {
     setError(null);
@@ -86,7 +84,7 @@ export function CurrencyPage() {
 
         <div className="flex flex-col gap-1">
           <span className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Preview</span>
-          <span className="text-[20px] font-bold text-ink">{preview.symbol}12,345.00</span>
+          <span className="text-[20px] font-bold text-ink">{formatMoney(12345, selected)}</span>
         </div>
 
         {error && <p className="text-[12.5px] text-danger">{error}</p>}

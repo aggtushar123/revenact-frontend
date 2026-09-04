@@ -8,6 +8,7 @@ import { ChurnOrganizationModal } from '../../components/organizations/ChurnOrga
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 import { fetchCustomers, updateCustomer } from '../../features/customers/customersSlice';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
+import { useOrgCurrency } from '../../hooks';
 import type { AppDispatch, RootState } from '../../store';
 
 export function List() {
@@ -52,7 +53,8 @@ export function List() {
     };
   }, [dispatch, debouncedSearch]);
 
-  const rows = useMemo(() => customers.map(mapCustomerToOrgRow), [customers]);
+  const currency = useOrgCurrency();
+  const rows = useMemo(() => customers.map((c) => mapCustomerToOrgRow(c, currency)), [customers, currency]);
 
   const handleNext = async () => {
     if (!next) return;

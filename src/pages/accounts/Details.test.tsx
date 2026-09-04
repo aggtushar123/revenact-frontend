@@ -7,6 +7,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { AccountDetails } from './Details';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import customersReducer from '../../features/customers/customersSlice';
+import authReducer from '../../features/auth/authSlice';
 
 // Real-shaped AccountRow, the kind organizations/Details.tsx's AccountsTab
 // passes through navigate()'s state when a row is clicked — see that
@@ -41,7 +42,37 @@ const apacDivision: AccountRow = {
 // test below reaches that tab, so `fetch` needs stubbing regardless of
 // what each test is actually asserting on.
 function renderAccountDetails(state?: { account: AccountRow }) {
-  const store = configureStore({ reducer: { customers: customersReducer } });
+  const store = configureStore({
+    reducer: { customers: customersReducer, auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role: 'admin' as const,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency: 'USD' as const,
+            currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '',
+            ai_agent_enabled: true,
+            ai_agent_tone: 'professional' as const,
+            ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[{ pathname: '/accounts/17', state }]}>
@@ -73,7 +104,7 @@ describe('AccountDetails page (/accounts/:id)', () => {
     expect(screen.getByText('Neutral')).toBeInTheDocument(); // CSM Pulse: health 4-6.9
     expect(screen.getByText('-20')).toBeInTheDocument(); // NPS, no leading '+'
     expect(screen.getByText('45%')).toBeInTheDocument();
-    expect(screen.getByText('$34K')).toBeInTheDocument();
+    expect(screen.getByText('$34.0K')).toBeInTheDocument();
 
     // A negative NPS is a detractor, not a promoter — the mock's old
     // hardcoded "Promoters 10" would fail this.
@@ -81,13 +112,13 @@ describe('AccountDetails page (/accounts/:id)', () => {
     expect(detractorsRow).toHaveTextContent('1');
   });
 
-  it('shows a real $0 ARR as $0, not the old hardcoded "$1.2M" fallback', () => {
+  it('shows a real $0 ARR as $0.0, not the old hardcoded "$1.2M" fallback', () => {
     // A freshly-Added account (Add Account) genuinely has arr=0 — the old
     // `account.arr ? ... : '1.2M'` treated that falsy-but-real 0 as
     // "missing" and substituted a made-up placeholder instead.
     renderAccountDetails({ account: { ...apacDivision, arr: 0 } });
 
-    expect(screen.getByText('$0')).toBeInTheDocument();
+    expect(screen.getByText('$0.0')).toBeInTheDocument();
     expect(screen.queryByText('$1.2M')).not.toBeInTheDocument();
   });
 
@@ -457,7 +488,37 @@ describe('AccountDetails page (/accounts/:id)', () => {
     });
 
     it('clicking an organization card navigates to its Organization Details page', async () => {
-      const store = configureStore({ reducer: { customers: customersReducer } });
+      const store = configureStore({
+    reducer: { customers: customersReducer, auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role: 'admin' as const,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency: 'USD' as const,
+            currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '',
+            ai_agent_enabled: true,
+            ai_agent_tone: 'professional' as const,
+            ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
       render(
         <Provider store={store}>
           <MemoryRouter initialEntries={[{ pathname: '/accounts/17', state: { account: apacDivision } }]}>

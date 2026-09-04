@@ -5,6 +5,7 @@ import { fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
+import authReducer from '../../features/auth/authSlice';
 import { PipelinesPage } from './PipelinesPage';
 
 // Integration tier (see the `testing` skill): real store, network mocked
@@ -58,7 +59,37 @@ const mitigatedRisk = {
 const EMPTY_CUSTOMERS_PAGE = { count: 0, next: null, previous: null, results: [] };
 
 function renderPage(view: 'board' | 'list' = 'board') {
-  const store = configureStore({ reducer: { customers: customersReducer } });
+  const store = configureStore({
+    reducer: { customers: customersReducer, auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role: 'admin' as const,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency: 'USD' as const,
+            currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '',
+            ai_agent_enabled: true,
+            ai_agent_tone: 'professional' as const,
+            ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
   render(
     <Provider store={store}>
       <PipelinesPage view={view} />

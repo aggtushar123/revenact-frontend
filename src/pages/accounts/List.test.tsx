@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
+import authReducer from '../../features/auth/authSlice';
 import { List } from './List';
 
 // Integration tier (see the `testing` skill): real store, network mocked
@@ -70,7 +71,40 @@ const EMPTY_STATS = {
 // A route stub for each click-through destination — just enough to
 // assert "navigation actually happened", not to render the real page.
 function renderPage() {
-  const store = configureStore({ reducer: { customers: customersReducer } });
+  // MetricsPanel (rendered by List) now reads state.auth.user's own
+  // organisation.currency for money formatting — needs the slice
+  // present even for tests that don't assert on formatted amounts.
+  const store = configureStore({
+    reducer: { customers: customersReducer, auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role: 'admin' as const,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency: 'USD' as const,
+            currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '',
+            ai_agent_enabled: true,
+            ai_agent_tone: 'professional' as const,
+            ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={['/accounts/list']}>

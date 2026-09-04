@@ -4,6 +4,7 @@ import { EntityAvatar } from '../shared/EntityAvatar';
 import { formatMoney, companyLabel } from '../../features/customers/formatters';
 import { PRIORITY_COLORS, pipelineOrgLabel } from './kanbanConfig';
 import type { PipelineCardEntity } from './kanbanConfig';
+import type { CurrencyCode } from '../../features/auth/authSlice';
 
 // Generic Kanban rendering shared by every stage-column board in the
 // app — originally just Opportunity/Risk (the standalone Pipelines
@@ -19,11 +20,15 @@ import type { PipelineCardEntity } from './kanbanConfig';
 // exporting a component can only export components (react-refresh/
 // only-export-components), not also that plain data.
 
-export function PipelineCardContent(entity: PipelineCardEntity) {
+// Plain function passed as KanbanBoard's own renderCard prop (called
+// directly as renderCard(entity), not rendered as JSX) — can't call
+// useOrgCurrency() itself, so currency comes in as an explicit param,
+// threaded by each page's own renderCard={(entity) => PipelineCardContent(entity, currency)} closure.
+export function PipelineCardContent(entity: PipelineCardEntity, currency: CurrencyCode) {
   return (
     <>
       <h4 className="text-[12.5px] font-bold text-ink leading-snug mb-2.5">{entity.title}</h4>
-      <div className="text-[12px] font-bold text-accent mb-3">MRR: ${formatMoney(entity.mrr)}</div>
+      <div className="text-[12px] font-bold text-accent mb-3">MRR: {formatMoney(entity.mrr, currency)}</div>
       <div className="flex items-center justify-between min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
           <EntityAvatar name={companyLabel(entity.companies)} className="w-5 h-5 rounded-full text-[9px]" />

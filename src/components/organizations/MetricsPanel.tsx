@@ -5,6 +5,8 @@ import { useDispatch, useSelector } from 'react-redux';
 import type { HealthCategory, LifecycleCategory } from './tableData';
 import { RenewalPopover } from './RenewalPopover';
 import { fetchUpcomingRenewals, fetchCustomerStats } from '../../features/customers/customersSlice';
+import { formatCompactMoney } from '../../features/customers/formatters';
+import { useOrgCurrency } from '../../hooks';
 import type { AppDispatch, RootState } from '../../store';
 
 type MetricTab = 'count' | 'mrr' | 'arr';
@@ -79,13 +81,6 @@ function MetricItem({ color, label, value, formatted }: { color: string; label: 
   );
 }
 
-// --- Format currency ---
-function formatCurrency(val: number): string {
-  if (val >= 1_000_000) return `$${(val / 1_000_000).toFixed(1)}M`;
-  if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}K`;
-  return `$${val}`;
-}
-
 interface MetricsPanelProps {
   /** Real count of onboarded organisations, from the backend. Passed in
    * as a prop (unlike the Health/NPS/Lifecycle sections and Renewal,
@@ -118,6 +113,7 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
   const { renewals, renewalsCount, renewalsLoading, renewalsError, stats, statsError } = useSelector(
     (state: RootState) => state.customers
   );
+  const currency = useOrgCurrency();
   const [renewalDays, setRenewalDays] = useState(RENEWAL_WINDOWS[0].days);
   const [renewalPanelStyle, setRenewalPanelStyle] = useState<CSSProperties | null>(null);
   const renewalWindow = RENEWAL_WINDOWS.find((w) => w.days === renewalDays) ?? RENEWAL_WINDOWS[0];
@@ -210,7 +206,7 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
   const getHealthValue = (cat: HealthCategory) => {
     const val = healthMetrics[cat][healthTab];
     if (healthTab === 'count') return val.toString();
-    return formatCurrency(val);
+    return formatCompactMoney(val, currency);
   };
 
   return (
@@ -300,7 +296,7 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
                       height: `${heightPct}%`,
                       backgroundColor: val > 0 ? lifecycleColors[stage] : 'var(--border-default)',
                     }}
-                    title={`${stage}: ${lifecycleTab === 'count' ? val : formatCurrency(val)}`}
+                    title={`${stage}: ${lifecycleTab === 'count' ? val : formatCompactMoney(val, currency)}`}
                   />
                 );
               })}

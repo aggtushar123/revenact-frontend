@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Target, DollarSign, Flame, CheckCircle2, ShieldAlert, Search, Plus, LayoutGrid, List as ListIcon } from 'lucide-react';
-import { useAppDispatch } from '../../hooks';
+import { useAppDispatch, useOrgCurrency } from '../../hooks';
 import {
   fetchOpportunitiesForCustomer,
   fetchOpportunitiesForAccount,
@@ -70,6 +70,7 @@ export function PipelinesTab({
   accountId,
 }: PipelinesTabProps) {
   const dispatch = useAppDispatch();
+  const currency = useOrgCurrency();
   const [activeSubTab, setActiveSubTab] = useState<'opportunities' | 'risks'>('opportunities');
   const [activeView, setActiveView] = useState<'list' | 'board'>('list');
   const [searchQuery, setSearchQuery] = useState('');
@@ -152,14 +153,14 @@ export function PipelinesTab({
         {activeSubTab === 'opportunities' ? (
           <>
             <PipelineStatCard title="Total Opportunities" value={opportunityStats.total.toString()} subtext="Across every stage" icon={<Target className="w-4 h-4 text-accent" />} />
-            <PipelineStatCard title="Pipeline MRR" value={`$${formatMoney(opportunityStats.totalMrr.toFixed(2))}`} subtext="Sum of open + won deals" icon={<DollarSign className="w-4 h-4 text-accent" />} />
+            <PipelineStatCard title="Pipeline MRR" value={formatMoney(opportunityStats.totalMrr, currency)} subtext="Sum of open + won deals" icon={<DollarSign className="w-4 h-4 text-accent" />} />
             <PipelineStatCard title="High Priority" value={opportunityStats.highPriority.toString()} subtext="Needs attention" icon={<Flame className="w-4 h-4 text-warning" />} />
             <PipelineStatCard title="Closed Won" value={opportunityStats.closedWon.toString()} subtext="Deals won" icon={<CheckCircle2 className="w-4 h-4 text-success" />} />
           </>
         ) : (
           <>
             <PipelineStatCard title="Total Risks" value={riskStats.total.toString()} subtext="Across every stage" icon={<ShieldAlert className="w-4 h-4 text-danger" />} />
-            <PipelineStatCard title="MRR At Risk" value={`$${formatMoney(riskStats.totalMrr.toFixed(2))}`} subtext="Sum of open + mitigated" icon={<DollarSign className="w-4 h-4 text-danger" />} />
+            <PipelineStatCard title="MRR At Risk" value={formatMoney(riskStats.totalMrr, currency)} subtext="Sum of open + mitigated" icon={<DollarSign className="w-4 h-4 text-danger" />} />
             <PipelineStatCard title="High Priority" value={riskStats.highPriority.toString()} subtext="Needs attention" icon={<Flame className="w-4 h-4 text-warning" />} />
             <PipelineStatCard title="Realised" value={riskStats.realised.toString()} subtext="Risks that materialized" icon={<CheckCircle2 className="w-4 h-4 text-ink-muted" />} />
           </>
@@ -248,7 +249,7 @@ export function PipelinesTab({
                 <KanbanBoard
                   columns={OPPORTUNITY_STAGE_COLUMNS}
                   entities={filteredOpportunities}
-                  renderCard={PipelineCardContent}
+                  renderCard={(entity) => PipelineCardContent(entity, currency)}
                   onCardClick={setEditingOpportunity}
                   onAddClick={(stage) => { setAddOpportunityDefaultStage(stage); setIsAddingOpportunity(true); }}
                   onMove={(id, stage) => dispatch(updateOpportunity({ id, stage }))}
@@ -263,7 +264,7 @@ export function PipelinesTab({
               <KanbanBoard
                 columns={RISK_STAGE_COLUMNS}
                 entities={filteredRisks}
-                renderCard={PipelineCardContent}
+                renderCard={(entity) => PipelineCardContent(entity, currency)}
                 onCardClick={setEditingRisk}
                 onAddClick={(stage) => { setAddRiskDefaultStage(stage); setIsAddingRisk(true); }}
                 onMove={(id, stage) => dispatch(updateRisk({ id, stage }))}
@@ -297,7 +298,7 @@ export function PipelinesTab({
                     <td className="p-4">
                       <span className="px-2.5 py-1 rounded-full bg-accent-dim text-accent text-[11.5px] font-bold">{o.stage_display}</span>
                     </td>
-                    <td className="p-4 font-bold text-ink-muted">${formatMoney(o.mrr)}</td>
+                    <td className="p-4 font-bold text-ink-muted">{formatMoney(o.mrr, currency)}</td>
                     {showAccountColumn && (
                       <td className="p-4">
                         <div className="flex items-center gap-2 min-w-0">
@@ -324,7 +325,7 @@ export function PipelinesTab({
                     <td className="p-4">
                       <span className="px-2.5 py-1 rounded-full bg-danger-dim text-danger text-[11.5px] font-bold">{r.stage_display}</span>
                     </td>
-                    <td className="p-4 font-bold text-ink-muted">${formatMoney(r.mrr)}</td>
+                    <td className="p-4 font-bold text-ink-muted">{formatMoney(r.mrr, currency)}</td>
                     {showAccountColumn && (
                       <td className="p-4">
                         <div className="flex items-center gap-2 min-w-0">
