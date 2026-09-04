@@ -23,6 +23,7 @@ import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
 import { CurrencyPage } from './pages/settings/CurrencyPage';
 import { GlobalPresetsPage } from './pages/settings/GlobalPresetsPage';
 import { AIAgentPage } from './pages/settings/AIAgentPage';
+import { EntityUploadsPage } from './pages/settings/EntityUploadsPage';
 import { Integrations } from './pages/integrations/Integrations';
 import { List as ContactsList } from './pages/contacts/List';
 import { ContactDetails } from './pages/contacts/Details';
@@ -133,7 +134,7 @@ function App() {
             <Route index element={<Navigate to="data" replace />} />
             <Route path="data" element={<SettingsPage />} />
             <Route path="currency" element={<CurrencyPage />} />
-            <Route path="entity-uploads" element={<SettingPlaceholder title="Entity Uploads" />} />
+            <Route path="entity-uploads" element={<EntityUploadsPage />} />
             <Route path="webhooks" element={<SettingPlaceholder title="Webhooks" />} />
             <Route path="activities" element={<SettingPlaceholder title="Activities" />} />
             <Route path="global-presets" element={<GlobalPresetsPage />} />
