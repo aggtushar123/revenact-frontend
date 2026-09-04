@@ -15,6 +15,7 @@ import { List as AccountsList } from './pages/accounts/List';
 import { Board as AccountsBoard } from './pages/accounts/Board';
 import { CopilotIndex } from './pages/copilot/Index';
 import { CreateScenario } from './pages/scenarios/CreateScenario';
+import { ScenariosList } from './pages/scenarios/ScenariosList';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
 import { Integrations } from './pages/integrations/Integrations';
@@ -111,8 +112,14 @@ function App() {
           </Route>
 
           <Route path="copilot" element={<CopilotIndex />} />
-          <Route path="scenarios/create" element={<CreateScenario />} />
-          
+
+          <Route path="scenarios">
+            <Route index element={<ScenariosList />} />
+            <Route path="create" element={<CreateScenario />} />
+            <Route path=":id" element={<CreateScenario />} />
+          </Route>
+
+
           <Route path="settings">
             <Route index element={<Navigate to="data" replace />} />
             <Route path="data" element={<SettingsPage />} />

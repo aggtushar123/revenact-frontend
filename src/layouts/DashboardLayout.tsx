@@ -4,7 +4,10 @@ import { Navbar } from '../components/layout/Navbar';
 
 export function DashboardLayout() {
   const location = useLocation();
-  const isScenarios = location.pathname.includes('/scenarios');
+  // Only the builder (/scenarios/create, /scenarios/:id) wants the
+  // full-canvas, no-Navbar treatment — /scenarios itself is a plain
+  // list page like any other, with the shared Navbar above it.
+  const isScenarios = location.pathname.startsWith('/scenarios/');
 
   return (
     <div className="flex bg-white h-screen w-screen overflow-hidden text-gray-900 font-sans">

@@ -1,24 +1,61 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Info, ChevronDown, Filter, Settings, Trash2 } from 'lucide-react';
-import type { ScenarioNodeDetail } from './types';
+import type { ScenarioNodeData, ScenarioNodeDetail } from './types';
 
 interface EditNodePaneProps {
   node: ScenarioNodeDetail | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: () => void;
+  /** Only the fields this pane actually collects real values for
+   * (label, and Send Email/On Event's own selects — see this
+   * component's own docstring) are included; the caller merges them
+   * onto the node's existing data rather than replacing it wholesale. */
+  onSave: (updates: Partial<ScenarioNodeData>) => void;
 }
 
+// Every per-action content block below (Filter/Condition/Assign
+// Playbook/Create Pipeline/Slack Message) is still an illustrative
+// mockup — none of them read from or write to real data, since there's
+// no real Playbook/Slack/email-integration/attribute-picker concept
+// backing any of this yet (see CreateScenario.tsx's own docstring on
+// why: no backend at all). Only `label` (every node type) and Send
+// Email/On Event's own selects are real, persisted state — this pane
+// re-syncs them from `node.data` whenever a different node is opened,
+// rather than leaking the previous node's own selections into it.
 export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProps) {
+  const [label, setLabel] = useState('');
   const [isEmailDropdownOpen, setIsEmailDropdownOpen] = useState(false);
   const [selectedEmailService, setSelectedEmailService] = useState<string>('');
   const [selectedEventTrigger, setSelectedEventTrigger] = useState<string>('');
   const [selectedOrgEnters, setSelectedOrgEnters] = useState<string>('');
   const [isToDropdownOpen, setIsToDropdownOpen] = useState(false);
 
+  useEffect(() => {
+    if (!node) return;
+    setLabel(node.data.label ?? '');
+    setSelectedEmailService(node.data.emailService ?? '');
+    setSelectedEventTrigger(node.data.eventTrigger ?? '');
+    setSelectedOrgEnters(node.data.orgEnters ?? '');
+    setIsEmailDropdownOpen(false);
+    setIsToDropdownOpen(false);
+    // Re-sync whenever a *different* node is opened for editing — not
+    // on every keystroke, which would fight the fields above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node?.id]);
+
   if (!isOpen || !node) return null;
 
   const action = node.data?.action || '';
+
+  function handleSave() {
+    const updates: Partial<ScenarioNodeData> = { label: label.trim() || node!.data.label };
+    if (action === 'Send Email') updates.emailService = selectedEmailService;
+    if (action === 'On Event') {
+      updates.eventTrigger = selectedEventTrigger;
+      updates.orgEnters = selectedOrgEnters;
+    }
+    onSave(updates);
+  }
 
   let title = `Edit ${action} Node`;
   let subtitle = '';
@@ -564,7 +601,11 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
   );
 
   return (
-    <div className="fixed inset-y-0 right-0 w-[550px] bg-white shadow-2xl z-[100] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-300">
+    <div
+      role="dialog"
+      aria-label={title}
+      className="fixed inset-y-0 right-0 w-[550px] bg-white shadow-2xl z-[100] flex flex-col border-l border-gray-200 animate-in slide-in-from-right duration-300"
+    >
       {/* Header */}
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-white shrink-0">
         <h2 className="text-[16px] font-bold text-indigo-600">{title}</h2>
@@ -575,6 +616,22 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-6 flex flex-col">
+        {/* Label — the one field every node type actually has and
+            saves, shown on the canvas node itself (see CustomNodes.tsx). */}
+        <div className="flex flex-col gap-1.5 mb-5">
+          <label htmlFor="scenario-node-label" className="text-[12px] font-bold text-gray-500">
+            Node Label
+          </label>
+          <input
+            id="scenario-node-label"
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder={`New ${action}`}
+            className="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-[13px] text-gray-800 focus:outline-none focus:ring-1 focus:ring-indigo-500/20 focus:border-rose-500 transition-all"
+          />
+        </div>
+
         {action === 'Filter' && renderFilterContent()}
         {action === 'Condition' && renderConditionContent()}
         {action === 'Assign Playbook' && renderAssignPlaybookContent()}
@@ -600,8 +657,8 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
         >
           Cancel
         </button>
-        <button 
-          onClick={onSave}
+        <button
+          onClick={handleSave}
           className="px-6 py-2 bg-indigo-600 text-white rounded-lg text-[13px] font-semibold hover:bg-indigo-700 transition-all h-[42px] min-w-[120px] shadow-sm"
         >
           Save & Close
