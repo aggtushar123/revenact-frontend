@@ -101,3 +101,27 @@ function extractErrorMessage(body: unknown): string | null {
   }
   return null;
 }
+
+interface Page<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+// Walks every page of a paginated (DRF-style {count,next,previous,results})
+// endpoint — extracted from SettingsPage.tsx, which was the first caller to
+// need "every record, not just the first page" (Usage% needs the real,
+// whole-tenant fill rate). Not every list endpoint is paginated this way —
+// Opportunity/Risk/Scenario return a plain array (see those views' own
+// docstrings on why) — for those, call apiFetch<T[]> directly instead.
+export async function fetchAllPages<T>(endpoint: string): Promise<T[]> {
+  const all: T[] = [];
+  let url: string | undefined = endpoint;
+  while (url) {
+    const page: Page<T> = await apiFetch<Page<T>>(url);
+    all.push(...page.results);
+    url = page.next ?? undefined;
+  }
+  return all;
+}

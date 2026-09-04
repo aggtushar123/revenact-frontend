@@ -1,6 +1,7 @@
-import { ChevronLeft, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronDown, Play } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 import { formatRelativeTime } from '../../features/customers/formatters';
+import { APPLY_TO_LABELS } from './types';
 import type { ApplyToTarget } from './types';
 
 interface ScenarioHeaderProps {
@@ -8,6 +9,15 @@ interface ScenarioHeaderProps {
   onNameChange: (name: string) => void;
   applyTo: ApplyToTarget;
   onApplyToChange: (target: ApplyToTarget) => void;
+  /** Gates On Event auto-execution only — see revenact-backend's
+   * Scenario.is_active docstring. Run Now ignores this. */
+  isActive: boolean;
+  onIsActiveChange: (active: boolean) => void;
+  /** Only true once the scenario has been saved at least once (has a
+   * real id) and apply_to === 'organizations' — see engine.py's own
+   * docstring on why only that target type is runnable in v1. */
+  canRun: boolean;
+  onRunNowClick: () => void;
   /** Saves in place — stays on the builder. */
   onSave: () => void;
   /** Saves, then returns to the scenarios list. */
@@ -22,6 +32,10 @@ export function ScenarioHeader({
   onNameChange,
   applyTo,
   onApplyToChange,
+  isActive,
+  onIsActiveChange,
+  canRun,
+  onRunNowClick,
   onSave,
   onSaveAndClose,
   lastSavedAt,
@@ -48,7 +62,7 @@ export function ScenarioHeader({
           <span className="text-[13px] text-ink-faint font-medium">Apply scenario to:</span>
 
           <div className="flex items-center gap-4">
-            {(['Organizations', 'Accounts', 'Contacts'] as const).map((option) => (
+            {(Object.keys(APPLY_TO_LABELS) as ApplyToTarget[]).map((option) => (
               <label key={option} className="flex items-center gap-2 cursor-pointer group">
                 <input
                   type="radio"
@@ -65,12 +79,34 @@ export function ScenarioHeader({
                 <span className={`text-[13px] font-semibold transition-colors ${
                   applyTo === option ? 'text-ink' : 'text-ink-faint group-hover:text-ink-muted'
                 }`}>
-                  {option}
+                  {APPLY_TO_LABELS[option]}
                 </span>
               </label>
             ))}
           </div>
         </div>
+
+        <div className="h-4 w-px bg-line mt-0.5" />
+
+        <label className="flex items-center gap-2.5 cursor-pointer" title="Gates On Event auto-execution — Run Now works either way.">
+          <button
+            type="button"
+            role="switch"
+            aria-checked={isActive}
+            aria-label="Scenario active"
+            onClick={() => onIsActiveChange(!isActive)}
+            className={`w-8 h-[18px] rounded-full relative transition-colors ${isActive ? 'bg-success' : 'bg-line-strong'}`}
+          >
+            <span
+              className={`absolute top-[2px] w-[14px] h-[14px] rounded-full bg-surface shadow-sm transition-transform ${
+                isActive ? 'translate-x-[16px]' : 'translate-x-[2px]'
+              }`}
+            />
+          </button>
+          <span className={`text-[13px] font-semibold ${isActive ? 'text-success' : 'text-ink-faint'}`}>
+            {isActive ? 'Active' : 'Inactive'}
+          </span>
+        </label>
       </div>
 
       <div className="flex items-center gap-3">
@@ -79,6 +115,16 @@ export function ScenarioHeader({
             Saved {formatRelativeTime(lastSavedAt)}
           </span>
         )}
+
+        <button
+          onClick={onRunNowClick}
+          disabled={!canRun}
+          title={canRun ? undefined : 'Save an Organizations scenario first to run it.'}
+          className="flex items-center gap-1.5 px-4 py-1.5 rounded-[6px] text-[13px] font-bold border border-line-strong text-ink-muted hover:bg-subtle transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          <Play className="w-3.5 h-3.5" />
+          Run Now
+        </button>
 
         {/* Save button with dropdown */}
         <div className="flex items-center group relative">

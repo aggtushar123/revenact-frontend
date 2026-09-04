@@ -1,6 +1,26 @@
 import { useEffect, useState } from 'react';
-import { X, Info, ChevronDown, Filter, Settings, Trash2 } from 'lucide-react';
+import { X, Info, ChevronDown, Settings } from 'lucide-react';
+import { LIFECYCLE_LABELS } from '../../features/customers/formatters';
+import type { LifecycleCategory } from '../../components/organizations/tableData';
 import type { ScenarioNodeData, ScenarioNodeDetail } from './types';
+
+// The fixed, real attribute allowlist services/scenarios/engine.py's
+// CONDITION_ATTRIBUTES accepts — see that module's own docstring on why
+// it's a small allowlist rather than "any Customer field".
+const CONDITION_ATTRIBUTES: { value: NonNullable<ScenarioNodeData['conditionAttribute']>; label: string }[] = [
+  { value: 'lifecycle_stage', label: 'Lifecycle Stage' },
+  { value: 'health_score', label: 'Health Score' },
+  { value: 'nps_score', label: 'NPS Score' },
+];
+
+const CONDITION_OPERATORS: { value: NonNullable<ScenarioNodeData['conditionOperator']>; label: string }[] = [
+  { value: 'equals', label: 'is equal to' },
+  { value: 'not_equals', label: 'is not equal to' },
+  { value: 'greater_than', label: 'is greater than' },
+  { value: 'less_than', label: 'is less than' },
+];
+
+const LIFECYCLE_OPTIONS = Object.entries(LIFECYCLE_LABELS) as [LifecycleCategory, string][];
 
 interface EditNodePaneProps {
   node: ScenarioNodeDetail | null;
@@ -29,6 +49,13 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
   const [selectedEventTrigger, setSelectedEventTrigger] = useState<string>('');
   const [selectedOrgEnters, setSelectedOrgEnters] = useState<string>('');
   const [isToDropdownOpen, setIsToDropdownOpen] = useState(false);
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailBody, setEmailBody] = useState('');
+  const [taskTitle, setTaskTitle] = useState('');
+  const [attributeValue, setAttributeValue] = useState('');
+  const [conditionAttribute, setConditionAttribute] = useState<ScenarioNodeData['conditionAttribute']>('lifecycle_stage');
+  const [conditionOperator, setConditionOperator] = useState<ScenarioNodeData['conditionOperator']>('equals');
+  const [conditionValue, setConditionValue] = useState('');
 
   useEffect(() => {
     if (!node) return;
@@ -36,6 +63,13 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
     setSelectedEmailService(node.data.emailService ?? '');
     setSelectedEventTrigger(node.data.eventTrigger ?? '');
     setSelectedOrgEnters(node.data.orgEnters ?? '');
+    setEmailSubject(node.data.emailSubject ?? '');
+    setEmailBody(node.data.emailBody ?? '');
+    setTaskTitle(node.data.taskTitle ?? '');
+    setAttributeValue(node.data.attributeValue ?? '');
+    setConditionAttribute(node.data.conditionAttribute ?? 'lifecycle_stage');
+    setConditionOperator(node.data.conditionOperator ?? 'equals');
+    setConditionValue(node.data.conditionValue ?? '');
     setIsEmailDropdownOpen(false);
     setIsToDropdownOpen(false);
     // Re-sync whenever a *different* node is opened for editing — not
@@ -49,11 +83,22 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
 
   function handleSave() {
     const updates: Partial<ScenarioNodeData> = { label: label.trim() || node!.data.label };
-    if (action === 'Send Email') updates.emailService = selectedEmailService;
+    if (action === 'Send Email') {
+      updates.emailService = selectedEmailService;
+      updates.emailSubject = emailSubject;
+      updates.emailBody = emailBody;
+    }
     if (action === 'On Event') {
       updates.eventTrigger = selectedEventTrigger;
       updates.orgEnters = selectedOrgEnters;
     }
+    if (action === 'Condition' || action === 'Filter') {
+      updates.conditionAttribute = conditionAttribute;
+      updates.conditionOperator = conditionOperator;
+      updates.conditionValue = conditionValue;
+    }
+    if (action === 'Create Task') updates.taskTitle = taskTitle;
+    if (action === 'Set Attribute') updates.attributeValue = attributeValue;
     onSave(updates);
   }
 
@@ -77,154 +122,30 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
     title = 'Edit Send Email Action Node';
   } else if (action === 'On Event') {
     title = 'Edit On Event Trigger Node';
+  } else if (action === 'Create Task') {
+    title = 'Edit Create Task Action Node';
+  } else if (action === 'Set Attribute') {
+    title = 'Edit Set Attribute Action Node';
+  } else if (action === 'Churn Entity') {
+    title = 'Edit Churn Entity Action Node';
   }
 
   const renderFilterContent = () => (
     <>
       <p className="text-[14px] text-ink-muted mb-4">{subtitle}</p>
-      
-      <div className="flex flex-col gap-4 mb-6">
-         <div className="flex items-center gap-2 text-[12px] font-medium text-ink-muted mb-1">
-            Select Currency and Timezone <Info className="w-3 h-3" />
-         </div>
-         
-         <div className="flex gap-3">
-            <div className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg flex items-center justify-between cursor-pointer hover:border-line-strong">
-               <span className="text-[13px] text-ink-muted font-medium">USD</span>
-               <ChevronDown className="w-3.5 h-3.5 text-ink-faint" />
-            </div>
-            <div className="flex-[2] px-3 py-2 bg-surface border border-line rounded-lg flex items-center justify-between cursor-pointer hover:border-line-strong">
-               <span className="text-[13px] text-ink-muted font-medium">(UTC+00:00) Europe/London</span>
-               <ChevronDown className="w-3.5 h-3.5 text-ink-faint" />
-            </div>
-         </div>
-      </div>
-
-      <div className="flex flex-col gap-3">
-         <div className="flex gap-2">
-            <div className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg flex items-center justify-between cursor-pointer hover:border-line-strong">
-               <span className="text-[13px] text-ink-muted">Organization</span>
-               <ChevronDown className="w-3.5 h-3.5 text-ink-faint" />
-            </div>
-            <div className="flex gap-1.5">
-               <button className="w-9 h-9 flex items-center justify-center bg-accent-dim text-accent rounded-lg border border-accent/30"><Filter className="w-4 h-4" /></button>
-               <button className="w-9 h-9 flex items-center justify-center bg-accent-dim text-accent rounded-lg border border-accent/30"><Settings className="w-4 h-4" /></button>
-            </div>
-         </div>
-
-         {/* Condition Logic Builder Mockup */}
-         <div className="bg-accent-dim/30 border border-accent/30 rounded-xl p-6 flex flex-col gap-4 relative overflow-hidden">
-            <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent/40" />
-            
-            {/* Row 1 */}
-            <div className="flex items-center gap-3">
-               <div className="flex-1 bg-surface border border-line-subtle rounded-lg p-3 flex items-center justify-between shadow-sm">
-                  <div className="flex items-center gap-2">
-                     <span className="text-[13px] text-accent font-medium">Lifecycle Stage</span>
-                     <span className="text-[13px] text-ink-muted italic">includes</span>
-                     <span className="px-2 py-0.5 bg-accent-dim text-accent rounded text-[12px] font-semibold border border-accent/30 flex items-center gap-1.5">
-                        Live (Enterprise)
-                        <X className="w-3 h-3 cursor-pointer hover:text-accent-hover" />
-                     </span>
-                  </div>
-                  <X className="w-4 h-4 text-ink-faint cursor-pointer hover:text-ink-muted" />
-               </div>
-            </div>
-
-            {/* Connector */}
-            <div className="flex items-center gap-3">
-               <div className="w-[100px] px-3 py-1.5 bg-surface border border-line-subtle rounded-lg flex items-center justify-between cursor-pointer shadow-sm">
-                  <span className="text-[12px] font-bold text-ink-muted uppercase tracking-wide">And</span>
-                  <ChevronDown className="w-3 h-3 text-ink-faint" />
-               </div>
-               
-               <div className="flex-1 bg-surface border border-line-subtle rounded-lg p-3 flex items-center justify-between shadow-sm relative group">
-                  <div className="flex items-center gap-2">
-                     <span className="text-[13px] text-accent font-medium font-inter">Product Utilization %</span>
-                     <span className="text-[13px] text-ink-muted italic">is less than</span>
-                     <span className="px-2 py-0.5 bg-surface text-ink-muted rounded text-[13px] font-bold border border-line-subtle flex items-center gap-1.5">
-                        60
-                        <X className="w-3 h-3 cursor-pointer hover:text-ink" />
-                     </span>
-                  </div>
-                  <X className="w-4 h-4 text-ink-faint cursor-pointer hover:text-ink-muted" />
-               </div>
-
-               <button className="p-2 text-ink-faint hover:text-danger transition-colors">
-                  <Trash2 className="w-4 h-4" />
-               </button>
-            </div>
-
-            <div className="flex gap-2 mt-2">
-               <button className="w-8 h-8 flex items-center justify-center bg-surface border border-line rounded-lg shadow-sm text-accent hover:bg-subtle"><Filter className="w-3.5 h-3.5" /></button>
-               <button className="w-8 h-8 flex items-center justify-center bg-surface border border-line rounded-lg shadow-sm text-accent hover:bg-subtle font-bold text-xs">{"{ }"}</button>
-            </div>
-         </div>
-      </div>
+      {renderConditionClause('Stops the flow here for any organization that does not match:')}
     </>
   );
 
   const renderConditionContent = () => (
     <>
       <p className="text-[14px] text-ink-muted mb-6">{subtitle}</p>
-      
+
       <div className="flex flex-col gap-6">
         <div>
           <h3 className="text-[14px] font-bold text-ink mb-3">"Yes" Flow:</h3>
           <p className="text-[13.5px] font-semibold text-ink-muted mb-4">Organizations that match the following condition:</p>
-
-          <div className="flex flex-col gap-4 mb-4">
-            <div className="flex items-center gap-2 text-[12px] font-medium text-ink-muted mb-1">
-               Select Currency and Timezone <Info className="w-3 h-3" />
-            </div>
-            <div className="flex gap-3">
-               <div className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg flex items-center justify-between cursor-pointer hover:border-line-strong">
-                  <span className="text-[13px] text-ink-muted font-medium">USD</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-ink-faint" />
-               </div>
-               <div className="flex-[2] px-3 py-2 bg-surface border border-line rounded-lg flex items-center justify-between cursor-pointer hover:border-line-strong">
-                  <span className="text-[13px] text-ink-muted font-medium">(UTC+00:00) Europe/London</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-ink-faint" />
-               </div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3">
-            <div className="flex gap-2">
-               <div className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg flex items-center justify-between cursor-pointer hover:border-line-strong">
-                  <span className="text-[13px] text-ink-muted">Organization</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-ink-faint" />
-               </div>
-               <div className="flex gap-1.5">
-                  <button className="w-9 h-9 flex items-center justify-center bg-accent-dim text-accent rounded-lg border border-accent/30"><Filter className="w-4 h-4" /></button>
-                  <button className="w-9 h-9 flex items-center justify-center bg-accent-dim text-accent rounded-lg border border-accent/30"><Settings className="w-4 h-4" /></button>
-               </div>
-            </div>
-
-            <div className="bg-accent-dim/30 border border-accent/30 rounded-xl p-6 flex flex-col gap-4 relative overflow-hidden">
-               <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent/40" />
-               <div className="flex items-center gap-3">
-                  <div className="flex-1 bg-surface border border-line-subtle rounded-lg p-3 flex items-center justify-between shadow-sm">
-                     <div className="flex items-center gap-2">
-                        <span className="text-[13px] text-accent font-medium">Account Tier Segment</span>
-                        <span className="text-[13px] text-ink-muted italic">includes</span>
-                        <span className="px-2 py-0.5 bg-accent-dim text-accent rounded text-[12px] font-semibold border border-accent/30 flex items-center gap-1.5">
-                           Enterprise or Strategic / Top Tier
-                           <X className="w-3 h-3 cursor-pointer hover:text-accent-hover" />
-                        </span>
-                     </div>
-                     <X className="w-4 h-4 text-ink-faint cursor-pointer hover:text-ink-muted" />
-                  </div>
-                  <button className="p-2 text-ink-faint hover:text-danger transition-colors">
-                     <Trash2 className="w-4 h-4" />
-                  </button>
-               </div>
-               <div className="flex gap-2 mt-2">
-                  <button className="w-8 h-8 flex items-center justify-center bg-surface border border-line rounded-lg shadow-sm text-accent hover:bg-subtle"><Filter className="w-3.5 h-3.5" /></button>
-                  <button className="w-8 h-8 flex items-center justify-center bg-surface border border-line rounded-lg shadow-sm text-accent hover:bg-subtle font-bold text-xs">{"{ }"}</button>
-               </div>
-            </div>
-          </div>
+          {renderConditionClause()}
         </div>
 
         <div className="pt-2">
@@ -235,12 +156,66 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
         <div className="bg-info-dim border border-info/30 rounded-lg p-4 flex gap-3 text-info text-[13px] leading-relaxed mt-2">
           <Info className="w-5 h-5 shrink-0 mt-0.5" />
           <p>
-            <strong>Note:</strong> You will need to create two branches. The first follows the "Yes" path, where all conditions above are met. The second follows the "No" path.
+            <strong>Note:</strong> Wire up the "Yes"/"No" edges out of this node by opening each one and setting its
+            label — see the canvas's own edge "Set Label" pill. This clause is checked for real when the scenario runs.
           </p>
         </div>
       </div>
     </>
   );
+
+  // Condition/Filter's real, single-clause config — deliberately
+  // narrower than the fancier multi-clause canvas mockup this replaces:
+  // one attribute (from a fixed allowlist) + operator + value, exactly
+  // what services/scenarios/engine.py's own CONDITION_ATTRIBUTES/
+  // _evaluate_condition actually reads at run time.
+  function renderConditionClause(introText?: string) {
+    return (
+      <div className="bg-accent-dim/30 border border-accent/30 rounded-xl p-4 flex flex-col gap-3">
+        {introText && <p className="text-[12.5px] text-ink-muted">{introText}</p>}
+        <div className="flex items-center gap-2">
+          <select
+            value={conditionAttribute}
+            onChange={(e) => setConditionAttribute(e.target.value as ScenarioNodeData['conditionAttribute'])}
+            className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+          >
+            {CONDITION_ATTRIBUTES.map((attr) => (
+              <option key={attr.value} value={attr.value}>{attr.label}</option>
+            ))}
+          </select>
+          <select
+            value={conditionOperator}
+            onChange={(e) => setConditionOperator(e.target.value as ScenarioNodeData['conditionOperator'])}
+            className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+          >
+            {CONDITION_OPERATORS.map((op) => (
+              <option key={op.value} value={op.value}>{op.label}</option>
+            ))}
+          </select>
+        </div>
+        {conditionAttribute === 'lifecycle_stage' ? (
+          <select
+            value={conditionValue}
+            onChange={(e) => setConditionValue(e.target.value)}
+            className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+          >
+            <option value="" disabled>Select a value</option>
+            {LIFECYCLE_OPTIONS.map(([value, lbl]) => (
+              <option key={value} value={value}>{lbl}</option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="number"
+            value={conditionValue}
+            onChange={(e) => setConditionValue(e.target.value)}
+            placeholder="Value"
+            className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+          />
+        )}
+      </div>
+    );
+  }
 
   const renderAssignPlaybookContent = () => (
     <>
@@ -396,9 +371,37 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
       </div>
 
       <div className="p-6 flex flex-col gap-6 flex-1 overflow-y-auto bg-subtle/30" onClick={() => isEmailDropdownOpen && setIsEmailDropdownOpen(false)}>
-        <div onClick={(e) => e.stopPropagation()}>
-          <p className="text-[13.5px] text-ink-muted mb-4">Select the service you want to use to send the email</p>
-          
+        <div onClick={(e) => e.stopPropagation()} className="flex flex-col gap-5">
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="scenario-email-subject" className="text-[12px] font-bold text-ink-muted flex items-center">
+              Subject <span className="text-danger ml-1">*</span>
+            </label>
+            <input
+              id="scenario-email-subject"
+              type="text"
+              value={emailSubject}
+              onChange={(e) => setEmailSubject(e.target.value)}
+              placeholder="e.g. Checking in on your onboarding"
+              className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="scenario-email-body" className="text-[12px] font-bold text-ink-muted flex items-center">
+              Body <span className="text-danger ml-1">*</span>
+            </label>
+            <textarea
+              id="scenario-email-body"
+              rows={5}
+              value={emailBody}
+              onChange={(e) => setEmailBody(e.target.value)}
+              placeholder="Enter message"
+              className="w-full p-3 bg-surface border border-line rounded-lg text-[13px] text-ink resize-none focus:outline-none focus:border-accent"
+            />
+          </div>
+
+          <p className="text-[13.5px] text-ink-muted">Select the service you want to use to send the email</p>
+
           <div className="flex flex-col gap-1.5 relative group">
             <label className="text-[12px] font-bold text-ink-muted flex items-center">
               Email service type <span className="text-danger ml-1">*</span>
@@ -600,6 +603,54 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
     </div>
   );
 
+  const renderCreateTaskContent = () => (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="scenario-task-title" className="text-[12px] font-bold text-ink-muted flex items-center">
+        Task title <span className="text-danger ml-1">*</span>
+      </label>
+      <input
+        id="scenario-task-title"
+        type="text"
+        value={taskTitle}
+        onChange={(e) => setTaskTitle(e.target.value)}
+        placeholder="e.g. Follow up on onboarding"
+        className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+      />
+      <p className="text-[12px] text-ink-faint mt-1">
+        Created with a due date of today, medium priority, assigned to "Scenario Automation".
+      </p>
+    </div>
+  );
+
+  const renderSetAttributeContent = () => (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="scenario-attribute-value" className="text-[12px] font-bold text-ink-muted flex items-center">
+        Set Lifecycle Stage to <span className="text-danger ml-1">*</span>
+      </label>
+      <select
+        id="scenario-attribute-value"
+        value={attributeValue}
+        onChange={(e) => setAttributeValue(e.target.value)}
+        className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+      >
+        <option value="" disabled>Select a value</option>
+        {LIFECYCLE_OPTIONS.map(([value, lbl]) => (
+          <option key={value} value={value}>{lbl}</option>
+        ))}
+      </select>
+      <p className="text-[12px] text-ink-faint mt-1">
+        Only Lifecycle Stage is settable from a scenario today.
+      </p>
+    </div>
+  );
+
+  const renderChurnEntityContent = () => (
+    <div className="bg-danger-dim border border-danger/30 rounded-lg p-4 text-danger text-[13px] leading-relaxed">
+      <strong>No further configuration needed.</strong> When this node runs, the organization's
+      lifecycle stage is set to Churned.
+    </div>
+  );
+
   return (
     <div
       role="dialog"
@@ -639,9 +690,12 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
         {action === 'Slack Message' && renderSlackMessageContent()}
         {action === 'Send Email' && renderSendEmailContent()}
         {action === 'On Event' && renderOnEventContent()}
-        
+        {action === 'Create Task' && renderCreateTaskContent()}
+        {action === 'Set Attribute' && renderSetAttributeContent()}
+        {action === 'Churn Entity' && renderChurnEntityContent()}
+
         {/* Fallback for unhandled nodes */}
-        {!['Filter', 'Condition', 'Assign Playbook', 'Create Pipeline', 'Slack Message', 'Send Email', 'On Event'].includes(action) && (
+        {!['Filter', 'Condition', 'Assign Playbook', 'Create Pipeline', 'Slack Message', 'Send Email', 'On Event', 'Create Task', 'Set Attribute', 'Churn Entity'].includes(action) && (
            <div className="flex flex-col items-center justify-center py-12 text-ink-faint">
              <Settings className="w-12 h-12 mb-4 opacity-20" />
              <p className="text-[14px]">Edit pane for {action} coming soon.</p>

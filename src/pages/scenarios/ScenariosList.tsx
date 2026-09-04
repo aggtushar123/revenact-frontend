@@ -1,25 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GitBranch, Plus, Trash2 } from 'lucide-react';
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 import { formatRelativeTime } from '../../features/customers/formatters';
-import { deleteScenario, listScenarios } from './scenarioStorage';
+import { ApiError } from '../../lib/apiClient';
+import { APPLY_TO_LABELS } from './types';
+import { deleteScenario, fetchScenarios } from './scenarioApi';
 import type { Scenario } from './types';
 
-// Scenarios live only in this browser's own localStorage (see
-// scenarioStorage.ts's own docstring — there's no backend for this at
-// all), so unlike every other list page in this app, there's no fetch:
-// reading localStorage is synchronous, and `refresh` below just re-
-// reads it after a create/delete rather than awaiting anything.
 export function ScenariosList() {
   const navigate = useNavigate();
-  // Reading localStorage is synchronous — a lazy initializer, not an
-  // effect, is enough (no fetch to await the way every other list page
-  // in this app has).
-  const [scenarios, setScenarios] = useState<Scenario[]>(() => listScenarios());
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Scenario | null>(null);
 
-  const refresh = () => setScenarios(listScenarios());
+  async function refresh() {
+    setIsLoading(true);
+    setError(null);
+    try {
+      setScenarios(await fetchScenarios());
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not load scenarios.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    refresh();
+  }, []);
 
   return (
     <div className="flex flex-col h-full w-full bg-surface text-ink p-6">
@@ -27,12 +37,12 @@ export function ScenariosList() {
         <div>
           <h1 className="text-[20px] font-bold text-ink tracking-tight">Scenarios</h1>
           <p className="text-[13px] text-ink-faint font-medium mt-0.5">
-            Saved in this browser only — see each scenario's own builder for why.
+            Build a flow with triggers, conditions, and actions to automate your workflow.
           </p>
         </div>
         <button
           onClick={() => navigate('/scenarios/create')}
-          className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent-hover text-white rounded-lg text-[13px] font-bold shadow-sm transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[13px] font-bold shadow-sm transition-colors"
         >
           <Plus className="w-4 h-4" />
           Create Scenario
@@ -40,7 +50,11 @@ export function ScenariosList() {
       </div>
 
       <div className="flex-1 overflow-hidden bg-surface rounded-xl border border-line-subtle shadow-sm">
-        {scenarios.length === 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full py-24 text-[13px] text-ink-faint">Loading…</div>
+        ) : error ? (
+          <div className="flex items-center justify-center h-full py-24 text-[13px] text-danger">{error}</div>
+        ) : scenarios.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full py-24 text-center gap-2">
             <GitBranch className="w-10 h-10 text-ink-faint opacity-40 mb-2" />
             <p className="text-[14px] font-semibold text-ink-muted">No scenarios yet.</p>
@@ -55,6 +69,7 @@ export function ScenariosList() {
                 <th className="px-6 py-3 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Name</th>
                 <th className="px-6 py-3 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Applies To</th>
                 <th className="px-6 py-3 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Nodes</th>
+                <th className="px-6 py-3 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Active</th>
                 <th className="px-6 py-3 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Last Updated</th>
                 <th className="px-6 py-3 w-10"></th>
               </tr>
@@ -76,10 +91,17 @@ export function ScenariosList() {
                       </span>
                     </div>
                   </td>
-                  <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">{scenario.applyTo}</td>
-                  <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">{scenario.nodes.length}</td>
                   <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">
-                    {formatRelativeTime(scenario.updatedAt)}
+                    {APPLY_TO_LABELS[scenario.apply_to]}
+                  </td>
+                  <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">{scenario.nodes.length}</td>
+                  <td className="px-6 py-3.5 text-[13px] font-medium">
+                    <span className={scenario.is_active ? 'text-success' : 'text-ink-faint'}>
+                      {scenario.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">
+                    {formatRelativeTime(scenario.updated_at)}
                   </td>
                   <td className="px-6 py-3.5 text-right">
                     <button
@@ -103,12 +125,12 @@ export function ScenariosList() {
       {deleteTarget && (
         <ConfirmDialog
           title={`Delete ${deleteTarget.name}?`}
-          message="This can't be undone — it's removed from this browser's own saved scenarios."
+          message="This can't be undone."
           confirmLabel="Delete"
           danger
           onConfirm={async () => {
-            deleteScenario(deleteTarget.id);
-            refresh();
+            await deleteScenario(deleteTarget.id);
+            await refresh();
           }}
           onClose={() => setDeleteTarget(null)}
         />

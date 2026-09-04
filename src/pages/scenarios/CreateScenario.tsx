@@ -19,21 +19,24 @@ import { CustomEdge } from './CustomEdge';
 import { BuilderSidebar } from './BuilderSidebar';
 import { ScenarioHeader } from './ScenarioHeader';
 import { EditNodePane } from './EditNodePane';
-import { getScenario, upsertScenario } from './scenarioStorage';
+import { RunNowModal } from './RunNowModal';
+import { createScenario, fetchScenario, runScenario, updateScenario } from './scenarioApi';
+import { ApiError } from '../../lib/apiClient';
 import type { ScenarioNodeDetail, ScenarioNodeData, ApplyToTarget } from './types';
 
-// Scenarios have no backend at all — no Scenario model, no automation
-// engine, nothing in revenact-backend. Every per-node-type edit panel
-// (Filter/Condition/Assign Playbook/Create Pipeline/Slack Message —
-// see EditNodePane.tsx) is still an illustrative mockup for the same
-// reason: there's no real Playbook/Slack/email-integration/attribute-
-// picker concept to select from yet. What *is* real: the canvas itself
-// (drag/connect/delete nodes and edges — see CustomNodes.tsx/
-// CustomEdge.tsx, already fully wired via useReactFlow), node label
-// editing, and the scenario as a whole (name/applyTo/graph) round-
-// tripping through localStorage — see scenarioStorage.ts — so building
-// a flow, saving it, leaving, and reopening it genuinely works end to
-// end for one browser, even with no server behind any of it.
+// See revenact-backend's services/scenarios/engine.py for exactly what
+// "wired up with backend" means here: real CRUD persistence (this
+// component's own load/persist below) plus a real, deliberately
+// limited execution engine (RunNowModal / ScenarioHeader's Run Now
+// button) — Send Email/Create Task/Set Attribute/Churn Entity/
+// Condition/Filter actually do the real-world thing they say. Every
+// other per-node-type edit panel (Assign Playbook/Slack Message/
+// Create Pipeline/MS Teams/Send Survey — see EditNodePane.tsx) is
+// still an illustrative mockup, on both sides, for the same reason as
+// before: no real Playbook/Slack/Teams/Survey concept exists anywhere
+// in this codebase. The canvas itself (drag/connect/delete nodes and
+// edges — CustomNodes.tsx/CustomEdge.tsx) and node label editing are
+// unrelated to any of that and were already real.
 
 const nodeTypes = {
   entry: EntryNode,
@@ -47,13 +50,6 @@ const edgeTypes = {
 
 let idIncrement = 10;
 const getId = () => `node_${idIncrement++}`;
-
-// No Web Crypto dependency (randomUUID isn't guaranteed in every test
-// environment) — good enough for a client-only id nothing else needs
-// to be globally unique against.
-function generateScenarioId(): string {
-  return `scenario_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-}
 
 interface FlowProps {
   nodes: Node<ScenarioNodeData>[];
@@ -209,11 +205,19 @@ export function CreateScenario() {
   const { id: routeId } = useParams<{ id?: string }>();
   const navigate = useNavigate();
 
-  const [scenarioId] = useState(() => routeId ?? generateScenarioId());
+  // undefined until the first successful save — see persist() below,
+  // which POSTs while this is undefined and PATCHes once it's a real id.
+  const [scenarioId, setScenarioId] = useState<number | undefined>(
+    routeId ? Number(routeId) : undefined
+  );
   const [name, setName] = useState('Untitled Scenario');
-  const [applyTo, setApplyTo] = useState<ApplyToTarget>('Organizations');
-  const [createdAt, setCreatedAt] = useState(() => new Date().toISOString());
+  const [applyTo, setApplyTo] = useState<ApplyToTarget>('organizations');
+  const [isActive, setIsActive] = useState(false);
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(!!routeId);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isRunModalOpen, setIsRunModalOpen] = useState(false);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node<ScenarioNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -226,34 +230,73 @@ export function CreateScenario() {
   // there's no "routeId changed under us" case to react to.
   useEffect(() => {
     if (!routeId) return;
-    const existing = getScenario(routeId);
-    if (!existing) return;
-    setName(existing.name);
-    setApplyTo(existing.applyTo);
-    setNodes(existing.nodes);
-    setEdges(existing.edges);
-    setCreatedAt(existing.createdAt);
-    setLastSavedAt(existing.updatedAt);
+
+    async function load() {
+      try {
+        const existing = await fetchScenario(routeId!);
+        setName(existing.name);
+        setApplyTo(existing.apply_to);
+        setIsActive(existing.is_active);
+        setNodes(existing.nodes);
+        setEdges(existing.edges);
+        setLastSavedAt(existing.updated_at);
+      } catch (err) {
+        setLoadError(err instanceof ApiError ? err.message : 'Could not load this scenario.');
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function persist() {
-    const now = new Date().toISOString();
-    upsertScenario({
-      id: scenarioId,
+  async function persist() {
+    setSaveError(null);
+    const payload = {
       name: name.trim() || 'Untitled Scenario',
-      applyTo,
+      apply_to: applyTo,
       nodes,
       edges,
-      createdAt,
-      updatedAt: now,
-    });
-    setLastSavedAt(now);
+      is_active: isActive,
+    };
+    try {
+      const saved = scenarioId
+        ? await updateScenario(scenarioId, payload)
+        : await createScenario(payload);
+      if (!scenarioId) {
+        setScenarioId(saved.id);
+        // Swaps /scenarios/create for /scenarios/<id> without a remount
+        // (`replace` — no "back" stop on the create URL) so a further
+        // Save PATCHes this same row instead of creating a duplicate.
+        navigate(`/scenarios/${saved.id}`, { replace: true });
+      }
+      setLastSavedAt(saved.updated_at);
+    } catch (err) {
+      setSaveError(err instanceof ApiError ? err.message : 'Could not save this scenario.');
+    }
   }
 
-  function handleSaveAndClose() {
-    persist();
+  async function handleSaveAndClose() {
+    await persist();
     navigate('/scenarios');
+  }
+
+  const canRun = applyTo === 'organizations' && scenarioId !== undefined;
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-base text-[13px] text-ink-faint">
+        Loading…
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-base text-[13px] text-danger">
+        {loadError}
+      </div>
+    );
   }
 
   return (
@@ -263,10 +306,20 @@ export function CreateScenario() {
         onNameChange={setName}
         applyTo={applyTo}
         onApplyToChange={setApplyTo}
+        isActive={isActive}
+        onIsActiveChange={setIsActive}
+        canRun={canRun}
+        onRunNowClick={() => setIsRunModalOpen(true)}
         onSave={persist}
         onSaveAndClose={handleSaveAndClose}
         lastSavedAt={lastSavedAt}
       />
+
+      {saveError && (
+        <div className="px-6 py-2 bg-danger-dim border-b border-danger/30 text-[12.5px] text-danger shrink-0">
+          {saveError}
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         <BuilderSidebar />
@@ -284,6 +337,13 @@ export function CreateScenario() {
           </ReactFlowProvider>
         </div>
       </div>
+
+      {isRunModalOpen && scenarioId !== undefined && (
+        <RunNowModal
+          onRun={(customerId) => runScenario(scenarioId, customerId)}
+          onClose={() => setIsRunModalOpen(false)}
+        />
+      )}
     </div>
   );
 }
