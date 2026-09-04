@@ -10,9 +10,9 @@ export function DashboardLayout() {
   const isScenarios = location.pathname.startsWith('/scenarios/');
 
   return (
-    <div className="flex bg-white h-screen w-screen overflow-hidden text-gray-900 font-sans">
+    <div className="flex bg-surface h-screen w-screen overflow-hidden text-ink font-sans">
       <Sidebar />
-      <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden bg-gray-50/50">
+      <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden bg-subtle/50">
         {!isScenarios && <Navbar />}
         <main className={`flex-1 overflow-hidden h-full flex flex-col ${isScenarios ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
           <Outlet />

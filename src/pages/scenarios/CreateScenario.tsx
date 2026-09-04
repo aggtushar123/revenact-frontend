@@ -152,29 +152,29 @@ function Flow({ nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges }
         panOnDrag={!isLocked}
         zoomOnScroll={!isLocked}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="#cbd5e1" />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="var(--border-strong)" />
 
-        <Panel position="top-right" className="bg-white border border-gray-200 shadow-sm rounded-lg p-1 flex gap-0.5 mr-6 mt-4 overflow-hidden">
+        <Panel position="top-right" className="bg-surface border border-line shadow-sm rounded-lg p-1 flex gap-0.5 mr-6 mt-4 overflow-hidden">
            <button
              onClick={() => zoomIn()}
-             className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 rounded transition-all text-gray-500 hover:text-gray-900"
+             className="w-8 h-8 flex items-center justify-center hover:bg-subtle rounded transition-all text-ink-muted hover:text-ink"
              title="Zoom In"
            >
              <span className="text-xl font-medium">+</span>
            </button>
            <button
              onClick={() => zoomOut()}
-             className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 rounded transition-all text-gray-500 hover:text-gray-900"
+             className="w-8 h-8 flex items-center justify-center hover:bg-subtle rounded transition-all text-ink-muted hover:text-ink"
              title="Zoom Out"
            >
              <span className="text-xl font-medium">−</span>
            </button>
 
-           <div className="w-px bg-gray-100 h-4 my-auto mx-1" />
+           <div className="w-px bg-subtle h-4 my-auto mx-1" />
 
            <button
              onClick={() => fitView({ duration: 400 })}
-             className="w-8 h-8 flex items-center justify-center hover:bg-gray-50 rounded transition-all text-gray-400 hover:text-gray-900"
+             className="w-8 h-8 flex items-center justify-center hover:bg-subtle rounded transition-all text-ink-faint hover:text-ink"
              title="Fit to Screen"
            >
              <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current"><path d="M15 3l2.3 2.3-2.89 2.87 1.42 1.42L18.7 6.7 21 9V3zM3 9l2.3-2.3 2.87 2.89 1.42-1.42L6.7 5.3 9 3H3zm6 12l-2.3-2.3 2.89-2.87-1.42-1.42L5.3 17.3 3 15v6zm12-6l-2.3 2.3-2.87-2.89-1.42 1.42 2.89 2.87-2.3 2.3V21z"/></svg>
@@ -182,7 +182,7 @@ function Flow({ nodes, edges, onNodesChange, onEdgesChange, setNodes, setEdges }
 
            <button
              onClick={() => setIsLocked(!isLocked)}
-             className={`w-8 h-8 flex items-center justify-center rounded transition-all ${isLocked ? 'bg-orange-50 text-orange-500 shadow-inner' : 'hover:bg-gray-50 text-gray-400 hover:text-gray-900'}`}
+             className={`w-8 h-8 flex items-center justify-center rounded transition-all ${isLocked ? 'bg-warning-dim text-warning shadow-inner' : 'hover:bg-subtle text-ink-faint hover:text-ink'}`}
              title={isLocked ? "Unlock Canvas" : "Lock Canvas"}
            >
              {isLocked ? (
@@ -257,7 +257,7 @@ export function CreateScenario() {
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#f8fafc] overflow-hidden">
+    <div className="w-full h-full flex flex-col bg-base overflow-hidden">
       <ScenarioHeader
         name={name}
         onNameChange={setName}
