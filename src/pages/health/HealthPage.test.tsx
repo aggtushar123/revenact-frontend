@@ -62,6 +62,32 @@ function customer(overrides: Record<string, unknown>) {
   };
 }
 
+function account(overrides: Record<string, unknown>) {
+  return {
+    id: 1,
+    customers: [{ id: 1, name: 'Globex Corp' }],
+    name: 'Globex EMEA',
+    domain: '',
+    address: '',
+    email: '',
+    phone: '',
+    owner: null,
+    created_at: '2026-08-31T00:00:00Z',
+    updated_at: '2026-08-31T00:00:00Z',
+    lifecycle_stage: 'live',
+    health_score: '8.0',
+    health_category: 'good',
+    pulse: [],
+    ai_pulse_score: 'satisfied',
+    ai_pulse_reason: '',
+    nps_score: null,
+    csat_score: null,
+    renewal_date: null,
+    arr: '0',
+    ...overrides,
+  };
+}
+
 const STATS = {
   health: {
     good: { count: 5, mrr: 20000, arr: 240000 },
@@ -69,6 +95,21 @@ const STATS = {
     poor: { count: 1, mrr: 500, arr: 6000 },
   },
   nps: { promoters: 4, passives: 1, detractors: 2, score: 25 },
+  lifecycle: Object.fromEntries(
+    ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'churn', 'expansion', 'other'].map((s) => [
+      s,
+      { count: 0, mrr: 0, arr: 0 },
+    ])
+  ),
+};
+
+const ACCOUNT_STATS = {
+  health: {
+    good: { count: 1, mrr: 0, arr: 0 },
+    average: { count: 0, mrr: 0, arr: 0 },
+    poor: { count: 3, mrr: 0, arr: 0 },
+  },
+  nps: { promoters: 0, passives: 0, detractors: 0, score: 0 },
   lifecycle: Object.fromEntries(
     ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'churn', 'expansion', 'other'].map((s) => [
       s,
@@ -86,9 +127,13 @@ function renderPage() {
   );
 }
 
-function fetchMockWith(customers: unknown[]) {
+function fetchMockWith(customers: unknown[], accounts: unknown[] = []) {
   return vi.fn((url: string) => {
     if (url.includes('/customers/stats/')) return Promise.resolve(jsonResponse(200, STATS));
+    if (url.includes('/accounts/stats/')) return Promise.resolve(jsonResponse(200, ACCOUNT_STATS));
+    if (url.includes('/accounts/')) {
+      return Promise.resolve(jsonResponse(200, { count: accounts.length, next: null, previous: null, results: accounts }));
+    }
     if (url.includes('/customers/')) {
       return Promise.resolve(jsonResponse(200, { count: customers.length, next: null, previous: null, results: customers }));
     }
@@ -166,6 +211,23 @@ describe('HealthPage', () => {
 
     await user.click(screen.getByText('Clear filter'));
     expect(await screen.findByText('Globex')).toBeInTheDocument();
+  });
+
+  it('switching to Accounts shows real account stats and an account table with a Company column', async () => {
+    const accounts = [account({ id: 1, name: 'Globex EMEA', customers: [{ id: 1, name: 'Globex Corp' }], health_category: 'poor' })];
+    vi.stubGlobal('fetch', fetchMockWith([], accounts));
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText('Good');
+    await user.click(screen.getByRole('button', { name: /^accounts$/i }));
+
+    const poorCard = await screen.findByText('Poor');
+    expect(within(poorCard.closest('button')!).getByText('3')).toBeInTheDocument();
+
+    expect(await screen.findByText('Globex EMEA')).toBeInTheDocument();
+    expect(screen.getByText('Company')).toBeInTheDocument();
+    expect(screen.getByText('Globex Corp')).toBeInTheDocument();
   });
 
   it('surfaces a stats fetch failure', async () => {
