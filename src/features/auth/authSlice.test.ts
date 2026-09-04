@@ -1,6 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
-import authReducer, { login, logout, clearError, fetchMe, updateProfile, changePassword } from './authSlice';
+import authReducer, {
+  login,
+  logout,
+  clearError,
+  fetchMe,
+  updateProfile,
+  updateOrganisation,
+  changePassword,
+  requestPasswordReset,
+  confirmPasswordReset,
+} from './authSlice';
 
 function makeStore() {
   return configureStore({ reducer: { auth: authReducer } });
@@ -14,7 +24,14 @@ const mockUser = {
   name: 'Demo User',
   avatar: 'https://i.pravatar.cc/150?u=demo@revenact.io',
   role: 'admin' as const,
-  organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc' },
+  organisation: {
+    id: 1,
+    name: 'Acme Inc',
+    slug: 'acme-inc',
+    currency: 'USD' as const,
+    currency_display: 'US Dollar ($)',
+    default_lifecycle_stage: '',
+  },
   is_active: true,
 };
 
@@ -122,6 +139,28 @@ describe('authSlice', () => {
       expect(JSON.parse(localStorage.getItem('revenact_user')!).name).toBe('New Name');
     });
 
+    it("updateOrganisation replaces user.organisation and persists it", async () => {
+      const store = await loggedInStore();
+      const updatedOrg = { ...mockUser.organisation, currency: 'EUR' as const, default_lifecycle_stage: 'adoption' };
+      mockFetchOnce(200, updatedOrg);
+
+      await store.dispatch(updateOrganisation({ currency: 'EUR', default_lifecycle_stage: 'adoption' }));
+
+      expect(store.getState().auth.user?.organisation.currency).toBe('EUR');
+      expect(store.getState().auth.user?.organisation.default_lifecycle_stage).toBe('adoption');
+      expect(JSON.parse(localStorage.getItem('revenact_user')!).organisation.currency).toBe('EUR');
+    });
+
+    it('updateOrganisation rejects with the server message for a non-admin, without touching state', async () => {
+      const store = await loggedInStore();
+      mockFetchOnce(403, { detail: 'Only an organisation admin can do this.' });
+
+      const result = await store.dispatch(updateOrganisation({ currency: 'EUR' }));
+
+      expect(result.payload).toBe('Only an organisation admin can do this.');
+      expect(store.getState().auth.user?.organisation.currency).toBe('USD');
+    });
+
     it('changePassword resolves without touching user state on success', async () => {
       const store = await loggedInStore();
       mockFetchOnce(200, null);
@@ -144,6 +183,61 @@ describe('authSlice', () => {
 
       expect(changePassword.rejected.match(result)).toBe(true);
       expect(result.payload).toBe('Current password is incorrect.');
+    });
+  });
+
+  describe('forgot/reset password', () => {
+    it('requestPasswordReset resolves on the backend\'s always-200 response', async () => {
+      mockFetchOnce(200, { detail: "If an account exists for that email, we've sent a password reset link." });
+
+      const store = makeStore();
+      const result = await store.dispatch(requestPasswordReset('alice@acme.io'));
+
+      expect(requestPasswordReset.fulfilled.match(result)).toBe(true);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/auth/password-reset/'),
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ email: 'alice@acme.io' }) })
+      );
+    });
+
+    it('requestPasswordReset surfaces a network failure', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')));
+
+      const store = makeStore();
+      const result = await store.dispatch(requestPasswordReset('alice@acme.io'));
+
+      expect(requestPasswordReset.rejected.match(result)).toBe(true);
+      expect(result.payload).toBe('Could not reach the server. Please try again.');
+    });
+
+    it('confirmPasswordReset resolves on a valid uid/token', async () => {
+      mockFetchOnce(200, { detail: 'Your password has been reset.' });
+
+      const store = makeStore();
+      const result = await store.dispatch(
+        confirmPasswordReset({ uid: 'MQ', token: 'a-valid-token', newPassword: 'newpassword1' })
+      );
+
+      expect(confirmPasswordReset.fulfilled.match(result)).toBe(true);
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/auth/password-reset/confirm/'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ uid: 'MQ', token: 'a-valid-token', new_password: 'newpassword1' }),
+        })
+      );
+    });
+
+    it('confirmPasswordReset surfaces the backend error on an invalid/expired token', async () => {
+      mockFetchOnce(400, { non_field_errors: ['This reset link is invalid or has expired.'] });
+
+      const store = makeStore();
+      const result = await store.dispatch(
+        confirmPasswordReset({ uid: 'MQ', token: 'stale-token', newPassword: 'newpassword1' })
+      );
+
+      expect(confirmPasswordReset.rejected.match(result)).toBe(true);
+      expect(result.payload).toBe('This reset link is invalid or has expired.');
     });
   });
 

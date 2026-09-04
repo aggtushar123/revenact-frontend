@@ -20,6 +20,8 @@ import { CreateScenario } from './pages/scenarios/CreateScenario';
 import { ScenariosList } from './pages/scenarios/ScenariosList';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
+import { CurrencyPage } from './pages/settings/CurrencyPage';
+import { GlobalPresetsPage } from './pages/settings/GlobalPresetsPage';
 import { Integrations } from './pages/integrations/Integrations';
 import { List as ContactsList } from './pages/contacts/List';
 import { ContactDetails } from './pages/contacts/Details';
@@ -129,11 +131,11 @@ function App() {
           <Route path="settings">
             <Route index element={<Navigate to="data" replace />} />
             <Route path="data" element={<SettingsPage />} />
-            <Route path="currency" element={<SettingPlaceholder title="Currency" />} />
+            <Route path="currency" element={<CurrencyPage />} />
             <Route path="entity-uploads" element={<SettingPlaceholder title="Entity Uploads" />} />
             <Route path="webhooks" element={<SettingPlaceholder title="Webhooks" />} />
             <Route path="activities" element={<SettingPlaceholder title="Activities" />} />
-            <Route path="global-presets" element={<SettingPlaceholder title="Global Presets" />} />
+            <Route path="global-presets" element={<GlobalPresetsPage />} />
             <Route path="connect-widget" element={<SettingPlaceholder title="Connect Widget" />} />
             <Route path="ai-agent" element={<SettingPlaceholder title="AI Agent" />} />
           </Route>

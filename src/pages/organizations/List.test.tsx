@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
+import authReducer from '../../features/auth/authSlice';
 import { List } from './List';
 
 // Integration tier (see the `testing` skill): real store + real router
@@ -55,8 +56,38 @@ const globex = {
 
 const initech = { ...globex, id: 2, name: 'Initech' };
 
-function renderPage() {
-  const store = configureStore({ reducer: { customers: customersReducer } });
+function renderPage(defaultLifecycleStage = '') {
+  // ActionBar (rendered by List) now reads state.auth.user's own
+  // organisation for Global Presets' default lifecycle stage — needs
+  // the slice present even for tests that don't exercise that path.
+  const store = configureStore({
+    reducer: { customers: customersReducer, auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role: 'admin' as const,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency: 'USD' as const,
+            currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: defaultLifecycleStage,
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
   render(
     <Provider store={store}>
       <MemoryRouter>
@@ -274,6 +305,18 @@ describe('Organizations List page — Add/Edit/Churn/Archive', () => {
 
     expect(await screen.findByText('New Co')).toBeInTheDocument();
     expect(screen.queryByText('Create Organization')).not.toBeInTheDocument(); // modal closed
+  });
+
+  it("Add Organization pre-selects Settings > Global Presets' own tenant default stage", async () => {
+    vi.stubGlobal('fetch', makeMutationFetchMock([]));
+    const user = userEvent.setup();
+
+    renderPage('adoption');
+    await screen.findByText('No organizations yet.');
+
+    await user.click(screen.getByRole('button', { name: /Add Organization/ }));
+
+    expect(await screen.findByLabelText('Lifecycle Stage')).toHaveValue('adoption');
   });
 
   it('editing an organization prefills the form and PATCHes the change', async () => {

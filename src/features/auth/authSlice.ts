@@ -6,10 +6,18 @@ import { apiFetch, ApiError } from '../../lib/apiClient';
 // revenact-backend/docs/API_CONTRACTS.md. Exported: userManagement uses
 // the same shape for CSMs (they're the same User model, just listed by
 // an admin instead of viewing themselves).
+export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'INR' | 'CAD' | 'AUD' | 'JPY';
+
 export interface Organisation {
   id: number;
   name: string;
   slug: string;
+  currency: CurrencyCode;
+  currency_display: string;
+  /** One of Customer['lifecycle_stage']'s own values, or '' for no
+   * tenant-wide default — see revenact-backend's Organisation model
+   * docstring. Backs Settings > Global Presets. */
+  default_lifecycle_stage: string;
 }
 
 export interface User {
@@ -133,6 +141,24 @@ export const updateProfile = createAsyncThunk<User, { name: string }, { rejectVa
   }
 );
 
+// Backs Settings > Currency / Global Presets. Admin-only server-side
+// (IsOrgAdmin — a CSM gets a 403); both settings pages gate the Save
+// button on `user.role === 'admin'` to match, showing a read-only view
+// otherwise. Either key alone is fine — the backend only writes what's
+// actually sent.
+export const updateOrganisation = createAsyncThunk<
+  Organisation,
+  Partial<Pick<Organisation, 'currency' | 'default_lifecycle_stage'>>,
+  { rejectValue: string }
+>('auth/updateOrganisation', async (data, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Organisation>('/auth/organisation/', { method: 'PATCH', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not update organisation settings.';
+    return rejectWithValue(message);
+  }
+});
+
 export const changePassword = createAsyncThunk<
   void,
   { currentPassword: string; newPassword: string },
@@ -145,6 +171,47 @@ export const changePassword = createAsyncThunk<
     });
   } catch (err) {
     const message = err instanceof ApiError ? err.message : 'Could not change your password.';
+    return rejectWithValue(message);
+  }
+});
+
+// Step 1 of the forgot-password flow (ForgotPassword.tsx) — requests a
+// reset-link email. The backend always resolves 200 regardless of whether
+// the address matches an account (see API_CONTRACTS.md), so a successful
+// unwrap() here just means "the request was accepted", not "that email
+// exists" — the UI should show the same generic message either way.
+export const requestPasswordReset = createAsyncThunk<void, string, { rejectValue: string }>(
+  'auth/requestPasswordReset',
+  async (email, { rejectWithValue }) => {
+    try {
+      await apiFetch('/auth/password-reset/', {
+        method: 'POST',
+        body: { email },
+        skipAuthRetry: true, // unauthenticated endpoint — no token to retry with
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not reach the server. Please try again.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Step 2 — consumes the uid/token pair from the emailed link (read off
+// ResetPassword.tsx's own URL) to set a new password. Doesn't log the user
+// in; they sign in at /login/ afterward same as any other time.
+export const confirmPasswordReset = createAsyncThunk<
+  void,
+  { uid: string; token: string; newPassword: string },
+  { rejectValue: string }
+>('auth/confirmPasswordReset', async ({ uid, token, newPassword }, { rejectWithValue }) => {
+  try {
+    await apiFetch('/auth/password-reset/confirm/', {
+      method: 'POST',
+      body: { uid, token, new_password: newPassword },
+      skipAuthRetry: true,
+    });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'This reset link is invalid or has expired.';
     return rejectWithValue(message);
   }
 });
@@ -245,6 +312,11 @@ const authSlice = createSlice({
       .addCase(updateProfile.fulfilled, (state, action: PayloadAction<User>) => {
         state.user = action.payload;
         localStorage.setItem('revenact_user', JSON.stringify(action.payload));
+      })
+      .addCase(updateOrganisation.fulfilled, (state, action: PayloadAction<Organisation>) => {
+        if (!state.user) return;
+        state.user.organisation = action.payload;
+        localStorage.setItem('revenact_user', JSON.stringify(state.user));
       })
       // Refresh session
       .addCase(refreshSession.fulfilled, (state, action) => {

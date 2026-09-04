@@ -12,7 +12,7 @@ const mockUser = {
   name: 'Alice Admin',
   avatar: 'https://i.pravatar.cc/150?u=alice@acme.io',
   role: 'admin' as const,
-  organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc' },
+  organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)', default_lifecycle_stage: '' },
   is_active: true,
 };
 

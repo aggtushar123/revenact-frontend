@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Search, Download, CloudUpload, Filter, Settings } from 'lucide-react';
 import { RowActionsPopover } from './RowActionsPopover';
 import { OrganizationFormModal } from './OrganizationFormModal';
+import { useAppSelector } from '../../hooks';
+import type { Customer } from '../../features/customers/customersSlice';
 
 interface ActionBarProps {
   searchQuery: string;
@@ -25,6 +27,13 @@ export function ActionBar({
   const [showSettingsPopup, setShowSettingsPopup] = useState<{ style: React.CSSProperties } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const selectedCount = selectedOrganizations.length;
+  // Settings > Global Presets' own default (see GlobalPresetsPage.tsx) —
+  // '' means "no tenant default", which OrganizationFormModal's own
+  // fallback chain already treats the same as not passing this prop at
+  // all (falls through to its hardcoded 'onboarding').
+  const defaultLifecycleStage = useAppSelector(
+    (state) => state.auth.user?.organisation.default_lifecycle_stage || undefined
+  ) as Customer['lifecycle_stage'] | undefined;
 
   const handleSettingsClick = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -125,7 +134,9 @@ export function ActionBar({
         />
       )}
 
-      {showAddModal && <OrganizationFormModal onClose={() => setShowAddModal(false)} />}
+      {showAddModal && (
+        <OrganizationFormModal defaultLifecycleStage={defaultLifecycleStage} onClose={() => setShowAddModal(false)} />
+      )}
 
       {/* Floating Theme button on the right edge */}
       <div className="fixed right-0 top-[35%] bg-elevated text-accent p-2 pl-3 rounded-l-lg shadow-lg cursor-pointer z-50 flex items-center justify-center border border-line-strong border-r-0">
