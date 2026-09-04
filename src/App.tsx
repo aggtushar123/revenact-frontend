@@ -24,6 +24,7 @@ import { CurrencyPage } from './pages/settings/CurrencyPage';
 import { GlobalPresetsPage } from './pages/settings/GlobalPresetsPage';
 import { AIAgentPage } from './pages/settings/AIAgentPage';
 import { EntityUploadsPage } from './pages/settings/EntityUploadsPage';
+import { WebhooksPage } from './pages/settings/WebhooksPage';
 import { Integrations } from './pages/integrations/Integrations';
 import { List as ContactsList } from './pages/contacts/List';
 import { ContactDetails } from './pages/contacts/Details';
@@ -135,7 +136,7 @@ function App() {
             <Route path="data" element={<SettingsPage />} />
             <Route path="currency" element={<CurrencyPage />} />
             <Route path="entity-uploads" element={<EntityUploadsPage />} />
-            <Route path="webhooks" element={<SettingPlaceholder title="Webhooks" />} />
+            <Route path="webhooks" element={<WebhooksPage />} />
             <Route path="activities" element={<SettingPlaceholder title="Activities" />} />
             <Route path="global-presets" element={<GlobalPresetsPage />} />
             <Route path="connect-widget" element={<SettingPlaceholder title="Connect Widget" />} />
