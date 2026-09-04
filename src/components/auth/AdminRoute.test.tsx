@@ -11,7 +11,7 @@ const baseUser = {
   email: 'a@acme.io',
   name: 'Someone',
   avatar: 'https://i.pravatar.cc/150?u=a@acme.io',
-  organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)', default_lifecycle_stage: '' },
+  organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)', default_lifecycle_stage: '', ai_agent_enabled: true, ai_agent_tone: 'professional' as const, ai_agent_tone_display: 'Professional' },
   is_active: true,
 };
 

@@ -22,6 +22,7 @@ import { SettingsPage } from './pages/settings/SettingsPage';
 import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
 import { CurrencyPage } from './pages/settings/CurrencyPage';
 import { GlobalPresetsPage } from './pages/settings/GlobalPresetsPage';
+import { AIAgentPage } from './pages/settings/AIAgentPage';
 import { Integrations } from './pages/integrations/Integrations';
 import { List as ContactsList } from './pages/contacts/List';
 import { ContactDetails } from './pages/contacts/Details';
@@ -137,7 +138,7 @@ function App() {
             <Route path="activities" element={<SettingPlaceholder title="Activities" />} />
             <Route path="global-presets" element={<GlobalPresetsPage />} />
             <Route path="connect-widget" element={<SettingPlaceholder title="Connect Widget" />} />
-            <Route path="ai-agent" element={<SettingPlaceholder title="AI Agent" />} />
+            <Route path="ai-agent" element={<AIAgentPage />} />
           </Route>
           
           <Route path="integrations" element={<Integrations />} />

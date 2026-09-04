@@ -7,6 +7,7 @@ import { apiFetch, ApiError } from '../../lib/apiClient';
 // the same shape for CSMs (they're the same User model, just listed by
 // an admin instead of viewing themselves).
 export type CurrencyCode = 'USD' | 'EUR' | 'GBP' | 'INR' | 'CAD' | 'AUD' | 'JPY';
+export type AgentTone = 'professional' | 'friendly' | 'concise';
 
 export interface Organisation {
   id: number;
@@ -18,6 +19,12 @@ export interface Organisation {
    * tenant-wide default — see revenact-backend's Organisation model
    * docstring. Backs Settings > Global Presets. */
   default_lifecycle_stage: string;
+  /** Backs Settings > AI Agent — real, but not yet consumed anywhere
+   * (Copilot has no backend of its own). See the backend model's own
+   * docstring. */
+  ai_agent_enabled: boolean;
+  ai_agent_tone: AgentTone;
+  ai_agent_tone_display: string;
 }
 
 export interface User {
@@ -148,7 +155,7 @@ export const updateProfile = createAsyncThunk<User, { name: string }, { rejectVa
 // actually sent.
 export const updateOrganisation = createAsyncThunk<
   Organisation,
-  Partial<Pick<Organisation, 'currency' | 'default_lifecycle_stage'>>,
+  Partial<Pick<Organisation, 'currency' | 'default_lifecycle_stage' | 'ai_agent_enabled' | 'ai_agent_tone'>>,
   { rejectValue: string }
 >('auth/updateOrganisation', async (data, { rejectWithValue }) => {
   try {
