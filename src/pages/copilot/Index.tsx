@@ -8,20 +8,27 @@ import { fetchConversation, fetchConversations, sendMessage } from './copilotApi
 import { ApiError } from '../../lib/apiClient';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
-  sessionStarted,
-  sessionMadeLive,
-  redirectSent,
-  thinkingStarted,
-  answerRecorded,
-  participantJoined,
-  handedOff,
+  fetchSession,
+  makeSessionLive,
+  handOffSession,
+  fetchMyInvites,
+  respondToInvite,
+} from '../../features/copilotSessions/sessionApi';
+import {
+  sessionSnapshotReceived,
+  myInvitesReceived,
+  inviteRemoved,
 } from '../../features/copilotSessions/copilotSessionsSlice';
 import type { ConversationSummary, CopilotMessage } from './types';
+
+const SESSION_POLL_INTERVAL_MS = 3000;
+const INVITES_POLL_INTERVAL_MS = 8000;
 
 export function CopilotIndex() {
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
   const sessions = useAppSelector((state) => state.copilotSessions.byId);
+  const myInvites = useAppSelector((state) => state.copilotSessions.myInvites);
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [view, setView] = useState<'home' | 'chat' | 'empty-chat'>('home');
@@ -35,19 +42,20 @@ export function CopilotIndex() {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  // Set by the new "Ask Copilot" entry point on the Organization/Account
-  // Details pages (see Details.tsx's own new button) — the account this
-  // NEXT message will start a real Multiplayer Copilot session about, once
-  // it actually sends. Cleared once that session exists (or the user picks
-  // something else) — a Session's own `accountName` is a permanent
-  // snapshot from here, not re-derived later.
+  // Set by the "Ask Copilot" entry point on the Organization/Account
+  // Details pages (see Details.tsx's own button) — the real account
+  // this conversation is about, kept around (not cleared on send) until
+  // a real CopilotSession actually exists for it (see handleMakeLive) —
+  // Phase 2a creates that row server-side only once the owner explicitly
+  // opts in, not automatically on the first message (see SessionView's
+  // own docstring on the backend).
   const [pendingAccountContext, setPendingAccountContext] = useState<{
     customerId?: number;
     accountId?: number;
     accountName: string;
   } | null>(null);
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const activeSession = activeSessionId ? sessions[activeSessionId] : null;
+
+  const activeSession = activeConversationId ? sessions[activeConversationId] : null;
 
   useEffect(() => {
     fetchConversations()
@@ -59,34 +67,77 @@ export function CopilotIndex() {
       });
   }, []);
 
-  // Loads a session's own real conversation and records a real join —
-  // shared by the shareable-link flow (query param, below) and clicking a
-  // session straight from the sidebar (no URL round-trip needed there).
-  function openSession(sessionId: string) {
-    const session = sessions[sessionId];
-    if (!session || !currentUser) return;
-    setActiveSessionId(sessionId);
-    setActiveConversationId(session.conversationId);
+  // Real cross-user sync, Phase 2a — no WebSocket push yet, so an open
+  // live/awaiting-handoff session just polls its own real state every
+  // few seconds (a private or closed session has nothing new to poll
+  // for). Refetches the conversation's own messages alongside the
+  // session's own participants/events, since another real participant's
+  // redirect shows up as both at once.
+  useEffect(() => {
+    if (!activeConversationId) return;
+    const pollable = activeSession?.status === 'live' || activeSession?.status === 'awaiting_handoff';
+    if (!pollable) return;
+
+    const poll = () => {
+      fetchSession(activeConversationId)
+        .then((session) => dispatch(sessionSnapshotReceived(session)))
+        .catch(() => {
+          // A transient failure just skips this tick — the next one
+          // tries again, not worth a UI error for one missed poll.
+        });
+      fetchConversation(activeConversationId)
+        .then((conversation) => setMessages(conversation.messages))
+        .catch(() => {});
+    };
+    const intervalId = window.setInterval(poll, SESSION_POLL_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [activeConversationId, activeSession?.status, dispatch]);
+
+  // Real invites, Phase 2a — polled independent of whatever conversation
+  // is open, since an invite needs to be visible before the invitee can
+  // even load the conversation it's for (see MyInvitesView's own
+  // docstring on the backend).
+  useEffect(() => {
+    const poll = () => {
+      fetchMyInvites()
+        .then((invites) => dispatch(myInvitesReceived(invites)))
+        .catch(() => {});
+    };
+    poll();
+    const intervalId = window.setInterval(poll, INVITES_POLL_INTERVAL_MS);
+    return () => window.clearInterval(intervalId);
+  }, [dispatch]);
+
+  // Loads a real conversation this user already has access to (owner,
+  // or an accepted+active session participant — see
+  // conversations_visible_to on the backend) — shared by the shareable-
+  // link flow (query param, below) and clicking a session from the
+  // sidebar. A 404 here means no real access, not a bug — surfaced as a
+  // real error rather than silently showing an empty chat.
+  function openSession(conversationId: number) {
+    setActiveConversationId(conversationId);
     setView('chat');
     setMessages([]);
-    fetchConversation(session.conversationId)
+    setSendError(null);
+    fetchConversation(conversationId)
       .then((conversation) => setMessages(conversation.messages))
-      .catch((err) => setSendError(err instanceof ApiError ? err.message : 'Could not load this session.'));
-    if (!session.participants.some((p) => p.userId === currentUser.id)) {
-      dispatch(
-        participantJoined({
-          id: sessionId,
-          userId: currentUser.id,
-          userName: currentUser.name,
-          at: new Date().toISOString(),
-        })
+      .catch((err) =>
+        setSendError(
+          err instanceof ApiError && err.status === 404
+            ? "You don't have access to this session — ask the owner to invite you."
+            : 'Could not load this session.'
+        )
       );
-    }
+    fetchSession(conversationId)
+      .then((session) => dispatch(sessionSnapshotReceived(session)))
+      .catch(() => {
+        // No session yet (or no access) — the conversation-level fetch
+        // above already surfaces a real access error when that's why;
+        // "no session exists" on its own isn't an error.
+      });
   }
 
-  // One-time read of the entry-point/shareable-link query params — see
-  // the plan this was built from for both flows (start-about-an-account,
-  // join-a-shared-session).
+  // One-time read of the entry-point/shareable-link query params.
   useEffect(() => {
     const sessionParam = searchParams.get('session');
     const forCustomerId = searchParams.get('forCustomerId');
@@ -94,7 +145,7 @@ export function CopilotIndex() {
     const forCustomerName = searchParams.get('forCustomerName');
 
     if (sessionParam) {
-      openSession(sessionParam);
+      openSession(Number(sessionParam));
     } else if (forCustomerId || forAccountId) {
       setPendingAccountContext({
         customerId: forCustomerId ? Number(forCustomerId) : undefined,
@@ -105,8 +156,7 @@ export function CopilotIndex() {
     }
     setSearchParams({}, { replace: true });
     // Only ever meant to run once, against whatever query params the page
-    // was actually opened with — re-running on every `sessions`/`dispatch`
-    // identity change would re-process a param already cleared above.
+    // was actually opened with.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -118,33 +168,12 @@ export function CopilotIndex() {
     setSendError(null);
     setIsSending(true);
     // Optimistic bubble — replaced wholesale by the server's own real
-    // messages (including its own id) once the send resolves, same
-    // "adopt the real response" convention as CampaignEditor's own send.
+    // messages (including its own id) once the send resolves.
     const optimisticId = -Date.now();
     setMessages((prev) => [
       ...prev,
       { id: optimisticId, role: 'user', content: trimmed, created_at: new Date().toISOString() },
     ]);
-
-    const isNewSessionStart = !!pendingAccountContext && !activeSessionId;
-    // Any message after a session's own first (its query) is, by
-    // definition, a redirect — a real follow-up into the same real
-    // conversation, not scripted (see the plan's own "reasoning
-    // fidelity" decision). Recorded before the call so a joiner watching
-    // live sees the redirect land immediately, not only once the real
-    // reply comes back.
-    if (activeSessionId && currentUser) {
-      dispatch(
-        redirectSent({
-          id: activeSessionId,
-          userId: currentUser.id,
-          userName: currentUser.name,
-          text: trimmed,
-          at: new Date().toISOString(),
-        })
-      );
-      dispatch(thinkingStarted({ id: activeSessionId, at: new Date().toISOString() }));
-    }
 
     try {
       const conversation = await sendMessage({
@@ -161,27 +190,14 @@ export function CopilotIndex() {
         ];
       });
 
-      const realAnswer = conversation.messages[conversation.messages.length - 1]?.content ?? '';
-      if (isNewSessionStart && pendingAccountContext && currentUser) {
-        const newSessionId = crypto.randomUUID();
-        dispatch(
-          sessionStarted({
-            id: newSessionId,
-            conversationId: conversation.id,
-            customerId: pendingAccountContext.customerId,
-            accountId: pendingAccountContext.accountId,
-            accountName: pendingAccountContext.accountName,
-            ownerId: currentUser.id,
-            ownerName: currentUser.name,
-            query: trimmed,
-            at: new Date().toISOString(),
-          })
-        );
-        dispatch(answerRecorded({ id: newSessionId, text: realAnswer, at: new Date().toISOString() }));
-        setActiveSessionId(newSessionId);
-        setPendingAccountContext(null);
-      } else if (activeSessionId) {
-        dispatch(answerRecorded({ id: activeSessionId, text: realAnswer, at: new Date().toISOString() }));
+      // A message into a conversation that already has a real session
+      // is, by definition, a real redirect (see SendMessageView's own
+      // docstring) — the backend already logged it; pull the fresh
+      // snapshot now rather than waiting for the next poll tick.
+      if (activeSession) {
+        fetchSession(conversation.id)
+          .then((session) => dispatch(sessionSnapshotReceived(session)))
+          .catch(() => {});
       }
     } catch (err) {
       setSendError(err instanceof ApiError ? err.message : 'Could not reach Copilot.');
@@ -202,47 +218,72 @@ export function CopilotIndex() {
     setActiveConversationId(conversationId);
     setSendError(null);
     setMessages([]);
-    // Reopening a past conversation restores its own session context too
-    // (presence, live toggle, hand-off) if one was ever started for it.
-    const matchingSession = Object.values(sessions).find((s) => s.conversationId === conversationId);
-    setActiveSessionId(matchingSession?.id ?? null);
     try {
       const conversation = await fetchConversation(conversationId);
       setMessages(conversation.messages);
     } catch (err) {
       setSendError(err instanceof ApiError ? err.message : 'Could not load this conversation.');
     }
+    fetchSession(conversationId)
+      .then((session) => dispatch(sessionSnapshotReceived(session)))
+      .catch(() => {
+        // No session for this conversation — nothing to show, not an error.
+      });
   }
 
   function handleNewChat() {
     setView('empty-chat');
     setSelectedSkill(null);
     setActiveConversationId(null);
-    setActiveSessionId(null);
     setPendingAccountContext(null);
     setMessages([]);
     setSendError(null);
     setIsSending(false);
   }
 
-  function handleMakeLive() {
-    if (activeSessionId) dispatch(sessionMadeLive({ id: activeSessionId }));
+  async function handleMakeLive() {
+    if (!activeConversationId) return;
+    try {
+      const session = await makeSessionLive(activeConversationId, pendingAccountContext ?? undefined);
+      dispatch(sessionSnapshotReceived(session));
+      setPendingAccountContext(null);
+    } catch (err) {
+      setSendError(err instanceof ApiError ? err.message : 'Could not make this session live.');
+    }
   }
 
-  function handleHandOff(toUserId: number, toUserName: string, note: string) {
-    if (activeSessionId && currentUser) {
-      dispatch(
-        handedOff({
-          id: activeSessionId,
-          fromUserId: currentUser.id,
-          fromUserName: currentUser.name,
-          toUserId,
-          toUserName,
-          note,
-          at: new Date().toISOString(),
-        })
+  async function handleHandOff(toUserId: number, toUserName: string, note: string) {
+    if (!activeConversationId) return;
+    try {
+      const session = await handOffSession(
+        activeConversationId,
+        toUserId,
+        note,
+        pendingAccountContext ?? undefined
       );
+      dispatch(sessionSnapshotReceived(session));
+      setPendingAccountContext(null);
+    } catch (err) {
+      setSendError(err instanceof ApiError ? err.message : `Could not hand off to ${toUserName}.`);
     }
+  }
+
+  function handleAcceptInvite(inviteId: number, conversationId: number) {
+    respondToInvite(inviteId, 'accepted')
+      .then(() => {
+        dispatch(inviteRemoved({ inviteId }));
+        openSession(conversationId);
+      })
+      .catch(() => {
+        // A failed accept just leaves the invite showing — the user can
+        // retry the same click.
+      });
+  }
+
+  function handleDeclineInvite(inviteId: number) {
+    respondToInvite(inviteId, 'declined')
+      .then(() => dispatch(inviteRemoved({ inviteId })))
+      .catch(() => {});
   }
 
   return (
@@ -284,11 +325,12 @@ export function CopilotIndex() {
               conversations={conversations}
               activeConversationId={activeConversationId}
               sessions={sessions}
-              currentUserId={currentUser?.id ?? null}
+              myInvites={myInvites}
               onNewChat={handleNewChat}
               onSelectChat={handleSelectChat}
               onSelectSkill={handleSelectSkill}
-              onOpenSession={openSession}
+              onAcceptInvite={handleAcceptInvite}
+              onDeclineInvite={handleDeclineInvite}
             />
             <div className="flex-1 overflow-hidden relative bg-surface border border-line/80 shadow-[0px_4px_24px_rgba(0,0,0,0.04)] rounded-[20px] m-1 mt-4 mr-4 mb-4 flex">
               {view === 'home' ? (
@@ -302,6 +344,7 @@ export function CopilotIndex() {
                   sendError={sendError}
                   pendingAccountName={pendingAccountContext?.accountName ?? null}
                   session={activeSession ?? null}
+                  currentUserId={currentUser?.id ?? null}
                   onMakeLive={handleMakeLive}
                   onHandOff={handleHandOff}
                 />

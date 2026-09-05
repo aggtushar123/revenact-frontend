@@ -20,11 +20,11 @@ export function PresenceStrip({ participants, max = 5 }: PresenceStripProps) {
   const overflow = participants.length - shown.length;
 
   return (
-    <div className="flex items-center -space-x-2" title={participants.map((p) => p.userName).join(', ')}>
+    <div className="flex items-center -space-x-2" title={participants.map((p) => p.user.name).join(', ')}>
       {shown.map((p) => (
         <EntityAvatar
-          key={p.userId}
-          name={p.userName}
+          key={p.user.id}
+          name={p.user.name}
           className="w-7 h-7 rounded-full border-2 border-surface shadow-sm"
         />
       ))}

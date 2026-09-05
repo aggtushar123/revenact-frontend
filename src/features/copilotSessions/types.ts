@@ -1,48 +1,72 @@
-// A Multiplayer Copilot session — see the plan this was built from for the
-// full PRD context. Deliberately NOT a real backend model: this whole
-// slice is Phase 1's own explicit scope (BroadcastChannel/localStorage
-// sync, no server), layered on top of the REAL services/copilot
-// Conversation this session's own `conversationId` points at. The query,
-// "thinking" state, and answer are all real Claude calls — only the
-// multiplayer transport (who's watching, live redirects/hand-offs) is
-// fake-for-now.
-export interface CopilotSession {
-  id: string;
-  conversationId: number;
-  customerId?: number;
-  accountId?: number;
-  accountName: string;
-  ownerId: number;
-  ownerName: string;
-  // Explicit opt-in only — never set automatically by a risk signal (see
-  // the plan's own "Default visibility" decision). A session with
-  // isLive=false is just this one browser's own private bookkeeping.
-  isLive: boolean;
-  status: 'private' | 'live' | 'awaiting-handoff' | 'closed';
-  transcript: SessionEvent[];
-  participants: SessionParticipant[];
-  createdAt: string;
-  closedAt?: string;
+// Multiplayer Copilot, Phase 2a — mirrors revenact-backend's real
+// CopilotSession/SessionEvent/SessionInvite (services/copilot/models.py,
+// serializers.py) field for field, the same way features/customers/
+// customersSlice.ts mirrors CustomerSerializer. Real cross-user sessions,
+// invite-only access — see revenact-backend's docs/API_CONTRACTS.md for
+// the full contract. Superseded from M0's own entirely-local,
+// BroadcastChannel-synced version (see git history) now that a real
+// backend exists to be the shared source of truth two *different* real
+// logins can both see.
+//
+// Keyed by `conversationId` everywhere in this app (not a synthetic
+// client-generated id — CopilotSession is a real OneToOne on Conversation
+// backend-side) — simpler than M0's own `crypto.randomUUID()`, which only
+// existed because there was no real backend id to use yet.
+
+export interface Actor {
+  id: number;
+  name: string;
+}
+
+export type SessionStatus = 'private' | 'live' | 'awaiting_handoff' | 'closed';
+
+export interface SessionEvent {
+  id: number;
+  kind: 'joined' | 'left' | 'redirected' | 'handed_off' | 'made_live' | 'closed';
+  actor: Actor | null;
+  /** Set only for kind='redirected' — which real Message this event
+   * tags (see the backend model's own docstring on why redirect text
+   * itself isn't duplicated here). */
+  message: { id: number; role: 'user' | 'assistant'; content: string; created_at: string } | null;
+  /** kind='handed_off': {to_user_id, to_user_name, note}. Empty object
+   * for every other kind. */
+  payload: Record<string, unknown>;
+  created_at: string;
 }
 
 export interface SessionParticipant {
-  userId: number;
-  userName: string;
-  joinedAt: string;
+  user: Actor;
+  joined_at: string;
+  left_at: string | null;
 }
 
-export type SessionEvent =
-  | { kind: 'query'; userId: number; userName: string; text: string; at: string }
-  | { kind: 'thinking'; at: string }
-  | { kind: 'answer'; text: string; at: string }
-  | { kind: 'joined'; userId: number; userName: string; at: string }
-  | { kind: 'redirected'; userId: number; userName: string; text: string; at: string }
-  | {
-      kind: 'handed-off';
-      fromUserId: number;
-      fromUserName: string;
-      toUserId: number;
-      toUserName: string;
-      note: string;
-      at: string;
-    };
+export interface CopilotSession {
+  id: number;
+  conversation_id: number;
+  owner: Actor;
+  customer_id: number | null;
+  customer_name: string | null;
+  account_id: number | null;
+  account_name: string | null;
+  status: SessionStatus;
+  /** Currently present only (left_at null) — see the backend
+   * serializer's own docstring. */
+  participants: SessionParticipant[];
+  /** Every event so far, or only those since `?since_id=` when fetched
+   * that way (see sessionApi.ts's own fetchSessionEvents). */
+  events: SessionEvent[];
+  created_at: string;
+  closed_at: string | null;
+}
+
+export interface SessionInvite {
+  id: number;
+  status: 'pending' | 'accepted' | 'declined';
+  invited_by: Actor | null;
+  conversation_id: number;
+  conversation_title: string;
+  /** The real company this session is about, if any — see the backend
+   * serializer's own get_account_label. */
+  account_label: string | null;
+  created_at: string;
+}

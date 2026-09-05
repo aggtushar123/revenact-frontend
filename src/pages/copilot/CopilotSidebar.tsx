@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { ChevronRight, ChevronLeft, Edit, ChevronDown, Radio, Inbox } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Edit, ChevronDown, Radio, Inbox, Check, X } from 'lucide-react';
 import { formatRelativeTime } from '../../features/customers/formatters';
-import type { CopilotSession } from '../../features/copilotSessions/types';
+import type { CopilotSession, SessionInvite } from '../../features/copilotSessions/types';
 import type { ConversationSummary } from './types';
 
 interface Props {
@@ -9,12 +9,13 @@ interface Props {
   setIsExpanded: (val: boolean) => void;
   conversations: ConversationSummary[];
   activeConversationId: number | null;
-  sessions: Record<string, CopilotSession>;
-  currentUserId: number | null;
+  sessions: Record<number, CopilotSession>;
+  myInvites: SessionInvite[];
   onNewChat?: () => void;
   onSelectChat?: (conversationId: number) => void;
   onSelectSkill?: (skill: string) => void;
-  onOpenSession?: (sessionId: string) => void;
+  onAcceptInvite?: (inviteId: number, conversationId: number) => void;
+  onDeclineInvite?: (inviteId: number) => void;
 }
 
 export function CopilotSidebar({
@@ -23,26 +24,15 @@ export function CopilotSidebar({
   conversations,
   activeConversationId,
   sessions,
-  currentUserId,
+  myInvites,
   onNewChat,
   onSelectChat,
   onSelectSkill,
-  onOpenSession,
+  onAcceptInvite,
+  onDeclineInvite,
 }: Props) {
   const [isSkillsExpanded, setIsSkillsExpanded] = useState(false);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(true);
-
-  const sessionByConversationId = new Map(Object.values(sessions).map((s) => [s.conversationId, s]));
-
-  // Real, not a generic notification center (none exists in this app —
-  // see the plan this was built from) — just this one, scoped, "does a
-  // Multiplayer Copilot session need me right now" section.
-  const handedOffToMe = Object.values(sessions).filter(
-    (s) =>
-      s.status === 'awaiting-handoff' &&
-      currentUserId !== null &&
-      [...s.transcript].reverse().find((e) => e.kind === 'handed-off')?.toUserId === currentUserId
-  );
 
   if (!isExpanded) {
     return (
@@ -71,20 +61,38 @@ export function CopilotSidebar({
       </div>
 
       <div className="px-5 py-4 flex flex-col gap-6 overflow-y-auto custom-scrollbar flex-1">
-        {handedOffToMe.length > 0 && (
+        {myInvites.length > 0 && (
           <div>
             <div className="flex items-center gap-2 text-warning font-bold text-[13px] mb-2.5">
               <Inbox className="w-3.5 h-3.5" />
-              Handed off to you
+              Invited to a live session
             </div>
-            <div className="flex flex-col gap-[2px] ml-2 border-l-2 border-warning/30 pl-2">
-              {handedOffToMe.map((session) => (
-                <ChatItem
-                  key={session.id}
-                  text={session.accountName}
-                  subtext={formatRelativeTime(session.transcript.at(-1)?.at ?? session.createdAt)}
-                  onClick={() => onOpenSession?.(session.id)}
-                />
+            <div className="flex flex-col gap-1.5 ml-2 border-l-2 border-warning/30 pl-2">
+              {myInvites.map((invite) => (
+                <div key={invite.id} className="rounded-md px-2.5 py-1.5">
+                  <div className="text-[12.5px] font-bold text-ink truncate">
+                    {invite.account_label ?? invite.conversation_title}
+                  </div>
+                  <div className="text-[11px] text-ink-faint font-medium mb-1.5">
+                    {invite.invited_by?.name ?? 'Someone'} · {formatRelativeTime(invite.created_at)}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => onAcceptInvite?.(invite.id, invite.conversation_id)}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-accent bg-accent-dim border border-accent/30 rounded-full px-2 py-0.5 hover:bg-accent-dim/70 transition-colors"
+                    >
+                      <Check className="w-3 h-3" />
+                      Accept
+                    </button>
+                    <button
+                      onClick={() => onDeclineInvite?.(invite.id)}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-ink-faint hover:text-ink border border-line rounded-full px-2 py-0.5 transition-colors"
+                    >
+                      <X className="w-3 h-3" />
+                      Decline
+                    </button>
+                  </div>
+                </div>
               ))}
             </div>
           </div>
@@ -139,14 +147,14 @@ export function CopilotSidebar({
                 <p className="text-[12px] text-ink-faint font-medium px-2.5 py-1.5">No chats yet.</p>
               ) : (
                 conversations.map((conversation) => {
-                  const session = sessionByConversationId.get(conversation.id);
+                  const session = sessions[conversation.id];
                   return (
                     <ChatItem
                       key={conversation.id}
                       text={conversation.title}
                       subtext={formatRelativeTime(conversation.updated_at)}
                       isActive={conversation.id === activeConversationId}
-                      isLive={session?.isLive}
+                      isLive={session?.status === 'live' || session?.status === 'awaiting_handoff'}
                       participantCount={session ? session.participants.length : undefined}
                       onClick={() => onSelectChat?.(conversation.id)}
                     />

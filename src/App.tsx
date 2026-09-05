@@ -1,6 +1,4 @@
-import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { subscribeToRemoteActions } from './features/copilotSessions/sessionSync';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AdminRoute } from './components/auth/AdminRoute';
@@ -36,7 +34,7 @@ import { CanvasPage } from './pages/canvas/CanvasPage';
 import { CanvasEditor } from './pages/canvas/CanvasEditor';
 import { CampaignsList } from './pages/campaigns/CampaignsList';
 import { CampaignEditor } from './pages/campaigns/CampaignEditor';
-import { useAppDispatch, useAppSelector } from './hooks';
+import { useAppSelector } from './hooks';
 import { AdvanceDashboard } from './pages/dashboard/AdvanceDashboard';
 import { AITrendingTopics } from './pages/dashboard/tabs/AITrendingTopics';
 import { ControlsView } from './pages/dashboard/tabs/ai-trending/ControlsView';
@@ -62,18 +60,6 @@ function RootRedirect() {
 }
 
 function App() {
-  const dispatch = useAppDispatch();
-
-  // Mounted once for the app's whole lifetime — replays a Multiplayer
-  // Copilot action that arrived from another tab through the *same*
-  // reducers a local dispatch would use (see copilotSessionsSlice.ts's
-  // own docstring), tagged so syncMiddleware.ts doesn't re-broadcast it.
-  useEffect(() => {
-    return subscribeToRemoteActions((action) => {
-      dispatch({ ...(action as { type: string; payload?: unknown }), meta: { fromSync: true } });
-    });
-  }, [dispatch]);
-
   return (
     <BrowserRouter>
       <Routes>

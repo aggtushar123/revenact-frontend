@@ -12,10 +12,13 @@ interface Props {
   isSending?: boolean;
   sendError?: string | null;
   /** Set once an "Ask Copilot about this account" entry point started
-   * this conversation, before the first real message (and so the real
-   * Multiplayer Copilot session) actually exists yet. */
+   * this conversation — kept around until a real CopilotSession exists
+   * for it (see Index.tsx's own pendingAccountContext), since Phase 2a
+   * only creates that row server-side once "Make this a live session"
+   * is actually clicked, not automatically on the first message. */
   pendingAccountName?: string | null;
   session?: CopilotSession | null;
+  currentUserId?: number | null;
   onMakeLive?: () => void;
   onHandOff?: (toUserId: number, toUserName: string, note: string) => void;
 }
@@ -25,12 +28,19 @@ interface Props {
 // scope cut — see docs/API_CONTRACTS.md's copilot section); `isSending`
 // reflects the real in-flight POST /copilot/messages/ call.
 //
-// `session` (Multiplayer Copilot, see the plan this was built from) is
-// entirely optional — most conversations have none, and render exactly
-// as before. When one exists, every message beyond the first (the
-// session's own query) is, by definition, a real redirect into the same
-// real conversation — tagged inline rather than kept in a separate log,
-// same visual distinctness the PRD's own transcript mock uses.
+// `session` (Multiplayer Copilot, Phase 2a — real cross-user sessions,
+// see revenact-backend's services/copilot/models.py) is entirely
+// optional — most conversations have none, and render exactly as
+// before. When one exists, every message beyond the first (the
+// session's own opening query) is, by definition, a real redirect into
+// the same real conversation, tagged via a real `redirected` SessionEvent
+// pointing at the exact Message it's about (not positional guessing).
+//
+// "Make this a live session" and "Invite" are real owner-only actions
+// server-side (see SessionView/SessionInviteCreateView) — gated here to
+// match, so a non-owner participant never sees a button that would just
+// 404. "Hand off" stays available to any active participant, same as
+// the backend's own SessionHandoffView.
 export function ChatView({
   messages,
   onSendPrompt,
@@ -39,11 +49,13 @@ export function ChatView({
   sendError,
   pendingAccountName,
   session,
+  currentUserId,
   onMakeLive,
   onHandOff,
 }: Props) {
   const [inputText, setInputText] = useState('');
   const [isHandoffOpen, setIsHandoffOpen] = useState(false);
+  const isOwner = !!session && !!currentUserId && session.owner.id === currentUserId;
 
   function submit() {
     if (inputText.trim() && !isSending) {
@@ -52,17 +64,13 @@ export function ChatView({
     }
   }
 
-  const userMessages = messages.filter((m) => m.role === 'user');
-  const redirectEvents = session?.transcript.filter((e) => e.kind === 'redirected') ?? [];
   function redirectFor(message: CopilotMessage) {
-    if (!session || message.role !== 'user') return null;
-    const index = userMessages.findIndex((m) => m.id === message.id);
-    // userMessages[0] is the session's own opening query, never a
-    // redirect — every one after lines up 1:1 with a real redirect event.
-    return index > 0 ? redirectEvents[index - 1] : null;
+    if (!session) return null;
+    return session.events.find((e) => e.kind === 'redirected' && e.message?.id === message.id) ?? null;
   }
 
-  const activityEvents = session?.transcript.filter((e) => e.kind === 'joined' || e.kind === 'handed-off') ?? [];
+  const activityEvents =
+    session?.events.filter((e) => e.kind === 'joined' || e.kind === 'handed_off') ?? [];
 
   return (
     <div className="flex-1 h-full flex flex-col bg-surface relative">
@@ -72,51 +80,68 @@ export function ChatView({
             <div className="flex items-center justify-between flex-wrap gap-2">
               <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-accent bg-accent-dim border border-accent/30 rounded-full px-3 py-1">
                 <Sparkles className="w-3 h-3" />
-                About: {session?.accountName ?? pendingAccountName}
+                About: {session?.customer_name ?? session?.account_name ?? pendingAccountName}
               </span>
 
-              {session && (
+              {!isEmpty && (
                 <div className="flex items-center gap-3">
-                  <PresenceStrip participants={session.participants} />
-                  {session.isLive ? (
+                  {session && <PresenceStrip participants={session.participants} />}
+                  {session?.status === 'live' || session?.status === 'awaiting_handoff' ? (
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-danger bg-danger-dim border border-danger/30 rounded-full px-2.5 py-1">
                       <Radio className="w-3 h-3" />
                       Live
                     </span>
                   ) : (
+                    // Real, if this session doesn't exist server-side
+                    // yet: clicking this is what actually creates it
+                    // (see SessionView's own docstring) — the current
+                    // viewer is implicitly its owner-to-be, since only
+                    // the conversation's own creator ever has
+                    // pendingAccountName set for it (see Index.tsx).
+                    // Once a real session does exist, only its real
+                    // owner may re-show this (a non-owner participant
+                    // would just get a 404).
+                    (!session || (isOwner && session.status === 'private')) && (
+                      <button
+                        onClick={onMakeLive}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted hover:text-accent border border-line hover:border-accent/30 rounded-full px-2.5 py-1 transition-colors"
+                      >
+                        <Users className="w-3 h-3" />
+                        Make this a live session
+                      </button>
+                    )
+                  )}
+                  {(!session || session.status !== 'closed') && (
                     <button
-                      onClick={onMakeLive}
+                      onClick={() => setIsHandoffOpen(true)}
                       className="inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted hover:text-accent border border-line hover:border-accent/30 rounded-full px-2.5 py-1 transition-colors"
                     >
-                      <Users className="w-3 h-3" />
-                      Make this a live session
+                      <UserPlus className="w-3 h-3" />
+                      Hand off to…
                     </button>
                   )}
-                  <button
-                    onClick={() => setIsHandoffOpen(true)}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted hover:text-accent border border-line hover:border-accent/30 rounded-full px-2.5 py-1 transition-colors"
-                  >
-                    <UserPlus className="w-3 h-3" />
-                    Hand off to…
-                  </button>
-                  {session.status === 'awaiting-handoff' && (
+                  {session?.status === 'awaiting_handoff' && (
                     <span className="text-[11px] font-bold text-warning">Awaiting hand-off</span>
+                  )}
+                  {session?.status === 'closed' && (
+                    <span className="text-[11px] font-bold text-ink-faint">Closed</span>
                   )}
                 </div>
               )}
             </div>
 
-            {session?.isLive && (
+            {(session?.status === 'live' || session?.status === 'awaiting_handoff') && (
               <p className="text-[11px] text-ink-faint italic">
-                Live sessions sync across tabs on this device — cross-device sync arrives with the real-time backend.
+                Live — real, invited teammates can see and act in this conversation too, synced every
+                few seconds.
               </p>
             )}
 
-            {activityEvents.map((event, i) => (
-              <div key={i} className="text-[11.5px] text-ink-faint font-medium pl-1">
+            {activityEvents.map((event) => (
+              <div key={event.id} className="text-[11.5px] text-ink-faint font-medium pl-1">
                 {event.kind === 'joined'
-                  ? `${event.userName} joined the session`
-                  : `${event.fromUserName} → ${event.toUserName} — "${event.note}"`}
+                  ? `${event.actor?.name ?? 'Someone'} joined the session`
+                  : `${event.actor?.name ?? 'Someone'} → ${event.payload.to_user_name} — "${event.payload.note}"`}
               </div>
             ))}
           </div>
@@ -130,7 +155,7 @@ export function ChatView({
                 <div key={message.id} className="flex flex-col items-end gap-1">
                   {redirect && (
                     <span className="text-[11px] font-bold text-accent pr-1">
-                      ↳ Redirected by {redirect.userName}
+                      ↳ Redirected by {redirect.actor?.name ?? 'Someone'}
                     </span>
                   )}
                   <div className="max-w-[65%] bg-accent-dim border border-accent/30 rounded-2xl rounded-tr-sm px-4 py-3 text-[13.5px] text-ink-muted font-medium leading-[1.65] shadow-sm whitespace-pre-wrap">

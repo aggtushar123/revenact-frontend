@@ -156,13 +156,15 @@ export function ActivityFeed({
     entitySurveysError,
   } = useAppSelector((state) => state.customers);
 
-  // Multiplayer Copilot sessions "about" this company (FR1.3) — reads
-  // straight from the copilotSessions slice, not a fetch thunk (no
-  // backend for it yet — see the plan this was built from).
+  // Multiplayer Copilot sessions "about" this company (FR1.3) — real
+  // data now (Phase 2a), but only whatever this browser has actually
+  // fetched into the copilotSessions slice already (opened, polled, or
+  // just made live) — there's no "list every session about company X"
+  // endpoint, same limitation the slice's own docstring notes.
   const sessionsById = useAppSelector((state) => state.copilotSessions.byId);
   const numericEntityId = Number(entityId);
   const sessionsForThisEntity = Object.values(sessionsById).filter((s) =>
-    entityType === 'organization' ? s.customerId === numericEntityId : s.accountId === numericEntityId
+    entityType === 'organization' ? s.customer_id === numericEntityId : s.account_id === numericEntityId
   );
 
   // Resolve numeric ID for the still-mock tabs (Headlines/CallSense/

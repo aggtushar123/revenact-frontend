@@ -5,19 +5,22 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { SessionsTab } from './SessionsTab';
 import type { CopilotSession } from '../../../features/copilotSessions/types';
 
+const carl = { id: 1, name: 'Carl' };
+
 function session(overrides: Partial<CopilotSession> = {}): CopilotSession {
   return {
-    id: 'sess-1',
-    conversationId: 1,
-    customerId: 7,
-    accountName: 'Pizza Hut',
-    ownerId: 1,
-    ownerName: 'Carl',
-    isLive: false,
+    id: 9,
+    conversation_id: 1,
+    owner: carl,
+    customer_id: 7,
+    customer_name: 'Pizza Hut',
+    account_id: null,
+    account_name: null,
     status: 'private',
-    transcript: [{ kind: 'query', userId: 1, userName: 'Carl', text: 'Why is Pizza Hut at risk?', at: '2026-09-05T10:00:00Z' }],
-    participants: [{ userId: 1, userName: 'Carl', joinedAt: '2026-09-05T10:00:00Z' }],
-    createdAt: '2026-09-05T10:00:00Z',
+    participants: [{ user: carl, joined_at: '2026-09-05T10:00:00Z', left_at: null }],
+    events: [],
+    created_at: '2026-09-05T10:00:00Z',
+    closed_at: null,
     ...overrides,
   };
 }
@@ -39,32 +42,32 @@ describe('SessionsTab', () => {
     expect(screen.getByText('No Copilot sessions yet')).toBeInTheDocument();
   });
 
-  it('renders a session with its own query, owner, and status', () => {
+  it('renders a session with its own real company, owner, and status', () => {
     renderTab([session()]);
-    expect(screen.getByText('Why is Pizza Hut at risk?')).toBeInTheDocument();
+    expect(screen.getByText('Pizza Hut')).toBeInTheDocument();
     expect(screen.getByText('Carl')).toBeInTheDocument();
     expect(screen.getByText('Private')).toBeInTheDocument();
   });
 
   it('shows a live session with a Live status pill', () => {
-    renderTab([session({ isLive: true, status: 'live' })]);
+    renderTab([session({ status: 'live' })]);
     expect(screen.getByText('Live')).toBeInTheDocument();
   });
 
   it('sorts sessions newest-first', () => {
     renderTab([
-      session({ id: 'older', createdAt: '2026-09-01T00:00:00Z', transcript: [{ kind: 'query', userId: 1, userName: 'Carl', text: 'Older query', at: '2026-09-01T00:00:00Z' }] }),
-      session({ id: 'newer', createdAt: '2026-09-05T00:00:00Z', transcript: [{ kind: 'query', userId: 1, userName: 'Carl', text: 'Newer query', at: '2026-09-05T00:00:00Z' }] }),
+      session({ id: 1, customer_name: 'Older Co', created_at: '2026-09-01T00:00:00Z' }),
+      session({ id: 2, customer_name: 'Newer Co', created_at: '2026-09-05T00:00:00Z' }),
     ]);
     const rendered = screen.getAllByRole('heading', { level: 4 }).map((h) => h.textContent);
-    expect(rendered).toEqual(['Newer query', 'Older query']);
+    expect(rendered).toEqual(['Newer Co', 'Older Co']);
   });
 
-  it('clicking a session navigates to its own real Copilot session link', async () => {
+  it('clicking a session navigates to its own real Copilot conversation link', async () => {
     const user = userEvent.setup();
     renderTab([session()]);
 
-    await user.click(screen.getByText('Why is Pizza Hut at risk?'));
+    await user.click(screen.getByText('Pizza Hut'));
 
     expect(await screen.findByText('COPILOT PAGE')).toBeInTheDocument();
   });

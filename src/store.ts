@@ -6,7 +6,6 @@ import brainReducer from './features/brain/brainSlice';
 import userManagementReducer from './features/userManagement/userManagementSlice';
 import customersReducer from './features/customers/customersSlice';
 import copilotSessionsReducer from './features/copilotSessions/copilotSessionsSlice';
-import { copilotSessionsSyncMiddleware } from './features/copilotSessions/syncMiddleware';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -19,11 +18,6 @@ export const store = configureStore({
     customers: customersReducer,
     copilotSessions: copilotSessionsReducer,
   },
-  // copilotSessionsSyncMiddleware persists+broadcasts copilotSessions/*
-  // actions to sessionSync.ts's own BroadcastChannel/localStorage layer —
-  // see that slice's own docstring for why this lives in middleware
-  // rather than the reducers themselves.
-  middleware: (getDefaultMiddleware) => getDefaultMiddleware().concat(copilotSessionsSyncMiddleware),
 });
 
 export type RootState = ReturnType<typeof store.getState>;

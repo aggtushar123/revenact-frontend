@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { PresenceStrip } from './PresenceStrip';
 
-function participant(userId: number, userName: string) {
-  return { userId, userName, joinedAt: '2026-09-05T10:00:00Z' };
+function participant(id: number, name: string) {
+  return { user: { id, name }, joined_at: '2026-09-05T10:00:00Z', left_at: null };
 }
 
 describe('PresenceStrip', () => {
