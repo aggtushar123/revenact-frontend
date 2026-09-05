@@ -30,6 +30,8 @@ import { List as ContactsList } from './pages/contacts/List';
 import { ContactDetails } from './pages/contacts/Details';
 import { PipelinesPage } from './pages/pipelines/PipelinesPage';
 import { SurveysPage } from './pages/surveys/SurveysPage';
+import { CanvasPage } from './pages/canvas/CanvasPage';
+import { CanvasEditor } from './pages/canvas/CanvasEditor';
 import { useAppSelector } from './hooks';
 import { AdvanceDashboard } from './pages/dashboard/AdvanceDashboard';
 import { AITrendingTopics } from './pages/dashboard/tabs/AITrendingTopics';
@@ -133,6 +135,11 @@ function App() {
 
           <Route path="surveys" element={<SurveysPage />} />
 
+          <Route path="canvas">
+            <Route index element={<CanvasPage />} />
+            <Route path="create" element={<CanvasEditor />} />
+            <Route path=":id" element={<CanvasEditor />} />
+          </Route>
 
           <Route path="settings">
             <Route index element={<Navigate to="data" replace />} />

@@ -31,6 +31,8 @@ import customersReducer, {
   fetchSurveysForCustomer,
   fetchSurveysForAccount,
   clearSurveys,
+  fetchCanvasesForCustomer,
+  fetchCanvasesForAccount,
 } from './customersSlice';
 
 function makeStore() {
@@ -1127,6 +1129,79 @@ describe('customersSlice', () => {
       const state = store.getState().customers;
       expect(state.entitySurveys).toEqual([]);
       expect(state.entitySurveysError).toBeNull();
+    });
+  });
+
+  describe('fetchCanvasesForCustomer / fetchCanvasesForAccount ("Canvas List" tab)', () => {
+    const orgCanvas = {
+      id: 1,
+      name: 'Renewal Strategy Q3',
+      nodes: [{ id: 'n1', type: 'contact', position: { x: 0, y: 0 }, data: { contact_id: 5 } }],
+      edges: [],
+      companies: [{ id: globex.id, name: 'Globex Corp' }],
+      account_id: null,
+      account_name: null,
+      created_at: '2026-09-01T00:00:00Z',
+      updated_at: '2026-09-01T00:00:00Z',
+    };
+    const accountCanvas = {
+      ...orgCanvas,
+      id: 2,
+      name: 'Stakeholder Map',
+      account_id: 17,
+      account_name: 'North America',
+    };
+
+    it('fetchCanvasesForCustomer GETs /customers/<id>/canvases/ and stores the result', async () => {
+      mockFetchOnce(200, [orgCanvas]);
+      const store = makeStore();
+
+      await store.dispatch(fetchCanvasesForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/canvases/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.entityCanvases).toEqual([orgCanvas]);
+      expect(state.entityCanvasesLoading).toBe(false);
+      expect(state.entityCanvasesError).toBeNull();
+    });
+
+    it('fetchCanvasesForAccount GETs the nested account endpoint and stores the result', async () => {
+      mockFetchOnce(200, [accountCanvas]);
+      const store = makeStore();
+
+      await store.dispatch(fetchCanvasesForAccount({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/canvases/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(store.getState().customers.entityCanvases).toEqual([accountCanvas]);
+    });
+
+    it('sets an error and leaves entityCanvases empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchCanvasesForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.entityCanvases).toEqual([]);
+      expect(state.entityCanvasesError).toBe('Not found.');
+    });
+
+    it('clears a previous fetch\'s canvases as soon as a new one starts', async () => {
+      mockFetchOnce(200, [orgCanvas]);
+      const store = makeStore();
+      await store.dispatch(fetchCanvasesForCustomer(globex.id));
+      expect(store.getState().customers.entityCanvases).toEqual([orgCanvas]);
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchCanvasesForCustomer(2));
+
+      expect(store.getState().customers.entityCanvases).toEqual([]);
     });
   });
 

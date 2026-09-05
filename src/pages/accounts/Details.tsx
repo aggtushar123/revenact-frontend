@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
 import { formatCompactMoney } from '../../features/customers/formatters';
@@ -20,6 +20,8 @@ import {
   fetchOpportunitiesForAccount,
   fetchRisksForAccount,
   clearPipelineData,
+  fetchCanvasesForAccount,
+  clearCanvases,
 } from '../../features/customers/customersSlice';
 
 export function AccountDetails() {
@@ -36,6 +38,9 @@ export function AccountDetails() {
     pipelineRisks,
     pipelineRisksLoading,
     pipelineRisksError,
+    entityCanvases,
+    entityCanvasesLoading,
+    entityCanvasesError,
   } = useAppSelector((state) => state.customers);
   const [activeTab, setActiveTab] = useState('General');
   const [is360Enabled, setIs360Enabled] = useState(true);
@@ -65,6 +70,7 @@ export function AccountDetails() {
       dispatch(fetchContactsForAccount({ customerId: account.orgId, accountId: account.revenactId }));
       dispatch(fetchOpportunitiesForAccount({ customerId: account.orgId, accountId: account.revenactId }));
       dispatch(fetchRisksForAccount({ customerId: account.orgId, accountId: account.revenactId }));
+      dispatch(fetchCanvasesForAccount({ customerId: account.orgId, accountId: account.revenactId }));
       // The Organizations tab below needs nothing fetched of its own —
       // `account.orgs` (every linked Customer, id+name) already rode
       // along on the same nav-state AccountRow as everything else on
@@ -72,6 +78,7 @@ export function AccountDetails() {
     } else {
       dispatch(clearContacts());
       dispatch(clearPipelineData());
+      dispatch(clearCanvases());
     }
   }, [dispatch, accountNavState, account]);
 
@@ -82,7 +89,7 @@ export function AccountDetails() {
     { name: 'Pipelines', count: pipelineOpportunities.length + pipelineRisks.length },
     { name: 'Custom Objects', count: 0 },
     { name: 'Success Plans', count: null },
-    { name: 'Canvas List', count: null },
+    { name: 'Canvas List', count: entityCanvases.length },
   ];
 
   // Build the pinned attributes for this account
@@ -218,6 +225,14 @@ export function AccountDetails() {
             risks={pipelineRisks}
             risksLoading={pipelineRisksLoading}
             risksError={pipelineRisksError}
+            customerId={accountNavState?.account ? account.orgId : undefined}
+            accountId={accountNavState?.account ? account.revenactId : undefined}
+          />
+        ) : activeTab === 'Canvas List' ? (
+          <CanvasListTab
+            canvases={entityCanvases}
+            isLoading={entityCanvasesLoading}
+            error={entityCanvasesError}
             customerId={accountNavState?.account ? account.orgId : undefined}
             accountId={accountNavState?.account ? account.revenactId : undefined}
           />

@@ -911,6 +911,51 @@ describe('Organization Details page (/organizations/:id)', () => {
     );
   });
 
+  it('fetches and renders this organization\'s own real canvases on the Canvas List tab', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.endsWith('/customers/10/canvases/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                id: 1,
+                name: 'Renewal Strategy Q3',
+                nodes: [{ id: 'n1', type: 'contact', position: { x: 0, y: 0 }, data: { contact_id: 2 } }],
+                edges: [],
+                companies: [{ id: 10, name: 'Globex Corp' }],
+                account_id: null,
+                account_name: null,
+                created_at: '2026-08-01T00:00:00Z',
+                updated_at: '2026-08-05T00:00:00Z',
+              },
+            ],
+          });
+        }
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/') || url.includes('/opportunities/') || url.includes('/risks/')
+          ? []
+          : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      })
+    );
+
+    renderDetails('10');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /^Canvas List/ }));
+
+    expect(await screen.findByText('Renewal Strategy Q3')).toBeInTheDocument();
+    expect(screen.getByText('1 contact')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/customers/10/canvases/'),
+      expect.objectContaining({ method: 'GET' })
+    );
+
+    await user.click(screen.getByRole('button', { name: 'New Canvas' }));
+    expect(screen.queryByText('Renewal Strategy Q3')).not.toBeInTheDocument();
+  });
+
   describe('Pipelines tab search/Add/Edit/Delete', () => {
     const orgOpp = {
       id: 1,

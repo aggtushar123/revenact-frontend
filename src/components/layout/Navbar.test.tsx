@@ -180,6 +180,12 @@ function renderNavbar(
         surveys: [],
         surveysLoading: false,
         surveysError: null,
+        entityCanvases: [],
+        entityCanvasesLoading: false,
+        entityCanvasesError: null,
+        canvases: [],
+        canvasesLoading: false,
+        canvasesError: null,
       },
     },
   });

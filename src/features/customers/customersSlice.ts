@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { Node, Edge } from '@xyflow/react';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import type { User, CurrencyCode } from '../auth/authSlice';
 
@@ -366,6 +367,32 @@ export interface SurveyWritePayload {
   responded_at?: string;
 }
 
+// Mirrors revenact-backend's CanvasSerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Canvas. `nodes`/`edges` round-trip
+// verbatim exactly as React Flow gives them (same shape scenarios'
+// own Scenario['nodes']/['edges'] use) — a node's own `data` holds only
+// a `contact_id` reference, never a name/role/sentiment snapshot; the
+// editor resolves those live from the already-fetched Contact list.
+export interface Canvas {
+  id: number;
+  name: string;
+  nodes: Node[];
+  edges: Edge[];
+  companies: CompanyRef[];
+  /** Unlike Opportunity/Risk's own `account_name`-only shape, Canvas
+   * also exposes the raw id — same reasoning as Survey's own. */
+  account_id: number | null;
+  account_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CanvasWritePayload {
+  name?: string;
+  nodes?: Node[];
+  edges?: Edge[];
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -617,6 +644,20 @@ interface CustomersState {
   surveys: Survey[];
   surveysLoading: boolean;
   surveysError: string | null;
+  /** Canvases for whichever Customer or Account the "Canvas List" tab
+   * is currently showing — same single-slot reasoning as
+   * `entitySurveys` above. Deliberately separate from `canvases` below
+   * — that one is the *global*, cross-Customer list the standalone
+   * Canvas gallery fetches; this is always scoped to a single Customer
+   * or Account. */
+  entityCanvases: Canvas[];
+  entityCanvasesLoading: boolean;
+  entityCanvasesError: string | null;
+  /** Every Canvas the caller's organisation owns — the standalone
+   * Canvas gallery, unpaginated, same reasoning as `surveys` above. */
+  canvases: Canvas[];
+  canvasesLoading: boolean;
+  canvasesError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -700,6 +741,12 @@ const initialState: CustomersState = {
   surveys: [],
   surveysLoading: false,
   surveysError: null,
+  entityCanvases: [],
+  entityCanvasesLoading: false,
+  entityCanvasesError: null,
+  canvases: [],
+  canvasesLoading: false,
+  canvasesError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -1398,6 +1445,84 @@ export const deleteSurvey = createAsyncThunk<number, number, { rejectValue: stri
   }
 );
 
+// Every Canvas the caller's organisation owns, unpaginated — powers
+// the standalone Canvas gallery, same reasoning as fetchSurveys above.
+export const fetchCanvases = createAsyncThunk<Canvas[], void, { rejectValue: string }>(
+  'customers/fetchCanvases',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Canvas[]>('/canvases/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load canvases.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Same `customerId`/`accountId` -> `customer_id`/`account_id` shape as
+// createSurvey above — used by CanvasEditor.tsx's own `persist()` on
+// its first save (the parent must already be known, read off the
+// `/canvas/create?customerId=...` route's own query params).
+export const createCanvas = createAsyncThunk<
+  Canvas,
+  { customerId?: number; accountId?: number } & CanvasWritePayload,
+  { rejectValue: string }
+>('customers/createCanvas', async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
+  const body =
+    accountId !== undefined
+      ? { ...data, account_id: accountId }
+      : { ...data, customer_id: customerId };
+  try {
+    return await apiFetch<Canvas>('/canvases/', { method: 'POST', body });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not create canvas.';
+    return rejectWithValue(message);
+  }
+});
+
+// GET /api/v1/canvases/<id>/ — CanvasEditor.tsx's own single-record
+// load for an existing Canvas. Its resolved value is consumed locally
+// by the editor's own useState (name/nodes/edges), same as
+// CreateScenario.tsx's own fetchScenario — not synced into `canvases`/
+// `entityCanvases` below.
+export const fetchCanvasById = createAsyncThunk<Canvas, number, { rejectValue: string }>(
+  'customers/fetchCanvasById',
+  async (id, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Canvas>(`/canvases/${id}/`);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load this canvas.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+export const updateCanvas = createAsyncThunk<
+  Canvas,
+  { id: number } & CanvasWritePayload,
+  { rejectValue: string }
+>('customers/updateCanvas', async ({ id, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Canvas>(`/canvases/${id}/`, { method: 'PATCH', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not save this canvas.';
+    return rejectWithValue(message);
+  }
+});
+
+export const deleteCanvas = createAsyncThunk<number, number, { rejectValue: string }>(
+  'customers/deleteCanvas',
+  async (id, { rejectWithValue }) => {
+    try {
+      await apiFetch<null>(`/canvases/${id}/`, { method: 'DELETE' });
+      return id;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not delete canvas.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // Powers the Organization Details page's own Pipelines tab — every
 // Opportunity rolled up for one Customer (organisation-level and every
 // one of its Accounts' — see CustomerOpportunityListView's own
@@ -1574,6 +1699,41 @@ export const fetchSurveysForAccount = createAsyncThunk<
   }
 });
 
+// Powers the "Canvas List" tab on the Organization Details page —
+// every Canvas rolled up for one Customer (organisation-level and
+// every one of its Accounts', see CustomerCanvasListView's own
+// docstring on the backend). Unlike Survey, there's no
+// createCanvasForCustomer/createCanvasForAccount pair — "+ New Canvas"
+// navigates straight to `/canvas/create?customerId=...` and the
+// editor's own flat `createCanvas` does the actual POST on first save.
+export const fetchCanvasesForCustomer = createAsyncThunk<
+  Canvas[],
+  number,
+  { rejectValue: string }
+>('customers/fetchCanvasesForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Canvas[]>(`/customers/${customerId}/canvases/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load canvases.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers the "Canvas List" tab on the standalone Account page — every
+// account-level Canvas for one Account.
+export const fetchCanvasesForAccount = createAsyncThunk<
+  Canvas[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>('customers/fetchCanvasesForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Canvas[]>(`/customers/${customerId}/accounts/${accountId}/canvases/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load canvases.';
+    return rejectWithValue(message);
+  }
+});
+
 // Adds an organization-level Survey under `customerId` — "Log Survey"
 // from inside the Activity Feed's own Surveys tab. No extraReducers
 // case, same "caller refetches" reasoning as createOpportunityForCustomer.
@@ -1728,6 +1888,13 @@ const customersSlice = createSlice({
       state.pipelineRisks = [];
       state.pipelineRisksLoading = false;
       state.pipelineRisksError = null;
+    },
+    // Same reasoning as clearPipelineData above, for the standalone
+    // Account page's own "Canvas List" tab.
+    clearCanvases(state) {
+      state.entityCanvases = [];
+      state.entityCanvasesLoading = false;
+      state.entityCanvasesError = null;
     },
   },
   extraReducers: (builder) => {
@@ -2303,6 +2470,69 @@ const customersSlice = createSlice({
       // it can't safely patch a specific slot itself" reasoning as
       // createOpportunityForCustomer/ForAccount above; SurveysTab.tsx
       // refetches `entitySurveys` afterward instead.
+      .addCase(fetchCanvases.pending, (state) => {
+        state.canvasesLoading = true;
+        state.canvasesError = null;
+      })
+      .addCase(fetchCanvases.fulfilled, (state, action) => {
+        state.canvasesLoading = false;
+        state.canvases = action.payload;
+      })
+      .addCase(fetchCanvases.rejected, (state, action) => {
+        state.canvasesLoading = false;
+        state.canvasesError = action.payload ?? 'Could not load canvases.';
+      })
+      // Same "no .rejected case, create/update/delete patch `canvases`
+      // directly" reasoning as Survey above.
+      .addCase(createCanvas.fulfilled, (state, action) => {
+        state.canvases.unshift(action.payload);
+      })
+      .addCase(updateCanvas.fulfilled, (state, action) => {
+        // Same "patch every slot it could be in" reasoning as
+        // updateSurvey above — a Canvas could be showing in both the
+        // standalone gallery's own `canvases` and the "Canvas List"
+        // tab's own `entityCanvases` at once.
+        const updated = action.payload;
+        const index = state.canvases.findIndex((c) => c.id === updated.id);
+        if (index !== -1) state.canvases[index] = updated;
+        const entityIndex = state.entityCanvases.findIndex((c) => c.id === updated.id);
+        if (entityIndex !== -1) state.entityCanvases[entityIndex] = updated;
+      })
+      .addCase(deleteCanvas.fulfilled, (state, action) => {
+        state.canvases = state.canvases.filter((c) => c.id !== action.payload);
+        state.entityCanvases = state.entityCanvases.filter((c) => c.id !== action.payload);
+      })
+      .addCase(fetchCanvasesForCustomer.pending, (state) => {
+        state.entityCanvasesLoading = true;
+        state.entityCanvasesError = null;
+        // Same "clear on pending" convention as fetchSurveysForCustomer
+        // above — avoids a stale previous entity's canvases flashing.
+        state.entityCanvases = [];
+      })
+      .addCase(fetchCanvasesForCustomer.fulfilled, (state, action) => {
+        state.entityCanvasesLoading = false;
+        state.entityCanvases = action.payload;
+      })
+      .addCase(fetchCanvasesForCustomer.rejected, (state, action) => {
+        state.entityCanvasesLoading = false;
+        state.entityCanvasesError = action.payload ?? 'Could not load canvases.';
+      })
+      .addCase(fetchCanvasesForAccount.pending, (state) => {
+        state.entityCanvasesLoading = true;
+        state.entityCanvasesError = null;
+        state.entityCanvases = [];
+      })
+      .addCase(fetchCanvasesForAccount.fulfilled, (state, action) => {
+        state.entityCanvasesLoading = false;
+        state.entityCanvases = action.payload;
+      })
+      .addCase(fetchCanvasesForAccount.rejected, (state, action) => {
+        state.entityCanvasesLoading = false;
+        state.entityCanvasesError = action.payload ?? 'Could not load canvases.';
+      })
+      // fetchCanvasById has no extraReducers case at all — its resolved
+      // value is consumed locally by CanvasEditor.tsx's own state, not
+      // synced into `canvases`/`entityCanvases` (see its own docstring).
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -2365,5 +2595,6 @@ export const {
   clearContacts,
   clearSelectedCustomer,
   clearPipelineData,
+  clearCanvases,
 } = customersSlice.actions;
 export default customersSlice.reducer;

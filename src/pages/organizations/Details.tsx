@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, RefreshCw, MoreHorizontal, Globe, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, ExternalLink, Download, X } from 'lucide-react';
 import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
 import { formatCompactMoney, formatMoney } from '../../features/customers/formatters';
@@ -13,6 +13,7 @@ import {
   fetchContactsForCustomer,
   fetchOpportunitiesForCustomer,
   fetchRisksForCustomer,
+  fetchCanvasesForCustomer,
 } from '../../features/customers/customersSlice';
 import type { Account } from '../../features/customers/customersSlice';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
@@ -47,6 +48,9 @@ export function Details() {
     pipelineRisks,
     pipelineRisksLoading,
     pipelineRisksError,
+    entityCanvases,
+    entityCanvasesLoading,
+    entityCanvasesError,
   } = useAppSelector((state) => state.customers);
 
   useEffect(() => {
@@ -55,6 +59,7 @@ export function Details() {
     dispatch(fetchContactsForCustomer(orgId));
     dispatch(fetchOpportunitiesForCustomer(orgId));
     dispatch(fetchRisksForCustomer(orgId));
+    dispatch(fetchCanvasesForCustomer(orgId));
   }, [dispatch, orgId]);
 
   // The General tab, PinnedAttributes panel, ActivityFeed, Contacts tab,
@@ -88,7 +93,7 @@ export function Details() {
     { name: 'Pipelines', count: pipelineOpportunities.length + pipelineRisks.length },
     { name: 'Custom Objects', count: 2 },
     { name: 'Success Plans', count: null },
-    { name: 'Canvas List', count: null },
+    { name: 'Canvas List', count: entityCanvases.length },
   ];
 
   return (
@@ -247,12 +252,24 @@ export function Details() {
             customerId={orgId}
           />
         )}
-        {activeTab !== 'General' && activeTab !== 'Accounts' && activeTab !== 'Contacts' && activeTab !== 'Pipelines' && (
-          <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
-            <Layout className="w-12 h-12 text-ink-faint mb-2" />
-            <span className="text-sm font-bold text-ink-muted uppercase tracking-widest">{activeTab} Coming Soon</span>
-          </div>
+        {activeTab === 'Canvas List' && (
+          <CanvasListTab
+            canvases={entityCanvases}
+            isLoading={entityCanvasesLoading}
+            error={entityCanvasesError}
+            customerId={orgId}
+          />
         )}
+        {activeTab !== 'General' &&
+          activeTab !== 'Accounts' &&
+          activeTab !== 'Contacts' &&
+          activeTab !== 'Pipelines' &&
+          activeTab !== 'Canvas List' && (
+            <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
+              <Layout className="w-12 h-12 text-ink-faint mb-2" />
+              <span className="text-sm font-bold text-ink-muted uppercase tracking-widest">{activeTab} Coming Soon</span>
+            </div>
+          )}
       </main>
     </div>
   );
