@@ -15,3 +15,6 @@ export type { PipelinesTabProps } from './PipelinesTab';
 
 export { CanvasListTab } from './CanvasListTab';
 export type { CanvasListTabProps } from './CanvasListTab';
+
+export { PresenceStrip } from './PresenceStrip';
+export type { PresenceStripProps } from './PresenceStrip';

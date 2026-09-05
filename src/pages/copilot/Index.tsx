@@ -1,13 +1,29 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { HomeView } from './HomeView';
 import { ChatView } from './ChatView';
 import { CopilotSidebar } from './CopilotSidebar';
 import { CockpitView } from './CockpitView';
 import { fetchConversation, fetchConversations, sendMessage } from './copilotApi';
 import { ApiError } from '../../lib/apiClient';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import {
+  sessionStarted,
+  sessionMadeLive,
+  redirectSent,
+  thinkingStarted,
+  answerRecorded,
+  participantJoined,
+  handedOff,
+} from '../../features/copilotSessions/copilotSessionsSlice';
 import type { ConversationSummary, CopilotMessage } from './types';
 
 export function CopilotIndex() {
+  const dispatch = useAppDispatch();
+  const currentUser = useAppSelector((state) => state.auth.user);
+  const sessions = useAppSelector((state) => state.copilotSessions.byId);
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [view, setView] = useState<'home' | 'chat' | 'empty-chat'>('home');
   const [activeTab, setActiveTab] = useState<'copilot' | 'cockpit'>('copilot');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
@@ -19,8 +35,20 @@ export function CopilotIndex() {
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
 
-  // Loads the caller's own real chat history once, for the sidebar —
-  // same "fetch on mount" convention as ScenariosList/CampaignsList's own.
+  // Set by the new "Ask Copilot" entry point on the Organization/Account
+  // Details pages (see Details.tsx's own new button) — the account this
+  // NEXT message will start a real Multiplayer Copilot session about, once
+  // it actually sends. Cleared once that session exists (or the user picks
+  // something else) — a Session's own `accountName` is a permanent
+  // snapshot from here, not re-derived later.
+  const [pendingAccountContext, setPendingAccountContext] = useState<{
+    customerId?: number;
+    accountId?: number;
+    accountName: string;
+  } | null>(null);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const activeSession = activeSessionId ? sessions[activeSessionId] : null;
+
   useEffect(() => {
     fetchConversations()
       .then(setConversations)
@@ -29,6 +57,57 @@ export function CopilotIndex() {
         // load the same as a genuinely empty list — nothing to start a
         // conversation from is not itself worth a blocking error banner.
       });
+  }, []);
+
+  // Loads a session's own real conversation and records a real join —
+  // shared by the shareable-link flow (query param, below) and clicking a
+  // session straight from the sidebar (no URL round-trip needed there).
+  function openSession(sessionId: string) {
+    const session = sessions[sessionId];
+    if (!session || !currentUser) return;
+    setActiveSessionId(sessionId);
+    setActiveConversationId(session.conversationId);
+    setView('chat');
+    setMessages([]);
+    fetchConversation(session.conversationId)
+      .then((conversation) => setMessages(conversation.messages))
+      .catch((err) => setSendError(err instanceof ApiError ? err.message : 'Could not load this session.'));
+    if (!session.participants.some((p) => p.userId === currentUser.id)) {
+      dispatch(
+        participantJoined({
+          id: sessionId,
+          userId: currentUser.id,
+          userName: currentUser.name,
+          at: new Date().toISOString(),
+        })
+      );
+    }
+  }
+
+  // One-time read of the entry-point/shareable-link query params — see
+  // the plan this was built from for both flows (start-about-an-account,
+  // join-a-shared-session).
+  useEffect(() => {
+    const sessionParam = searchParams.get('session');
+    const forCustomerId = searchParams.get('forCustomerId');
+    const forAccountId = searchParams.get('forAccountId');
+    const forCustomerName = searchParams.get('forCustomerName');
+
+    if (sessionParam) {
+      openSession(sessionParam);
+    } else if (forCustomerId || forAccountId) {
+      setPendingAccountContext({
+        customerId: forCustomerId ? Number(forCustomerId) : undefined,
+        accountId: forAccountId ? Number(forAccountId) : undefined,
+        accountName: forCustomerName ?? 'this account',
+      });
+      setView('empty-chat');
+    }
+    setSearchParams({}, { replace: true });
+    // Only ever meant to run once, against whatever query params the page
+    // was actually opened with — re-running on every `sessions`/`dispatch`
+    // identity change would re-process a param already cleared above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSendPrompt(prompt: string) {
@@ -47,6 +126,26 @@ export function CopilotIndex() {
       { id: optimisticId, role: 'user', content: trimmed, created_at: new Date().toISOString() },
     ]);
 
+    const isNewSessionStart = !!pendingAccountContext && !activeSessionId;
+    // Any message after a session's own first (its query) is, by
+    // definition, a redirect — a real follow-up into the same real
+    // conversation, not scripted (see the plan's own "reasoning
+    // fidelity" decision). Recorded before the call so a joiner watching
+    // live sees the redirect land immediately, not only once the real
+    // reply comes back.
+    if (activeSessionId && currentUser) {
+      dispatch(
+        redirectSent({
+          id: activeSessionId,
+          userId: currentUser.id,
+          userName: currentUser.name,
+          text: trimmed,
+          at: new Date().toISOString(),
+        })
+      );
+      dispatch(thinkingStarted({ id: activeSessionId, at: new Date().toISOString() }));
+    }
+
     try {
       const conversation = await sendMessage({
         conversationId: activeConversationId ?? undefined,
@@ -61,6 +160,29 @@ export function CopilotIndex() {
           ...withoutThisOne,
         ];
       });
+
+      const realAnswer = conversation.messages[conversation.messages.length - 1]?.content ?? '';
+      if (isNewSessionStart && pendingAccountContext && currentUser) {
+        const newSessionId = crypto.randomUUID();
+        dispatch(
+          sessionStarted({
+            id: newSessionId,
+            conversationId: conversation.id,
+            customerId: pendingAccountContext.customerId,
+            accountId: pendingAccountContext.accountId,
+            accountName: pendingAccountContext.accountName,
+            ownerId: currentUser.id,
+            ownerName: currentUser.name,
+            query: trimmed,
+            at: new Date().toISOString(),
+          })
+        );
+        dispatch(answerRecorded({ id: newSessionId, text: realAnswer, at: new Date().toISOString() }));
+        setActiveSessionId(newSessionId);
+        setPendingAccountContext(null);
+      } else if (activeSessionId) {
+        dispatch(answerRecorded({ id: activeSessionId, text: realAnswer, at: new Date().toISOString() }));
+      }
     } catch (err) {
       setSendError(err instanceof ApiError ? err.message : 'Could not reach Copilot.');
     } finally {
@@ -80,6 +202,10 @@ export function CopilotIndex() {
     setActiveConversationId(conversationId);
     setSendError(null);
     setMessages([]);
+    // Reopening a past conversation restores its own session context too
+    // (presence, live toggle, hand-off) if one was ever started for it.
+    const matchingSession = Object.values(sessions).find((s) => s.conversationId === conversationId);
+    setActiveSessionId(matchingSession?.id ?? null);
     try {
       const conversation = await fetchConversation(conversationId);
       setMessages(conversation.messages);
@@ -92,9 +218,31 @@ export function CopilotIndex() {
     setView('empty-chat');
     setSelectedSkill(null);
     setActiveConversationId(null);
+    setActiveSessionId(null);
+    setPendingAccountContext(null);
     setMessages([]);
     setSendError(null);
     setIsSending(false);
+  }
+
+  function handleMakeLive() {
+    if (activeSessionId) dispatch(sessionMadeLive({ id: activeSessionId }));
+  }
+
+  function handleHandOff(toUserId: number, toUserName: string, note: string) {
+    if (activeSessionId && currentUser) {
+      dispatch(
+        handedOff({
+          id: activeSessionId,
+          fromUserId: currentUser.id,
+          fromUserName: currentUser.name,
+          toUserId,
+          toUserName,
+          note,
+          at: new Date().toISOString(),
+        })
+      );
+    }
   }
 
   return (
@@ -135,9 +283,12 @@ export function CopilotIndex() {
               setIsExpanded={setIsSidebarExpanded}
               conversations={conversations}
               activeConversationId={activeConversationId}
+              sessions={sessions}
+              currentUserId={currentUser?.id ?? null}
               onNewChat={handleNewChat}
               onSelectChat={handleSelectChat}
               onSelectSkill={handleSelectSkill}
+              onOpenSession={openSession}
             />
             <div className="flex-1 overflow-hidden relative bg-surface border border-line/80 shadow-[0px_4px_24px_rgba(0,0,0,0.04)] rounded-[20px] m-1 mt-4 mr-4 mb-4 flex">
               {view === 'home' ? (
@@ -149,6 +300,10 @@ export function CopilotIndex() {
                   messages={messages}
                   isSending={isSending}
                   sendError={sendError}
+                  pendingAccountName={pendingAccountContext?.accountName ?? null}
+                  session={activeSession ?? null}
+                  onMakeLive={handleMakeLive}
+                  onHandOff={handleHandOff}
                 />
               )}
             </div>

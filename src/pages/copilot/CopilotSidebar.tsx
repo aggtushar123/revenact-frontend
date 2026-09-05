@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { ChevronRight, ChevronLeft, Edit, ChevronDown } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Edit, ChevronDown, Radio, Inbox } from 'lucide-react';
 import { formatRelativeTime } from '../../features/customers/formatters';
+import type { CopilotSession } from '../../features/copilotSessions/types';
 import type { ConversationSummary } from './types';
 
 interface Props {
@@ -8,9 +9,12 @@ interface Props {
   setIsExpanded: (val: boolean) => void;
   conversations: ConversationSummary[];
   activeConversationId: number | null;
+  sessions: Record<string, CopilotSession>;
+  currentUserId: number | null;
   onNewChat?: () => void;
   onSelectChat?: (conversationId: number) => void;
   onSelectSkill?: (skill: string) => void;
+  onOpenSession?: (sessionId: string) => void;
 }
 
 export function CopilotSidebar({
@@ -18,12 +22,27 @@ export function CopilotSidebar({
   setIsExpanded,
   conversations,
   activeConversationId,
+  sessions,
+  currentUserId,
   onNewChat,
   onSelectChat,
   onSelectSkill,
+  onOpenSession,
 }: Props) {
   const [isSkillsExpanded, setIsSkillsExpanded] = useState(false);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(true);
+
+  const sessionByConversationId = new Map(Object.values(sessions).map((s) => [s.conversationId, s]));
+
+  // Real, not a generic notification center (none exists in this app —
+  // see the plan this was built from) — just this one, scoped, "does a
+  // Multiplayer Copilot session need me right now" section.
+  const handedOffToMe = Object.values(sessions).filter(
+    (s) =>
+      s.status === 'awaiting-handoff' &&
+      currentUserId !== null &&
+      [...s.transcript].reverse().find((e) => e.kind === 'handed-off')?.toUserId === currentUserId
+  );
 
   if (!isExpanded) {
     return (
@@ -52,6 +71,25 @@ export function CopilotSidebar({
       </div>
 
       <div className="px-5 py-4 flex flex-col gap-6 overflow-y-auto custom-scrollbar flex-1">
+        {handedOffToMe.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 text-warning font-bold text-[13px] mb-2.5">
+              <Inbox className="w-3.5 h-3.5" />
+              Handed off to you
+            </div>
+            <div className="flex flex-col gap-[2px] ml-2 border-l-2 border-warning/30 pl-2">
+              {handedOffToMe.map((session) => (
+                <ChatItem
+                  key={session.id}
+                  text={session.accountName}
+                  subtext={formatRelativeTime(session.transcript.at(-1)?.at ?? session.createdAt)}
+                  onClick={() => onOpenSession?.(session.id)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         <div>
           <div
             onClick={() => setIsSkillsExpanded(!isSkillsExpanded)}
@@ -100,15 +138,20 @@ export function CopilotSidebar({
               {conversations.length === 0 ? (
                 <p className="text-[12px] text-ink-faint font-medium px-2.5 py-1.5">No chats yet.</p>
               ) : (
-                conversations.map((conversation) => (
-                  <ChatItem
-                    key={conversation.id}
-                    text={conversation.title}
-                    subtext={formatRelativeTime(conversation.updated_at)}
-                    isActive={conversation.id === activeConversationId}
-                    onClick={() => onSelectChat?.(conversation.id)}
-                  />
-                ))
+                conversations.map((conversation) => {
+                  const session = sessionByConversationId.get(conversation.id);
+                  return (
+                    <ChatItem
+                      key={conversation.id}
+                      text={conversation.title}
+                      subtext={formatRelativeTime(conversation.updated_at)}
+                      isActive={conversation.id === activeConversationId}
+                      isLive={session?.isLive}
+                      participantCount={session ? session.participants.length : undefined}
+                      onClick={() => onSelectChat?.(conversation.id)}
+                    />
+                  );
+                })
               )}
             </div>
           )}
@@ -122,11 +165,15 @@ function ChatItem({
   text,
   subtext,
   isActive,
+  isLive,
+  participantCount,
   onClick,
 }: {
   text: string;
   subtext?: string;
   isActive?: boolean;
+  isLive?: boolean;
+  participantCount?: number;
   onClick?: () => void;
 }) {
   return (
@@ -136,7 +183,17 @@ function ChatItem({
         isActive ? 'bg-accent-dim text-accent font-bold border-accent/30 shadow-sm' : 'text-ink-muted hover:bg-subtle hover:text-ink'
       }`}
     >
-      <div className="truncate">{text}</div>
+      <div className="flex items-center gap-1.5">
+        <div className="truncate flex-1">{text}</div>
+        {isLive && (
+          <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-danger shrink-0">
+            <Radio className="w-2.5 h-2.5" />
+          </span>
+        )}
+        {participantCount !== undefined && participantCount > 1 && (
+          <span className="text-[10px] font-bold text-ink-faint shrink-0">×{participantCount}</span>
+        )}
+      </div>
       {subtext && <div className="text-[11px] text-ink-faint font-medium truncate">{subtext}</div>}
     </div>
   );

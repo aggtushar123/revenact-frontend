@@ -6,6 +6,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
+import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
 import { Details } from './Details';
 
 // Minimal but real shape, matching revenact-backend's CustomerSerializer —
@@ -56,7 +57,7 @@ const globex = {
 
 function renderDetails(id: string) {
   const store = configureStore({
-    reducer: { customers: customersReducer, auth: authReducer },
+    reducer: { customers: customersReducer, auth: authReducer, copilotSessions: copilotSessionsReducer },
     preloadedState: {
       auth: {
         user: {

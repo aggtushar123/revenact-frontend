@@ -8,6 +8,7 @@ import { AccountDetails } from './Details';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
+import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
 
 // Real-shaped AccountRow, the kind organizations/Details.tsx's AccountsTab
 // passes through navigate()'s state when a row is clicked — see that
@@ -43,7 +44,7 @@ const apacDivision: AccountRow = {
 // what each test is actually asserting on.
 function renderAccountDetails(state?: { account: AccountRow }) {
   const store = configureStore({
-    reducer: { customers: customersReducer, auth: authReducer },
+    reducer: { customers: customersReducer, auth: authReducer, copilotSessions: copilotSessionsReducer },
     preloadedState: {
       auth: {
         user: {
@@ -489,7 +490,7 @@ describe('AccountDetails page (/accounts/:id)', () => {
 
     it('clicking an organization card navigates to its Organization Details page', async () => {
       const store = configureStore({
-    reducer: { customers: customersReducer, auth: authReducer },
+    reducer: { customers: customersReducer, auth: authReducer, copilotSessions: copilotSessionsReducer },
     preloadedState: {
       auth: {
         user: {

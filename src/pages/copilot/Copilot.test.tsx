@@ -1,13 +1,21 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import { MemoryRouter } from 'react-router-dom';
+import authReducer from '../../features/auth/authSlice';
+import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
 import { CopilotIndex } from './Index';
 import type { Conversation, ConversationSummary } from './types';
 
 // Integration tier (see the `testing` skill): only the fetch boundary is
 // mocked — real component tree, same convention as CampaignsList.test.tsx's
 // own, now that a real copilot app backs this (see
-// docs/API_CONTRACTS.md's `copilot` section).
+// docs/API_CONTRACTS.md's `copilot` section). Wrapped in a real Redux
+// Provider + MemoryRouter now that Multiplayer Copilot sessions (see
+// features/copilotSessions/) need both — real auth state for
+// ownerId/ownerName, real router context for useSearchParams.
 
 function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
@@ -33,6 +41,50 @@ function conversationDetail(overrides: Partial<Conversation> = {}): Conversation
   };
 }
 
+function makeStore() {
+  return configureStore({
+    reducer: { auth: authReducer, copilotSessions: copilotSessionsReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role: 'admin' as const,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency: 'USD' as const,
+            currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '',
+            ai_agent_enabled: true,
+            ai_agent_tone: 'professional' as const,
+            ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
+}
+
+function renderCopilot() {
+  render(
+    <Provider store={makeStore()}>
+      <MemoryRouter initialEntries={['/copilot']}>
+        <CopilotIndex />
+      </MemoryRouter>
+    </Provider>
+  );
+}
+
 async function expandSidebar(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByLabelText('Expand sidebar'));
 }
@@ -49,7 +101,7 @@ describe('Copilot (/copilot)', () => {
   it('loads real conversation history on mount and renders it in the sidebar', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, [existingConversation]))));
     const user = userEvent.setup();
-    render(<CopilotIndex />);
+    renderCopilot();
 
     await expandSidebar(user);
 
@@ -68,7 +120,7 @@ describe('Copilot (/copilot)', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
-    render(<CopilotIndex />);
+    renderCopilot();
 
     const input = await screen.findByPlaceholderText(PLACEHOLDER);
     await user.type(input, "What's my churn risk?");
@@ -93,7 +145,7 @@ describe('Copilot (/copilot)', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
-    render(<CopilotIndex />);
+    renderCopilot();
 
     await expandSidebar(user);
     await user.click(await screen.findByText("What's my churn risk?"));
@@ -115,7 +167,7 @@ describe('Copilot (/copilot)', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
-    render(<CopilotIndex />);
+    renderCopilot();
 
     const input = await screen.findByPlaceholderText(PLACEHOLDER);
     await user.type(input, 'Hello');
@@ -138,7 +190,7 @@ describe('Copilot (/copilot)', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
-    render(<CopilotIndex />);
+    renderCopilot();
 
     await user.click(await screen.findByRole('heading', { name: 'Internal Business Review', level: 4 }));
     await user.click(await screen.findByRole('button', { name: 'Run' }));

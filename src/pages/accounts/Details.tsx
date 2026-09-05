@@ -7,6 +7,7 @@ import {
   MessageCircle,
   ChevronRight,
   ExternalLink,
+  Sparkles,
 } from 'lucide-react';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
@@ -27,6 +28,7 @@ import {
 export function AccountDetails() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
+  const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const {
     contacts,
@@ -142,6 +144,16 @@ export function AccountDetails() {
               <div className={`absolute top-0.5 w-3 h-3 bg-surface rounded-full shadow-sm transition-all duration-300 ${is360Enabled ? 'right-0.5' : 'left-0.5'}`} />
             </button>
           </div>
+
+          <button
+            onClick={() =>
+              navigate(`/copilot?forAccountId=${account.revenactId}&forCustomerName=${encodeURIComponent(account.name)}`)
+            }
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-[#0D0F0E] text-[12px] font-bold shadow-sm hover:scale-105 transition-all"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Ask Copilot
+          </button>
 
           <div className="flex items-center gap-1">
             <HeaderAction icon={<MessageCircle className="w-4 h-4" />} />

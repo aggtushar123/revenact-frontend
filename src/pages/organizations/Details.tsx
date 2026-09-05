@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, RefreshCw, MoreHorizontal, Globe, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, ExternalLink, Download, X } from 'lucide-react';
+import { MessageSquare, RefreshCw, MoreHorizontal, Globe, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, ExternalLink, Download, X, Sparkles } from 'lucide-react';
 import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab } from '../../components/shared';
@@ -26,6 +26,7 @@ import { AccountFormModal } from './AccountFormModal';
 export function Details() {
   const { id } = useParams<{ id: string }>();
   const orgId = parseInt(id || '0', 10);
+  const navigate = useNavigate();
   // Set by the standalone Surveys page's own row-click navigation (see
   // SurveysPage.tsx) so landing here opens straight to the Surveys
   // filter instead of the general feed — see ActivityFeedProps' own
@@ -130,6 +131,20 @@ export function Details() {
              </div>
            </div>
            
+           {organization && (
+             <button
+               onClick={() =>
+                 navigate(
+                   `/copilot?forCustomerId=${organization.id}&forCustomerName=${encodeURIComponent(organization.org)}`
+                 )
+               }
+               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-[#0D0F0E] text-[12px] font-bold shadow-sm hover:scale-105 transition-all"
+             >
+               <Sparkles className="w-3.5 h-3.5" />
+               Ask Copilot
+             </button>
+           )}
+
            <div className="flex items-center gap-1">
              <IconButton icon={<MessageSquare className="w-4 h-4" />} minimal />
              <IconButton icon={<RefreshCw className="w-4 h-4" />} minimal />

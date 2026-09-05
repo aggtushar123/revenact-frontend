@@ -8,3 +8,4 @@ export { ActivitiesTab } from './ActivitiesTab';
 export { CallSenseTab } from './CallSenseTab';
 export { HeadlinesTab } from './HeadlinesTab';
 export { SlackTab } from './SlackTab';
+export { SessionsTab } from './SessionsTab';

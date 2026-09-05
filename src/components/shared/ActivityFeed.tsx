@@ -13,6 +13,7 @@ import {
   HeadlinesTab,
   SlackTab,
   SurveysTab,
+  SessionsTab,
 } from '../organizations/activity';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
@@ -95,10 +96,10 @@ const FEED_TABS = [
 const FILTER_ITEMS = [
   'All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets',
   'Calendar Events', 'Pulse', 'Conversations', 'Revenact Support',
-  'Surveys', 'Slack',
+  'Surveys', 'Sessions', 'Slack',
 ];
 
-const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events', 'Surveys', 'Slack'];
+const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events', 'Surveys', 'Sessions', 'Slack'];
 
 // ── Account id resolution ────────────────────────────────────────────────────
 // Headlines/CallSense/Slack are still fully mock (SlackTab keeps its
@@ -149,6 +150,15 @@ export function ActivityFeed({
     entitySurveysLoading,
     entitySurveysError,
   } = useAppSelector((state) => state.customers);
+
+  // Multiplayer Copilot sessions "about" this company (FR1.3) — reads
+  // straight from the copilotSessions slice, not a fetch thunk (no
+  // backend for it yet — see the plan this was built from).
+  const sessionsById = useAppSelector((state) => state.copilotSessions.byId);
+  const numericEntityId = Number(entityId);
+  const sessionsForThisEntity = Object.values(sessionsById).filter((s) =>
+    entityType === 'organization' ? s.customerId === numericEntityId : s.accountId === numericEntityId
+  );
 
   // Resolve numeric ID for the still-mock tabs (Headlines/CallSense/
   // Slack) — see resolveAccountId's own comment.
@@ -361,6 +371,7 @@ export function ActivityFeed({
                   customerId={customerId}
                 />
               )}
+              {filter === 'Sessions' && <SessionsTab sessions={sessionsForThisEntity} />}
               {filter === 'Slack' && <SlackTab entityId={resolvedId} />}
 
               {!IMPLEMENTED_FILTERS.includes(filter) && (
