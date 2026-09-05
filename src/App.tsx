@@ -32,6 +32,8 @@ import { PipelinesPage } from './pages/pipelines/PipelinesPage';
 import { SurveysPage } from './pages/surveys/SurveysPage';
 import { CanvasPage } from './pages/canvas/CanvasPage';
 import { CanvasEditor } from './pages/canvas/CanvasEditor';
+import { CampaignsList } from './pages/campaigns/CampaignsList';
+import { CampaignEditor } from './pages/campaigns/CampaignEditor';
 import { useAppSelector } from './hooks';
 import { AdvanceDashboard } from './pages/dashboard/AdvanceDashboard';
 import { AITrendingTopics } from './pages/dashboard/tabs/AITrendingTopics';
@@ -139,6 +141,12 @@ function App() {
             <Route index element={<CanvasPage />} />
             <Route path="create" element={<CanvasEditor />} />
             <Route path=":id" element={<CanvasEditor />} />
+          </Route>
+
+          <Route path="campaigns">
+            <Route index element={<CampaignsList />} />
+            <Route path="create" element={<CampaignEditor />} />
+            <Route path=":id" element={<CampaignEditor />} />
           </Route>
 
           <Route path="settings">
