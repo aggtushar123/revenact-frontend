@@ -14,6 +14,7 @@ import {
   fetchMyInvites,
   respondToInvite,
 } from '../../features/copilotSessions/sessionApi';
+import { connectSessionSocket } from '../../features/copilotSessions/sessionSocket';
 import {
   sessionSnapshotReceived,
   myInvitesReceived,
@@ -21,12 +22,18 @@ import {
 } from '../../features/copilotSessions/copilotSessionsSlice';
 import type { ConversationSummary, CopilotMessage } from './types';
 
-const SESSION_POLL_INTERVAL_MS = 3000;
+// Phase 2b's own real-time push (see sessionSocket.ts) is the primary
+// sync mechanism now — this poll is a slow resilience fallback in case
+// a socket silently drops (a laptop sleeping through a network change,
+// etc.) rather than the whole feature's own correctness depending on a
+// socket connection never failing.
+const SESSION_POLL_INTERVAL_MS = 20000;
 const INVITES_POLL_INTERVAL_MS = 8000;
 
 export function CopilotIndex() {
   const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
+  const accessToken = useAppSelector((state) => state.auth.accessToken);
   const sessions = useAppSelector((state) => state.copilotSessions.byId);
   const myInvites = useAppSelector((state) => state.copilotSessions.myInvites);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -67,31 +74,45 @@ export function CopilotIndex() {
       });
   }, []);
 
-  // Real cross-user sync, Phase 2a — no WebSocket push yet, so an open
-  // live/awaiting-handoff session just polls its own real state every
-  // few seconds (a private or closed session has nothing new to poll
-  // for). Refetches the conversation's own messages alongside the
-  // session's own participants/events, since another real participant's
-  // redirect shows up as both at once.
+  // Real cross-user sync, Phase 2b — a real WebSocket push
+  // (sessionSocket.ts) as the primary mechanism for an open
+  // live/awaiting-handoff session (a private or closed session has
+  // nothing new to sync). Each push (or slow-poll fallback tick, below)
+  // also re-fetches the conversation's own messages, since another
+  // real participant's redirect shows up as both a new SessionEvent and
+  // a new Message at once.
   useEffect(() => {
     if (!activeConversationId) return;
     const pollable = activeSession?.status === 'live' || activeSession?.status === 'awaiting_handoff';
-    if (!pollable) return;
+    if (!pollable || !accessToken) return;
 
-    const poll = () => {
-      fetchSession(activeConversationId)
-        .then((session) => dispatch(sessionSnapshotReceived(session)))
-        .catch(() => {
-          // A transient failure just skips this tick — the next one
-          // tries again, not worth a UI error for one missed poll.
-        });
+    const refreshMessages = () => {
       fetchConversation(activeConversationId)
         .then((conversation) => setMessages(conversation.messages))
         .catch(() => {});
     };
-    const intervalId = window.setInterval(poll, SESSION_POLL_INTERVAL_MS);
-    return () => window.clearInterval(intervalId);
-  }, [activeConversationId, activeSession?.status, dispatch]);
+
+    const socket = connectSessionSocket(activeConversationId, accessToken, (session) => {
+      dispatch(sessionSnapshotReceived(session));
+      refreshMessages();
+    });
+
+    // Resilience fallback only — real sync is the socket above. Runs
+    // much slower than Phase 2a's own tight poll did, since it's not
+    // the primary path anymore; catches up within its own cycle if a
+    // socket ever silently drops without the reconnect logic noticing.
+    const intervalId = window.setInterval(() => {
+      fetchSession(activeConversationId)
+        .then((session) => dispatch(sessionSnapshotReceived(session)))
+        .catch(() => {});
+      refreshMessages();
+    }, SESSION_POLL_INTERVAL_MS);
+
+    return () => {
+      socket.disconnect();
+      window.clearInterval(intervalId);
+    };
+  }, [activeConversationId, activeSession?.status, accessToken, dispatch]);
 
   // Real invites, Phase 2a — polled independent of whatever conversation
   // is open, since an invite needs to be visible before the invitee can
