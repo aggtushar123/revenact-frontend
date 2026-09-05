@@ -32,11 +32,28 @@ export interface CockpitRenewalBucket {
   value: number;
 }
 
+export interface CockpitRenewalItem {
+  id: number;
+  name: string;
+  type: 'customer' | 'account';
+  value: number;
+  renewal_date: string;
+}
+
+export interface CockpitRenewals {
+  window_days: number;
+  customers: CockpitRenewalBucket;
+  accounts: CockpitRenewalBucket;
+  // Every renewing Customer/Account merged into one list, sorted
+  // soonest-first — the real drill-down, not just a count/value pair.
+  items: CockpitRenewalItem[];
+}
+
 export interface CockpitSummary {
   customers: CockpitBookSummary;
   accounts: CockpitBookSummary;
-  renewals_next_30_days: {
-    customers: CockpitRenewalBucket;
-    accounts: CockpitRenewalBucket;
-  };
+  renewals: CockpitRenewals;
 }
+
+export const RENEWAL_WINDOW_OPTIONS = [30, 60, 90] as const;
+export type RenewalWindowDays = (typeof RENEWAL_WINDOW_OPTIONS)[number];

@@ -3,8 +3,11 @@
 import { apiFetch } from '../../lib/apiClient';
 import type { CockpitSummary, CockpitTask } from './cockpitTypes';
 
-export function fetchCockpitSummary(): Promise<CockpitSummary> {
-  return apiFetch<CockpitSummary>('/cockpit/summary/');
+// `days` controls the Renewals window (backend defaults to 30 — see
+// CockpitSummaryView's own `?days=` docstring) — Renewals' own "Next
+// N Days" dropdown passes this for real now.
+export function fetchCockpitSummary(days?: number): Promise<CockpitSummary> {
+  return apiFetch<CockpitSummary>(`/cockpit/summary/${days ? `?days=${days}` : ''}`);
 }
 
 // `?mine=true` — see TaskListView's own docstring: without it, this

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
@@ -18,10 +19,7 @@ function jsonResponse(status: number, body: unknown) {
 const EMPTY_SUMMARY = {
   customers: { count: 0, value: 0, health: { good: 0, average: 0, poor: 0 } },
   accounts: { count: 0, value: 0, health: { good: 0, average: 0, poor: 0 } },
-  renewals_next_30_days: {
-    customers: { count: 0, value: 0 },
-    accounts: { count: 0, value: 0 },
-  },
+  renewals: { window_days: 30, customers: { count: 0, value: 0 }, accounts: { count: 0, value: 0 }, items: [] },
 };
 
 function makeStore() {
@@ -61,7 +59,13 @@ function makeStore() {
 function renderCockpit() {
   render(
     <Provider store={makeStore()}>
-      <CockpitView />
+      <MemoryRouter initialEntries={['/copilot']}>
+        <Routes>
+          <Route path="/copilot" element={<CockpitView />} />
+          <Route path="/organizations/:id" element={<div>ORG DETAIL PAGE</div>} />
+          <Route path="/accounts/:id" element={<div>ACCOUNT DETAIL PAGE</div>} />
+        </Routes>
+      </MemoryRouter>
     </Provider>
   );
 }
@@ -80,9 +84,11 @@ describe('CockpitView', () => {
             jsonResponse(200, {
               customers: { count: 4, value: 12000, health: { good: 3, average: 1, poor: 0 } },
               accounts: { count: 2, value: 5000, health: { good: 2, average: 0, poor: 0 } },
-              renewals_next_30_days: {
+              renewals: {
+                window_days: 30,
                 customers: { count: 1, value: 1200 },
                 accounts: { count: 0, value: 0 },
+                items: [],
               },
             })
           );
@@ -166,5 +172,53 @@ describe('CockpitView', () => {
     await user.click(screen.getByText('Upcoming (1)'));
     expect(await screen.findByText('Future Task')).toBeInTheDocument();
     expect(screen.getByText('North America')).toBeInTheDocument();
+  });
+
+  it('the Renewals window dropdown really refetches with a new ?days=', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/cockpit/summary/')) return Promise.resolve(jsonResponse(200, EMPTY_SUMMARY));
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderCockpit();
+
+    await screen.findByText('Next 30 Days');
+    await user.click(screen.getByText('Next 30 Days'));
+    await user.click(screen.getByText('Next 60 Days'));
+
+    expect(await screen.findByText('Next 60 Days')).toBeInTheDocument();
+    const call = fetchMock.mock.calls.find(([url]) => (url as string).includes('days=60'));
+    expect(call).toBeTruthy();
+  });
+
+  it('clicking a renewing customer navigates to its real detail page', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('/cockpit/summary/')) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              ...EMPTY_SUMMARY,
+              renewals: {
+                window_days: 30,
+                customers: { count: 1, value: 1200 },
+                accounts: { count: 0, value: 0 },
+                items: [
+                  { id: 42, name: 'Acme Co', type: 'customer', value: 1200, renewal_date: '2026-09-12' },
+                ],
+              },
+            })
+          );
+        }
+        return Promise.resolve(jsonResponse(200, []));
+      })
+    );
+    const user = userEvent.setup();
+    renderCockpit();
+
+    await user.click(await screen.findByText('Acme Co'));
+
+    expect(await screen.findByText('ORG DETAIL PAGE')).toBeInTheDocument();
   });
 });

@@ -120,7 +120,9 @@ export function Navbar() {
         {isCopilot ? (
           <div className="flex flex-col">
             <span className="text-[12.5px] font-medium text-ink-muted tracking-wide mt-1">{formattedDate}</span>
-            <h1 className="text-[20px] font-bold text-ink tracking-tight leading-tight -mt-0.5">{greeting}, Daniel</h1>
+            <h1 className="text-[20px] font-bold text-ink tracking-tight leading-tight -mt-0.5">
+              {greeting}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
+            </h1>
           </div>
         ) : account ? (
           <div className="flex items-center gap-4">
