@@ -5,12 +5,12 @@ import { updateOrganisation } from '../../features/auth/authSlice';
 import { ApiError } from '../../lib/apiClient';
 import type { AgentTone } from '../../features/auth/authSlice';
 
-// Backs Settings > AI Agent (Navbar.tsx's own /settings/ai-agent tab,
-// unrouted until now). Real, admin-gated persistence via
-// Organisation.ai_agent_enabled/ai_agent_tone — but, same honesty as
-// CurrencyPage's own: Copilot (src/pages/copilot/) has no backend at
-// all yet, so nothing reads these back out today. This page stores a
-// real preference for whenever that changes, not a working toggle.
+// Backs Settings > AI Agent (Navbar.tsx's own /settings/ai-agent tab).
+// Real, admin-gated persistence via Organisation.ai_agent_enabled/
+// ai_agent_tone — and, since Copilot Tier 0, a real, working toggle:
+// services.copilot.views.SendMessageView reads both fields on every
+// send (disabled blocks the send with a real 403; tone shapes the
+// system prompt), see docs/API_CONTRACTS.md's copilot section.
 const TONE_OPTIONS: { value: AgentTone; label: string }[] = [
   { value: 'professional', label: 'Professional' },
   { value: 'friendly', label: 'Friendly' },
@@ -100,8 +100,8 @@ export function AIAgentPage() {
         <div className="flex items-start gap-2.5 px-4 py-3 rounded-lg bg-accent-dim/40 border border-accent/30">
           <Info className="w-4 h-4 text-accent shrink-0 mt-0.5" />
           <p className="text-[12px] text-accent/90 leading-relaxed font-medium">
-            These preferences are saved for real, but Copilot doesn't read them yet — there's no backend behind it
-            today.
+            Copilot reads these for real: turning the toggle off blocks Copilot from
+            answering, and the tone you pick shapes how it responds.
           </p>
         </div>
 
