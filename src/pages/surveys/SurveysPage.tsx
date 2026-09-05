@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, Plus, ThumbsUp, Smile, Gauge } from 'lucide-react';
+import { ClipboardList, Plus, ThumbsUp, Smile, Gauge, Pencil, Trash2, Clock } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchSurveys, fetchCustomers } from '../../features/customers/customersSlice';
+import { fetchSurveys, fetchCustomers, updateSurvey, deleteSurvey } from '../../features/customers/customersSlice';
 import type { Survey } from '../../features/customers/customersSlice';
 import { SurveyFormModal } from '../../components/pipelines/SurveyFormModal';
+import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
+import { SurveyTrendChart } from './SurveyTrendChart';
 import { EntityAvatar } from '../../components/shared';
 import { companyLabel } from '../../features/customers/formatters';
 
@@ -38,6 +40,8 @@ export function SurveysPage() {
   const { surveys, surveysLoading, surveysError, customers } = useAppSelector((state) => state.customers);
   const [selectedType, setSelectedType] = useState<Survey['survey_type'] | null>(null);
   const [isLogging, setIsLogging] = useState(false);
+  const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null);
+  const [deletingSurvey, setDeletingSurvey] = useState<Survey | null>(null);
 
   useEffect(() => {
     dispatch(fetchSurveys());
@@ -85,6 +89,12 @@ export function SurveysPage() {
     const customerId = survey.companies[0]?.id;
     if (customerId === undefined) return;
     navigate(`/organizations/${customerId}`, { state: { activityFilter: 'Surveys' } });
+  }
+
+  // One-way, no confirm — same "Log Response" convention: an immediate
+  // status move, no undo built for either.
+  function handleMarkExpired(survey: Survey) {
+    dispatch(updateSurvey({ id: survey.id, status: 'expired' }));
   }
 
   return (
@@ -139,6 +149,8 @@ export function SurveysPage() {
         })}
       </div>
 
+      <SurveyTrendChart surveys={surveys} />
+
       <div className="flex-1 bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden flex flex-col">
         <div className="px-5 py-3 border-b border-line-subtle flex items-center justify-between">
           <h2 className="text-[13px] font-bold text-ink">
@@ -171,6 +183,9 @@ export function SurveysPage() {
                   <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Sent</th>
                   <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Status</th>
                   <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Score</th>
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider text-right">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-line-subtle">
@@ -201,6 +216,42 @@ export function SurveysPage() {
                     <td className="px-5 py-3 text-[13px] font-bold text-ink">
                       {survey.score ?? '—'}
                     </td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center justify-end gap-1">
+                        {survey.status === 'sent' && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleMarkExpired(survey);
+                            }}
+                            title="Mark Expired"
+                            className="p-1.5 text-ink-faint hover:text-ink hover:bg-subtle rounded-md transition-colors"
+                          >
+                            <Clock className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingSurvey(survey);
+                          }}
+                          title="Edit"
+                          className="p-1.5 text-ink-faint hover:text-ink hover:bg-subtle rounded-md transition-colors"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeletingSurvey(survey);
+                          }}
+                          title="Delete"
+                          className="p-1.5 text-ink-faint hover:text-danger hover:bg-danger-dim rounded-md transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -210,6 +261,30 @@ export function SurveysPage() {
       </div>
 
       {isLogging && <SurveyFormModal companies={companies} onClose={() => setIsLogging(false)} />}
+
+      {editingSurvey && (
+        <SurveyFormModal
+          survey={editingSurvey}
+          onClose={() => setEditingSurvey(null)}
+          onDeleteRequest={() => {
+            setDeletingSurvey(editingSurvey);
+            setEditingSurvey(null);
+          }}
+        />
+      )}
+
+      {deletingSurvey && (
+        <ConfirmDialog
+          title={`Delete this ${TYPE_CARDS.find((c) => c.type === deletingSurvey.survey_type)?.label} survey?`}
+          message="This can't be undone."
+          confirmLabel="Delete"
+          danger
+          onConfirm={async () => {
+            await dispatch(deleteSurvey(deletingSurvey.id)).unwrap();
+          }}
+          onClose={() => setDeletingSurvey(null)}
+        />
+      )}
     </div>
   );
 }

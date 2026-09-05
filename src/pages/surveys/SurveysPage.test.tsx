@@ -239,4 +239,138 @@ describe('SurveysPage (/surveys)', () => {
 
     expect(await screen.findByText('Organization 6 — filter: Surveys')).toBeInTheDocument();
   });
+
+  it('editing a survey from the Actions column PATCHes it and updates the row, without navigating', async () => {
+    const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+      const method = options?.method ?? 'GET';
+      if (method === 'GET' && url.includes('/customers/') && !url.includes('/surveys/')) {
+        return Promise.resolve(jsonResponse(200, EMPTY_CUSTOMERS_PAGE));
+      }
+      if (method === 'PATCH' && url.endsWith('/surveys/1/')) {
+        const body = JSON.parse(options!.body!);
+        expect(body.survey_type).toBe('nps');
+        expect(body.sent_at).toBe('2026-08-10');
+        return Promise.resolve(jsonResponse(200, { ...sentNps, sent_at: '2026-08-10' }));
+      }
+      if (method === 'GET' && url.endsWith('/surveys/')) {
+        return Promise.resolve(jsonResponse(200, [sentNps]));
+      }
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Shopify');
+
+    await user.click(screen.getByTitle('Edit'));
+    expect(screen.getByText('Edit NPS Survey')).toBeInTheDocument();
+
+    const sentInput = screen.getByDisplayValue('2026-08-01');
+    await user.clear(sentInput);
+    await user.type(sentInput, '2026-08-10');
+    await user.click(screen.getByRole('button', { name: 'Save changes' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/surveys/1/'),
+        expect.objectContaining({ method: 'PATCH' })
+      )
+    );
+    // Didn't fall through to the row-click navigation.
+    expect(screen.queryByText(/Organization \d+/)).not.toBeInTheDocument();
+    expect(screen.getByText('10 Aug 2026')).toBeInTheDocument();
+  });
+
+  it('marking a sent survey Expired PATCHes its status without a confirm step', async () => {
+    const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+      const method = options?.method ?? 'GET';
+      if (method === 'GET' && url.includes('/customers/') && !url.includes('/surveys/')) {
+        return Promise.resolve(jsonResponse(200, EMPTY_CUSTOMERS_PAGE));
+      }
+      if (method === 'PATCH' && url.endsWith('/surveys/1/')) {
+        const body = JSON.parse(options!.body!);
+        expect(body).toEqual({ status: 'expired' });
+        return Promise.resolve(
+          jsonResponse(200, { ...sentNps, status: 'expired', status_display: 'Expired' })
+        );
+      }
+      if (method === 'GET' && url.endsWith('/surveys/')) {
+        return Promise.resolve(jsonResponse(200, [sentNps]));
+      }
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Shopify');
+
+    await user.click(screen.getByTitle('Mark Expired'));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/surveys/1/'),
+        expect.objectContaining({ method: 'PATCH' })
+      )
+    );
+    expect(await screen.findByText('Expired')).toBeInTheDocument();
+  });
+
+  it('deleting a survey via the Actions column\'s confirm dialog DELETEs it and removes the row', async () => {
+    const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
+      const method = options?.method ?? 'GET';
+      if (method === 'GET' && url.includes('/customers/') && !url.includes('/surveys/')) {
+        return Promise.resolve(jsonResponse(200, EMPTY_CUSTOMERS_PAGE));
+      }
+      if (method === 'DELETE' && url.endsWith('/surveys/1/')) {
+        return Promise.resolve({ ok: true, status: 204, json: async () => null });
+      }
+      if (method === 'GET' && url.endsWith('/surveys/')) {
+        return Promise.resolve(jsonResponse(200, [sentNps]));
+      }
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Shopify');
+
+    await user.click(screen.getByTitle('Delete'));
+    const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
+    await user.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/surveys/1/'),
+        expect.objectContaining({ method: 'DELETE' })
+      )
+    );
+    expect(screen.queryByText('Shopify')).not.toBeInTheDocument();
+    expect(await screen.findByText('No surveys logged yet.')).toBeInTheDocument();
+  });
+
+  it('renders a placeholder when there are no responses yet, and the trend chart otherwise', async () => {
+    const fetchMock = makeFetchMock({ surveys: [sentNps] });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+    await screen.findByText('Shopify');
+
+    expect(screen.getByText('Score Trend')).toBeInTheDocument();
+    expect(screen.getByText('Not enough responses yet.')).toBeInTheDocument();
+  });
+
+  it('shows the trend chart (no placeholder) once there are responded surveys', async () => {
+    const anotherMonthCsat = { ...respondedCsat, id: 3, responded_at: '2026-09-01' };
+    const fetchMock = makeFetchMock({ surveys: [respondedCsat, anotherMonthCsat] });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+    await screen.findAllByText('WeWork');
+
+    expect(screen.getByText('Score Trend')).toBeInTheDocument();
+    expect(screen.queryByText('Not enough responses yet.')).not.toBeInTheDocument();
+  });
 });

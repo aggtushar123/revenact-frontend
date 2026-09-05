@@ -426,6 +426,125 @@ describe('Organization Details page (/organizations/:id)', () => {
     expect(JSON.parse((patchCall[1] as { body: string }).body)).toEqual({ status: 'responded', score: 80 });
   });
 
+  const SURVEY_STATUS_DISPLAY: Record<string, string> = {
+    sent: 'Sent',
+    responded: 'Responded',
+    expired: 'Expired',
+  };
+
+  function surveyDetailFetchMock(initial: Record<string, unknown>) {
+    let survey = initial;
+    return vi.fn((url: string, options?: { method?: string; body?: string }) => {
+      if (/\/surveys\/\d+\/$/.test(url) && options?.method === 'PATCH') {
+        const body = JSON.parse(options.body!);
+        // Same "status/status_display always travel together" shape the
+        // real SurveySerializer returns — a plain `{...body}` merge
+        // would leave a stale status_display behind.
+        survey = {
+          ...survey,
+          ...body,
+          ...(body.status && { status_display: SURVEY_STATUS_DISPLAY[body.status] }),
+        };
+        return Promise.resolve({ ok: true, status: 200, json: async () => survey });
+      }
+      if (/\/surveys\/\d+\/$/.test(url) && options?.method === 'DELETE') {
+        survey = null as unknown as Record<string, unknown>;
+        return Promise.resolve({ ok: true, status: 204, json: async () => null });
+      }
+      if (url.includes('/surveys/')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => (survey ? [survey] : []) });
+      }
+      const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        ? []
+        : globex;
+      return Promise.resolve({ ok: true, status: 200, json: async () => body });
+    });
+  }
+
+  const sentNpsFixture = {
+    id: 7,
+    survey_type: 'nps',
+    survey_type_display: 'NPS',
+    status: 'sent',
+    status_display: 'Sent',
+    score: null,
+    sent_at: '2026-08-01',
+    responded_at: null,
+    companies: [{ id: 10, name: 'Globex Corp' }],
+    account_id: null,
+    account_name: null,
+    created_at: '2026-08-01T00:00:00Z',
+  };
+
+  it('editing a survey\'s Sent date from the Surveys filter PATCHes it in place', async () => {
+    const fetchMock = surveyDetailFetchMock(sentNpsFixture);
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderDetails('10');
+    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
+    await screen.findByText('Sent Aug 1, 2026');
+
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    const sentInput = screen.getByDisplayValue('2026-08-01');
+    await user.clear(sentInput);
+    await user.type(sentInput, '2026-08-10');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/surveys/7/'),
+        expect.objectContaining({ method: 'PATCH' })
+      )
+    );
+    const patchCall = fetchMock.mock.calls.find(([, o]) => o?.method === 'PATCH')!;
+    expect(JSON.parse((patchCall[1] as { body: string }).body)).toEqual({
+      survey_type: 'nps',
+      sent_at: '2026-08-10',
+    });
+    expect(await screen.findByText('Sent Aug 10, 2026')).toBeInTheDocument();
+  });
+
+  it('marking a sent survey Expired from the Surveys filter PATCHes its status', async () => {
+    const fetchMock = surveyDetailFetchMock(sentNpsFixture);
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderDetails('10');
+    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
+    await user.click(await screen.findByRole('button', { name: 'Mark Expired' }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/surveys/7/'),
+        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ status: 'expired' }) })
+      )
+    );
+    expect(await screen.findByText('Expired')).toBeInTheDocument();
+  });
+
+  it('deleting a survey from the Surveys filter\'s confirm dialog DELETEs it and removes the card', async () => {
+    const fetchMock = surveyDetailFetchMock(sentNpsFixture);
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderDetails('10');
+    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
+    await screen.findByText('Sent Aug 1, 2026');
+
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+    const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
+    await user.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/surveys/7/'),
+        expect.objectContaining({ method: 'DELETE' })
+      )
+    );
+    expect(await screen.findByText('No surveys logged yet')).toBeInTheDocument();
+  });
+
   it('fetches this organization\'s own real calendar events on the General tab, under the Calendar Events filter', async () => {
     vi.stubGlobal(
       'fetch',

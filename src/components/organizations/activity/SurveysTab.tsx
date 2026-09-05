@@ -7,9 +7,11 @@ import {
   fetchSurveysForCustomer,
   fetchSurveysForAccount,
   updateSurvey,
+  deleteSurvey,
 } from '../../../features/customers/customersSlice';
 import type { Survey } from '../../../features/customers/customersSlice';
 import { ApiError } from '../../../lib/apiClient';
+import { ConfirmDialog } from '../../organizations/ConfirmDialog';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -58,6 +60,13 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
   const [respondingId, setRespondingId] = useState<number | null>(null);
   const [responseScore, setResponseScore] = useState('');
   const [responseError, setResponseError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editType, setEditType] = useState<Survey['survey_type']>('nps');
+  const [editSentAt, setEditSentAt] = useState('');
+  const [editScore, setEditScore] = useState('');
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [deletingSurvey, setDeletingSurvey] = useState<Survey | null>(null);
 
   // Organisation-level: entityId IS the customer id. Account-level:
   // customerId is the parent, entityId the account itself — same
@@ -110,6 +119,40 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
     } catch (err) {
       setResponseError(err instanceof ApiError ? err.message : 'Could not log that response.');
     }
+  }
+
+  function startEdit(survey: Survey) {
+    setEditingId(survey.id);
+    setEditType(survey.survey_type);
+    setEditSentAt(survey.sent_at);
+    setEditScore(survey.score != null ? String(survey.score) : '');
+    setEditError(null);
+  }
+
+  async function handleSaveEdit(survey: Survey) {
+    setEditError(null);
+    setIsSavingEdit(true);
+    try {
+      await dispatch(
+        updateSurvey({
+          id: survey.id,
+          survey_type: editType,
+          sent_at: editSentAt,
+          ...(survey.status === 'responded' && { score: Number(editScore) }),
+        })
+      ).unwrap();
+      setEditingId(null);
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : 'Could not save those changes.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  }
+
+  // One-way, no confirm — same "Log Response" convention: an immediate
+  // status move, no undo built for either.
+  function handleMarkExpired(survey: Survey) {
+    dispatch(updateSurvey({ id: survey.id, status: 'expired' }));
   }
 
   if (isLoading) {
@@ -192,6 +235,62 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
           {surveys.map((survey) => {
             const statusStyle = STATUS_STYLES[survey.status];
             const StatusIcon = statusStyle.icon;
+
+            if (editingId === survey.id) {
+              return (
+                <div key={survey.id} className="bg-surface border border-accent/50 rounded-xl p-4 shadow-sm">
+                  <div className="flex items-end gap-2 flex-wrap">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Type</label>
+                      <select
+                        value={editType}
+                        onChange={(e) => setEditType(e.target.value as Survey['survey_type'])}
+                        className="px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+                      >
+                        <option value="nps">NPS</option>
+                        <option value="csat">CSAT</option>
+                        {entityType === 'organization' && <option value="ces">CES</option>}
+                      </select>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Sent</label>
+                      <input
+                        type="date"
+                        value={editSentAt}
+                        onChange={(e) => setEditSentAt(e.target.value)}
+                        className="px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+                      />
+                    </div>
+                    {survey.status === 'responded' && (
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Score</label>
+                        <input
+                          type="number"
+                          value={editScore}
+                          onChange={(e) => setEditScore(e.target.value)}
+                          className="w-20 px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+                        />
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleSaveEdit(survey)}
+                      disabled={isSavingEdit}
+                      className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isSavingEdit ? 'Saving…' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="px-2 py-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  {editError && <p className="text-[12.5px] text-danger mt-2">{editError}</p>}
+                </div>
+              );
+            }
+
             return (
               <div
                 key={survey.id}
@@ -212,45 +311,80 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
                   </div>
                 </div>
 
-                {survey.status === 'responded' ? (
-                  <span className="text-[15px] font-extrabold text-ink shrink-0">{survey.score}</span>
-                ) : survey.status === 'sent' ? (
-                  respondingId === survey.id ? (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <input
-                        type="number"
-                        value={responseScore}
-                        onChange={(e) => setResponseScore(e.target.value)}
-                        placeholder="Score"
-                        autoFocus
-                        className="w-20 px-2 py-1 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
-                      />
-                      <button
-                        onClick={() => handleLogResponse(survey)}
-                        className="px-2.5 py-1 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[11.5px] font-bold"
-                      >
-                        Save
-                      </button>
-                      <button
-                        onClick={() => { setRespondingId(null); setResponseError(null); }}
-                        className="px-1.5 py-1 text-[11.5px] font-semibold text-ink-muted hover:text-ink"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => { setRespondingId(survey.id); setResponseScore(''); }}
-                      className="text-[12px] font-bold text-accent hover:underline shrink-0"
-                    >
-                      Log Response
-                    </button>
-                  )
-                ) : null}
+                <div className="flex items-center gap-3 shrink-0">
+                  {survey.status === 'responded' ? (
+                    <span className="text-[15px] font-extrabold text-ink">{survey.score}</span>
+                  ) : survey.status === 'sent' ? (
+                    respondingId === survey.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          value={responseScore}
+                          onChange={(e) => setResponseScore(e.target.value)}
+                          placeholder="Score"
+                          autoFocus
+                          className="w-20 px-2 py-1 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+                        />
+                        <button
+                          onClick={() => handleLogResponse(survey)}
+                          className="px-2.5 py-1 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[11.5px] font-bold"
+                        >
+                          Save
+                        </button>
+                        <button
+                          onClick={() => { setRespondingId(null); setResponseError(null); }}
+                          className="px-1.5 py-1 text-[11.5px] font-semibold text-ink-muted hover:text-ink"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => { setRespondingId(survey.id); setResponseScore(''); }}
+                          className="text-[12px] font-bold text-accent hover:underline"
+                        >
+                          Log Response
+                        </button>
+                        <button
+                          onClick={() => handleMarkExpired(survey)}
+                          className="text-[12px] font-semibold text-ink-faint hover:text-ink hover:underline"
+                        >
+                          Mark Expired
+                        </button>
+                      </>
+                    )
+                  ) : null}
+                  <button
+                    onClick={() => startEdit(survey)}
+                    className="text-[12px] font-semibold text-ink-faint hover:text-ink hover:underline"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => setDeletingSurvey(survey)}
+                    className="text-[12px] font-semibold text-ink-faint hover:text-danger hover:underline"
+                  >
+                    Delete
+                  </button>
+                </div>
               </div>
             );
           })}
           {responseError && <p className="text-[12.5px] text-danger">{responseError}</p>}
+
+          {deletingSurvey && (
+            <ConfirmDialog
+              title={`Delete this ${TYPE_LABELS[deletingSurvey.survey_type]} survey?`}
+              message="This can't be undone."
+              confirmLabel="Delete"
+              danger
+              onConfirm={async () => {
+                await dispatch(deleteSurvey(deletingSurvey.id)).unwrap();
+              }}
+              onClose={() => setDeletingSurvey(null)}
+            />
+          )}
         </div>
       )}
     </div>
