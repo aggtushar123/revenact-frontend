@@ -7,7 +7,17 @@ import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import brainReducer from '../../features/brain/brainSlice';
 import customersReducer from '../../features/customers/customersSlice';
+import notificationsReducer from '../../features/notifications/notificationsSlice';
+import type { Notification } from '../../features/notifications/types';
+import * as notificationApi from '../../features/notifications/notificationApi';
 import { Navbar } from './Navbar';
+
+// The bell dropdown calls the real API on click (optimistic local update +
+// a real sync call, see Navbar.tsx's own handleNotificationClick/
+// handleMarkAllRead) — mocked here the same way pages elsewhere in this
+// suite mock their own API modules, so these tests exercise the real
+// dispatch/navigate wiring without a real network call.
+vi.mock('../../features/notifications/notificationApi');
 
 const mockUser = {
   id: 1,
@@ -87,11 +97,18 @@ const sarahChen = {
 function renderNavbar(
   initialRoute: string | { pathname: string; state?: unknown } = '/dashboard',
   selectedCustomer: typeof globex | null = null,
-  selectedContact: typeof sarahChen | null = null
+  selectedContact: typeof sarahChen | null = null,
+  notifications: Notification[] = []
 ) {
   const store = configureStore({
-    reducer: { auth: authReducer, brain: brainReducer, customers: customersReducer },
+    reducer: {
+      auth: authReducer,
+      brain: brainReducer,
+      customers: customersReducer,
+      notifications: notificationsReducer,
+    },
     preloadedState: {
+      notifications: { items: notifications },
       auth: {
         user: mockUser,
         accessToken: 'access.jwt',
@@ -382,5 +399,102 @@ describe('Navbar contact breadcrumb (/contacts/:id)', () => {
     renderNavbar('/contacts/list', null, sarahChen);
 
     expect(screen.queryByRole('heading', { name: 'Sarah Chen' })).not.toBeInTheDocument();
+  });
+});
+
+const unreadInvite: Notification = {
+  id: 1,
+  kind: 'copilot_invite',
+  message: 'Carl invited you to a live Copilot session',
+  link: '/organizations/10',
+  actor: { id: 2, name: 'Carl' },
+  is_read: false,
+  created_at: '2026-09-06T09:00:00Z',
+};
+
+const readAssignment: Notification = {
+  id: 2,
+  kind: 'customer_assigned',
+  message: 'Carl assigned you the organization Globex Corp',
+  link: '/organizations/10',
+  actor: { id: 2, name: 'Carl' },
+  is_read: true,
+  created_at: '2026-09-05T09:00:00Z',
+};
+
+describe('Navbar notification bell', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    vi.mocked(notificationApi.markNotificationRead).mockReset().mockResolvedValue(readAssignment);
+    vi.mocked(notificationApi.markAllNotificationsRead)
+      .mockReset()
+      .mockResolvedValue({ detail: 'ok' });
+  });
+
+  it('is closed by default and shows no unread badge with an empty list', () => {
+    renderNavbar();
+
+    expect(screen.queryByText('Notifications')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mark all as read')).not.toBeInTheDocument();
+  });
+
+  it('shows a real unread count badge for unread notifications only', () => {
+    renderNavbar('/dashboard', null, null, [unreadInvite, readAssignment]);
+
+    expect(screen.getByText('1')).toBeInTheDocument();
+  });
+
+  it('opens on click and lists real notifications, newest state first as given', async () => {
+    const user = userEvent.setup();
+    renderNavbar('/dashboard', null, null, [unreadInvite, readAssignment]);
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+
+    expect(screen.getByText('Notifications')).toBeInTheDocument();
+    expect(screen.getByText('Carl invited you to a live Copilot session')).toBeInTheDocument();
+    expect(screen.getByText('Carl assigned you the organization Globex Corp')).toBeInTheDocument();
+  });
+
+  it('shows an empty state when there are no notifications', async () => {
+    const user = userEvent.setup();
+    renderNavbar('/dashboard', null, null, []);
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+
+    expect(screen.getByText('No notifications yet.')).toBeInTheDocument();
+    expect(screen.queryByText('Mark all as read')).not.toBeInTheDocument();
+  });
+
+  it('clicking an unread notification marks it read and navigates to its real link', async () => {
+    const user = userEvent.setup();
+    renderNavbar('/dashboard', null, null, [unreadInvite]);
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    await user.click(screen.getByText('Carl invited you to a live Copilot session'));
+
+    expect(notificationApi.markNotificationRead).toHaveBeenCalledWith(1);
+    expect(await screen.findByText('Details Marker')).toBeInTheDocument();
+  });
+
+  it('clicking an already-read notification navigates without re-marking it read', async () => {
+    const user = userEvent.setup();
+    renderNavbar('/dashboard', null, null, [readAssignment]);
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    await user.click(screen.getByText('Carl assigned you the organization Globex Corp'));
+
+    expect(notificationApi.markNotificationRead).not.toHaveBeenCalled();
+    expect(await screen.findByText('Details Marker')).toBeInTheDocument();
+  });
+
+  it('"Mark all as read" clears the unread badge and calls the real API', async () => {
+    const user = userEvent.setup();
+    renderNavbar('/dashboard', null, null, [unreadInvite]);
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    await user.click(screen.getByText('Mark all as read'));
+
+    expect(notificationApi.markAllNotificationsRead).toHaveBeenCalled();
+    expect(screen.queryByText('1')).not.toBeInTheDocument();
   });
 });

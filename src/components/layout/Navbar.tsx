@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ACCOUNTS_DATA } from '../organizations/accountsData';
 import type { AccountRow } from '../organizations/accountsData';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
-import { companyLabel } from '../../features/customers/formatters';
+import { companyLabel, formatRelativeTime } from '../../features/customers/formatters';
 import { EntityAvatar } from '../shared';
 import {
   ChevronLeft,
@@ -15,28 +15,59 @@ import {
   MessageSquare,
   Sparkles,
   User as UserIcon,
-  LogOut
+  LogOut,
+  Check,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { logout } from '../../features/auth/authSlice';
+import {
+  markNotificationRead,
+  markAllNotificationsRead,
+} from '../../features/notifications/notificationApi';
+import { notificationRead, allRead } from '../../features/notifications/notificationsSlice';
 
 export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
+  const notifications = useAppSelector((state) => state.notifications.items);
+  const unreadCount = notifications.filter((n) => !n.is_read).length;
   const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
+  const notificationsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (accountMenuRef.current && !accountMenuRef.current.contains(e.target as Node)) {
         setIsAccountMenuOpen(false);
       }
+      if (notificationsRef.current && !notificationsRef.current.contains(e.target as Node)) {
+        setIsNotificationsOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  function handleNotificationClick(notification: (typeof notifications)[number]) {
+    setIsNotificationsOpen(false);
+    if (!notification.is_read) {
+      dispatch(notificationRead({ id: notification.id }));
+      markNotificationRead(notification.id).catch(() => {
+        // The optimistic local read-state stands even if this particular
+        // sync call fails — a stale unread badge is the worst case, not
+        // a broken UI; the next real fetch reconciles it either way.
+      });
+    }
+    if (notification.link) navigate(notification.link);
+  }
+
+  function handleMarkAllRead() {
+    dispatch(allRead());
+    markAllNotificationsRead().catch(() => {});
+  }
 
 
   // Detect organization details path. Reads the same selectedCustomer that
@@ -324,9 +355,65 @@ export function Navbar() {
           <IconButton icon={<HelpCircle className="w-4 h-4" />} />
           <IconButton icon={<MessageSquare className="w-4 h-4" />} />
 
-          <div className="relative">
-             <IconButton icon={<Bell className="w-4 h-4" />} />
-             <span className="absolute -top-1 -right-0.5 min-w-[15px] h-[15px] bg-accent text-[#0D0F0E] flex items-center justify-center text-[9px] font-bold rounded-full px-0.5 border-2 border-surface shadow-sm">25</span>
+          <div className="relative" ref={notificationsRef}>
+            <button
+              onClick={() => setIsNotificationsOpen((open) => !open)}
+              aria-label="Notifications"
+              className="p-1.5 hover:text-ink hover:bg-subtle rounded-lg transition-all border border-transparent hover:border-line-subtle"
+            >
+              <Bell className="w-4 h-4" />
+            </button>
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-0.5 min-w-[15px] h-[15px] bg-accent text-[#0D0F0E] flex items-center justify-center text-[9px] font-bold rounded-full px-0.5 border-2 border-surface shadow-sm">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+
+            {isNotificationsOpen && (
+              <div className="absolute right-0 top-[calc(100%+10px)] w-80 bg-surface border border-line rounded-xl shadow-xl overflow-hidden z-50">
+                <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-line-subtle">
+                  <span className="text-[12.5px] font-bold text-ink">Notifications</span>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={handleMarkAllRead}
+                      className="flex items-center gap-1 text-[11px] font-semibold text-ink-faint hover:text-accent transition-colors"
+                    >
+                      <Check className="w-3 h-3" />
+                      Mark all as read
+                    </button>
+                  )}
+                </div>
+                <div className="max-h-[360px] overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="text-[12px] text-ink-faint font-medium px-3.5 py-6 text-center">
+                      No notifications yet.
+                    </p>
+                  ) : (
+                    notifications.map((notification) => (
+                      <button
+                        key={notification.id}
+                        onClick={() => handleNotificationClick(notification)}
+                        className={`w-full text-left flex items-start gap-2 px-3.5 py-2.5 border-b border-line-subtle last:border-b-0 transition-colors hover:bg-subtle ${
+                          notification.is_read ? '' : 'bg-accent-dim/30'
+                        }`}
+                      >
+                        {!notification.is_read && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-accent mt-1.5 shrink-0" />
+                        )}
+                        <div className={`min-w-0 ${notification.is_read ? 'pl-3.5' : ''}`}>
+                          <p className="text-[12.5px] text-ink font-medium leading-snug">
+                            {notification.message}
+                          </p>
+                          <p className="text-[11px] text-ink-faint mt-0.5">
+                            {formatRelativeTime(notification.created_at)}
+                          </p>
+                        </div>
+                      </button>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
