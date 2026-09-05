@@ -68,6 +68,10 @@ export interface OrgRow {
    * fallback data) predates these fields. */
   email?: string;
   phone?: string;
+  /** Shown on ActivityFeed's Overview tab — optional for the same
+   * "mock TABLE_DATA below predates this field" reason as email/phone
+   * above. */
+  industry?: string;
   mrr: number;
   arr: number;
   /** This row's own contract currency (Customer.currency, Tier 1) — `arr`/

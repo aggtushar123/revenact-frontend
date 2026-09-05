@@ -24,6 +24,7 @@ function appleCustomer(overrides: Partial<Customer> = {}): Customer {
     name: 'Apple Inc',
     address: 'Cupertino, CA',
     domain: 'apple.com',
+    industry: 'Consumer electronics & technology',
     email: 'contact@apple.com',
     phone: '+1 (408) 996-1010',
     owner: carl,
@@ -95,6 +96,7 @@ describe('mapCustomerToOrgRow', () => {
     expect(row.nameAddress).toBe('Cupertino, CA');
     expect(row.email).toBe('contact@apple.com');
     expect(row.phone).toBe('+1 (408) 996-1010');
+    expect(row.industry).toBe('Consumer electronics & technology');
     // Derived the same way the old mock data was: arr / 12, rounded.
     expect(row.arr).toBe(51200);
     expect(row.mrr).toBe(4267);
@@ -119,12 +121,14 @@ describe('mapCustomerToOrgRow', () => {
         scope_web_app: '',
         email: '',
         phone: '',
+        industry: '',
       })
     );
 
     expect(row.owner).toBe('Unassigned');
     expect(row.email).toBeUndefined();
     expect(row.phone).toBeUndefined();
+    expect(row.industry).toBeUndefined();
     expect(row.img).toBeUndefined();
     expect(row.aiScore).toBe('—');
     expect(row.reason).toBe('-');

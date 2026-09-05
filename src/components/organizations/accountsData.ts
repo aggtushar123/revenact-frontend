@@ -29,6 +29,7 @@ export interface AccountRow {
   location?: string;
   email?: string;
   phone?: string;
+  industry?: string;
   /** Every Customer this account is linked to (see the backend Account
    * model's own docstring — a true many-to-many, no primary owner) —
    * `orgId`/`orgName` above are just the first of these, kept for the

@@ -214,6 +214,7 @@ export function AccountDetails() {
                     location: account.location,
                     email: account.email,
                     phone: account.phone,
+                    industry: account.industry,
                   }}
                 />
               </div>

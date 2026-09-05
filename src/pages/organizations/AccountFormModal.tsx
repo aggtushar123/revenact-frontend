@@ -73,6 +73,7 @@ export function AccountFormModal({
   const [selectedCompanyId, setSelectedCompanyId] = useState(customerId ? String(customerId) : '');
   const [name, setName] = useState(account?.name ?? '');
   const [domain, setDomain] = useState(account?.domain ?? '');
+  const [industry, setIndustry] = useState(account?.industry ?? '');
   const [ownerId, setOwnerId] = useState<string>(account?.owner ? String(account.owner.id) : '');
   const [lifecycleStage, setLifecycleStage] = useState<Account['lifecycle_stage']>(
     account?.lifecycle_stage ?? defaultLifecycleStage ?? 'onboarding'
@@ -107,6 +108,7 @@ export function AccountFormModal({
     const data = {
       name: name.trim(),
       domain: domain.trim(),
+      industry: industry.trim(),
       owner_id: ownerId ? Number(ownerId) : null,
       lifecycle_stage: lifecycleStage,
       renewal_date: renewalDate || null,
@@ -183,6 +185,12 @@ export function AccountFormModal({
 
           <TextField label="Name" value={name} onChange={setName} required autoFocus />
           <TextField label="Domain" value={domain} onChange={setDomain} placeholder="na.acme.com" />
+          <TextField
+            label="Industry"
+            value={industry}
+            onChange={setIndustry}
+            placeholder="Leave blank to use the parent organization's"
+          />
           <div className="grid grid-cols-2 gap-3">
             <SelectField label="Owner" value={ownerId} onChange={setOwnerId}>
               <option value="">Unassigned</option>

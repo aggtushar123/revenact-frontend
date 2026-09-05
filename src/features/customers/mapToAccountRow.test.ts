@@ -23,6 +23,7 @@ function account(overrides: Partial<Account> = {}): Account {
     customers: [{ id: 6, name: 'Apple Inc' }],
     name: 'North America Enterprise',
     domain: '',
+    industry: '',
     address: '',
     email: '',
     phone: '',
@@ -104,6 +105,43 @@ describe('mapAccountToAccountRow', () => {
     expect(row.location).toBe('Cupertino, CA');
     expect(row.email).toBe('contact@apple.com');
     expect(row.phone).toBe('+1 (408) 996-1010');
+  });
+
+  it("uses its own industry when set, else falls back to the parent's", () => {
+    const ownIndustry = mapAccountToAccountRow(
+      account({ industry: 'Enterprise device management' }),
+      6,
+      'Apple Inc',
+      'apple.com',
+      'Cupertino, CA',
+      'contact@apple.com',
+      '+1 (408) 996-1010',
+      'Consumer electronics & technology'
+    );
+    expect(ownIndustry.industry).toBe('Enterprise device management');
+
+    const fallback = mapAccountToAccountRow(
+      account({ industry: '' }),
+      6,
+      'Apple Inc',
+      'apple.com',
+      'Cupertino, CA',
+      'contact@apple.com',
+      '+1 (408) 996-1010',
+      'Consumer electronics & technology'
+    );
+    expect(fallback.industry).toBe('Consumer electronics & technology');
+
+    const neither = mapAccountToAccountRow(
+      account({ industry: '' }),
+      6,
+      'Apple Inc',
+      'apple.com',
+      'Cupertino, CA',
+      'contact@apple.com',
+      '+1 (408) 996-1010'
+    );
+    expect(neither.industry).toBeUndefined();
   });
 
   it('falls back gracefully when owner/scores/renewal are unset', () => {

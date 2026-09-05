@@ -78,7 +78,8 @@ export function Details() {
           organization.domain,
           organization.nameAddress,
           organization.email ?? '',
-          organization.phone ?? ''
+          organization.phone ?? '',
+          organization.industry ?? ''
         )
       )
     : [];
@@ -200,6 +201,7 @@ export function Details() {
                      location: organization.nameAddress,
                      email: organization.email,
                      phone: organization.phone,
+                     industry: organization.industry,
                    }}
                  />
                </div>

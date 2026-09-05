@@ -48,6 +48,7 @@ export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose
 
   const [name, setName] = useState(customer?.name ?? '');
   const [domain, setDomain] = useState(customer?.domain ?? '');
+  const [industry, setIndustry] = useState(customer?.industry ?? '');
   const [address, setAddress] = useState(customer?.address ?? '');
   const [ownerId, setOwnerId] = useState<string>(customer?.owner ? String(customer.owner.id) : '');
   const [lifecycleStage, setLifecycleStage] = useState<Customer['lifecycle_stage']>(
@@ -85,6 +86,7 @@ export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose
     const data = {
       name: name.trim(),
       domain: domain.trim(),
+      industry: industry.trim(),
       address: address.trim(),
       owner_id: ownerId ? Number(ownerId) : null,
       lifecycle_stage: lifecycleStage,
@@ -134,6 +136,17 @@ export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Domain" value={domain} onChange={setDomain} placeholder="acme.com" />
             <TextField label="Name / Address" value={address} onChange={setAddress} placeholder="City, ST" />
+          </div>
+          <div>
+            <TextField
+              label="Industry"
+              value={industry}
+              onChange={setIndustry}
+              placeholder="e.g. Video conferencing software"
+            />
+            <p className="mt-1 text-[11px] text-ink-faint">
+              Helps Copilot recognize this account when a question describes it without naming it.
+            </p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <SelectField label="Owner" value={ownerId} onChange={setOwnerId}>

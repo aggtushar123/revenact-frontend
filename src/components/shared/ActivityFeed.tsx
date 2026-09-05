@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, Plus, Filter, Sparkles, Layout, FileText, Zap, Globe, MapPin, Mail, Phone } from 'lucide-react';
+import { Search, Plus, Filter, Sparkles, Layout, FileText, Zap, Globe, MapPin, Mail, Phone, Briefcase } from 'lucide-react';
 import React from 'react';
 import {
   EmailsTab,
@@ -69,6 +69,11 @@ export interface ActivityFeedProps {
     location?: string;
     email?: string;
     phone?: string;
+    /** Free-text, hand-entered via Add/Edit Organization/Account — the
+     * same field the backend's Copilot folds into its semantic company
+     * matching once set (see revenact-backend's
+     * services/copilot/retrieval.py). */
+    industry?: string;
   };
   /** Tailwind class for the health dot in ActivitiesTab */
   healthColor?: string;
@@ -409,6 +414,7 @@ export function ActivityFeed({
               <InfoCard icon={<MapPin className="w-4 h-4" />} label="Location" value={overviewInfo?.location ?? '—'} />
               <InfoCard icon={<Mail className="w-4 h-4" />} label="Email" value={overviewInfo?.email ?? '—'} />
               <InfoCard icon={<Phone className="w-4 h-4" />} label="Phone" value={overviewInfo?.phone ?? '—'} />
+              <InfoCard icon={<Briefcase className="w-4 h-4" />} label="Industry" value={overviewInfo?.industry ?? '—'} />
             </div>
           </div>
         ) : activeSubTab === 'Headlines' ? (

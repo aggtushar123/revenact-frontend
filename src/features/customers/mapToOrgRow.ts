@@ -80,6 +80,7 @@ export function mapCustomerToOrgRow(c: Customer): OrgRow {
     nameAddress: c.address || '-',
     email: c.email || undefined,
     phone: c.phone || undefined,
+    industry: c.industry || undefined,
     mrr: Math.round(arr / 12),
     arr,
     currency: c.currency,

@@ -14,6 +14,12 @@ export interface Customer {
   name: string;
   address: string;
   domain: string;
+  /** Free-text, hand-entered via Add/Edit Organization — not part of
+   * the original tableData.ts mock schema. Shown on ActivityFeed's
+   * Overview tab and, the reason it exists, folded into what the
+   * backend's Copilot embeds for semantic company matching (see
+   * revenact-backend's services/copilot/retrieval.py) once set. */
+  industry: string;
   /** Contact info shown on ActivityFeed's Overview tab — not part of
    * the original tableData.ts mock schema. */
   email: string;
@@ -94,6 +100,12 @@ export interface Account {
   customers: CompanyRef[];
   name: string;
   domain: string;
+  /** Falls back to the parent Customer's own value when blank — see
+   * mapAccountToAccountRow.ts, which is where that fallback actually
+   * happens for display (the backend also resolves this fallback
+   * server-side, for Copilot's own semantic matching — see
+   * services/copilot/retrieval.py's _effective_industry). */
+  industry: string;
   /** Falls back to the parent Customer's own value when blank — see
    * mapAccountToAccountRow.ts, which is where that fallback actually
    * happens (not this type, and not the backend). */
@@ -406,6 +418,7 @@ export interface CanvasWritePayload {
 export interface AccountWritePayload {
   name?: string;
   domain?: string;
+  industry?: string;
   owner_id?: number | null;
   lifecycle_stage?: Account['lifecycle_stage'];
   renewal_date?: string | null;
@@ -424,6 +437,7 @@ export interface AccountWritePayload {
 export interface CustomerWritePayload {
   name?: string;
   domain?: string;
+  industry?: string;
   address?: string;
   owner_id?: number | null;
   lifecycle_stage?: Customer['lifecycle_stage'];

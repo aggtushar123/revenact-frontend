@@ -26,6 +26,7 @@ const globex = {
   name: 'Globex Corp',
   address: '',
   domain: 'globex.example',
+  industry: '',
   email: '',
   phone: '',
   owner: null,
