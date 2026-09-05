@@ -48,8 +48,13 @@ export function AccountDetails() {
   // needed to make a click-through show the real account end to end.
   // A direct URL visit or refresh has no state to read, so it still
   // falls back to the mock, same as before.
-  const accountNavState = location.state as { account: AccountRow } | null;
+  const accountNavState = location.state as { account: AccountRow; activityFilter?: string } | null;
   const account = accountNavState?.account ?? ACCOUNTS_DATA.find((a) => a.id === id) ?? ACCOUNTS_DATA[0];
+  // Set by the standalone Surveys page's own row-click navigation (see
+  // SurveysPage.tsx) so landing here opens straight to the Surveys
+  // filter instead of the general feed — see ActivityFeedProps' own
+  // `initialFilter` docstring.
+  const activityFilter = accountNavState?.activityFilter;
 
   // Same "only fetch real data when reached with a real, already-known
   // parent customer id" convention as ActivityFeed's own `customerId`
@@ -183,6 +188,7 @@ export function AccountDetails() {
                   // fallback below, since there's no real customer id to
                   // fetch real Activities against then.
                   customerId={accountNavState?.account ? account.orgId : undefined}
+                  initialFilter={activityFilter}
                   healthColor="bg-success"
                   overviewInfo={{
                     domain: account.domain,

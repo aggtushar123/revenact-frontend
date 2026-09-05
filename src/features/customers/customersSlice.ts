@@ -331,6 +331,41 @@ export interface RiskWritePayload {
   priority?: Risk['priority'];
 }
 
+// Mirrors revenact-backend's SurveySerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Survey. `score` is one field
+// for all three types (-100..100 for NPS, 0..100 for CSAT/CES, the
+// same ranges Customer['nps_score']/csat_score/ces_percentage already
+// use) — null until responded.
+export interface Survey {
+  id: number;
+  survey_type: 'nps' | 'csat' | 'ces';
+  survey_type_display: string;
+  status: 'sent' | 'responded' | 'expired';
+  status_display: string;
+  score: number | null;
+  sent_at: string;
+  responded_at: string | null;
+  companies: CompanyRef[];
+  /** Unlike Opportunity/Risk's own `account_name`-only shape, Survey
+   * also exposes the raw id — the standalone Surveys page's own
+   * row-click navigates to this Account's real Details page, and
+   * `account_name` alone (a string) isn't enough to build that link. */
+  account_id: number | null;
+  account_name: string | null;
+  created_at: string;
+}
+
+// "Log Survey" only sets survey_type/sent_at; "Log Response" only sets
+// status/score (responded_at defaults server-side to today if omitted
+// — see backend SurveySerializer.update()).
+export interface SurveyWritePayload {
+  survey_type?: Survey['survey_type'];
+  sent_at?: string;
+  status?: Survey['status'];
+  score?: number | null;
+  responded_at?: string;
+}
+
 // The subset of Account fields the Add/Edit Account form actually
 // exposes — identity, ownership, lifecycle stage, and renewal date.
 // Same product decision as CustomerWritePayload: health/pulse/AI-pulse/
@@ -564,6 +599,24 @@ interface CustomersState {
   pipelineRisks: Risk[];
   pipelineRisksLoading: boolean;
   pipelineRisksError: string | null;
+  /** Surveys for whichever Customer or Account ActivityFeed's
+   * "Surveys" filter is currently showing — same single-slot reasoning
+   * as `activities`/`emails`/`tasks`/`notes`/`tickets`/
+   * `calendarEvents` above. Deliberately separate from `surveys` below
+   * — that one is the *global*, cross-Customer list the standalone
+   * Surveys page fetches; this is always scoped to a single Customer
+   * or Account. */
+  entitySurveys: Survey[];
+  entitySurveysLoading: boolean;
+  entitySurveysError: string | null;
+  /** Every Survey the caller's organisation owns — the standalone
+   * Surveys page, unpaginated (its own rollup cards are computed
+   * client-side from this same list, see SurveyListView's own
+   * docstring on the backend — same reasoning as `opportunities`
+   * above). */
+  surveys: Survey[];
+  surveysLoading: boolean;
+  surveysError: string | null;
 }
 
 const initialState: CustomersState = {
@@ -641,6 +694,12 @@ const initialState: CustomersState = {
   pipelineRisks: [],
   pipelineRisksLoading: false,
   pipelineRisksError: null,
+  entitySurveys: [],
+  entitySurveysLoading: false,
+  entitySurveysError: null,
+  surveys: [],
+  surveysLoading: false,
+  surveysError: null,
 };
 
 // `url`, when given, is one of DRF's own (already-absolute) `next`/
@@ -1275,6 +1334,70 @@ export const deleteRisk = createAsyncThunk<number, number, { rejectValue: string
   }
 );
 
+// Powers the standalone Surveys page — every Survey across every
+// Customer/Account the caller's organisation owns, unpaginated (see
+// SurveyListView's own docstring on the backend — its own rollup
+// cards are computed client-side from this same list).
+export const fetchSurveys = createAsyncThunk<Survey[], void, { rejectValue: string }>(
+  'customers/fetchSurveys',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Survey[]>('/surveys/');
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load surveys.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Same `customerId`/`accountId` -> `customer_id`/`account_id` shape as
+// createOpportunity/createRisk above, same reasoning throughout —
+// "Log Survey" from the standalone Surveys page's own company picker.
+export const createSurvey = createAsyncThunk<
+  Survey,
+  { customerId?: number; accountId?: number } & SurveyWritePayload & { survey_type: Survey['survey_type']; sent_at: string },
+  { rejectValue: string }
+>('customers/createSurvey', async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
+  const body =
+    accountId !== undefined
+      ? { ...data, account_id: accountId }
+      : { ...data, customer_id: customerId };
+  try {
+    return await apiFetch<Survey>('/surveys/', { method: 'POST', body });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not add survey.';
+    return rejectWithValue(message);
+  }
+});
+
+// PATCH /api/v1/surveys/<id>/ — "Log Response" (status/score) as well
+// as any other edit.
+export const updateSurvey = createAsyncThunk<
+  Survey,
+  { id: number } & SurveyWritePayload,
+  { rejectValue: string }
+>('customers/updateSurvey', async ({ id, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Survey>(`/surveys/${id}/`, { method: 'PATCH', body: data });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not update survey.';
+    return rejectWithValue(message);
+  }
+});
+
+export const deleteSurvey = createAsyncThunk<number, number, { rejectValue: string }>(
+  'customers/deleteSurvey',
+  async (id, { rejectWithValue }) => {
+    try {
+      await apiFetch<null>(`/surveys/${id}/`, { method: 'DELETE' });
+      return id;
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not delete survey.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // Powers the Organization Details page's own Pipelines tab — every
 // Opportunity rolled up for one Customer (organisation-level and every
 // one of its Accounts' — see CustomerOpportunityListView's own
@@ -1420,6 +1543,78 @@ export const createRiskForAccount = createAsyncThunk<
   }
 );
 
+// Powers the Activity Feed's own "Surveys" filter — every Survey
+// rolled up for one Customer (organisation-level and every one of its
+// Accounts', see CustomerSurveyListView's own docstring on the backend).
+export const fetchSurveysForCustomer = createAsyncThunk<
+  Survey[],
+  number,
+  { rejectValue: string }
+>('customers/fetchSurveysForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Survey[]>(`/customers/${customerId}/surveys/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load surveys.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers the standalone Account page's own Surveys filter — every
+// account-level Survey for one Account.
+export const fetchSurveysForAccount = createAsyncThunk<
+  Survey[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>('customers/fetchSurveysForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Survey[]>(`/customers/${customerId}/accounts/${accountId}/surveys/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load surveys.';
+    return rejectWithValue(message);
+  }
+});
+
+// Adds an organization-level Survey under `customerId` — "Log Survey"
+// from inside the Activity Feed's own Surveys tab. No extraReducers
+// case, same "caller refetches" reasoning as createOpportunityForCustomer.
+export const createSurveyForCustomer = createAsyncThunk<
+  Survey,
+  { customerId: number } & SurveyWritePayload & { survey_type: Survey['survey_type']; sent_at: string },
+  { rejectValue: string }
+>('customers/createSurveyForCustomer', async ({ customerId, ...data }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Survey>(`/customers/${customerId}/surveys/`, {
+      method: 'POST',
+      body: data,
+    });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not add survey.';
+    return rejectWithValue(message);
+  }
+});
+
+export const createSurveyForAccount = createAsyncThunk<
+  Survey,
+  { customerId: number; accountId: number } & SurveyWritePayload & {
+      survey_type: Survey['survey_type'];
+      sent_at: string;
+    },
+  { rejectValue: string }
+>(
+  'customers/createSurveyForAccount',
+  async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Survey>(`/customers/${customerId}/accounts/${accountId}/surveys/`, {
+        method: 'POST',
+        body: data,
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not add survey.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 // `name` is the only field the backend requires — everything else in
 // CustomerWritePayload is optional, matching the quick-add form.
 export const createCustomer = createAsyncThunk<
@@ -1498,6 +1693,14 @@ const customersSlice = createSlice({
       state.calendarEvents = [];
       state.calendarEventsLoading = false;
       state.calendarEventsError = null;
+    },
+    // Same reasoning as clearActivities/clearEmails/clearTasks/
+    // clearNotes/clearTickets/clearCalendarEvents above, for the
+    // "Surveys" filter.
+    clearSurveys(state) {
+      state.entitySurveys = [];
+      state.entitySurveysLoading = false;
+      state.entitySurveysError = null;
     },
     // Same reasoning as clearActivities/clearEmails/clearTasks/
     // clearNotes/clearTickets/clearCalendarEvents above, for a
@@ -2031,6 +2234,75 @@ const customersSlice = createSlice({
         state.pipelineRisksLoading = false;
         state.pipelineRisksError = action.payload ?? 'Could not load risks.';
       })
+      .addCase(fetchSurveys.pending, (state) => {
+        state.surveysLoading = true;
+        state.surveysError = null;
+      })
+      .addCase(fetchSurveys.fulfilled, (state, action) => {
+        state.surveysLoading = false;
+        state.surveys = action.payload;
+      })
+      .addCase(fetchSurveys.rejected, (state, action) => {
+        state.surveysLoading = false;
+        state.surveysError = action.payload ?? 'Could not load surveys.';
+      })
+      // Same "no .rejected case, create/update/delete patch `surveys`
+      // directly" reasoning as Opportunity/Risk above.
+      .addCase(createSurvey.fulfilled, (state, action) => {
+        state.surveys.unshift(action.payload);
+      })
+      .addCase(updateSurvey.fulfilled, (state, action) => {
+        // Same "patch every slot it could be in" reasoning as
+        // updateOpportunity/updateRisk above — a responded Survey
+        // could be showing in both the standalone page's own `surveys`
+        // and the Activity Feed's own `entitySurveys` at once.
+        const updated = action.payload;
+        const index = state.surveys.findIndex((s) => s.id === updated.id);
+        if (index !== -1) state.surveys[index] = updated;
+        const entityIndex = state.entitySurveys.findIndex((s) => s.id === updated.id);
+        if (entityIndex !== -1) state.entitySurveys[entityIndex] = updated;
+      })
+      .addCase(deleteSurvey.fulfilled, (state, action) => {
+        state.surveys = state.surveys.filter((s) => s.id !== action.payload);
+        state.entitySurveys = state.entitySurveys.filter((s) => s.id !== action.payload);
+      })
+      .addCase(fetchSurveysForCustomer.pending, (state) => {
+        state.entitySurveysLoading = true;
+        state.entitySurveysError = null;
+        // Same "clear on pending, not just on a real no-id fallback"
+        // convention as fetchTicketsForCustomer above — avoids a stale
+        // previous entity's surveys flashing while switching between
+        // organizations/accounts before this fetch resolves.
+        state.entitySurveys = [];
+      })
+      .addCase(fetchSurveysForCustomer.fulfilled, (state, action) => {
+        state.entitySurveysLoading = false;
+        state.entitySurveys = action.payload;
+      })
+      .addCase(fetchSurveysForCustomer.rejected, (state, action) => {
+        state.entitySurveysLoading = false;
+        state.entitySurveysError = action.payload ?? 'Could not load surveys.';
+      })
+      .addCase(fetchSurveysForAccount.pending, (state) => {
+        state.entitySurveysLoading = true;
+        state.entitySurveysError = null;
+        state.entitySurveys = [];
+      })
+      .addCase(fetchSurveysForAccount.fulfilled, (state, action) => {
+        state.entitySurveysLoading = false;
+        state.entitySurveys = action.payload;
+      })
+      .addCase(fetchSurveysForAccount.rejected, (state, action) => {
+        state.entitySurveysLoading = false;
+        state.entitySurveysError = action.payload ?? 'Could not load surveys.';
+      })
+      // createSurveyForCustomer/createSurveyForAccount ("Log Survey"
+      // from inside the Activity Feed's own Surveys tab) have no
+      // .fulfilled case here — same "this thunk doesn't know whether
+      // the caller is a scoped Details-page tab or something else, so
+      // it can't safely patch a specific slot itself" reasoning as
+      // createOpportunityForCustomer/ForAccount above; SurveysTab.tsx
+      // refetches `entitySurveys` afterward instead.
       // createCustomer/updateCustomer's own rejections are shown inline in
       // their modal forms instead (same pattern as userManagementSlice's
       // addCSM/updateCSM) — no .rejected case needed here.
@@ -2089,6 +2361,7 @@ export const {
   clearNotes,
   clearTickets,
   clearCalendarEvents,
+  clearSurveys,
   clearContacts,
   clearSelectedCustomer,
   clearPipelineData,

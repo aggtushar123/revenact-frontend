@@ -12,6 +12,7 @@ import {
   CallSenseTab,
   HeadlinesTab,
   SlackTab,
+  SurveysTab,
 } from '../organizations/activity';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
@@ -33,6 +34,9 @@ import {
   fetchCalendarEventsForCustomer,
   fetchCalendarEventsForAccount,
   clearCalendarEvents,
+  fetchSurveysForCustomer,
+  fetchSurveysForAccount,
+  clearSurveys,
   type Email,
 } from '../../features/customers/customersSlice';
 
@@ -67,6 +71,15 @@ export interface ActivityFeedProps {
   };
   /** Tailwind class for the health dot in ActivitiesTab */
   healthColor?: string;
+  /** Pre-selects one of FILTER_ITEMS on mount instead of the default
+   * 'All' — the standalone Surveys page's own row-click navigates here
+   * with `location.state.activityFilter: 'Surveys'` (see
+   * organizations/Details.tsx and accounts/Details.tsx, which read
+   * that and pass it through) so landing on this company's own Details
+   * page opens straight to its Surveys history instead of the general
+   * feed. Any other unimplemented value just falls through to the
+   * usual "coming soon" placeholder, same as typing one in by hand. */
+  initialFilter?: string;
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -85,7 +98,7 @@ const FILTER_ITEMS = [
   'Surveys', 'Slack',
 ];
 
-const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events', 'Slack'];
+const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events', 'Surveys', 'Slack'];
 
 // ── Account id resolution ────────────────────────────────────────────────────
 // Headlines/CallSense/Slack are still fully mock (SlackTab keeps its
@@ -107,9 +120,10 @@ export function ActivityFeed({
   customerId,
   overviewInfo,
   healthColor = 'bg-success',
+  initialFilter,
 }: ActivityFeedProps) {
   const [activeSubTab, setActiveSubTab] = useState('Activity Feed');
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState(initialFilter ?? 'All');
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
   const dispatch = useAppDispatch();
   const {
@@ -131,6 +145,9 @@ export function ActivityFeed({
     calendarEvents,
     calendarEventsLoading,
     calendarEventsError,
+    entitySurveys,
+    entitySurveysLoading,
+    entitySurveysError,
   } = useAppSelector((state) => state.customers);
 
   // Resolve numeric ID for the still-mock tabs (Headlines/CallSense/
@@ -220,6 +237,19 @@ export function ActivityFeed({
       dispatch(fetchCalendarEventsForAccount({ customerId, accountId: Number(entityId) }));
     } else {
       dispatch(clearCalendarEvents());
+    }
+  }, [dispatch, entityType, entityId, customerId]);
+
+  // Surveys is wired to the real backend model the same way
+  // Activities/Emails/Tasks/Notes/Tickets/Calendar Events are above —
+  // same resolvability rules, same clear-on-no-real-id fallback.
+  useEffect(() => {
+    if (entityType === 'organization') {
+      dispatch(fetchSurveysForCustomer(Number(entityId)));
+    } else if (customerId !== undefined) {
+      dispatch(fetchSurveysForAccount({ customerId, accountId: Number(entityId) }));
+    } else {
+      dispatch(clearSurveys());
     }
   }, [dispatch, entityType, entityId, customerId]);
 
@@ -319,6 +349,16 @@ export function ActivityFeed({
                   events={calendarEvents}
                   isLoading={calendarEventsLoading}
                   error={calendarEventsError}
+                />
+              )}
+              {filter === 'Surveys' && (
+                <SurveysTab
+                  surveys={entitySurveys}
+                  isLoading={entitySurveysLoading}
+                  error={entitySurveysError}
+                  entityType={entityType}
+                  entityId={entityId}
+                  customerId={customerId}
                 />
               )}
               {filter === 'Slack' && <SlackTab entityId={resolvedId} />}

@@ -1,0 +1,215 @@
+import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ClipboardList, Plus, ThumbsUp, Smile, Gauge } from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { fetchSurveys, fetchCustomers } from '../../features/customers/customersSlice';
+import type { Survey } from '../../features/customers/customersSlice';
+import { SurveyFormModal } from '../../components/pipelines/SurveyFormModal';
+import { EntityAvatar } from '../../components/shared';
+import { companyLabel } from '../../features/customers/formatters';
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function formatDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+}
+
+const TYPE_CARDS: { type: Survey['survey_type']; label: string; icon: typeof ThumbsUp }[] = [
+  { type: 'nps', label: 'NPS', icon: ThumbsUp },
+  { type: 'csat', label: 'CSAT', icon: Smile },
+  { type: 'ces', label: 'CES', icon: Gauge },
+];
+
+const STATUS_LABEL_COLOR: Record<Survey['status'], string> = {
+  sent: 'text-info bg-info-dim',
+  responded: 'text-success bg-success-dim',
+  expired: 'text-ink-faint bg-subtle',
+};
+
+// Structurally lighter than Health/Lifecycle — no currency dimension,
+// so no COUNT/MRR-style toggle needed. Rollup cards are computed
+// client-side from the same unpaginated `surveys` list PipelinesPage's
+// own "Pipelines Overview" banner uses for its totals — no separate
+// stats endpoint (see SurveyListView's own docstring on the backend).
+export function SurveysPage() {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const { surveys, surveysLoading, surveysError, customers } = useAppSelector((state) => state.customers);
+  const [selectedType, setSelectedType] = useState<Survey['survey_type'] | null>(null);
+  const [isLogging, setIsLogging] = useState(false);
+
+  useEffect(() => {
+    dispatch(fetchSurveys());
+    // Company picker for "Log Survey" — same source as PipelinesPage's
+    // own Add Opportunity/Add Risk.
+    dispatch(fetchCustomers());
+  }, [dispatch]);
+
+  const companies = useMemo(() => customers.map((c) => ({ id: c.id, name: c.name })), [customers]);
+
+  const rollup = useMemo(() => {
+    const buckets: Record<Survey['survey_type'], { sent: number; responded: number; scoreSum: number }> = {
+      nps: { sent: 0, responded: 0, scoreSum: 0 },
+      csat: { sent: 0, responded: 0, scoreSum: 0 },
+      ces: { sent: 0, responded: 0, scoreSum: 0 },
+    };
+    for (const survey of surveys) {
+      const bucket = buckets[survey.survey_type];
+      bucket.sent += 1;
+      if (survey.status === 'responded' && survey.score !== null) {
+        bucket.responded += 1;
+        bucket.scoreSum += survey.score;
+      }
+    }
+    return buckets;
+  }, [surveys]);
+
+  const rows = useMemo(
+    () => (selectedType ? surveys.filter((s) => s.survey_type === selectedType) : surveys),
+    [surveys, selectedType]
+  );
+
+  function handleRowClick(survey: Survey) {
+    // Every Survey resolves to at least one ultimate parent Customer
+    // via `companies` (org-level: itself; account-level: its own
+    // Account's parent) — same property Opportunity/Risk already use.
+    // Landing on that Customer's own Details page is also *more*
+    // complete than a specific Account's own page would be for an
+    // account-level survey: CustomerSurveyListView already rolls up
+    // both organisation-level and every Account's own surveys there,
+    // so the one just clicked shows up either way, without needing a
+    // second live fetch just to build a real AccountRow for
+    // accounts/Details.tsx's own nav-state requirement (see that
+    // page's own docstring on why it needs one to show real data).
+    const customerId = survey.companies[0]?.id;
+    if (customerId === undefined) return;
+    navigate(`/organizations/${customerId}`, { state: { activityFilter: 'Surveys' } });
+  }
+
+  return (
+    <div className="flex flex-col h-full w-full overflow-y-auto p-6 gap-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-[20px] font-bold text-ink tracking-tight">Surveys</h1>
+          <p className="text-[13px] text-ink-faint font-medium mt-0.5">
+            Every NPS/CSAT/CES survey logged across every Organization and Account.
+          </p>
+        </div>
+        <button
+          onClick={() => setIsLogging(true)}
+          className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[13px] font-bold shadow-sm transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Log Survey
+        </button>
+      </div>
+
+      {surveysError && <p className="text-[12.5px] text-danger">{surveysError}</p>}
+
+      <div className="grid grid-cols-3 gap-4">
+        {TYPE_CARDS.map(({ type, label, icon: Icon }) => {
+          const bucket = rollup[type];
+          const responseRate = bucket.sent > 0 ? Math.round((bucket.responded / bucket.sent) * 100) : null;
+          const avgScore = bucket.responded > 0 ? Math.round(bucket.scoreSum / bucket.responded) : null;
+          const isActive = selectedType === type;
+          return (
+            <button
+              key={type}
+              onClick={() => setSelectedType(isActive ? null : type)}
+              aria-pressed={isActive}
+              className={`text-left p-4 rounded-xl border shadow-sm transition-all ${
+                isActive ? 'border-accent bg-accent-dim/30' : 'border-line-subtle bg-surface hover:bg-subtle/40'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <Icon className="w-4 h-4 text-accent" />
+                <span className="text-[13px] font-bold text-ink">{label}</span>
+              </div>
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-[24px] font-bold text-ink leading-none">{bucket.sent}</span>
+                <span className="text-[11.5px] text-ink-faint font-medium">sent</span>
+              </div>
+              <div className="text-[12px] text-ink-muted font-medium">
+                {responseRate === null ? 'No responses yet' : `${responseRate}% responded`}
+                {avgScore !== null && ` · avg ${avgScore}`}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="flex-1 bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden flex flex-col">
+        <div className="px-5 py-3 border-b border-line-subtle flex items-center justify-between">
+          <h2 className="text-[13px] font-bold text-ink">
+            {selectedType ? TYPE_CARDS.find((c) => c.type === selectedType)?.label : 'All'} Surveys — {rows.length}
+          </h2>
+          {selectedType && (
+            <button
+              onClick={() => setSelectedType(null)}
+              className="text-[12px] font-semibold text-accent hover:underline"
+            >
+              Clear filter
+            </button>
+          )}
+        </div>
+
+        {surveysLoading ? (
+          <div className="flex items-center justify-center py-16 text-[13px] text-ink-faint">Loading…</div>
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 gap-1 text-center">
+            <ClipboardList className="w-8 h-8 text-ink-faint mb-1" />
+            <p className="text-[14px] font-semibold text-ink-muted">No surveys logged yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto flex-1">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-subtle/40 border-b border-line-subtle">
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Company</th>
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Type</th>
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Sent</th>
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Status</th>
+                  <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider">Score</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line-subtle">
+                {rows.map((survey) => (
+                  <tr
+                    key={survey.id}
+                    onClick={() => handleRowClick(survey)}
+                    className="hover:bg-subtle/40 transition-colors cursor-pointer"
+                  >
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <EntityAvatar name={companyLabel(survey.companies)} className="w-6 h-6 rounded-full text-[10px]" />
+                        <span className="text-[13px] font-semibold text-ink truncate">
+                          {companyLabel(survey.companies)}
+                          {survey.account_name ? ` • ${survey.account_name}` : ''}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 text-[13px] font-medium text-ink-muted">
+                      {survey.survey_type_display}
+                    </td>
+                    <td className="px-5 py-3 text-[13px] font-medium text-ink-muted">{formatDate(survey.sent_at)}</td>
+                    <td className="px-5 py-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold ${STATUS_LABEL_COLOR[survey.status]}`}>
+                        {survey.status_display}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-[13px] font-bold text-ink">
+                      {survey.score ?? '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {isLogging && <SurveyFormModal companies={companies} onClose={() => setIsLogging(false)} />}
+    </div>
+  );
+}

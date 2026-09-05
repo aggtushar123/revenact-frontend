@@ -321,6 +321,111 @@ describe('Organization Details page (/organizations/:id)', () => {
     );
   });
 
+  it('fetches this organization\'s own real surveys on the General tab, under the Surveys filter', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('/surveys/')) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: async () => [
+              {
+                id: 1,
+                survey_type: 'nps',
+                survey_type_display: 'NPS',
+                status: 'sent',
+                status_display: 'Sent',
+                score: null,
+                sent_at: '2026-09-01',
+                responded_at: null,
+                companies: [{ id: 10, name: 'Globex Corp' }],
+                account_id: null,
+                account_name: null,
+                created_at: '2026-09-01T00:00:00Z',
+              },
+            ],
+          });
+        }
+        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+          ? []
+          : globex;
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      })
+    );
+
+    renderDetails('10');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
+
+    // 'NPS' alone is ambiguous — the Details page's own NPS metrics
+    // card (unrelated to Surveys) already renders that exact text, so
+    // assert on the survey card's own unique "Sent <date>" line instead.
+    expect(await screen.findByText('Sent Sep 1, 2026')).toBeInTheDocument();
+    expect(screen.getByText('Sent')).toBeInTheDocument();
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/customers/10/surveys/'),
+      expect.objectContaining({ method: 'GET' })
+    );
+  });
+
+  it('logging a survey and its response both go through the real API', async () => {
+    let surveys: unknown[] = [];
+    const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
+      if (url.includes('/surveys/') && options?.method === 'POST') {
+        const created = {
+          id: 5,
+          survey_type: 'nps',
+          survey_type_display: 'NPS',
+          status: 'sent',
+          status_display: 'Sent',
+          score: null,
+          sent_at: '2026-09-01',
+          responded_at: null,
+          companies: [{ id: 10, name: 'Globex Corp' }],
+          account_id: null,
+          account_name: null,
+          created_at: '2026-09-01T00:00:00Z',
+        };
+        surveys = [created];
+        return Promise.resolve({ ok: true, status: 201, json: async () => created });
+      }
+      if (/\/surveys\/\d+\/$/.test(url) && options?.method === 'PATCH') {
+        const body = JSON.parse(options.body!);
+        surveys = surveys.map((s) => ({ ...(s as object), ...body }));
+        return Promise.resolve({ ok: true, status: 200, json: async () => surveys[0] });
+      }
+      if (url.includes('/surveys/')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => surveys });
+      }
+      const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        ? []
+        : globex;
+      return Promise.resolve({ ok: true, status: 200, json: async () => body });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderDetails('10');
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
+    await screen.findByText('No surveys logged yet');
+
+    await user.click(screen.getByRole('button', { name: 'Log Survey' }));
+    await user.click(screen.getByRole('button', { name: 'Log' }));
+
+    expect(await screen.findByText('Sent')).toBeInTheDocument();
+    const postCall = fetchMock.mock.calls.find(([, o]) => o?.method === 'POST')!;
+    expect(JSON.parse((postCall[1] as { body: string }).body).survey_type).toBe('nps');
+
+    await user.click(screen.getByRole('button', { name: 'Log Response' }));
+    await user.type(screen.getByPlaceholderText('Score'), '80');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('80')).toBeInTheDocument();
+    const patchCall = fetchMock.mock.calls.find(([, o]) => o?.method === 'PATCH')!;
+    expect(JSON.parse((patchCall[1] as { body: string }).body)).toEqual({ status: 'responded', score: 80 });
+  });
+
   it('fetches this organization\'s own real calendar events on the General tab, under the Calendar Events filter', async () => {
     vi.stubGlobal(
       'fetch',

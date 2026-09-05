@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, RefreshCw, MoreHorizontal, Globe, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, ExternalLink, Download, X } from 'lucide-react';
 import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
@@ -25,6 +25,12 @@ import { AccountFormModal } from './AccountFormModal';
 export function Details() {
   const { id } = useParams<{ id: string }>();
   const orgId = parseInt(id || '0', 10);
+  // Set by the standalone Surveys page's own row-click navigation (see
+  // SurveysPage.tsx) so landing here opens straight to the Surveys
+  // filter instead of the general feed — see ActivityFeedProps' own
+  // `initialFilter` docstring.
+  const location = useLocation();
+  const activityFilter = (location.state as { activityFilter?: string } | null)?.activityFilter;
   const dispatch = useAppDispatch();
   const {
     selectedCustomer,
@@ -168,6 +174,7 @@ export function Details() {
                    entityId={organization.id}
                    entityType="organization"
                    healthColor={organization.health.clr}
+                   initialFilter={activityFilter}
                    overviewInfo={{
                      domain: organization.domain,
                      location: organization.nameAddress,

@@ -2,6 +2,7 @@ export { EmailsTab, EmailThreadPanel } from './EmailsTab';
 export { TasksTab } from './TasksTab';
 export { NotesTab } from './NotesTab';
 export { TicketsTab } from './TicketsTab';
+export { SurveysTab } from './SurveysTab';
 export { CalendarEventsTab } from './CalendarEventsTab';
 export { ActivitiesTab } from './ActivitiesTab';
 export { CallSenseTab } from './CallSenseTab';

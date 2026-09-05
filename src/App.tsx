@@ -29,6 +29,7 @@ import { Integrations } from './pages/integrations/Integrations';
 import { List as ContactsList } from './pages/contacts/List';
 import { ContactDetails } from './pages/contacts/Details';
 import { PipelinesPage } from './pages/pipelines/PipelinesPage';
+import { SurveysPage } from './pages/surveys/SurveysPage';
 import { useAppSelector } from './hooks';
 import { AdvanceDashboard } from './pages/dashboard/AdvanceDashboard';
 import { AITrendingTopics } from './pages/dashboard/tabs/AITrendingTopics';
@@ -129,6 +130,8 @@ function App() {
             <Route path="create" element={<CreateScenario />} />
             <Route path=":id" element={<CreateScenario />} />
           </Route>
+
+          <Route path="surveys" element={<SurveysPage />} />
 
 
           <Route path="settings">

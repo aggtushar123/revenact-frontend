@@ -28,6 +28,9 @@ import customersReducer, {
   fetchCalendarEventsForCustomer,
   fetchCalendarEventsForAccount,
   clearCalendarEvents,
+  fetchSurveysForCustomer,
+  fetchSurveysForAccount,
+  clearSurveys,
 } from './customersSlice';
 
 function makeStore() {
@@ -1034,6 +1037,96 @@ describe('customersSlice', () => {
       const state = store.getState().customers;
       expect(state.tickets).toEqual([]);
       expect(state.ticketsError).toBeNull();
+    });
+  });
+
+  describe('fetchSurveysForCustomer / fetchSurveysForAccount (ActivityFeed\'s Surveys filter)', () => {
+    const orgSurvey = {
+      id: 1,
+      survey_type: 'nps',
+      survey_type_display: 'NPS',
+      status: 'sent',
+      status_display: 'Sent',
+      score: null,
+      sent_at: '2026-09-01',
+      responded_at: null,
+      companies: [{ id: globex.id, name: 'Globex Corp' }],
+      account_id: null,
+      account_name: null,
+      created_at: '2026-09-01T00:00:00Z',
+    };
+    const accountSurvey = {
+      ...orgSurvey,
+      id: 2,
+      survey_type: 'csat',
+      survey_type_display: 'CSAT',
+      account_id: 17,
+      account_name: 'North America',
+    };
+
+    it('fetchSurveysForCustomer GETs /customers/<id>/surveys/ and stores the result', async () => {
+      mockFetchOnce(200, [orgSurvey]);
+      const store = makeStore();
+
+      await store.dispatch(fetchSurveysForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/surveys/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.entitySurveys).toEqual([orgSurvey]);
+      expect(state.entitySurveysLoading).toBe(false);
+      expect(state.entitySurveysError).toBeNull();
+    });
+
+    it('fetchSurveysForAccount GETs the nested account endpoint and stores the result', async () => {
+      mockFetchOnce(200, [accountSurvey]);
+      const store = makeStore();
+
+      await store.dispatch(fetchSurveysForAccount({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/surveys/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(store.getState().customers.entitySurveys).toEqual([accountSurvey]);
+    });
+
+    it('sets an error and leaves entitySurveys empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchSurveysForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.entitySurveys).toEqual([]);
+      expect(state.entitySurveysError).toBe('Not found.');
+    });
+
+    it('clears a previous fetch\'s surveys as soon as a new one starts', async () => {
+      mockFetchOnce(200, [orgSurvey]);
+      const store = makeStore();
+      await store.dispatch(fetchSurveysForCustomer(globex.id));
+      expect(store.getState().customers.entitySurveys).toEqual([orgSurvey]);
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchSurveysForCustomer(2));
+
+      expect(store.getState().customers.entitySurveys).toEqual([]);
+    });
+
+    it('clearSurveys empties the slot outright (ActivityFeed\'s no-resolvable-id fallback)', async () => {
+      mockFetchOnce(200, [orgSurvey]);
+      const store = makeStore();
+      await store.dispatch(fetchSurveysForCustomer(globex.id));
+      expect(store.getState().customers.entitySurveys).toEqual([orgSurvey]);
+
+      store.dispatch(clearSurveys());
+
+      const state = store.getState().customers;
+      expect(state.entitySurveys).toEqual([]);
+      expect(state.entitySurveysError).toBeNull();
     });
   });
 

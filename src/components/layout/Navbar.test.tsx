@@ -174,6 +174,12 @@ function renderNavbar(
         pipelineRisks: [],
         pipelineRisksLoading: false,
         pipelineRisksError: null,
+        entitySurveys: [],
+        entitySurveysLoading: false,
+        entitySurveysError: null,
+        surveys: [],
+        surveysLoading: false,
+        surveysError: null,
       },
     },
   });
