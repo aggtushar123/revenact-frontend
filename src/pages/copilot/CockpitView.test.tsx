@@ -164,14 +164,16 @@ describe('CockpitView', () => {
     const user = userEvent.setup();
     renderCockpit();
 
+    // Upcoming is the default tab (see CockpitView's own useState).
     expect(await screen.findByText('Overdue (1)')).toBeInTheDocument();
     expect(screen.getByText('Upcoming (1)')).toBeInTheDocument();
-    expect(screen.getByText('Overdue Task')).toBeInTheDocument();
+    expect(screen.getByText('Future Task')).toBeInTheDocument();
+    expect(screen.getByText('North America')).toBeInTheDocument();
     expect(screen.queryByText('Done Task')).not.toBeInTheDocument();
 
-    await user.click(screen.getByText('Upcoming (1)'));
-    expect(await screen.findByText('Future Task')).toBeInTheDocument();
-    expect(screen.getByText('North America')).toBeInTheDocument();
+    await user.click(screen.getByText('Overdue (1)'));
+    expect(await screen.findByText('Overdue Task')).toBeInTheDocument();
+    expect(screen.getByText('Globex')).toBeInTheDocument();
   });
 
   it('the Renewals window dropdown really refetches with a new ?days=', async () => {

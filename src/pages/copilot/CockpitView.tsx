@@ -56,7 +56,7 @@ function HealthRing({ health }: { health: CockpitHealthBreakdown }) {
 
 export function CockpitView() {
   const navigate = useNavigate();
-  const [taskTab, setTaskTab] = useState<'upcoming' | 'overdue'>('overdue');
+  const [taskTab, setTaskTab] = useState<'upcoming' | 'overdue'>('upcoming');
   const currency = useAppSelector((state) => state.auth.user?.organisation.currency ?? 'USD');
 
   const [summary, setSummary] = useState<CockpitSummary | null>(null);
