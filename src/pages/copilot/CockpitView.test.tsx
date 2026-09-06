@@ -192,6 +192,41 @@ describe('CockpitView', () => {
     expect(call).toBeTruthy();
   });
 
+  it('keeps the renewals drill-down list collapsed until its toggle is clicked', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('/cockpit/summary/')) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              ...EMPTY_SUMMARY,
+              renewals: {
+                window_days: 30,
+                customers: { count: 1, value: 1200 },
+                accounts: { count: 0, value: 0 },
+                items: [
+                  { id: 42, name: 'Acme Co', type: 'customer', value: 1200, renewal_date: '2026-09-12' },
+                ],
+              },
+            })
+          );
+        }
+        return Promise.resolve(jsonResponse(200, []));
+      })
+    );
+    const user = userEvent.setup();
+    renderCockpit();
+
+    const toggle = await screen.findByText('View 1 renewing item');
+    expect(screen.queryByText('Acme Co')).not.toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(await screen.findByText('Acme Co')).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(screen.queryByText('Acme Co')).not.toBeInTheDocument();
+  });
+
   it('clicking a renewing customer navigates to its real detail page', async () => {
     vi.stubGlobal(
       'fetch',
@@ -217,6 +252,9 @@ describe('CockpitView', () => {
     const user = userEvent.setup();
     renderCockpit();
 
+    // The drill-down list is collapsed behind this toggle by default (see
+    // CockpitView's own comment on it) — real users open it the same way.
+    await user.click(await screen.findByText('View 1 renewing item'));
     await user.click(await screen.findByText('Acme Co'));
 
     expect(await screen.findByText('ORG DETAIL PAGE')).toBeInTheDocument();

@@ -68,10 +68,22 @@ export function CockpitView() {
   const [isWindowMenuOpen, setIsWindowMenuOpen] = useState(false);
   const windowMenuRef = useRef<HTMLDivElement>(null);
 
+  // The itemized drill-down list (every renewing Customer/Account) used to
+  // sit inline under the org/account counts, which made this whole card
+  // taller than My Portfolio Summary next to it — collapsed behind this
+  // toggle instead, so the card's default height matches Portfolio's; the
+  // full list is still one click away as a popover, same interaction
+  // pattern as the window-size dropdown above it.
+  const [isRenewalsListOpen, setIsRenewalsListOpen] = useState(false);
+  const renewalsListRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (windowMenuRef.current && !windowMenuRef.current.contains(e.target as Node)) {
         setIsWindowMenuOpen(false);
+      }
+      if (renewalsListRef.current && !renewalsListRef.current.contains(e.target as Node)) {
+        setIsRenewalsListOpen(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -110,6 +122,7 @@ export function CockpitView() {
   const displayedTasks = taskTab === 'upcoming' ? upcomingTasks : overdueTasks;
 
   function goToRenewalItem(item: { id: number; type: 'customer' | 'account' }) {
+    setIsRenewalsListOpen(false);
     navigate(item.type === 'customer' ? `/organizations/${item.id}` : `/accounts/${item.id}`);
   }
 
@@ -222,7 +235,7 @@ export function CockpitView() {
             )}
           </div>
 
-          <div className="flex gap-10 mb-5">
+          <div className="flex gap-10">
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-2 text-[13px] font-bold text-ink-muted tracking-tight">
                 <div className="text-danger flex items-center justify-center">
@@ -270,35 +283,53 @@ export function CockpitView() {
             </div>
           </div>
 
-          {/* Real drill-down — every renewing Customer/Account, soonest-first.
-              Capped well below its old 220px: at that height this list (up
-              to a few dozen renewals) was taller than My Portfolio Summary
-              next to it, which stretched the whole top row and left My
-              Tasks below with almost no room in the shared h-full column
-              (see CockpitView's own layout comment). Bounded here instead
-              of removed — the full list is still one scroll away. */}
+          {/* Real drill-down — every renewing Customer/Account, soonest-
+              first. Collapsed behind this toggle rather than shown inline:
+              at any real number of renewals this list made the card taller
+              than My Portfolio Summary next to it, which either stretched
+              that row's height (stealing space from My Tasks below, given
+              the shared h-full column) or stretched Portfolio Summary to
+              match it for no reason of its own. Popped over the page as an
+              absolutely-positioned panel instead, so opening it doesn't
+              change this card's height at all — the full list is still one
+              click away, just not paid for in layout space by default. */}
           {summary.renewals.items.length > 0 && (
-            <div className="border-t border-line-subtle pt-3 flex flex-col gap-1 max-h-[130px] overflow-y-auto custom-scrollbar">
-              {summary.renewals.items.map((item) => (
-                <button
-                  key={`${item.type}-${item.id}`}
-                  onClick={() => goToRenewalItem(item)}
-                  className="w-full flex items-center gap-2 py-1.5 px-1 -mx-1 rounded-md hover:bg-subtle transition-colors text-left cursor-pointer"
-                >
-                  <div className={item.type === 'customer' ? 'text-danger' : 'text-info'}>
-                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-[9px] h-[9px]">
-                      {item.type === 'customer' ? <path d="M12 2L2 22h20L12 2z" /> : <rect x="3" y="3" width="18" height="18" rx="2" />}
-                    </svg>
-                  </div>
-                  <span className="text-[12px] font-bold text-ink truncate flex-1">{item.name}</span>
-                  <span className="text-[11px] font-semibold text-ink-muted shrink-0">
-                    {formatCompactMoney(item.value, currency)}
-                  </span>
-                  <span className="text-[11px] text-ink-faint shrink-0 w-[64px] text-right">
-                    {formatDate(item.renewal_date)}
-                  </span>
-                </button>
-              ))}
+            <div className="mt-3" ref={renewalsListRef}>
+              <button
+                onClick={() => setIsRenewalsListOpen((open) => !open)}
+                className="flex items-center gap-1 text-[11.5px] font-bold text-ink-faint hover:text-accent transition-colors"
+              >
+                <ChevronDown
+                  className={`w-3.5 h-3.5 stroke-[2.5px] transition-transform ${isRenewalsListOpen ? 'rotate-180' : ''}`}
+                />
+                View {summary.renewals.items.length} renewing{' '}
+                {summary.renewals.items.length === 1 ? 'item' : 'items'}
+              </button>
+
+              {isRenewalsListOpen && (
+                <div className="absolute left-6 right-6 top-full mt-2 bg-elevated border border-line rounded-lg shadow-xl z-20 flex flex-col gap-1 max-h-[260px] overflow-y-auto custom-scrollbar p-2">
+                  {summary.renewals.items.map((item) => (
+                    <button
+                      key={`${item.type}-${item.id}`}
+                      onClick={() => goToRenewalItem(item)}
+                      className="w-full flex items-center gap-2 py-1.5 px-1 rounded-md hover:bg-subtle transition-colors text-left cursor-pointer"
+                    >
+                      <div className={item.type === 'customer' ? 'text-danger' : 'text-info'}>
+                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-[9px] h-[9px]">
+                          {item.type === 'customer' ? <path d="M12 2L2 22h20L12 2z" /> : <rect x="3" y="3" width="18" height="18" rx="2" />}
+                        </svg>
+                      </div>
+                      <span className="text-[12px] font-bold text-ink truncate flex-1">{item.name}</span>
+                      <span className="text-[11px] font-semibold text-ink-muted shrink-0">
+                        {formatCompactMoney(item.value, currency)}
+                      </span>
+                      <span className="text-[11px] text-ink-faint shrink-0 w-[64px] text-right">
+                        {formatDate(item.renewal_date)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
