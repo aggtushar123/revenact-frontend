@@ -9,7 +9,10 @@ import {
   updateCustomObjectRecord,
 } from '../../features/customObjects/customObjectsApi';
 import { displayValue } from '../../features/customObjects/displayValue';
-import type { CustomFieldDefinition, CustomObjectDefinition, CustomObjectRecord } from '../../features/customObjects/types';
+import { FieldInput } from '../../features/customObjects/FieldInput';
+import { initialFormValues, toPayload } from '../../features/customObjects/recordForm';
+import type { FormValues } from '../../features/customObjects/recordForm';
+import type { CustomObjectDefinition, CustomObjectRecord } from '../../features/customObjects/types';
 import { ConfirmDialog } from '../organizations/ConfirmDialog';
 
 export interface CustomObjectsTabProps {
@@ -21,96 +24,6 @@ export interface CustomObjectsTabProps {
    * object once loaded, so the hosting Details page can show it on
    * the tab label itself instead of today's hardcoded `2`/`0`. */
   onCountChange?: (count: number) => void;
-}
-
-// A field value as held in the add/edit form's own local state — plain
-// strings/booleans straight from each input, coerced to the real
-// number/boolean createCustomObjectRecord expects only at submit time
-// (see `toPayloadValue`). Kept as strings while editing so a
-// half-typed number ("12.") or an empty required field doesn't get
-// silently mangled before the user's done typing.
-type FormValues = Record<string, string | boolean>;
-
-function initialFormValues(fields: CustomFieldDefinition[], record?: CustomObjectRecord): FormValues {
-  const values: FormValues = {};
-  for (const field of fields) {
-    const existing = record?.data[field.api_name];
-    if (field.field_type === 'boolean') {
-      values[field.api_name] = typeof existing === 'boolean' ? existing : false;
-    } else {
-      values[field.api_name] = existing === undefined || existing === null ? '' : String(existing);
-    }
-  }
-  return values;
-}
-
-function toPayload(fields: CustomFieldDefinition[], values: FormValues): CustomObjectRecord['data'] {
-  const data: CustomObjectRecord['data'] = {};
-  for (const field of fields) {
-    const value = values[field.api_name];
-    if (field.field_type === 'boolean') {
-      data[field.api_name] = Boolean(value);
-      continue;
-    }
-    const trimmed = typeof value === 'string' ? value.trim() : '';
-    if (!trimmed) continue; // omitted — backend enforces is_required itself
-    if (field.field_type === 'number' || field.field_type === 'currency') {
-      data[field.api_name] = Number(trimmed);
-    } else {
-      data[field.api_name] = trimmed;
-    }
-  }
-  return data;
-}
-
-function FieldInput({
-  field,
-  value,
-  onChange,
-}: {
-  field: CustomFieldDefinition;
-  value: string | boolean;
-  onChange: (value: string | boolean) => void;
-}) {
-  const baseClass =
-    'w-full px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[12.5px] text-ink focus:outline-none focus:border-accent';
-
-  if (field.field_type === 'boolean') {
-    return (
-      <input
-        type="checkbox"
-        checked={Boolean(value)}
-        onChange={(e) => onChange(e.target.checked)}
-        aria-label={field.name}
-      />
-    );
-  }
-  if (field.field_type === 'picklist') {
-    return (
-      <select
-        value={typeof value === 'string' ? value : ''}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label={field.name}
-        className={baseClass}
-      >
-        <option value="">—</option>
-        {field.picklist_options.map((option) => (
-          <option key={option} value={option}>
-            {option}
-          </option>
-        ))}
-      </select>
-    );
-  }
-  return (
-    <input
-      type={field.field_type === 'date' ? 'date' : field.field_type === 'number' || field.field_type === 'currency' ? 'number' : 'text'}
-      value={typeof value === 'string' ? value : ''}
-      onChange={(e) => onChange(e.target.value)}
-      aria-label={field.name}
-      className={baseClass}
-    />
-  );
 }
 
 // Shared between the Organization Details page's own Custom Objects tab
