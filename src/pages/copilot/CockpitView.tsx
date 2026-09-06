@@ -270,9 +270,15 @@ export function CockpitView() {
             </div>
           </div>
 
-          {/* Real drill-down — every renewing Customer/Account, soonest-first */}
+          {/* Real drill-down — every renewing Customer/Account, soonest-first.
+              Capped well below its old 220px: at that height this list (up
+              to a few dozen renewals) was taller than My Portfolio Summary
+              next to it, which stretched the whole top row and left My
+              Tasks below with almost no room in the shared h-full column
+              (see CockpitView's own layout comment). Bounded here instead
+              of removed — the full list is still one scroll away. */}
           {summary.renewals.items.length > 0 && (
-            <div className="border-t border-line-subtle pt-3 flex flex-col gap-1 max-h-[220px] overflow-y-auto custom-scrollbar">
+            <div className="border-t border-line-subtle pt-3 flex flex-col gap-1 max-h-[130px] overflow-y-auto custom-scrollbar">
               {summary.renewals.items.map((item) => (
                 <button
                   key={`${item.type}-${item.id}`}
