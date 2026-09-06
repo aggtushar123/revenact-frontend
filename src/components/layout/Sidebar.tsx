@@ -1,12 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutGrid, MessageSquare, Network, Layers, Users,
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
-  Columns, PenTool, Box, CircleDot, HeartPulse, UserCog, Plug,
+  Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
   Brain, GitMerge, BookOpen, CheckSquare, Zap
 } from 'lucide-react';
 import { useAppSelector } from '../../hooks';
+import { fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
+import type { CustomObjectDefinition } from '../../features/customObjects/types';
 
 export function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -15,6 +17,25 @@ export function Sidebar() {
 
   const isOrgsActive = location.pathname.includes('/organizations');
   const reviewCount = useAppSelector(s => s.brain.metrics.nodesPendingReview);
+
+  // The org's own real custom object types (Settings > Custom Objects)
+  // — replaces the single hardcoded "SFDC Opportunity Line Item" nav
+  // item this section used to have, which linked to a dead /sfdc route
+  // with nothing behind it. Fetched once (not per accordion toggle —
+  // there's no accordion behavior wired to that chevron yet, same as
+  // before) rather than kept in Redux: the sidebar is the second place
+  // that needs this list (after Settings' own page), still not enough
+  // call sites to justify a shared slice over a plain fetch.
+  const [customObjects, setCustomObjects] = useState<CustomObjectDefinition[]>([]);
+
+  useEffect(() => {
+    fetchCustomObjectDefinitions()
+      .then(setCustomObjects)
+      .catch(() => {
+        // A failed fetch just leaves this section showing no items —
+        // not worth a blocking error in a sidebar.
+      });
+  }, []);
 
   return (
     <aside 
@@ -68,12 +89,15 @@ export function Sidebar() {
           <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
         )}
 
-        <NavItem 
-          to="/sfdc" 
-          icon={<div className="w-[18px] h-[18px] bg-gray-400 rounded-sm flex items-center justify-center text-white text-[10px] font-bold shadow-sm">S</div>} 
-          label="SFDC Opportunity Line I..." 
-          isExpanded={isExpanded} 
-        />
+        {customObjects.map((definition) => (
+          <NavItem
+            key={definition.id}
+            to={`/custom-objects/${definition.id}`}
+            icon={<Boxes className="w-[18px] h-[18px]" />}
+            label={definition.name}
+            isExpanded={isExpanded}
+          />
+        ))}
         <NavItem to="/feedbacks" icon={<Globe className="w-[18px] h-[18px]" />} label="Product Feedbacks" isExpanded={isExpanded} />
 
         {/* TOOLS Section */}

@@ -1,13 +1,17 @@
 // Thin apiFetch wrappers — same pattern as pages/settings/webhooksApi.ts.
 // Mirrors revenact-backend's services/custom_objects — see
 // docs/API_CONTRACTS.md's `custom_objects` section.
-import { apiFetch } from '../../lib/apiClient';
+import { apiFetch, fetchAllPages } from '../../lib/apiClient';
 import type { CustomFieldDefinition, CustomObjectDefinition, CustomObjectRecord } from './types';
 
 // ── Object definitions (Settings > Custom Objects — admin-only writes) ──
 
 export function fetchCustomObjectDefinitions(): Promise<CustomObjectDefinition[]> {
   return apiFetch<CustomObjectDefinition[]>('/custom-objects/definitions/');
+}
+
+export function fetchCustomObjectDefinition(id: number): Promise<CustomObjectDefinition> {
+  return apiFetch<CustomObjectDefinition>(`/custom-objects/definitions/${id}/`);
 }
 
 export function createCustomObjectDefinition(payload: {
@@ -59,6 +63,17 @@ export function fetchCustomObjectRecords(
   return apiFetch<CustomObjectRecord[]>(
     `/custom-objects/records/?definition=${definitionId}&${parentParam}`
   );
+}
+
+// Every record of one object type across the whole organisation, any
+// parent — the org-wide per-object page (pages/customObjects/
+// CustomObjectRecordsPage.tsx) reached from the sidebar's own real
+// "Custom Objects" section. The backend paginates this one (unlike the
+// single-parent call above, which stays a plain array) — fetchAllPages
+// walks every page into one flat list, same convention as
+// SettingsPage.tsx's own "every record, not just the first page" need.
+export function fetchAllCustomObjectRecords(definitionId: number): Promise<CustomObjectRecord[]> {
+  return fetchAllPages<CustomObjectRecord>(`/custom-objects/records/?definition=${definitionId}`);
 }
 
 export function createCustomObjectRecord(payload: {

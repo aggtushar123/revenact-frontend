@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Boxes, Plus, Trash2, Pencil } from 'lucide-react';
 import { ApiError } from '../../lib/apiClient';
-import { formatDate } from '../../features/customers/formatters';
 import {
   createCustomObjectRecord,
   deleteCustomObjectRecord,
@@ -9,6 +8,7 @@ import {
   fetchCustomObjectRecords,
   updateCustomObjectRecord,
 } from '../../features/customObjects/customObjectsApi';
+import { displayValue } from '../../features/customObjects/displayValue';
 import type { CustomFieldDefinition, CustomObjectDefinition, CustomObjectRecord } from '../../features/customObjects/types';
 import { ConfirmDialog } from '../organizations/ConfirmDialog';
 
@@ -61,15 +61,6 @@ function toPayload(fields: CustomFieldDefinition[], values: FormValues): CustomO
     }
   }
   return data;
-}
-
-function displayValue(field: CustomFieldDefinition, record: CustomObjectRecord): string {
-  const value = record.data[field.api_name];
-  if (value === undefined || value === null || value === '') return '—';
-  if (field.field_type === 'boolean') return value ? 'Yes' : 'No';
-  if (field.field_type === 'date') return formatDate(String(value));
-  if (field.field_type === 'currency') return `$${Number(value).toLocaleString()}`;
-  return String(value);
 }
 
 function FieldInput({

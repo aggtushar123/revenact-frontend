@@ -38,6 +38,12 @@ export interface CustomObjectRecord {
   object_definition_id: number;
   customer_id: number | null;
   account_id: number | null;
+  /** Which Organization/Account this record belongs to — real on every
+   * response, but only actually needed on the org-wide per-object page
+   * (CustomObjectRecordsPage.tsx), which spans every parent at once;
+   * CustomObjectsTab.tsx already knows its own single parent. */
+  parent_name: string;
+  parent_type: 'customer' | 'account';
   data: CustomObjectRecordData;
   created_at: string;
   updated_at: string;
