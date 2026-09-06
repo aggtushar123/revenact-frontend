@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { AttributesTabContent } from './AttributesTabContent';
+import { CustomObjectsPage } from './CustomObjectsPage';
 import { SettingPlaceholder } from './SettingPlaceholder';
 import { ORGANIZATION_ATTRIBUTES } from './organizationAttributes';
 import { ACCOUNT_ATTRIBUTES } from './accountAttributes';
@@ -23,7 +24,7 @@ export function SettingsPage() {
   const [pipelineEntity, setPipelineEntity] = useState<'Opportunities' | 'Risks'>('Opportunities');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const subTabs = ['Organization', 'Account', 'Contact', 'Pipeline', 'Custom Objects (2/3)'];
+  const subTabs = ['Organization', 'Account', 'Contact', 'Pipeline', 'Custom Objects'];
 
   const { entities: organizations, isLoading: orgLoading, error: orgError } =
     useAllEntities<Customer>(() => fetchAllPages('/customers/'), 'organization', activeSubTab === 'Organization');
@@ -174,6 +175,8 @@ export function SettingsPage() {
                 />
               )}
             </>
+          ) : activeSubTab === 'Custom Objects' ? (
+            <CustomObjectsPage />
           ) : (
             <SettingPlaceholder title={activeSubTab} />
           )}

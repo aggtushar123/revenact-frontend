@@ -1,7 +1,56 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from '../../features/auth/authSlice';
 import { SettingsPage } from './SettingsPage';
+
+// Custom Objects (see the describe block near the bottom of this file)
+// is the one sub-tab whose real content (CustomObjectsPage) reads
+// state.auth.user for its own admin gate — same convention as
+// WebhooksPage.test.tsx's own makeStore/renderPage. Every other
+// sub-tab here talks to apiFetch directly with no store at all (see
+// this file's own original comment above), so only that one describe
+// block wraps in a real Provider.
+function renderSettingsPageAsAdmin() {
+  const store = configureStore({
+    reducer: { auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role: 'admin' as const,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency: 'USD' as const,
+            currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '',
+            ai_agent_enabled: true,
+            ai_agent_tone: 'professional' as const,
+            ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
+  render(
+    <Provider store={store}>
+      <SettingsPage />
+    </Provider>
+  );
+}
 
 // Integration tier (see the `testing` skill): no store needed at all —
 // this page talks to apiFetch directly (there's no dedicated "walk
@@ -171,23 +220,22 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
     expect(screen.getByText('Lifecycle Stage')).toBeInTheDocument();
   });
 
-  it('switching to a still-unwired sub-tab shows the placeholder instead of the table', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] })))
-    );
+  it('switching to Custom Objects shows the real page, not the table', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/custom-objects/definitions/')) return Promise.resolve(jsonResponse(200, []));
+      return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await screen.findByText('Custom Attributes');
 
-    // Account/Contact/Pipeline have their own real attributes tables
-    // now too (see their own describe blocks below) -- Custom Objects
-    // is the one still unwired.
     await user.click(screen.getByRole('button', { name: /Custom Objects/ }));
 
     expect(screen.queryByText('Custom Attributes')).not.toBeInTheDocument();
-    expect(screen.getByText(/under construction/i)).toBeInTheDocument();
+    expect(await screen.findByText('No custom objects yet.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /New Object/ })).toBeInTheDocument();
   });
 });
 

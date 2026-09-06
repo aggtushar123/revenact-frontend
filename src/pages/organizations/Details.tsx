@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, RefreshCw, MoreHorizontal, Globe, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, ExternalLink, Download, X, Sparkles } from 'lucide-react';
 import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab, CustomObjectsTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
 import { formatCompactMoney, formatMoney } from '../../features/customers/formatters';
@@ -87,13 +87,17 @@ export function Details() {
   const [activeTab, setActiveTab] = useState('General');
   const [isPinnedOpen, setIsPinnedOpen] = useState(true);
   const [isAttrModalOpen, setIsAttrModalOpen] = useState(false);
+  // Real count, reported by CustomObjectsTab itself once it's fetched —
+  // replaces the old hardcoded `2` (see this tab's own render block
+  // below for why CustomObjectsTab, not this page, owns that fetch).
+  const [customObjectsCount, setCustomObjectsCount] = useState(0);
 
   const tabs = [
     { name: 'General', count: null },
     { name: 'Accounts', count: accounts.length },
     { name: 'Contacts', count: contacts.length },
     { name: 'Pipelines', count: pipelineOpportunities.length + pipelineRisks.length },
-    { name: 'Custom Objects', count: 2 },
+    { name: 'Custom Objects', count: customObjectsCount },
     { name: 'Success Plans', count: null },
     { name: 'Canvas List', count: entityCanvases.length },
   ];
@@ -277,11 +281,15 @@ export function Details() {
             customerId={orgId}
           />
         )}
+        {activeTab === 'Custom Objects' && (
+          <CustomObjectsTab customerId={orgId} onCountChange={setCustomObjectsCount} />
+        )}
         {activeTab !== 'General' &&
           activeTab !== 'Accounts' &&
           activeTab !== 'Contacts' &&
           activeTab !== 'Pipelines' &&
-          activeTab !== 'Canvas List' && (
+          activeTab !== 'Canvas List' &&
+          activeTab !== 'Custom Objects' && (
             <div className="flex flex-col items-center justify-center h-full py-10 opacity-30">
               <Layout className="w-12 h-12 text-ink-faint mb-2" />
               <span className="text-sm font-bold text-ink-muted uppercase tracking-widest">{activeTab} Coming Soon</span>

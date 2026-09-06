@@ -1,0 +1,206 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from '../../features/auth/authSlice';
+import { CustomObjectsPage } from './CustomObjectsPage';
+
+// Integration tier (see the `testing` skill): a real Redux store for
+// the admin gate (same convention as WebhooksPage.test.tsx's own
+// makeStore/renderPage) plus the fetch boundary mocked for the real
+// customObjectsApi.ts calls.
+
+function jsonResponse(status: number, body: unknown) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
+function definition(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 1,
+    name: 'Opportunity Line Item',
+    api_name: 'opportunity_line_item',
+    applies_to_customer: false,
+    applies_to_account: true,
+    fields: [],
+    records_count: 0,
+    created_at: '2026-09-06T00:00:00Z',
+    ...overrides,
+  };
+}
+
+function makeStore(role: 'admin' | 'csm' = 'admin') {
+  return configureStore({
+    reducer: { auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency: 'USD' as const,
+            currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '',
+            ai_agent_enabled: true,
+            ai_agent_tone: 'professional' as const,
+            ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
+}
+
+function renderPage(role: 'admin' | 'csm' = 'admin') {
+  render(
+    <Provider store={makeStore(role)}>
+      <CustomObjectsPage />
+    </Provider>
+  );
+}
+
+describe('CustomObjectsPage', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('a CSM sees a read-only notice and never fetches', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage('csm');
+
+    expect(screen.getByText(/Only an organisation admin can define custom objects/)).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('an admin sees the real list of the org’s own custom objects', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, [definition()]))));
+
+    renderPage();
+
+    expect(await screen.findByText('Opportunity Line Item')).toBeInTheDocument();
+    expect(screen.getByText('Accounts')).toBeInTheDocument();
+  });
+
+  it('shows an empty state when the org has defined nothing yet', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, []))));
+
+    renderPage();
+
+    expect(await screen.findByText('No custom objects yet.')).toBeInTheDocument();
+  });
+
+  it('creating a new object sends real applies_to flags and shows it in the list', async () => {
+    const fetchMock = vi.fn((_url: string, options?: RequestInit) => {
+      if (options?.method === 'POST') {
+        const body = JSON.parse(options.body as string);
+        return Promise.resolve(jsonResponse(201, definition({ id: 2, ...body })));
+      }
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('No custom objects yet.');
+
+    await user.click(screen.getByRole('button', { name: /New Object/ }));
+    await user.type(screen.getByPlaceholderText('Opportunity Line Item'), 'Contract Clause');
+    await user.click(screen.getByLabelText('Applies to Accounts'));
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(await screen.findByText('Contract Clause')).toBeInTheDocument();
+    const postCall = fetchMock.mock.calls.find(([, options]) => options?.method === 'POST');
+    expect(JSON.parse((postCall![1] as RequestInit).body as string)).toEqual({
+      name: 'Contract Clause',
+      applies_to_customer: true,
+      applies_to_account: true,
+    });
+  });
+
+  it('deleting a definition removes it from the real list', async () => {
+    const fetchMock = vi.fn((_url: string, options?: RequestInit) => {
+      if (options?.method === 'DELETE') return Promise.resolve(jsonResponse(204, null));
+      return Promise.resolve(jsonResponse(200, [definition()]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await screen.findByText('Opportunity Line Item');
+
+    await user.click(screen.getByRole('button', { name: 'Delete Opportunity Line Item' }));
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByText('No custom objects yet.')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/custom-objects/definitions/1/'),
+      expect.objectContaining({ method: 'DELETE' })
+    );
+  });
+
+  it('adding a field to an expanded object shows it and calls the real endpoint', async () => {
+    const fetchMock = vi.fn((_url: string, options?: RequestInit) => {
+      if (options?.method === 'POST') {
+        return Promise.resolve(
+          jsonResponse(201, {
+            id: 9,
+            name: 'Product',
+            api_name: 'product',
+            field_type: 'text',
+            field_type_display: 'Text',
+            is_required: true,
+            picklist_options: [],
+            order: 1,
+            created_at: '2026-09-06T00:00:00Z',
+          })
+        );
+      }
+      return Promise.resolve(jsonResponse(200, [definition()]));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage();
+    await user.click(await screen.findByText('Opportunity Line Item'));
+    await user.click(screen.getByRole('button', { name: /Add field/ }));
+    await user.type(screen.getByPlaceholderText('Field name'), 'Product');
+    await user.click(screen.getByLabelText('Required'));
+    await user.click(screen.getByRole('button', { name: 'Add' }));
+
+    expect(await screen.findByText('Product')).toBeInTheDocument();
+    expect(screen.getByText('· Required')).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/custom-objects/definitions/1/fields/'),
+      expect.objectContaining({ method: 'POST' })
+    );
+  });
+
+  it('a picklist field shows its own comma-separated options input', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, [definition()]))));
+    const user = userEvent.setup();
+
+    renderPage();
+    await user.click(await screen.findByText('Opportunity Line Item'));
+    await user.click(screen.getByRole('button', { name: /Add field/ }));
+
+    expect(screen.queryByPlaceholderText(/Options, comma-separated/)).not.toBeInTheDocument();
+
+    await user.selectOptions(screen.getByRole('combobox'), 'picklist');
+
+    expect(screen.getByPlaceholderText(/Options, comma-separated/)).toBeInTheDocument();
+  });
+});

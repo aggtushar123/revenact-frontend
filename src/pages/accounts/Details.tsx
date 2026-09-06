@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab, CustomObjectsTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
 import { formatCompactMoney } from '../../features/customers/formatters';
@@ -47,6 +47,10 @@ export function AccountDetails() {
   const [activeTab, setActiveTab] = useState('General');
   const [is360Enabled, setIs360Enabled] = useState(true);
   const [isPinnedOpen, setIsPinnedOpen] = useState(true);
+  // Real count, reported by CustomObjectsTab itself once it's fetched —
+  // replaces the old hardcoded `0` (see this tab's own render block
+  // below for why CustomObjectsTab, not this page, owns that fetch).
+  const [customObjectsCount, setCustomObjectsCount] = useState(0);
 
   // Clicking through from a real org's Accounts tab (see
   // organizations/Details.tsx) carries the real, already-fetched
@@ -89,7 +93,7 @@ export function AccountDetails() {
     { name: 'Organizations', count: account.orgs?.length ?? 1 },
     { name: 'Contacts', count: contacts.length },
     { name: 'Pipelines', count: pipelineOpportunities.length + pipelineRisks.length },
-    { name: 'Custom Objects', count: 0 },
+    { name: 'Custom Objects', count: customObjectsCount },
     { name: 'Success Plans', count: null },
     { name: 'Canvas List', count: entityCanvases.length },
   ];
@@ -248,6 +252,11 @@ export function AccountDetails() {
             error={entityCanvasesError}
             customerId={accountNavState?.account ? account.orgId : undefined}
             accountId={accountNavState?.account ? account.revenactId : undefined}
+          />
+        ) : activeTab === 'Custom Objects' ? (
+          <CustomObjectsTab
+            accountId={accountNavState?.account ? account.revenactId : undefined}
+            onCountChange={setCustomObjectsCount}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full text-ink-faint py-24 bg-surface m-6 rounded-3xl border-2 border-dashed border-line-subtle shadow-inner">
