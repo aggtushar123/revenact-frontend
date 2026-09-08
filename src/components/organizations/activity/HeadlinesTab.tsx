@@ -1,5 +1,14 @@
-import { LayoutTemplate, FileText, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  LayoutTemplate,
+  FileText,
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+  AlertCircle,
+} from 'lucide-react';
 import { useState } from 'react';
+import { ConfirmDialog } from '../ConfirmDialog';
 import type { Headline } from '../../../features/customers/customersSlice';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -25,9 +34,26 @@ export interface HeadlinesTabProps {
   headlines: Headline[];
   isLoading: boolean;
   error: string | null;
+  /** Omitted when there's no real entity to generate against (a direct
+   * URL visit to an account page with no resolvable parent Customer —
+   * see ActivityFeed's own prop doc). The button hides rather than
+   * offering an action that can only 404. */
+  onRegenerate?: () => Promise<void>;
+  isRegenerating?: boolean;
+  /** Shown as a banner above the cards, not in place of them — a failed
+   * regenerate leaves the existing cards perfectly readable. */
+  regenerateError?: string | null;
 }
 
-export function HeadlinesTab({ headlines, isLoading, error }: HeadlinesTabProps) {
+export function HeadlinesTab({
+  headlines,
+  isLoading,
+  error,
+  onRegenerate,
+  isRegenerating = false,
+  regenerateError = null,
+}: HeadlinesTabProps) {
+  const [confirming, setConfirming] = useState(false);
   const summaryItems = headlines.filter((item) => item.kind === 'summary');
   const feedItems = headlines.filter((item) => item.kind !== 'summary');
 
@@ -67,11 +93,54 @@ export function HeadlinesTab({ headlines, isLoading, error }: HeadlinesTabProps)
     );
   }
 
+  // Regenerating discards the cards the model wrote last time, and
+  // there's no undo — but only if there are any. With nothing generated
+  // yet (a fresh account, or only hand-written cards, which the backend
+  // never touches) there's nothing to lose, so the confirm would be
+  // friction for no reason.
+  const hasGeneratedCards = headlines.some((item) => item.generated_at !== null);
+
+  function handleRegenerateClick() {
+    if (hasGeneratedCards) {
+      setConfirming(true);
+    } else {
+      void onRegenerate?.();
+    }
+  }
+
+  const regenerateButton = onRegenerate && (
+    <button
+      onClick={handleRegenerateClick}
+      disabled={isRegenerating}
+      className="flex items-center gap-1.5 text-[12.5px] font-bold text-accent hover:text-accent-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+    >
+      <RefreshCw className={`w-3.5 h-3.5 ${isRegenerating ? 'animate-spin' : ''}`} />
+      {isRegenerating ? 'Regenerating…' : 'Regenerate'}
+    </button>
+  );
+
+  const confirmDialog = confirming && onRegenerate && (
+    <ConfirmDialog
+      title="Regenerate headlines?"
+      message="This rewrites the cards written for this account from its current notes, emails, tickets and activities. The previous versions can't be recovered. Anything written by hand is left alone."
+      confirmLabel="Regenerate"
+      onConfirm={onRegenerate}
+      onClose={() => setConfirming(false)}
+    />
+  );
+
   if (headlines.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
-        <LayoutTemplate className="w-10 h-10 text-ink-faint mb-2" />
-        <span className="text-sm font-semibold text-ink-faint">No headlines yet</span>
+      <div className="flex flex-col items-center justify-center flex-1 py-16">
+        <LayoutTemplate className="w-10 h-10 text-ink-faint mb-2 opacity-40" />
+        <span className="text-sm font-semibold text-ink-faint opacity-40">No headlines yet</span>
+        {regenerateError && (
+          <span className="text-[12.5px] font-semibold text-danger mt-3 max-w-md text-center">
+            {regenerateError}
+          </span>
+        )}
+        {onRegenerate && <div className="mt-4">{regenerateButton}</div>}
+        {confirmDialog}
       </div>
     );
   }
@@ -79,10 +148,22 @@ export function HeadlinesTab({ headlines, isLoading, error }: HeadlinesTabProps)
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar bg-surface font-sans p-6 md:p-8">
       {/* Title Header */}
-      <div className="flex items-center gap-2 mb-8">
-        <LayoutTemplate className="w-5 h-5 text-accent" />
-        <h2 className="text-[14.5px] font-extrabold text-accent tracking-wide">Account Headlines</h2>
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-2">
+          <LayoutTemplate className="w-5 h-5 text-accent" />
+          <h2 className="text-[14.5px] font-extrabold text-accent tracking-wide">
+            Account Headlines
+          </h2>
+        </div>
+        {regenerateButton}
       </div>
+
+      {regenerateError && (
+        <div className="flex items-start gap-2 mb-6 rounded-lg border border-danger/30 bg-danger/10 px-3.5 py-2.5">
+          <AlertCircle className="w-4 h-4 text-danger shrink-0 mt-px" />
+          <span className="text-[12.5px] font-semibold text-danger">{regenerateError}</span>
+        </div>
+      )}
 
       <div className="pl-[2px]">
         {/* Summary cards (TL;DR) sit above the groups, without a pill */}
@@ -111,6 +192,8 @@ export function HeadlinesTab({ headlines, isLoading, error }: HeadlinesTabProps)
           </div>
         ))}
       </div>
+
+      {confirmDialog}
     </div>
   );
 }

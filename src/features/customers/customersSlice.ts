@@ -617,6 +617,14 @@ interface CustomersState {
   headlines: Headline[];
   headlinesLoading: boolean;
   headlinesError: string | null;
+  /** Regenerating is tracked apart from `headlinesLoading`/
+   * `headlinesError` on purpose. A failed *list* load means there are
+   * no cards to show, so the tab renders the error in their place; a
+   * failed *regenerate* leaves the existing cards untouched (the
+   * backend does the delete and insert in one transaction), so its
+   * error belongs in a banner above them, not instead of them. */
+  headlinesGenerating: boolean;
+  headlinesGenerateError: string | null;
   /** Tickets for whichever Customer or Account ActivityFeed's
    * "Tickets" filter is currently showing — same single-slot
    * reasoning as `activities`/`emails`/`tasks`/`notes` above. */
@@ -769,6 +777,8 @@ const initialState: CustomersState = {
   headlines: [],
   headlinesLoading: false,
   headlinesError: null,
+  headlinesGenerating: false,
+  headlinesGenerateError: null,
   tickets: [],
   ticketsLoading: false,
   ticketsError: null,
@@ -1114,6 +1124,35 @@ export const fetchHeadlinesForAccount = createAsyncThunk<
     );
   } catch (err) {
     const message = err instanceof ApiError ? err.message : 'Could not load headlines.';
+    return rejectWithValue(message);
+  }
+});
+
+// The "Regenerate" button on the Headlines tab. POSTs to the generate
+// endpoint, which reads the parent's real Notes/Emails/Tickets/
+// Activities, rewrites the cards it wrote previously (leaving any
+// hand-written one alone), and returns the full new list — so the
+// fulfilled payload replaces the slot outright, no refetch needed.
+//
+// `accountId` omitted means the Customer-scoped endpoint, matching how
+// the two fetch thunks above split.
+export const regenerateHeadlines = createAsyncThunk<
+  Headline[],
+  { customerId: number; accountId?: number },
+  { rejectValue: string }
+>('customers/regenerateHeadlines', async ({ customerId, accountId }, { rejectWithValue }) => {
+  const path =
+    accountId === undefined
+      ? `/customers/${customerId}/headlines/generate/`
+      : `/customers/${customerId}/accounts/${accountId}/headlines/generate/`;
+  try {
+    return await apiFetch<Headline[]>(path, { method: 'POST' });
+  } catch (err) {
+    // The backend distinguishes "nothing to summarise" (422), "the
+    // provider isn't configured" (503) and "the call failed" (502),
+    // each with a message worth showing verbatim — a generic fallback
+    // here would throw all three away.
+    const message = err instanceof ApiError ? err.message : 'Could not regenerate headlines.';
     return rejectWithValue(message);
   }
 });
@@ -1945,6 +1984,8 @@ const customersSlice = createSlice({
       state.headlines = [];
       state.headlinesLoading = false;
       state.headlinesError = null;
+      state.headlinesGenerating = false;
+      state.headlinesGenerateError = null;
     },
     // Same reasoning as clearActivities/clearEmails/clearTasks/
     // clearNotes above, for the "Tickets" filter.
@@ -2258,6 +2299,22 @@ const customersSlice = createSlice({
       .addCase(fetchHeadlinesForAccount.rejected, (state, action) => {
         state.headlinesLoading = false;
         state.headlinesError = action.payload ?? 'Could not load headlines.';
+      })
+      // Regenerate deliberately leaves `headlines` alone while it runs
+      // and when it fails — the old cards stay on screen until new ones
+      // genuinely arrive, so a failed regenerate never costs the user
+      // what they were already reading.
+      .addCase(regenerateHeadlines.pending, (state) => {
+        state.headlinesGenerating = true;
+        state.headlinesGenerateError = null;
+      })
+      .addCase(regenerateHeadlines.fulfilled, (state, action) => {
+        state.headlinesGenerating = false;
+        state.headlines = action.payload;
+      })
+      .addCase(regenerateHeadlines.rejected, (state, action) => {
+        state.headlinesGenerating = false;
+        state.headlinesGenerateError = action.payload ?? 'Could not regenerate headlines.';
       })
       // fetchTicketsForCustomer and fetchTicketsForAccount share the
       // same tickets/ticketsLoading/ticketsError slots, same reasoning

@@ -25,6 +25,7 @@ import customersReducer, {
   fetchHeadlinesForCustomer,
   fetchHeadlinesForAccount,
   clearHeadlines,
+  regenerateHeadlines,
   fetchTicketsForCustomer,
   fetchTicketsForAccount,
   clearTickets,
@@ -1057,6 +1058,84 @@ describe('customersSlice', () => {
       const state = store.getState().customers;
       expect(state.headlines).toEqual([]);
       expect(state.headlinesError).toBeNull();
+    });
+
+    it('regenerateHeadlines POSTs the account generate endpoint and swaps in the result', async () => {
+      const store = makeStore();
+      mockFetchOnce(200, [summary]);
+      await store.dispatch(fetchHeadlinesForAccount({ customerId: globex.id, accountId: 17 }));
+
+      const regenerated = { ...summary, id: 9, content: 'Freshly written.' };
+      mockFetchOnce(201, [regenerated]);
+      await store.dispatch(regenerateHeadlines({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/headlines/generate/`),
+        expect.objectContaining({ method: 'POST' })
+      );
+      // The endpoint returns the full new list, so no refetch is needed.
+      expect(store.getState().customers.headlines).toEqual([regenerated]);
+      expect(store.getState().customers.headlinesGenerating).toBe(false);
+    });
+
+    it('regenerateHeadlines POSTs the customer endpoint when no accountId is given', async () => {
+      mockFetchOnce(201, [summary]);
+      const store = makeStore();
+
+      await store.dispatch(regenerateHeadlines({ customerId: globex.id }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/headlines/generate/`),
+        expect.objectContaining({ method: 'POST' })
+      );
+    });
+
+    // The backend does its delete and insert in one transaction, so a
+    // failed regenerate leaves the stored cards intact — the slice has
+    // to leave the on-screen ones intact to match, or the user loses
+    // something perfectly readable to a failure that changed nothing.
+    it('a failed regenerate keeps the existing cards and reports separately', async () => {
+      const store = makeStore();
+      mockFetchOnce(200, [summary]);
+      await store.dispatch(fetchHeadlinesForCustomer(globex.id));
+
+      mockFetchOnce(422, {
+        detail: 'Globex has no notes, emails, tickets or activities in the last 90 days.',
+      });
+      await store.dispatch(regenerateHeadlines({ customerId: globex.id }));
+
+      const state = store.getState().customers;
+      expect(state.headlines).toEqual([summary]);
+      expect(state.headlinesError).toBeNull();
+      expect(state.headlinesGenerateError).toBe(
+        'Globex has no notes, emails, tickets or activities in the last 90 days.'
+      );
+    });
+
+    it('passes through the backend\'s unconfigured-provider message verbatim', async () => {
+      mockFetchOnce(503, {
+        detail: "Copilot isn't configured yet — set ANTHROPIC_API_KEY in your .env.",
+      });
+      const store = makeStore();
+
+      await store.dispatch(regenerateHeadlines({ customerId: globex.id }));
+
+      expect(store.getState().customers.headlinesGenerateError).toBe(
+        "Copilot isn't configured yet — set ANTHROPIC_API_KEY in your .env."
+      );
+    });
+
+    it('does not blank the cards while a regenerate is in flight', async () => {
+      const store = makeStore();
+      mockFetchOnce(200, [summary]);
+      await store.dispatch(fetchHeadlinesForCustomer(globex.id));
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(regenerateHeadlines({ customerId: globex.id }));
+
+      const state = store.getState().customers;
+      expect(state.headlines).toEqual([summary]);
+      expect(state.headlinesGenerating).toBe(true);
     });
   });
 

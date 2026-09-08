@@ -32,6 +32,7 @@ import {
   fetchHeadlinesForCustomer,
   fetchHeadlinesForAccount,
   clearHeadlines,
+  regenerateHeadlines,
   fetchTicketsForCustomer,
   fetchTicketsForAccount,
   clearTickets,
@@ -158,6 +159,8 @@ export function ActivityFeed({
     headlines,
     headlinesLoading,
     headlinesError,
+    headlinesGenerating,
+    headlinesGenerateError,
     tickets,
     ticketsLoading,
     ticketsError,
@@ -259,6 +262,23 @@ export function ActivityFeed({
       dispatch(clearHeadlines());
     }
   }, [dispatch, entityType, entityId, customerId]);
+
+  // The "Regenerate" button's action. Undefined — so the button isn't
+  // offered at all — in the same no-resolvable-parent case the fetch
+  // above falls back to clearing: there'd be nothing to generate
+  // against, and the request could only 404.
+  const canRegenerate = entityType === 'organization' || customerId !== undefined;
+  const handleRegenerate = canRegenerate
+    ? async () => {
+        await dispatch(
+          regenerateHeadlines(
+            entityType === 'organization'
+              ? { customerId: Number(entityId) }
+              : { customerId: customerId as number, accountId: Number(entityId) }
+          )
+        );
+      }
+    : undefined;
 
   // Tickets is wired to the real backend model the same way
   // Activities/Emails/Tasks/Notes are above — same resolvability
@@ -453,6 +473,9 @@ export function ActivityFeed({
             headlines={headlines}
             isLoading={headlinesLoading}
             error={headlinesError}
+            onRegenerate={handleRegenerate}
+            isRegenerating={headlinesGenerating}
+            regenerateError={headlinesGenerateError}
           />
         ) : activeSubTab === 'CallSense' ? (
           <CallSenseTab entityId={resolvedId} />

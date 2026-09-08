@@ -166,6 +166,8 @@ function renderNavbar(
         headlines: [],
         headlinesLoading: false,
         headlinesError: null,
+        headlinesGenerating: false,
+        headlinesGenerateError: null,
         tickets: [],
         ticketsLoading: false,
         ticketsError: null,

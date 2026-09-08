@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { HeadlinesTab } from './HeadlinesTab';
 import type { Headline } from '../../../features/customers/customersSlice';
@@ -136,5 +136,126 @@ describe('HeadlinesTab', () => {
     expect(
       screen.getByText('Apple EMEA Retail Operations Renewal and Expansion')
     ).toBeInTheDocument();
+  });
+
+  describe('the Regenerate button', () => {
+    it('is not offered when there is no entity to generate against', () => {
+      // ActivityFeed omits the callback in the same case its fetch
+      // falls back to clearing — a direct URL visit with no resolvable
+      // parent Customer. Offering a button that can only 404 is worse
+      // than not offering one.
+      render(<HeadlinesTab headlines={[headline()]} isLoading={false} error={null} />);
+      expect(screen.queryByRole('button', { name: /Regenerate/ })).not.toBeInTheDocument();
+    });
+
+    it('regenerates without a confirm when there is nothing generated to lose', async () => {
+      const onRegenerate = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      // generated_at null throughout — hand-written or seeded cards,
+      // which the backend never replaces.
+      render(
+        <HeadlinesTab
+          headlines={[headline()]}
+          isLoading={false}
+          error={null}
+          onRegenerate={onRegenerate}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: /Regenerate/ }));
+
+      expect(onRegenerate).toHaveBeenCalled();
+      expect(screen.queryByText('Regenerate headlines?')).not.toBeInTheDocument();
+    });
+
+    it('confirms first when it would discard cards the model wrote', async () => {
+      const onRegenerate = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      render(
+        <HeadlinesTab
+          headlines={[headline({ generated_at: '2026-01-21T00:00:00Z' })]}
+          isLoading={false}
+          error={null}
+          onRegenerate={onRegenerate}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: /Regenerate/ }));
+
+      expect(screen.getByText('Regenerate headlines?')).toBeInTheDocument();
+      expect(onRegenerate).not.toHaveBeenCalled();
+
+      // Scoped to the dialog: the header button carries the same
+      // label, so an unscoped query matches both.
+      const dialog = screen.getByText('Regenerate headlines?').closest('.max-w-sm') as HTMLElement;
+      await user.click(within(dialog).getByRole('button', { name: 'Regenerate' }));
+      expect(onRegenerate).toHaveBeenCalled();
+    });
+
+    it('shows progress and blocks a second click while running', () => {
+      const onRegenerate = vi.fn().mockResolvedValue(undefined);
+      render(
+        <HeadlinesTab
+          headlines={[headline()]}
+          isLoading={false}
+          error={null}
+          onRegenerate={onRegenerate}
+          isRegenerating
+        />
+      );
+
+      expect(screen.getByRole('button', { name: /Regenerating…/ })).toBeDisabled();
+    });
+
+    it('shows a failed regenerate above the cards, never instead of them', () => {
+      // The backend does the delete and insert in one transaction, so
+      // the cards on screen are still correct after a failure — showing
+      // the error in their place (the way a failed *list* load does)
+      // would throw away something perfectly readable.
+      render(
+        <HeadlinesTab
+          headlines={[headline()]}
+          isLoading={false}
+          error={null}
+          onRegenerate={vi.fn()}
+          regenerateError="Apple EMEA has no notes, emails, tickets or activities in the last 90 days — nothing to summarise yet."
+        />
+      );
+
+      expect(screen.getByText(/nothing to summarise yet/)).toBeInTheDocument();
+      expect(
+        screen.getByText('Apple EMEA Retail Operations Renewal and Expansion')
+      ).toBeInTheDocument();
+    });
+
+    it('offers the button from the empty state, where it is most useful', async () => {
+      const onRegenerate = vi.fn().mockResolvedValue(undefined);
+      const user = userEvent.setup();
+      render(
+        <HeadlinesTab
+          headlines={[]}
+          isLoading={false}
+          error={null}
+          onRegenerate={onRegenerate}
+        />
+      );
+
+      expect(screen.getByText('No headlines yet')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: /Regenerate/ }));
+      expect(onRegenerate).toHaveBeenCalled();
+    });
+
+    it('surfaces a failure from the empty state too', () => {
+      render(
+        <HeadlinesTab
+          headlines={[]}
+          isLoading={false}
+          error={null}
+          onRegenerate={vi.fn()}
+          regenerateError="Copilot isn't configured yet — set ANTHROPIC_API_KEY in your .env."
+        />
+      );
+      expect(screen.getByText(/ANTHROPIC_API_KEY/)).toBeInTheDocument();
+    });
   });
 });
