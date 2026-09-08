@@ -88,10 +88,22 @@ async function parseResponse<T>(response: Response): Promise<T> {
   return data as T;
 }
 
-// DRF error shape is either {"detail": "..."} or field-level
-// {"field_name": ["message", ...]} — pick out one human-readable message.
+// DRF error shapes: {"detail": "..."}, field-level
+// {"field_name": ["message", ...]}, or a bare ["message", ...] array —
+// that last one is what `raise ValidationError("…")` from a view body
+// produces (as opposed to from a serializer, which DRF wraps in
+// {"non_field_errors": [...]}). Pick out one human-readable message.
+//
+// Without the array case, every such error rendered as the useless
+// "Request failed (400)" instead of the real reason — which is exactly
+// what a user hits when a guardrail refuses their action.
 function extractErrorMessage(body: unknown): string | null {
   if (!body || typeof body !== 'object') return null;
+
+  if (Array.isArray(body)) {
+    return typeof body[0] === 'string' ? body[0] : null;
+  }
+
   const record = body as Record<string, unknown>;
   if (typeof record.detail === 'string') return record.detail;
 

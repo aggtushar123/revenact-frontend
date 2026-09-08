@@ -88,3 +88,52 @@ describe('apiFetch', () => {
     expect(onAuthFailure).not.toHaveBeenCalled();
   });
 });
+
+describe('apiFetch error messages', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    setAuthHooks({
+      getAccessToken: () => 'access.jwt',
+      refreshAccessToken: async () => null,
+      onAuthFailure: () => {},
+    });
+  });
+
+  async function messageFor(body: unknown, status = 400) {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(status, body)));
+    try {
+      await apiFetch('/anything/');
+      throw new Error('expected apiFetch to reject');
+    } catch (err) {
+      return (err as ApiError).message;
+    }
+  }
+
+  it('reads DRF\'s {"detail": "..."} shape', async () => {
+    expect(await messageFor({ detail: 'Not found.' }, 404)).toBe('Not found.');
+  });
+
+  it('reads a field-level {"field": ["..."]} shape', async () => {
+    expect(await messageFor({ email: ['A user with this email already exists.'] })).toBe(
+      'A user with this email already exists.'
+    );
+  });
+
+  it('reads a serializer-level {"non_field_errors": ["..."]} shape', async () => {
+    expect(await messageFor({ non_field_errors: ['This is the only person who can manage users.'] })).toBe(
+      'This is the only person who can manage users.'
+    );
+  });
+
+  it('reads a bare ["..."] array, which a view-body ValidationError produces', async () => {
+    // Without this case these surfaced as the useless "Request failed
+    // (400)" — exactly what a user sees when a guardrail refuses them.
+    expect(await messageFor(['Move the people holding this role onto another one first.'])).toBe(
+      'Move the people holding this role onto another one first.'
+    );
+  });
+
+  it('falls back to a status message when the body has nothing readable', async () => {
+    expect(await messageFor({ weird: { nested: true } }, 500)).toBe('Request failed (500)');
+  });
+});
