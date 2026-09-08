@@ -8,6 +8,7 @@ import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
 import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
 import { Details } from './Details';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Minimal but real shape, matching revenact-backend's CustomerSerializer —
 // see customersSlice.test.ts / docs/API_CONTRACTS.md -> customers.
@@ -66,6 +67,9 @@ function renderDetails(id: string) {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',

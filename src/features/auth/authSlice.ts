@@ -27,12 +27,31 @@ export interface Organisation {
   ai_agent_tone_display: string;
 }
 
+// The closed set the backend actually enforces — mirrors
+// revenact-backend's services/accounts/capabilities.py. The role
+// *editor* fetches labels from /auth/capabilities/ rather than
+// hardcoding them, but gating code needs the keys at compile time.
+export type Capability =
+  | 'manage_users'
+  | 'manage_org_settings'
+  | 'manage_custom_objects'
+  | 'manage_integrations'
+  | 'manage_fx_rates';
+
 export interface User {
   id: number;
   email: string;
   name: string;
   avatar: string;
-  role: 'admin' | 'csm';
+  /** The role's slug. `'admin'`/`'csm'` are the two built-in ones every
+   * organisation has, but an org can define any number of its own — so
+   * this is a plain string, and gating reads `permissions` below
+   * rather than comparing against it. */
+  role: string;
+  role_id: number | null;
+  role_name: string;
+  /** What this user can actually do — see useCapability in hooks.ts. */
+  permissions: Capability[];
   organisation: Organisation;
   is_active: boolean;
 }

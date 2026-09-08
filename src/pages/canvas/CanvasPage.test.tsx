@@ -7,6 +7,7 @@ import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
 import { CanvasPage } from './CanvasPage';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): real store, network mocked
 // at the fetch boundary — responses shaped exactly like revenact-backend's
@@ -58,6 +59,9 @@ function renderPage() {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',

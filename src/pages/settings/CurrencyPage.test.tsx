@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import { CurrencyPage } from './CurrencyPage';
+import { capabilitiesForRole } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): a real Redux store (same
 // convention as Profile.test.tsx's own — this page dispatches
@@ -26,6 +27,9 @@ function makeStore(role: 'admin' | 'csm' = 'admin', currency: 'USD' | 'EUR' = 'U
           name: 'Alice',
           avatar: '',
           role,
+          role_id: 1,
+          role_name: role === 'admin' ? 'Admin' : 'CSM',
+          permissions: capabilitiesForRole(role),
           organisation: {
             id: 1,
             name: 'Acme Inc',
@@ -101,7 +105,7 @@ describe('CurrencyPage', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderPage(makeStore('csm', 'USD'));
 
-    expect(screen.getByText(/Only an organisation admin can change this/)).toBeInTheDocument();
+    expect(screen.getByText(/You don't have permission to change this/)).toBeInTheDocument();
     expect(screen.getByLabelText('Currency')).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
     // Exchange Rates is admin-only both ways server-side (IsOrgAdmin on

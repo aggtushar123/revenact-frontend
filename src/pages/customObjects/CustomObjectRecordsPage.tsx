@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Boxes, Network, Layers, Plus, Pencil, Trash2 } from 'lucide-react';
-import { useAppSelector } from '../../hooks';
+import { useCapability } from '../../hooks';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 import {
@@ -46,7 +46,7 @@ export function CustomObjectRecordsPage() {
 
 function CustomObjectRecordsPageForId({ definitionId }: { definitionId: number }) {
   const navigate = useNavigate();
-  const isAdmin = useAppSelector((state) => state.auth.user?.role === 'admin');
+  const isAdmin = useCapability('manage_custom_objects');
 
   const [definition, setDefinition] = useState<CustomObjectDefinition | null>(null);
   const [records, setRecords] = useState<CustomObjectRecord[]>([]);

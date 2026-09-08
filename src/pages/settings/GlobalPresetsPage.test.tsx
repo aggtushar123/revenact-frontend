@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import { GlobalPresetsPage } from './GlobalPresetsPage';
+import { capabilitiesForRole } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): same convention as
 // CurrencyPage.test.tsx's own — a real Redux store, fetch boundary
@@ -25,6 +26,9 @@ function makeStore(role: 'admin' | 'csm' = 'admin', defaultLifecycleStage = '') 
           name: 'Alice',
           avatar: '',
           role,
+          role_id: 1,
+          role_name: role === 'admin' ? 'Admin' : 'CSM',
+          permissions: capabilitiesForRole(role),
           organisation: {
             id: 1,
             name: 'Acme Inc',
@@ -90,7 +94,7 @@ describe('GlobalPresetsPage', () => {
   it('a CSM sees a read-only view with no Save button', () => {
     renderPage(makeStore('csm', 'live'));
 
-    expect(screen.getByText(/Only an organisation admin can change this/)).toBeInTheDocument();
+    expect(screen.getByText(/You don't have permission to change this/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Default Lifecycle Stage/)).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument();
   });

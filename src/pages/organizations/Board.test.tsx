@@ -7,6 +7,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
 import { Board } from './Board';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): real store + real router
 // context (cards navigate on click), network mocked at the fetch
@@ -70,6 +71,9 @@ function renderPage() {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',

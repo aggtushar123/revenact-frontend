@@ -6,6 +6,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import { CockpitView } from './CockpitView';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): only the fetch boundary is
 // mocked — real Cockpit backing data now (see docs/API_CONTRACTS.md ->
@@ -33,6 +34,9 @@ function makeStore() {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',

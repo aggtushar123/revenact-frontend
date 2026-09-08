@@ -11,6 +11,9 @@ const carl = {
   name: 'Carl CSM',
   avatar: 'https://i.pravatar.cc/150?u=carl@acme.io',
   role: 'csm' as const,
+  role_id: 2,
+  role_name: 'CSM',
+  permissions: [],
   organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)', default_lifecycle_stage: '', ai_agent_enabled: true, ai_agent_tone: 'professional' as const, ai_agent_tone_display: 'Professional' },
   is_active: true,
 };

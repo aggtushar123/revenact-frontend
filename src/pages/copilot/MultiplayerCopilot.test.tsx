@@ -9,6 +9,7 @@ import copilotSessionsReducer from '../../features/copilotSessions/copilotSessio
 import { CopilotIndex } from './Index';
 import type { Conversation } from './types';
 import type { CopilotSession } from '../../features/copilotSessions/types';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Integration tier — the "Ask Copilot about this account" entry point
 // through to a real, backend-shaped session: Make Live, a redirect, and
@@ -46,6 +47,9 @@ function makeStore() {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',

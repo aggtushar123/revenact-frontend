@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ShieldAlert, Info } from 'lucide-react';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { updateOrganisation } from '../../features/auth/authSlice';
 import { LIFECYCLE_LABELS } from '../../features/customers/formatters';
 import { ApiError } from '../../lib/apiClient';
@@ -20,7 +20,7 @@ const STAGE_OPTIONS: LifecycleCategory[] = [
 export function GlobalPresetsPage() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = useCapability('manage_org_settings');
   const savedStage = user?.organisation.default_lifecycle_stage ?? '';
   const [selected, setSelected] = useState<string>(savedStage);
   const [isSaving, setIsSaving] = useState(false);
@@ -54,7 +54,7 @@ export function GlobalPresetsPage() {
       {!isAdmin && (
         <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-dim border border-warning/30 text-[12.5px] text-warning">
           <ShieldAlert className="w-4 h-4 shrink-0" />
-          Only an organisation admin can change this.
+          You don't have permission to change this.
         </div>
       )}
 

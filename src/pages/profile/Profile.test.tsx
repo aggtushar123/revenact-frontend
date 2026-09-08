@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import { Profile } from './Profile';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 const mockUser = {
   id: 1,
@@ -12,6 +13,9 @@ const mockUser = {
   name: 'Alice Admin',
   avatar: 'https://i.pravatar.cc/150?u=alice@acme.io',
   role: 'admin' as const,
+  role_id: 1,
+  role_name: 'Admin',
+  permissions: ALL_CAPABILITIES,
   organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)', default_lifecycle_stage: '', ai_agent_enabled: true, ai_agent_tone: 'professional' as const, ai_agent_tone_display: 'Professional' },
   is_active: true,
 };
@@ -57,7 +61,7 @@ describe('Profile page', () => {
     renderProfile();
 
     // The header card renders from the pre-loaded store immediately...
-    expect(screen.getByText('Organisation Admin')).toBeInTheDocument();
+    expect(screen.getByText('Admin')).toBeInTheDocument();
     expect(screen.getByText('Acme Inc')).toBeInTheDocument();
 
     // ...and fetchMe fires on mount to refresh it.

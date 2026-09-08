@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ShieldAlert, Info } from 'lucide-react';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { updateOrganisation } from '../../features/auth/authSlice';
 import { ApiError } from '../../lib/apiClient';
 import type { AgentTone } from '../../features/auth/authSlice';
@@ -20,7 +20,7 @@ const TONE_OPTIONS: { value: AgentTone; label: string }[] = [
 export function AIAgentPage() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = useCapability('manage_org_settings');
   const savedEnabled = user?.organisation.ai_agent_enabled ?? true;
   const savedTone = user?.organisation.ai_agent_tone ?? 'professional';
   const [enabled, setEnabled] = useState(savedEnabled);
@@ -56,7 +56,7 @@ export function AIAgentPage() {
       {!isAdmin && (
         <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-dim border border-warning/30 text-[12.5px] text-warning">
           <ShieldAlert className="w-4 h-4 shrink-0" />
-          Only an organisation admin can change this.
+          You don't have permission to change this.
         </div>
       )}
 

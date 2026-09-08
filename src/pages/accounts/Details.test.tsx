@@ -9,6 +9,7 @@ import type { AccountRow } from '../../components/organizations/accountsData';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
 import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Real-shaped AccountRow, the kind organizations/Details.tsx's AccountsTab
 // passes through navigate()'s state when a row is clicked — see that
@@ -53,6 +54,9 @@ function renderAccountDetails(state?: { account: AccountRow }) {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',
@@ -499,6 +503,9 @@ describe('AccountDetails page (/accounts/:id)', () => {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',

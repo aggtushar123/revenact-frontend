@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react';
 import { ShieldAlert, Plus, Trash2, CheckCircle2, XCircle, ChevronDown } from 'lucide-react';
-import { useAppSelector } from '../../hooks';
+import { useCapability } from '../../hooks';
 import { formatRelativeTime } from '../../features/customers/formatters';
 import { ApiError } from '../../lib/apiClient';
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
@@ -14,8 +14,7 @@ import type { Webhook } from './webhooksApi';
 // on why) — this page doesn't render a read-only view for a CSM the
 // way those three do, since it can't even fetch the list to show one.
 export function WebhooksPage() {
-  const user = useAppSelector((state) => state.auth.user);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = useCapability('manage_integrations');
 
   const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [isLoading, setIsLoading] = useState(isAdmin);
@@ -72,7 +71,7 @@ export function WebhooksPage() {
         </div>
         <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-dim border border-warning/30 text-[12.5px] text-warning">
           <ShieldAlert className="w-4 h-4 shrink-0" />
-          Only an organisation admin can view or manage webhooks.
+          You don't have permission to view or manage webhooks.
         </div>
       </div>
     );

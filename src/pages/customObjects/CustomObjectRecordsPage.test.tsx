@@ -6,6 +6,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import { CustomObjectRecordsPage } from './CustomObjectRecordsPage';
+import { capabilitiesForRole } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): a real Redux store (the
 // admin gate for ManageFieldsPanel's own mutation controls, same
@@ -60,6 +61,9 @@ function makeStore(role: 'admin' | 'csm' = 'admin') {
           name: 'Alice',
           avatar: '',
           role,
+          role_id: 1,
+          role_name: role === 'admin' ? 'Admin' : 'CSM',
+          permissions: capabilitiesForRole(role),
           organisation: {
             id: 1,
             name: 'Acme Inc',

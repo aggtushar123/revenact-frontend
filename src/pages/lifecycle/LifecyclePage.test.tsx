@@ -6,6 +6,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
 import { LifecyclePage } from './LifecyclePage';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): a real Redux store (this
 // page dispatches fetchCustomerStats, same thunk MetricsPanel already
@@ -140,6 +141,9 @@ function renderPage() {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',

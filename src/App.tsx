@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { AdminRoute } from './components/auth/AdminRoute';
+import { RequireCapability } from './components/auth/RequireCapability';
 import { Login } from './pages/auth/Login';
 import { ForgotPassword } from './pages/auth/ForgotPassword';
 import { ResetPassword } from './pages/auth/ResetPassword';
@@ -165,7 +165,7 @@ function App() {
           <Route path="integrations" element={<Integrations />} />
 
           <Route path="profile" element={<Profile />} />
-          <Route path="users" element={<AdminRoute><UserManagement /></AdminRoute>} />
+          <Route path="users" element={<RequireCapability capability="manage_users"><UserManagement /></RequireCapability>} />
           
           <Route path="contacts">
             <Route index element={<Navigate to="list" replace />} />

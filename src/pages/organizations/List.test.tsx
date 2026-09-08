@@ -7,6 +7,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
 import { List } from './List';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): real store + real router
 // context (OrganizationsTable navigates on row click), network mocked at
@@ -72,6 +73,9 @@ function renderPage(defaultLifecycleStage = '', currency: 'USD' | 'EUR' = 'USD')
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',

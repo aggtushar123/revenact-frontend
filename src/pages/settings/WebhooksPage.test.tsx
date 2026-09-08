@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import { WebhooksPage } from './WebhooksPage';
+import { capabilitiesForRole } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): a real Redux store for
 // role-gating (same convention as CurrencyPage.test.tsx's own) plus
@@ -39,6 +40,9 @@ function makeStore(role: 'admin' | 'csm' = 'admin') {
           name: 'Alice',
           avatar: '',
           role,
+          role_id: 1,
+          role_name: role === 'admin' ? 'Admin' : 'CSM',
+          permissions: capabilitiesForRole(role),
           organisation: {
             id: 1,
             name: 'Acme Inc',
@@ -80,7 +84,7 @@ describe('WebhooksPage', () => {
     vi.stubGlobal('fetch', fetchMock);
     renderPage('csm');
 
-    expect(screen.getByText(/Only an organisation admin can view or manage webhooks/)).toBeInTheDocument();
+    expect(screen.getByText(/You don't have permission to view or manage webhooks/)).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

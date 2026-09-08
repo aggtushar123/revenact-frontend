@@ -6,17 +6,20 @@ import {
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
   Brain, GitMerge, BookOpen, CheckSquare, Zap
 } from 'lucide-react';
-import { useAppSelector } from '../../hooks';
+import { useAppSelector, useCapability } from '../../hooks';
 import { fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
 import type { CustomObjectDefinition } from '../../features/customObjects/types';
 
 export function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const location = useLocation();
-  const user = useAppSelector((state) => state.auth.user);
 
   const isOrgsActive = location.pathname.includes('/organizations');
   const reviewCount = useAppSelector(s => s.brain.metrics.nodesPendingReview);
+  // The Users link gates on the capability its page actually needs, not
+  // on holding a role called "admin" — an org can define any role it
+  // likes now, including one that grants exactly this and nothing else.
+  const canManageUsers = useCapability('manage_users');
 
   // The org's own real custom object types (Settings > Custom Objects)
   // — replaces the single hardcoded "SFDC Opportunity Line Item" nav
@@ -145,7 +148,7 @@ export function Sidebar() {
         <NavItem to="/settings" icon={<Box className="w-[18px] h-[18px]" />} label="Settings" isExpanded={isExpanded} />
         <NavItem to="/lifecycle" icon={<CircleDot className="w-[18px] h-[18px]" />} label="Lifecycle" isExpanded={isExpanded} />
         <NavItem to="/health" icon={<HeartPulse className="w-[18px] h-[18px]" />} label="Health" isExpanded={isExpanded} />
-        {user?.role === 'admin' && (
+        {canManageUsers && (
           <NavItem to="/users" icon={<UserCog className="w-[18px] h-[18px]" />} label="Users" isExpanded={isExpanded} />
         )}
         <NavItem to="/integrations" icon={<Plug className="w-[18px] h-[18px]" />} label="Integrations" isExpanded={isExpanded} />

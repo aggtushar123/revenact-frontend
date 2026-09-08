@@ -95,7 +95,9 @@ export function Profile() {
           <div className="text-[13px] text-ink-muted truncate">{user.email}</div>
           <div className="flex items-center gap-2 mt-1.5">
             <span className="text-[11px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-accent-dim text-accent">
-              {user.role === 'admin' ? 'Organisation Admin' : 'Customer Success Manager'}
+              {/* The role's own real name — an org can define any number
+                  of these now, so there's nothing to map two slugs onto. */}
+              {user.role_name}
             </span>
             <span className="text-[11px] text-ink-faint truncate">{user.organisation.name}</span>
           </div>

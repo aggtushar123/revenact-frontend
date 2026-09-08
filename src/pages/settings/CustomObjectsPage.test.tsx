@@ -6,6 +6,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import { CustomObjectsPage } from './CustomObjectsPage';
+import { capabilitiesForRole } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): a real Redux store for
 // the admin gate (same convention as WebhooksPage.test.tsx's own
@@ -44,6 +45,9 @@ function makeStore(role: 'admin' | 'csm' = 'admin') {
           name: 'Alice',
           avatar: '',
           role,
+          role_id: 1,
+          role_name: role === 'admin' ? 'Admin' : 'CSM',
+          permissions: capabilitiesForRole(role),
           organisation: {
             id: 1,
             name: 'Acme Inc',
@@ -88,7 +92,7 @@ describe('CustomObjectsPage', () => {
 
     renderPage('csm');
 
-    expect(screen.getByText(/Only an organisation admin can define custom objects/)).toBeInTheDocument();
+    expect(screen.getByText(/You don't have permission to define custom objects/)).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

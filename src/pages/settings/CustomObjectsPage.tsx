@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ShieldAlert, Plus, Trash2 } from 'lucide-react';
-import { useAppSelector } from '../../hooks';
+import { useCapability } from '../../hooks';
 import { ApiError } from '../../lib/apiClient';
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 import { createCustomObjectDefinition, deleteCustomObjectDefinition, fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
@@ -25,8 +25,7 @@ import type { CustomObjectDefinition } from '../../features/customObjects/types'
 // own ManageFieldsPanel), reached the same way from the sidebar's own
 // real "Custom Objects" section.
 export function CustomObjectsPage() {
-  const user = useAppSelector((state) => state.auth.user);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = useCapability('manage_custom_objects');
 
   const [definitions, setDefinitions] = useState<CustomObjectDefinition[]>([]);
   const [isLoading, setIsLoading] = useState(isAdmin);
@@ -98,7 +97,7 @@ export function CustomObjectsPage() {
         </div>
         <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-dim border border-warning/30 text-[12.5px] text-warning">
           <ShieldAlert className="w-4 h-4 shrink-0" />
-          Only an organisation admin can define custom objects — ask yours to add one, or open a
+          You don't have permission to define custom objects — ask an admin to add one, or open a
           Customer/Account page to use what's already there.
         </div>
       </div>

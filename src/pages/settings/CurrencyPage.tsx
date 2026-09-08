@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ShieldAlert, Plus, Pencil, Trash2, Check, X } from 'lucide-react';
-import { useAppDispatch, useAppSelector } from '../../hooks';
+import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { updateOrganisation } from '../../features/auth/authSlice';
 import { formatMoney, CURRENCY_OPTIONS } from '../../features/customers/formatters';
 import { fetchFxRates, createFxRate, updateFxRate, deleteFxRate } from './fxRatesApi';
@@ -20,7 +20,7 @@ import type { CurrencyCode } from '../../features/auth/authSlice';
 export function CurrencyPage() {
   const dispatch = useAppDispatch();
   const user = useAppSelector((state) => state.auth.user);
-  const isAdmin = user?.role === 'admin';
+  const isAdmin = useCapability('manage_org_settings');
   const [selected, setSelected] = useState<CurrencyCode>(user?.organisation.currency ?? 'USD');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,7 +136,7 @@ export function CurrencyPage() {
       {!isAdmin && (
         <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-dim border border-warning/30 text-[12.5px] text-warning">
           <ShieldAlert className="w-4 h-4 shrink-0" />
-          Only an organisation admin can change this.
+          You don't have permission to change this.
         </div>
       )}
 

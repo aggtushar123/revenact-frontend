@@ -8,6 +8,7 @@ import authReducer from '../../features/auth/authSlice';
 import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
 import { CopilotIndex } from './Index';
 import type { Conversation, ConversationSummary } from './types';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): only the fetch boundary is
 // mocked — real component tree, same convention as CampaignsList.test.tsx's
@@ -52,6 +53,9 @@ function makeStore() {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',

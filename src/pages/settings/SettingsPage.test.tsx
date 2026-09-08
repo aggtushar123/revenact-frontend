@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import { SettingsPage } from './SettingsPage';
+import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Custom Objects (see the describe block near the bottom of this file)
 // is the one sub-tab whose real content (CustomObjectsPage) reads
@@ -24,6 +25,9 @@ function renderSettingsPageAsAdmin() {
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: ALL_CAPABILITIES,
           organisation: {
             id: 1,
             name: 'Acme Inc',
