@@ -36,7 +36,13 @@ export type Capability =
   | 'manage_org_settings'
   | 'manage_custom_objects'
   | 'manage_integrations'
-  | 'manage_fx_rates';
+  | 'manage_fx_rates'
+  // Unlike the five above, this one gates no UI: every customer/account
+  // page stays reachable and what changes is how many rows come back.
+  // Nothing calls useCapability with it — it's here because the union
+  // has to accept what /auth/me/ sends, and because the Roles tab
+  // renders a checkbox per key.
+  | 'view_all_accounts';
 
 export interface User {
   id: number;

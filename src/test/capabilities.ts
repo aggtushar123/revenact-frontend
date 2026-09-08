@@ -14,6 +14,7 @@ export const ALL_CAPABILITIES: Capability[] = [
   'manage_custom_objects',
   'manage_integrations',
   'manage_fx_rates',
+  'view_all_accounts',
 ];
 
 /** What the two built-in roles grant: Admin everything, CSM nothing —
