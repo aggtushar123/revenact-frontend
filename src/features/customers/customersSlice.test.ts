@@ -22,6 +22,9 @@ import customersReducer, {
   fetchNotesForCustomer,
   fetchNotesForAccount,
   clearNotes,
+  fetchHeadlinesForCustomer,
+  fetchHeadlinesForAccount,
+  clearHeadlines,
   fetchTicketsForCustomer,
   fetchTicketsForAccount,
   clearTickets,
@@ -932,6 +935,128 @@ describe('customersSlice', () => {
       const state = store.getState().customers;
       expect(state.notes).toEqual([]);
       expect(state.notesError).toBeNull();
+    });
+  });
+
+  describe('fetchHeadlinesForCustomer / fetchHeadlinesForAccount (the Headlines sub-tab)', () => {
+    const summary = {
+      id: 1,
+      kind: 'summary' as const,
+      kind_display: 'Summary',
+      title: 'TL;DR (Last 3 months)',
+      content: 'Account shows exceptional health with strong renewal momentum.',
+      status: '' as const,
+      status_display: '',
+      period_start: null,
+      period_end: null,
+      time_period_label: 'Last 3 months',
+      data_sources: ['notes' as const, 'emails' as const],
+      data_sources_display: 'Notes and Emails',
+      group: '',
+      generated_at: null,
+      created_at: '2026-01-21T00:00:00Z',
+    };
+    const accountHeadline = {
+      ...summary,
+      id: 2,
+      kind: 'headline' as const,
+      kind_display: 'Headline',
+      title: 'Apple EMEA Retail Operations Renewal and Expansion',
+      status: 'open' as const,
+      status_display: 'Open',
+      period_start: '2025-11-20',
+      period_end: '2026-01-21',
+      time_period_label: '',
+      group: 'January 2026',
+    };
+
+    it('fetchHeadlinesForCustomer GETs /customers/<id>/headlines/ and stores the result', async () => {
+      mockFetchOnce(200, [summary]);
+      const store = makeStore();
+
+      await store.dispatch(fetchHeadlinesForCustomer(globex.id));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/headlines/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      const state = store.getState().customers;
+      expect(state.headlines).toEqual([summary]);
+      expect(state.headlinesLoading).toBe(false);
+      expect(state.headlinesError).toBeNull();
+    });
+
+    it('fetchHeadlinesForAccount GETs the nested account endpoint and stores the result', async () => {
+      mockFetchOnce(200, [accountHeadline]);
+      const store = makeStore();
+
+      await store.dispatch(fetchHeadlinesForAccount({ customerId: globex.id, accountId: 17 }));
+
+      expect(fetch).toHaveBeenCalledWith(
+        expect.stringContaining(`/customers/${globex.id}/accounts/17/headlines/`),
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(store.getState().customers.headlines).toEqual([accountHeadline]);
+    });
+
+    // The defect this whole feature replaces: the tab used to render
+    // one hardcoded array for every account, because the component
+    // resolved every real account id onto the same stub. This is the
+    // guard that the fetch is genuinely per-account now.
+    it('headlines for one account never leak into another account\'s fetch', async () => {
+      mockFetchOnce(200, [accountHeadline]);
+      const store = makeStore();
+      await store.dispatch(fetchHeadlinesForAccount({ customerId: globex.id, accountId: 17 }));
+      expect(store.getState().customers.headlines).toEqual([accountHeadline]);
+
+      const otherAccountHeadline = { ...accountHeadline, id: 3, title: 'APAC Rollout' };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          status: 200,
+          json: async () => [otherAccountHeadline],
+        })
+      );
+      await store.dispatch(fetchHeadlinesForAccount({ customerId: globex.id, accountId: 6 }));
+
+      expect(store.getState().customers.headlines).toEqual([otherAccountHeadline]);
+    });
+
+    it('sets an error and leaves headlines empty on a 404', async () => {
+      mockFetchOnce(404, { detail: 'Not found.' });
+      const store = makeStore();
+
+      await store.dispatch(fetchHeadlinesForCustomer(999));
+
+      const state = store.getState().customers;
+      expect(state.headlines).toEqual([]);
+      expect(state.headlinesError).toBe('Not found.');
+    });
+
+    it('clears a previous fetch\'s headlines as soon as a new one starts', async () => {
+      mockFetchOnce(200, [summary]);
+      const store = makeStore();
+      await store.dispatch(fetchHeadlinesForCustomer(globex.id));
+      expect(store.getState().customers.headlines).toEqual([summary]);
+
+      vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+      store.dispatch(fetchHeadlinesForCustomer(2));
+
+      expect(store.getState().customers.headlines).toEqual([]);
+    });
+
+    it('clearHeadlines empties the slot outright (ActivityFeed\'s no-resolvable-id fallback)', async () => {
+      mockFetchOnce(200, [summary]);
+      const store = makeStore();
+      await store.dispatch(fetchHeadlinesForCustomer(globex.id));
+      expect(store.getState().customers.headlines).toEqual([summary]);
+
+      store.dispatch(clearHeadlines());
+
+      const state = store.getState().customers;
+      expect(state.headlines).toEqual([]);
+      expect(state.headlinesError).toBeNull();
     });
   });
 

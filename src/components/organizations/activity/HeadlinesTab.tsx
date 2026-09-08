@@ -1,71 +1,94 @@
 import { LayoutTemplate, FileText, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
+import type { Headline } from '../../../features/customers/customersSlice';
 
-export interface HeadlineItem {
-  id: number;
-  orgId: number;
-  title: string;
-  status?: 'Open' | 'Closed' | 'In Progress';
-  content: string;
-  startDate?: string;
-  endDate?: string;
-  group: string;
-  dataSources?: string;
-  timePeriod?: string;
-  isSummary?: boolean;
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+// "2025-11-20" -> "20 Nov 2025" — the span shown on a headline card's
+// own footer. Same parse-the-parts approach as NotesTab's formatDate
+// (no Date, so no timezone shift on a date-only string).
+function formatDate(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
-const HEADLINES_DATA: HeadlineItem[] = [
-  {
-    id: 1,
-    orgId: 1,
-    title: 'TL;DR (Last 3 months)',
-    content: "Apple EMEA Retail Operations account shows exceptional health with strong renewal momentum throughout December 2025 and January 2026. The account maintains 96% utilization (1,150/1,200 users), £135K ARR, and 91 health score with consistent positive sentiment. December focused heavily on renewal preparation and expansion planning, with multiple stakeholders coordinating on Product B expansion and Integrations Module evaluation. January shifted to renewal execution and advanced optimization discussions. No risks identified - account positioned for successful renewal with significant growth opportunities.",
-    group: 'Summary',
-    dataSources: 'Notes, Emails, Call Transcripts and Tickets',
-    timePeriod: 'Last 3 months',
-    isSummary: true
-  },
-  {
-    id: 2,
-    orgId: 1,
-    title: 'Apple EMEA Retail Operations Renewal and Expansion',
-    status: 'Open',
-    content: "Comprehensive renewal process for Apple's EMEA Retail Operations showing exceptional account health with 96% utilization and strong expansion interest. Daniel from Revenact coordinated renewal documentation and expansion modeling for Product B and Integrations Module, while Priya and Leo from Apple consolidated usage trends and conducted internal reviews. The account demonstrates consistent positive metrics with £135K ARR, 91 health score, and teams actively advocating for broader rollouts. Renewal positioned for success with meaningful growth opportunities identified.",
-    startDate: '20 Nov 2025',
-    endDate: '21 Jan 2026',
-    group: 'January'
-  }
-];
+// A status dot, coloured by what the status actually means — the mock
+// hardcoded `bg-danger` for every card, including "Closed", which read
+// as an alert on a storyline that had been resolved.
+const STATUS_DOT: Record<string, string> = {
+  open: 'bg-danger',
+  in_progress: 'bg-warning',
+  closed: 'bg-success',
+};
 
-export function HeadlinesTab({ entityId }: { entityId: number | string }) {
-  const allItems = HEADLINES_DATA.filter(h => h.orgId == entityId);
-  const items = allItems.length > 0 ? allItems : HEADLINES_DATA; // Fallback for testing
+export interface HeadlinesTabProps {
+  headlines: Headline[];
+  isLoading: boolean;
+  error: string | null;
+}
 
-  const summaryItems = items.filter(item => item.isSummary);
-  const feedItems = items.filter(item => !item.isSummary);
+export function HeadlinesTab({ headlines, isLoading, error }: HeadlinesTabProps) {
+  const summaryItems = headlines.filter((item) => item.kind === 'summary');
+  const feedItems = headlines.filter((item) => item.kind !== 'summary');
 
-  const grouped = feedItems.reduce<Record<string, HeadlineItem[]>>((acc, item) => {
+  // `group` arrives derived from period_end (see HeadlineSerializer) —
+  // the mock stored it as free text, which is how it drifted from the
+  // dates on the same card. Cards with no period_end have no group and
+  // fall into one trailing untitled section rather than vanishing.
+  const grouped = feedItems.reduce<Record<string, Headline[]>>((acc, item) => {
     if (!acc[item.group]) acc[item.group] = [];
     acc[item.group].push(item);
     return acc;
   }, {});
 
-  const sortedGroups = Object.entries(grouped);
+  // Feed order is newest group first. Entries already arrive
+  // period_end-descending within a group, so only the groups
+  // themselves need sorting — by the newest card each one holds,
+  // since "January 2026" doesn't sort chronologically as a string.
+  const sortedGroups = Object.entries(grouped).sort((a, b) => {
+    const newest = (items: Headline[]) =>
+      items.reduce((max, item) => (item.period_end && item.period_end > max ? item.period_end : max), '');
+    return newest(b[1]).localeCompare(newest(a[1]));
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
+        <span className="text-sm font-semibold text-ink-faint">Loading headlines…</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 py-16">
+        <span className="text-sm font-semibold text-danger">{error}</span>
+      </div>
+    );
+  }
+
+  if (headlines.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
+        <LayoutTemplate className="w-10 h-10 text-ink-faint mb-2" />
+        <span className="text-sm font-semibold text-ink-faint">No headlines yet</span>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar bg-white font-sans p-6 md:p-8">
+    <div className="flex-1 overflow-y-auto custom-scrollbar bg-surface font-sans p-6 md:p-8">
       {/* Title Header */}
       <div className="flex items-center gap-2 mb-8">
-        <LayoutTemplate className="w-5 h-5 text-indigo-600" />
-        <h2 className="text-[14.5px] font-extrabold text-indigo-600 tracking-wide">Account Headlines</h2>
+        <LayoutTemplate className="w-5 h-5 text-accent" />
+        <h2 className="text-[14.5px] font-extrabold text-accent tracking-wide">Account Headlines</h2>
       </div>
 
       <div className="pl-[2px]">
-        {/* Render Summary Cards (TL;DR) at the top without a pill */}
+        {/* Summary cards (TL;DR) sit above the groups, without a pill */}
         {summaryItems.length > 0 && (
           <div className="mb-8 flex flex-col gap-5">
-            {summaryItems.map(item => (
+            {summaryItems.map((item) => (
               <HeadlineCard key={item.id} item={item} />
             ))}
           </div>
@@ -74,12 +97,14 @@ export function HeadlinesTab({ entityId }: { entityId: number | string }) {
         {/* Card Items Section */}
         {sortedGroups.map(([group, groupItems]) => (
           <div key={group} className="mb-8">
-            <div className="mb-5 inline-block bg-[#F1F5F9] rounded-full px-3.5 py-1 text-[11.5px] font-bold text-[#64748B]">
-              {group}
-            </div>
-            
+            {group && (
+              <div className="mb-5 inline-block bg-subtle rounded-full px-3.5 py-1 text-[11.5px] font-bold text-ink-muted">
+                {group}
+              </div>
+            )}
+
             <div className="flex flex-col gap-5">
-              {groupItems.map(item => (
+              {groupItems.map((item) => (
                 <HeadlineCard key={item.id} item={item} />
               ))}
             </div>
@@ -90,55 +115,79 @@ export function HeadlinesTab({ entityId }: { entityId: number | string }) {
   );
 }
 
-function HeadlineCard({ item }: { item: HeadlineItem }) {
+function HeadlineCard({ item }: { item: Headline }) {
   const [expanded, setExpanded] = useState(true);
+  // Which footer a card gets follows `kind`, not whether it happens to
+  // carry data sources. The mock used "has dataSources?" as a stand-in
+  // for "is this the TL;DR?" because only its TL;DR had any — now that
+  // the generator records sources on every card it writes, that proxy
+  // would give storyline cards the summary footer and drop their date
+  // span.
+  const isSummary = item.kind === 'summary';
 
   return (
-    <div className="bg-white border border-[#E2E8F0] shadow-sm rounded-xl p-5 hover:shadow-md transition-all duration-200 group">
+    <div className="bg-surface border border-line shadow-sm rounded-xl p-5 hover:shadow-md transition-all duration-200 group">
       <div className="flex items-start justify-between mb-3">
-        <h4 className="text-[14.5px] font-extrabold text-[#334155] leading-snug group-hover:text-indigo-600 transition-colors cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <h4
+          className="text-[14.5px] font-extrabold text-ink leading-snug group-hover:text-accent transition-colors cursor-pointer"
+          onClick={() => setExpanded(!expanded)}
+        >
           {item.title}
         </h4>
         {item.status && (
           <div className="flex items-center gap-1.5 text-[12px] font-bold shrink-0 ml-4">
-            <div className="w-1.5 h-1.5 rounded-full bg-[#EF4444]" />
-            <span className="text-[#475569]">{item.status}</span>
+            <div
+              className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[item.status] ?? 'bg-ink-faint'}`}
+            />
+            <span className="text-ink-muted">{item.status_display}</span>
           </div>
         )}
       </div>
 
       {expanded && (
-        <p className={`text-[13px] text-[#475569] leading-[1.65] pr-2 ${item.dataSources ? 'mb-4' : 'mb-0'}`}>
+        <p
+          className={`text-[13px] text-ink-muted leading-[1.65] pr-2 ${isSummary ? 'mb-4' : 'mb-0'}`}
+        >
           {item.content}
         </p>
       )}
 
       {/* Footer for TL;DR type cards */}
-      {expanded && item.dataSources && (
-        <div className="flex items-center gap-6 text-[12.5px] font-medium text-gray-500 pt-2 border-t border-transparent">
+      {expanded && isSummary && (
+        <div className="flex items-center gap-6 text-[12.5px] font-medium text-ink-muted pt-2 border-t border-transparent">
           <div className="flex items-center gap-2 flex-wrap">
-            <FileText className="w-4 h-4 text-gray-400" />
-            <span>Data sources: <span className="text-gray-700 font-semibold">{item.dataSources}</span></span>
+            <FileText className="w-4 h-4 text-ink-faint" />
+            <span>
+              Data sources:{' '}
+              <span className="text-ink-muted font-semibold">{item.data_sources_display}</span>
+            </span>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Clock className="w-4 h-4 text-gray-400" />
-            <span>Time period: <span className="text-gray-700 font-semibold">{item.timePeriod}</span></span>
-          </div>
+          {item.time_period_label && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Clock className="w-4 h-4 text-ink-faint" />
+              <span>
+                Time period:{' '}
+                <span className="text-ink-muted font-semibold">{item.time_period_label}</span>
+              </span>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Footer for Standard Headline item cards */}
-      {(!item.dataSources && item.startDate) && (
+      {/* Footer for standard headline cards */}
+      {!isSummary && item.period_start && (
         <div className="flex items-center justify-between mt-4 border-t border-transparent pt-1">
-          <button 
+          <button
             onClick={() => setExpanded(!expanded)}
-            className="flex items-center gap-1 text-[12.5px] font-bold text-[#6D72D6] hover:text-indigo-800 transition-colors"
+            className="flex items-center gap-1 text-[12.5px] font-bold text-accent hover:text-accent-hover transition-colors"
           >
             {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
             {expanded ? 'Hide details' : 'Show details'}
           </button>
-          <div className="text-[12.5px] font-bold text-[#64748B] flex items-center gap-1.5">
-            {item.startDate} <span className="text-gray-400 font-normal">→</span> {item.endDate}
+          <div className="text-[12.5px] font-bold text-ink-muted flex items-center gap-1.5">
+            {formatDate(item.period_start)}{' '}
+            <span className="text-ink-faint font-normal">→</span>{' '}
+            {item.period_end ? formatDate(item.period_end) : '—'}
           </div>
         </div>
       )}

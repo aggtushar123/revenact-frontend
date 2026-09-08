@@ -29,6 +29,9 @@ import {
   fetchNotesForCustomer,
   fetchNotesForAccount,
   clearNotes,
+  fetchHeadlinesForCustomer,
+  fetchHeadlinesForAccount,
+  clearHeadlines,
   fetchTicketsForCustomer,
   fetchTicketsForAccount,
   clearTickets,
@@ -42,11 +45,12 @@ import {
 } from '../../features/customers/customersSlice';
 
 // ── Data sources ─────────────────────────────────────────────────────────────
-// Activities/Emails/Tasks/Notes/Tickets/Calendar Events are all wired
-// to real backend models below, not this mock injection scheme (see
-// fetchActivitiesFor*/fetchEmailsFor*/fetchTasksFor*/fetchNotesFor*/
-// fetchTicketsFor*/fetchCalendarEventsFor* above) — only Slack (and
-// the numeric id it and Headlines/CallSense need) still uses it.
+// Activities/Emails/Tasks/Notes/Tickets/Calendar Events/Headlines are
+// all wired to real backend models below, not this mock injection
+// scheme (see fetchActivitiesFor*/fetchEmailsFor*/fetchTasksFor*/
+// fetchNotesFor*/fetchTicketsFor*/fetchCalendarEventsFor*/
+// fetchHeadlinesFor* above) — only Slack (and the numeric id it and
+// CallSense need) still uses it.
 import { ACCOUNT_ID_MAP } from '../organizations/accountActivityData';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -107,12 +111,18 @@ const FILTER_ITEMS = [
 const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events', 'Surveys', 'Sessions', 'Slack'];
 
 // ── Account id resolution ────────────────────────────────────────────────────
-// Headlines/CallSense/Slack are still fully mock (SlackTab keeps its
-// own SLACK_DATA locally; Headlines/CallSense are decorative) — they
-// take a resolved numeric id the same way the mock-swapped filters
-// used to. ACCOUNT_ID_MAP only knows the mock's own string ids (e.g.
+// CallSense/Slack are still fully mock (SlackTab keeps its own
+// SLACK_DATA locally; CallSense is decorative) — they take a
+// resolved numeric id the same way the mock-swapped filters used to.
+// ACCOUNT_ID_MAP only knows the mock's own string ids (e.g.
 // 'acc-1'), so a real account id falls back to the stub 101, same
 // fallback those tabs' own mock content already keys off.
+//
+// Headlines no longer goes through here: it reads real, per-entity
+// data off the same entityId/customerId every other wired tab uses.
+// Routing it through this shim is what made every account render the
+// same two hardcoded cards — every real account id collapsed onto
+// the stub 101.
 
 function resolveAccountId(accountId: string): number {
   return ACCOUNT_ID_MAP[accountId] ?? 101;
@@ -145,6 +155,9 @@ export function ActivityFeed({
     notes,
     notesLoading,
     notesError,
+    headlines,
+    headlinesLoading,
+    headlinesError,
     tickets,
     ticketsLoading,
     ticketsError,
@@ -167,7 +180,7 @@ export function ActivityFeed({
     entityType === 'organization' ? s.customer_id === numericEntityId : s.account_id === numericEntityId
   );
 
-  // Resolve numeric ID for the still-mock tabs (Headlines/CallSense/
+  // Resolve numeric ID for the still-mock tabs (CallSense/
   // Slack) — see resolveAccountId's own comment.
   let resolvedId: number;
   if (entityType === 'account') {
@@ -228,6 +241,22 @@ export function ActivityFeed({
       dispatch(fetchNotesForAccount({ customerId, accountId: Number(entityId) }));
     } else {
       dispatch(clearNotes());
+    }
+  }, [dispatch, entityType, entityId, customerId]);
+
+  // Headlines is wired to the real backend model the same way
+  // Activities/Emails/Tasks/Notes are above — same resolvability
+  // rules, same clear-on-no-real-id fallback. Note this uses the real
+  // `entityId`, not `resolvedId`: the tab used to take the shim's
+  // stubbed 101 for every account, which is exactly why they all
+  // showed the same cards.
+  useEffect(() => {
+    if (entityType === 'organization') {
+      dispatch(fetchHeadlinesForCustomer(Number(entityId)));
+    } else if (customerId !== undefined) {
+      dispatch(fetchHeadlinesForAccount({ customerId, accountId: Number(entityId) }));
+    } else {
+      dispatch(clearHeadlines());
     }
   }, [dispatch, entityType, entityId, customerId]);
 
@@ -420,7 +449,11 @@ export function ActivityFeed({
             </div>
           </div>
         ) : activeSubTab === 'Headlines' ? (
-          <HeadlinesTab entityId={resolvedId} />
+          <HeadlinesTab
+            headlines={headlines}
+            isLoading={headlinesLoading}
+            error={headlinesError}
+          />
         ) : activeSubTab === 'CallSense' ? (
           <CallSenseTab entityId={resolvedId} />
         ) : (

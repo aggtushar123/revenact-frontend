@@ -192,6 +192,48 @@ export interface Note {
   links: number;
 }
 
+// Mirrors revenact-backend's HeadlineSerializer field-for-field — see
+// docs/API_CONTRACTS.md -> customers -> Headline. `kind` splits the
+// two card shapes the tab renders: 'summary' is the pinned TL;DR
+// (carries `time_period_label` + `data_sources`, never a `status`),
+// 'headline' is one storyline in the feed (carries a `status` and a
+// period span). `group` is derived server-side from `period_end`, the
+// way NotesTab derives its own date headers — the mock stored it as
+// free text, which is how it drifted. `data_sources_display` is the
+// footer's prose list, built from the keys the generator actually
+// read, so the card can't claim a source nobody looked at.
+export type HeadlineKind = 'summary' | 'headline';
+export type HeadlineStatus = 'open' | 'in_progress' | 'closed';
+export type HeadlineDataSource =
+  | 'notes'
+  | 'emails'
+  | 'call_transcripts'
+  | 'tickets'
+  | 'activities';
+
+export interface Headline {
+  id: number;
+  kind: HeadlineKind;
+  kind_display: string;
+  title: string;
+  content: string;
+  /** Empty string for a summary — the backend refuses a summary with a
+   * status at the DB level, not just in the serializer. */
+  status: HeadlineStatus | '';
+  status_display: string;
+  period_start: string | null;
+  period_end: string | null;
+  time_period_label: string;
+  data_sources: HeadlineDataSource[];
+  data_sources_display: string;
+  /** '' for a summary, and for a headline with no `period_end` to
+   * group under. */
+  group: string;
+  /** Set only on cards the model wrote — null when hand-written. */
+  generated_at: string | null;
+  created_at: string;
+}
+
 // Mirrors revenact-backend's TicketSerializer field-for-field — see
 // docs/API_CONTRACTS.md -> customers -> Ticket. Field set was
 // reverse-engineered from the card, not dictated up front — see that
@@ -567,6 +609,14 @@ interface CustomersState {
   notes: Note[];
   notesLoading: boolean;
   notesError: string | null;
+  /** Headlines for whichever Customer or Account ActivityFeed's
+   * "Headlines" sub-tab is currently showing — same single-slot
+   * reasoning as `activities`/`emails`/`tasks`/`notes` above, even
+   * though Headlines is a top-level sub-tab rather than one of the
+   * feed's own filters. */
+  headlines: Headline[];
+  headlinesLoading: boolean;
+  headlinesError: string | null;
   /** Tickets for whichever Customer or Account ActivityFeed's
    * "Tickets" filter is currently showing — same single-slot
    * reasoning as `activities`/`emails`/`tasks`/`notes` above. */
@@ -716,6 +766,9 @@ const initialState: CustomersState = {
   notes: [],
   notesLoading: false,
   notesError: null,
+  headlines: [],
+  headlinesLoading: false,
+  headlinesError: null,
   tickets: [],
   ticketsLoading: false,
   ticketsError: null,
@@ -1029,6 +1082,38 @@ export const fetchNotesForAccount = createAsyncThunk<
     return await apiFetch<Note[]>(`/customers/${customerId}/accounts/${accountId}/notes/`);
   } catch (err) {
     const message = err instanceof ApiError ? err.message : 'Could not load notes.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers the "Headlines" sub-tab on the Organization Details page —
+// every organization-level Headline for one Customer.
+export const fetchHeadlinesForCustomer = createAsyncThunk<
+  Headline[],
+  number,
+  { rejectValue: string }
+>('customers/fetchHeadlinesForCustomer', async (customerId, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Headline[]>(`/customers/${customerId}/headlines/`);
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load headlines.';
+    return rejectWithValue(message);
+  }
+});
+
+// Powers the "Headlines" sub-tab on the standalone Account page —
+// every account-level Headline for one Account.
+export const fetchHeadlinesForAccount = createAsyncThunk<
+  Headline[],
+  { customerId: number; accountId: number },
+  { rejectValue: string }
+>('customers/fetchHeadlinesForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<Headline[]>(
+      `/customers/${customerId}/accounts/${accountId}/headlines/`
+    );
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not load headlines.';
     return rejectWithValue(message);
   }
 });
@@ -1855,6 +1940,13 @@ const customersSlice = createSlice({
       state.notesError = null;
     },
     // Same reasoning as clearActivities/clearEmails/clearTasks/
+    // clearNotes above, for the "Headlines" sub-tab.
+    clearHeadlines(state) {
+      state.headlines = [];
+      state.headlinesLoading = false;
+      state.headlinesError = null;
+    },
+    // Same reasoning as clearActivities/clearEmails/clearTasks/
     // clearNotes above, for the "Tickets" filter.
     clearTickets(state) {
       state.tickets = [];
@@ -2137,6 +2229,35 @@ const customersSlice = createSlice({
       .addCase(fetchNotesForAccount.rejected, (state, action) => {
         state.notesLoading = false;
         state.notesError = action.payload ?? 'Could not load notes.';
+      })
+      // fetchHeadlinesForCustomer and fetchHeadlinesForAccount share
+      // the same headlines/headlinesLoading/headlinesError slots, same
+      // reasoning as the activities/emails/tasks/notes slots above.
+      .addCase(fetchHeadlinesForCustomer.pending, (state) => {
+        state.headlinesLoading = true;
+        state.headlinesError = null;
+        state.headlines = [];
+      })
+      .addCase(fetchHeadlinesForCustomer.fulfilled, (state, action) => {
+        state.headlinesLoading = false;
+        state.headlines = action.payload;
+      })
+      .addCase(fetchHeadlinesForCustomer.rejected, (state, action) => {
+        state.headlinesLoading = false;
+        state.headlinesError = action.payload ?? 'Could not load headlines.';
+      })
+      .addCase(fetchHeadlinesForAccount.pending, (state) => {
+        state.headlinesLoading = true;
+        state.headlinesError = null;
+        state.headlines = [];
+      })
+      .addCase(fetchHeadlinesForAccount.fulfilled, (state, action) => {
+        state.headlinesLoading = false;
+        state.headlines = action.payload;
+      })
+      .addCase(fetchHeadlinesForAccount.rejected, (state, action) => {
+        state.headlinesLoading = false;
+        state.headlinesError = action.payload ?? 'Could not load headlines.';
       })
       // fetchTicketsForCustomer and fetchTicketsForAccount share the
       // same tickets/ticketsLoading/ticketsError slots, same reasoning
@@ -2603,6 +2724,7 @@ export const {
   clearEmails,
   clearTasks,
   clearNotes,
+  clearHeadlines,
   clearTickets,
   clearCalendarEvents,
   clearSurveys,
