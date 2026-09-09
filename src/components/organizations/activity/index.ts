@@ -5,6 +5,7 @@ export { TicketsTab } from './TicketsTab';
 export { SurveysTab } from './SurveysTab';
 export { CalendarEventsTab } from './CalendarEventsTab';
 export { ActivitiesTab } from './ActivitiesTab';
+export { AllActivityTab } from './AllActivityTab';
 export { CallSenseTab } from './CallSenseTab';
 export { HeadlinesTab } from './HeadlinesTab';
 export { SlackTab } from './SlackTab';

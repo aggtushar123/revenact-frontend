@@ -9,6 +9,7 @@ import {
   TicketsTab,
   CalendarEventsTab,
   ActivitiesTab,
+  AllActivityTab,
   CallSenseTab,
   HeadlinesTab,
   SlackTab,
@@ -384,7 +385,36 @@ export function ActivityFeed({
 
             {/* Tab content */}
             <div className="flex-1 overflow-hidden flex flex-col">
-              {(filter === 'All' || filter === 'Activities') && (
+              {filter === 'All' && (
+                <AllActivityTab
+                  activities={activities}
+                  emails={emails}
+                  tasks={tasks}
+                  notes={notes}
+                  tickets={tickets}
+                  calendarEvents={calendarEvents}
+                  surveys={entitySurveys}
+                  isLoading={
+                    activitiesLoading ||
+                    emailsLoading ||
+                    tasksLoading ||
+                    notesLoading ||
+                    ticketsLoading ||
+                    calendarEventsLoading ||
+                    entitySurveysLoading
+                  }
+                  errors={[
+                    activitiesError,
+                    emailsError,
+                    tasksError,
+                    notesError,
+                    ticketsError,
+                    calendarEventsError,
+                    entitySurveysError,
+                  ].filter((e): e is string => e !== null)}
+                />
+              )}
+              {filter === 'Activities' && (
                 <ActivitiesTab
                   activities={activities}
                   isLoading={activitiesLoading}

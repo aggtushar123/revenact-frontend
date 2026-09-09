@@ -219,7 +219,10 @@ describe('AccountDetails page (/accounts/:id)', () => {
       renderAccountDetails();
 
       await screen.findByText('9.5'); // page finished rendering the mock fallback
-      expect(screen.getByText('No activities found')).toBeInTheDocument();
+      // The default "All" filter is a merged stream of every source
+      // now, so its empty state speaks for all of them rather than for
+      // activities alone.
+      expect(screen.getByText('No activity yet')).toBeInTheDocument();
     });
   });
 
