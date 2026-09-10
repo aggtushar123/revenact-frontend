@@ -1,20 +1,21 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { STATUS_DATA } from '../mockData';
+import type { TicketBucket } from '../../../../../features/tickets/ticketsSlice';
+import { STATUS_COLORS, FALLBACK_COLOR } from '../chartTheme';
 
-export function StatusDonut() {
-  const total = STATUS_DATA.reduce((acc, curr) => acc + curr.value, 0);
+export function StatusDonut({ data }: { data: TicketBucket[] }) {
+  const total = data.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
     <div className="w-full h-full p-4 flex flex-col relative h-[280px]">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-[13px] font-bold text-gray-800">Ticket Status Distribution</h3>
+        <h3 className="text-[13px] font-bold text-ink">Ticket Status Distribution</h3>
       </div>
 
       <div className="flex-1 w-full relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={STATUS_DATA}
+              data={data}
               cx="50%"
               cy="50%"
               innerRadius={45}
@@ -38,7 +39,7 @@ export function StatusDonut() {
                   <text 
                     x={x} 
                     y={y} 
-                    fill="#6b7280" 
+                    fill="var(--text-secondary)" 
                     textAnchor={x > Number(cx) ? 'start' : 'end'} 
                     dominantBaseline="central"
                     fontSize={10}
@@ -49,10 +50,10 @@ export function StatusDonut() {
                   </text>
                 );
               }}
-              labelLine={{ stroke: '#e5e7eb', strokeWidth: 1 }}
+              labelLine={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
             >
-              {STATUS_DATA.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.fill} />
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] ?? FALLBACK_COLOR} />
               ))}
             </Pie>
             <Tooltip 
@@ -65,7 +66,7 @@ export function StatusDonut() {
 
         {/* Center Text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-6">
-          <span className="text-3xl font-bold text-gray-800">{total}</span>
+          <span className="text-3xl font-bold text-ink">{total}</span>
         </div>
       </div>
     </div>

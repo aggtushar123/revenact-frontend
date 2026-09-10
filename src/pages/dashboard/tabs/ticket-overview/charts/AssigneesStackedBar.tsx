@@ -1,16 +1,10 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { ASSIGNEE_DATA } from '../mockData';
+import type { TicketAssigneeRow } from '../../../../../features/tickets/ticketsSlice';
+import { STATUS_COLORS, STATUS_ORDER, FALLBACK_COLOR, niceMax } from '../chartTheme';
 
-const ASSIGNEE_COLORS = { 
-  Solved: '#2ecc71',   // Standard green
-  Open: '#f1c40f',     // Yellow
-  Pending: '#3498db',  // Standard blue
-  Closed: '#f39c12',   // Orange
-  New: '#e74c3c',      // Red
-  Hold: '#1abc9c'      // Teal
-};
-
-export function AssigneesStackedBar() {
+export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
+  // The mock's domain={[0, 80]} clipped any assignee past 80 tickets.
+  const max = niceMax(data.map((d) => d.total));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderCustomBarLabel = (props: any) => {
     const { x, y, width, height, payload, dataKey } = props;
@@ -32,28 +26,28 @@ export function AssigneesStackedBar() {
   };
 
   return (
-    <div className="w-full h-full p-4 flex flex-col bg-white border border-gray-100 rounded-lg shadow-sm h-[320px]">
+    <div className="w-full h-full p-4 flex flex-col bg-surface border border-line-subtle rounded-lg shadow-sm h-[320px]">
       <div className="flex flex-col mb-4">
-        <h3 className="text-[13px] font-bold text-gray-800">Ticket Assignees by Ticket Status</h3>
+        <h3 className="text-[13px] font-bold text-ink">Ticket Assignees by Ticket Status</h3>
       </div>
       
       <div className="flex-1 w-full relative -ml-4">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             layout="vertical"
-            data={ASSIGNEE_DATA}
+            data={data}
             margin={{ top: 0, right: 40, left: 10, bottom: 0 }}
             barSize={16}
             barGap={0}
           >
-            <XAxis type="number" hide domain={[0, 80]} />
+            <XAxis type="number" hide domain={[0, max]} />
             <YAxis 
               type="category" 
               dataKey="name" 
               axisLine={false} 
               tickLine={false} 
               width={110}
-              tick={{ fontSize: 10, fill: '#6b7280', fontWeight: 500 }}
+              tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 500 }}
             />
             <Tooltip 
               cursor={{ fill: 'rgba(0,0,0,0.02)' }}
@@ -65,15 +59,21 @@ export function AssigneesStackedBar() {
               dataKey="total" 
               fill="transparent" 
               isAnimationActive={false}
-              label={{ position: 'right', fill: '#4b5563', fontSize: 11, fontWeight: 600, dx: 5 }} 
+              label={{ position: 'right', fill: 'var(--text-secondary)', fontSize: 11, fontWeight: 600, dx: 5 }} 
             />
 
-            <Bar dataKey="Solved" stackId="a" fill={ASSIGNEE_COLORS.Solved} label={renderCustomBarLabel} isAnimationActive={false} />
-            <Bar dataKey="Open" stackId="a" fill={ASSIGNEE_COLORS.Open} label={renderCustomBarLabel} isAnimationActive={false} />
-            <Bar dataKey="Pending" stackId="a" fill={ASSIGNEE_COLORS.Pending} label={renderCustomBarLabel} isAnimationActive={false} />
-            <Bar dataKey="Closed" stackId="a" fill={ASSIGNEE_COLORS.Closed} label={renderCustomBarLabel} isAnimationActive={false} />
-            <Bar dataKey="New" stackId="a" fill={ASSIGNEE_COLORS.New} label={renderCustomBarLabel} isAnimationActive={false} />
-            <Bar dataKey="Hold" stackId="a" fill={ASSIGNEE_COLORS.Hold} label={renderCustomBarLabel} isAnimationActive={false} />
+            {/* One segment per real status, in ticket-lifecycle order —
+                the mock hard-coded Zendesk's own six status names. */}
+            {STATUS_ORDER.map((statusLabel) => (
+              <Bar
+                key={statusLabel}
+                dataKey={statusLabel}
+                stackId="a"
+                fill={STATUS_COLORS[statusLabel] ?? FALLBACK_COLOR}
+                label={renderCustomBarLabel}
+                isAnimationActive={false}
+              />
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </div>

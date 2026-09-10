@@ -1,14 +1,15 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
-import { PRIORITY_DATA } from '../mockData';
+import type { TicketBucket } from '../../../../../features/tickets/ticketsSlice';
+import { PRIORITY_COLORS, FALLBACK_COLOR } from '../chartTheme';
 
-export function PriorityDonut() {
-  const total = PRIORITY_DATA.reduce((acc, curr) => acc + curr.value, 0);
+export function PriorityDonut({ data }: { data: TicketBucket[] }) {
+  const total = data.reduce((acc, curr) => acc + curr.value, 0);
 
   return (
     <div className="w-full h-full p-4 flex flex-col relative h-[280px]">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="text-[13px] font-bold text-gray-800">Ticket Priority Distribution</h3>
-        <button className="text-gray-400 hover:text-gray-600">
+        <h3 className="text-[13px] font-bold text-ink">Ticket Priority Distribution</h3>
+        <button className="text-ink-faint hover:text-ink-muted">
           {/* Mock expand icon */}
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
@@ -20,7 +21,7 @@ export function PriorityDonut() {
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
-              data={PRIORITY_DATA}
+              data={data}
               cx="50%"
               cy="50%"
               innerRadius={45}
@@ -44,7 +45,7 @@ export function PriorityDonut() {
                   <text 
                     x={x} 
                     y={y} 
-                    fill="#6b7280" 
+                    fill="var(--text-secondary)" 
                     textAnchor={x > Number(cx) ? 'start' : 'end'} 
                     dominantBaseline="central"
                     fontSize={10}
@@ -55,10 +56,10 @@ export function PriorityDonut() {
                   </text>
                 );
               }}
-              labelLine={{ stroke: '#e5e7eb', strokeWidth: 1 }}
+              labelLine={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
             >
-              {PRIORITY_DATA.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.fill} />
+              {data.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.name] ?? FALLBACK_COLOR} />
               ))}
             </Pie>
             <Tooltip 
@@ -71,7 +72,7 @@ export function PriorityDonut() {
 
         {/* Center Text */}
         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-          <span className="text-3xl font-bold text-gray-800">{total}</span>
+          <span className="text-3xl font-bold text-ink">{total}</span>
         </div>
       </div>
     </div>

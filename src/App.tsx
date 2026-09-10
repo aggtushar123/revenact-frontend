@@ -94,7 +94,21 @@ function App() {
               <Route path="ticket" element={<TicketOverviewContainer />}>
                 <Route index element={<Navigate to="controls" replace />} />
                 <Route path="controls" element={<TicketControlsView />} />
-                <Route path="*" element={<PlaceholderView />} />
+                {/* Ticket Date / Primary Owner / Ticket Priority / Account
+                    used to be routes here, each falling through to the
+                    placeholder below — so clicking a control that reads
+                    "All" unmounted the dashboard. They're real filter
+                    dropdowns on the container's own bar now, and anything
+                    still pointing at the old paths lands back on Controls
+                    rather than on "under development". */}
+                {/* Absolute, not relative: a relative "controls" resolves
+                    against the unmatched path, so /ticket/ticket-priority
+                    would redirect to /ticket/ticket-priority/controls,
+                    match this same catch-all again, and append forever. */}
+                <Route
+                  path="*"
+                  element={<Navigate to="/dashboard/advance/ticket/controls" replace />}
+                />
               </Route>
               {/* Fallback for other tabs */}
               <Route path="*" element={
