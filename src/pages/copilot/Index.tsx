@@ -193,7 +193,13 @@ export function CopilotIndex() {
     const optimisticId = -Date.now();
     setMessages((prev) => [
       ...prev,
-      { id: optimisticId, role: 'user', content: trimmed, created_at: new Date().toISOString() },
+      {
+        id: optimisticId,
+        role: 'user',
+        content: trimmed,
+        sources: [],
+        created_at: new Date().toISOString(),
+      },
     ]);
 
     try {

@@ -4,6 +4,7 @@ import { PresenceStrip } from '../../components/shared';
 import { HandoffModal } from './HandoffModal';
 import type { CopilotSession } from '../../features/copilotSessions/types';
 import type { CopilotMessage } from './types';
+import { MessageSources } from './MessageSources';
 
 interface Props {
   messages: CopilotMessage[];
@@ -167,6 +168,7 @@ export function ChatView({
                   <p className="text-[13.5px] text-ink font-medium leading-relaxed whitespace-pre-wrap">
                     {message.content}
                   </p>
+                  <MessageSources sources={message.sources} />
                   <div className="flex items-center gap-[18px] mt-4 text-ink-faint">
                     <button className="hover:text-ink-muted hover:bg-subtle rounded-md p-1.5 transition-colors -ml-1.5">
                       <Copy className="w-4 h-4 stroke-[2px]" />
