@@ -21,18 +21,18 @@ export function AITrendingTopics() {
   return (
     <div className="flex flex-col h-full w-full">
       {/* Sub-navigation bar mimicking former filter bar */}
-      <div className="flex items-center px-4 bg-white border-b border-gray-100 shrink-0 overflow-x-auto scrollbar-none shadow-[0_2px_4px_rgba(0,0,0,0.01)] mb-4 rounded-lg">
+      <div className="flex items-center px-4 bg-surface border-b border-line-subtle shrink-0 overflow-x-auto scrollbar-none shadow-[0_2px_4px_rgba(0,0,0,0.01)] mb-4 rounded-lg">
         <div className="flex items-center min-w-max h-[40px]">
           {subtabs.map((tab, idx) => (
             <div key={tab.path} className="flex items-center h-full">
-              {idx > 0 && <div className="w-px h-3.5 mx-2 bg-gray-200" />}
+              {idx > 0 && <div className="w-px h-3.5 mx-2 bg-line" />}
               <NavLink
                 to={tab.path}
                 className={({ isActive }) => `
                   h-full flex items-center px-2 text-[12.5px] font-bold transition-all whitespace-nowrap border-b-[2px]
                   ${isActive 
-                    ? 'border-indigo-600 text-indigo-700 bg-indigo-50/20' 
-                    : 'border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50/50'
+                    ? 'border-accent text-accent bg-accent-dim/20' 
+                    : 'border-transparent text-ink-muted hover:text-ink hover:bg-subtle/50'
                   }
                 `}
               >

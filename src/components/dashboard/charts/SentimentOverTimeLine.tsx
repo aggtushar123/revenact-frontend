@@ -33,25 +33,25 @@ const data = [
 export function SentimentOverTimeLine() {
   return (
     <div className="w-full h-full p-6 flex flex-col">
-      <h3 className="text-[14px] font-bold text-gray-800 mb-4">Activity Sentiments Over Time</h3>
+      <h3 className="text-[14px] font-bold text-ink mb-4">Activity Sentiments Over Time</h3>
       
       <div className="flex-1 w-full min-h-[350px] relative">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 25, right: 30, left: -20, bottom: 40 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-strong)" />
             <XAxis 
               dataKey="name" 
               axisLine={false} 
               tickLine={false} 
               scale="point"
-              tick={{ fill: '#9ca3af', fontSize: 10, angle: -45, textAnchor: 'end' }} 
+              tick={{ fill: 'var(--text-tertiary)', fontSize: 10, angle: -45, textAnchor: 'end' }} 
               padding={{ left: 10, right: 10 }}
               dy={15}
             />
             <YAxis 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: '#9ca3af', fontSize: 12 }}
+              tick={{ fill: 'var(--text-tertiary)', fontSize: 12 }}
               dx={-10}
               domain={[0, 150]}
               ticks={[0, 30, 60, 90, 120, 150]}
@@ -63,32 +63,32 @@ export function SentimentOverTimeLine() {
             <Line 
               type="monotone" 
               dataKey="positive" 
-              stroke="#22c55e" 
+              stroke="var(--success)" 
               strokeWidth={2} 
-              dot={{ r: 3, strokeWidth: 1, fill: '#22c55e' }} 
+              dot={{ r: 3, strokeWidth: 1, fill: 'var(--success)' }} 
               activeDot={{ r: 5, strokeWidth: 0 }}
             >
-              <LabelList dataKey="positive" position="top" fill="#22c55e" fontSize={10} offset={10} />
+              <LabelList dataKey="positive" position="top" fill="var(--success)" fontSize={10} offset={10} />
             </Line>
             <Line 
               type="monotone" 
               dataKey="neutral" 
-              stroke="#facc15" 
+              stroke="var(--warning)" 
               strokeWidth={2} 
-              dot={{ r: 3, strokeWidth: 1, fill: '#facc15' }} 
+              dot={{ r: 3, strokeWidth: 1, fill: 'var(--warning)' }} 
               activeDot={{ r: 5, strokeWidth: 0 }}
             >
-              <LabelList dataKey="neutral" position="top" fill="#facc15" fontSize={10} offset={10} />
+              <LabelList dataKey="neutral" position="top" fill="var(--warning)" fontSize={10} offset={10} />
             </Line>
             <Line 
               type="monotone" 
               dataKey="negative" 
-              stroke="#ea580c" 
+              stroke="var(--danger)" 
               strokeWidth={2} 
-              dot={{ r: 3, strokeWidth: 1, fill: '#ea580c' }} 
+              dot={{ r: 3, strokeWidth: 1, fill: 'var(--danger)' }} 
               activeDot={{ r: 5, strokeWidth: 0 }}
             >
-              <LabelList dataKey="negative" position="bottom" fill="#ea580c" fontSize={10} offset={10} />
+              <LabelList dataKey="negative" position="bottom" fill="var(--danger)" fontSize={10} offset={10} />
             </Line>
           </LineChart>
         </ResponsiveContainer>

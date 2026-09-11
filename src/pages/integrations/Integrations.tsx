@@ -50,20 +50,20 @@ const INTEGRATIONS = [
   { id: 'slack', name: 'Slack', category: 'Communication', desc: 'Receive alerts, health changes, and actionable notifications.', connected: false, icon: SLACK_SVG },
   { id: 'hubspot', name: 'HubSpot', category: 'CRM', desc: 'Two-way sync for marketing leads and sales pipeline.', connected: false, icon: HUBSPOT_SVG },
   { id: 'zendesk', name: 'Zendesk', category: 'Support', desc: 'View support tickets alongside customer health scores.', connected: false, icon: ZENDESK_SVG },
-  { id: 'github', name: 'GitHub', category: 'Productivity', desc: 'Link commits, pull requests, and issues to project work.', connected: false, icon: <GitBranch className="w-10 h-10 text-gray-900" /> },
-  { id: 'figma', name: 'Figma', category: 'Productivity', desc: 'Embed live designs directly into your documentation.', connected: false, icon: <PenTool className="w-10 h-10 text-pink-500" /> },
-  { id: 'teams', name: 'Microsoft Teams', category: 'Communication', desc: 'Receive rich notifications and actionable alerts in channels.', connected: false, icon: <Users className="w-10 h-10 text-indigo-600" /> },
-  { id: 'intercom', name: 'Intercom', category: 'Support', desc: 'Sync customer chats and support interactions live.', connected: true, icon: <MessageCircle className="w-10 h-10 text-blue-500" /> },
-  { id: 'asana', name: 'Asana', category: 'Productivity', desc: 'Create and track tasks directly from customer feedback.', connected: false, icon: <ListTodo className="w-10 h-10 text-rose-500" /> },
-  { id: 'notion', name: 'Notion', category: 'Productivity', desc: 'Sync databases and embed Revenact records into pages.', connected: false, icon: <Box className="w-10 h-10 text-gray-800" /> },
-  { id: 'pipedrive', name: 'Pipedrive', category: 'CRM', desc: 'Two-way sync for sales pipelines and deal stages.', connected: false, icon: <AlignEndHorizontal className="w-10 h-10 text-green-500" /> },
-  { id: 'mailchimp', name: 'Mailchimp', category: 'Communication', desc: 'Sync messaging lists and view campaign performance.', connected: false, icon: <Mail className="w-10 h-10 text-yellow-500 drop-shadow-sm" /> },
-  { id: 'stripe', name: 'Stripe', category: 'CRM', desc: 'View billing history, subscriptions, and MRR metrics.', connected: true, icon: <CreditCard className="w-10 h-10 text-indigo-500" /> },
-  { id: 'zoom', name: 'Zoom', category: 'Communication', desc: 'Automatically log meetings and recordings to contacts.', connected: false, icon: <Video className="w-10 h-10 text-blue-500" /> },
-  { id: 'datadog', name: 'Datadog', category: 'Support', desc: 'Monitor engineering alerts affecting key customers.', connected: false, icon: <Activity className="w-10 h-10 text-purple-600" /> },
-  { id: 'shopify', name: 'Shopify', category: 'CRM', desc: 'Sync storefront orders and customer purchase history.', connected: false, icon: <ShoppingBag className="w-10 h-10 text-emerald-500" /> },
-  { id: 'snowflake', name: 'Snowflake', category: 'Productivity', desc: 'Query data warehouse natively for custom dashboards.', connected: false, icon: <Snowflake className="w-10 h-10 text-sky-400" /> },
-  { id: 'sendgrid', name: 'SendGrid', category: 'Communication', desc: 'Manage transactional emails and template sync.', connected: false, icon: <Send className="w-10 h-10 text-blue-400" /> },
+  { id: 'github', name: 'GitHub', category: 'Productivity', desc: 'Link commits, pull requests, and issues to project work.', connected: false, icon: <GitBranch className="w-10 h-10 text-ink" /> },
+  { id: 'figma', name: 'Figma', category: 'Productivity', desc: 'Embed live designs directly into your documentation.', connected: false, icon: <PenTool className="w-10 h-10 text-accent" /> },
+  { id: 'teams', name: 'Microsoft Teams', category: 'Communication', desc: 'Receive rich notifications and actionable alerts in channels.', connected: false, icon: <Users className="w-10 h-10 text-accent" /> },
+  { id: 'intercom', name: 'Intercom', category: 'Support', desc: 'Sync customer chats and support interactions live.', connected: true, icon: <MessageCircle className="w-10 h-10 text-info" /> },
+  { id: 'asana', name: 'Asana', category: 'Productivity', desc: 'Create and track tasks directly from customer feedback.', connected: false, icon: <ListTodo className="w-10 h-10 text-danger" /> },
+  { id: 'notion', name: 'Notion', category: 'Productivity', desc: 'Sync databases and embed Revenact records into pages.', connected: false, icon: <Box className="w-10 h-10 text-ink" /> },
+  { id: 'pipedrive', name: 'Pipedrive', category: 'CRM', desc: 'Two-way sync for sales pipelines and deal stages.', connected: false, icon: <AlignEndHorizontal className="w-10 h-10 text-success" /> },
+  { id: 'mailchimp', name: 'Mailchimp', category: 'Communication', desc: 'Sync messaging lists and view campaign performance.', connected: false, icon: <Mail className="w-10 h-10 text-warning drop-shadow-sm" /> },
+  { id: 'stripe', name: 'Stripe', category: 'CRM', desc: 'View billing history, subscriptions, and MRR metrics.', connected: true, icon: <CreditCard className="w-10 h-10 text-accent" /> },
+  { id: 'zoom', name: 'Zoom', category: 'Communication', desc: 'Automatically log meetings and recordings to contacts.', connected: false, icon: <Video className="w-10 h-10 text-info" /> },
+  { id: 'datadog', name: 'Datadog', category: 'Support', desc: 'Monitor engineering alerts affecting key customers.', connected: false, icon: <Activity className="w-10 h-10 text-accent" /> },
+  { id: 'shopify', name: 'Shopify', category: 'CRM', desc: 'Sync storefront orders and customer purchase history.', connected: false, icon: <ShoppingBag className="w-10 h-10 text-success" /> },
+  { id: 'snowflake', name: 'Snowflake', category: 'Productivity', desc: 'Query data warehouse natively for custom dashboards.', connected: false, icon: <Snowflake className="w-10 h-10 text-info" /> },
+  { id: 'sendgrid', name: 'SendGrid', category: 'Communication', desc: 'Manage transactional emails and template sync.', connected: false, icon: <Send className="w-10 h-10 text-info" /> },
 ];
 
 const CATEGORIES = ['All', 'CRM', 'Communication', 'Productivity', 'Support'];
@@ -80,7 +80,7 @@ export function Integrations() {
   });
 
   return (
-    <div className="flex flex-col h-full w-full bg-[#FAFAFA] text-[#1f2937] overflow-y-auto">
+    <div className="flex flex-col h-full w-full bg-base text-ink overflow-y-auto">
       {/* Controls Area */}
       <div className="px-8 pt-10 pb-6 w-full max-w-7xl mx-auto shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Category Pills */}
@@ -91,8 +91,8 @@ export function Integrations() {
               onClick={() => setActiveTab(cat)}
               className={`px-4 py-1.5 rounded-full text-[13px] font-semibold transition-all whitespace-nowrap border ${
                 activeTab === cat 
-                  ? 'bg-rose-50 text-rose-600 border-rose-200 shadow-sm' 
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  ? 'bg-accent-dim text-accent border-accent/30 shadow-sm'
+                  : 'bg-surface text-ink-muted border-line hover:border-line-strong hover:bg-subtle'
               }`}
             >
               {cat}
@@ -103,11 +103,11 @@ export function Integrations() {
         {/* Search */}
         <div className="relative w-full md:w-[280px]">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400" />
+            <Search className="h-4 w-4 text-ink-faint" />
           </div>
           <input
             type="text"
-            className="block w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all sm:text-sm font-medium shadow-sm"
+            className="block w-full pl-9 pr-3 py-2 border border-line rounded-xl leading-5 bg-surface placeholder-ink-faint focus:outline-none focus:ring-2 focus:ring-accent/20 focus:border-accent transition-all sm:text-sm font-medium shadow-sm"
             placeholder="Search integrations..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -121,41 +121,41 @@ export function Integrations() {
           {filteredIntegrations.map((integration) => (
             <div 
               key={integration.id} 
-              className="group bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col cursor-pointer overflow-hidden relative"
+              className="group bg-surface rounded-2xl p-6 border border-line-subtle shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 flex flex-col cursor-pointer overflow-hidden relative"
             >
               {/* Top Row: Icon + Status */}
               <div className="flex items-start justify-between mb-4">
-                <div className="w-14 h-14 bg-gray-50/50 rounded-2xl flex items-center justify-center shadow-inner border border-gray-100/60 p-2 group-hover:scale-105 transition-transform">
+                <div className="w-14 h-14 bg-subtle/50 rounded-2xl flex items-center justify-center shadow-inner border border-line-subtle/60 p-2 group-hover:scale-105 transition-transform">
                   {integration.icon}
                 </div>
                 
                 {integration.connected ? (
-                  <div className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1 rounded-full border border-green-200/60 shadow-sm">
+                  <div className="flex items-center gap-1.5 bg-success-dim text-success px-2.5 py-1 rounded-full border border-success/40 shadow-sm">
                     <CheckCircle2 className="w-3.5 h-3.5" />
                     <span className="text-xs font-bold uppercase tracking-wider">Connected</span>
                   </div>
                 ) : (
-                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 px-2.5 py-1 rounded-full border border-gray-100">
+                  <div className="text-xs font-semibold text-ink-faint uppercase tracking-wider bg-subtle px-2.5 py-1 rounded-full border border-line-subtle">
                      Not Setup
                   </div>
                 )}
               </div>
 
               {/* Content */}
-              <h3 className="text-lg font-bold text-gray-900 tracking-tight mb-1 group-hover:text-rose-600 transition-colors">
+              <h3 className="text-lg font-bold text-ink tracking-tight mb-1 group-hover:text-danger transition-colors">
                 {integration.name}
               </h3>
-              <p className="text-sm text-gray-500 font-medium leading-relaxed mb-6 flex-1">
+              <p className="text-sm text-ink-muted font-medium leading-relaxed mb-6 flex-1">
                 {integration.desc}
               </p>
 
               {/* Action Button */}
-              <div className="mt-auto flex items-center justify-between pt-4 border-t border-gray-50">
-                 <span className="text-[11px] font-bold text-gray-400 tracking-wider uppercase">{integration.category}</span>
+              <div className="mt-auto flex items-center justify-between pt-4 border-t border-line-subtle">
+                 <span className="text-[11px] font-bold text-ink-faint tracking-wider uppercase">{integration.category}</span>
                  <button className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm ${
                    integration.connected 
-                     ? 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50' 
-                     : 'bg-gray-900 text-white hover:bg-rose-500 hover:shadow-rose-500/25'
+                     ? 'bg-surface text-ink-muted border border-line hover:bg-subtle' 
+                     : 'bg-accent text-[#0D0F0E] hover:bg-accent-hover'
                  }`}>
                    {integration.connected ? 'Configure' : 'Connect'}
                  </button>
@@ -164,10 +164,10 @@ export function Integrations() {
           ))}
           
           {filteredIntegrations.length === 0 && (
-             <div className="col-span-full py-12 flex flex-col items-center justify-center text-center border-2 border-dashed border-gray-200 rounded-3xl bg-white/50">
-               <SlidersHorizontal className="w-12 h-12 text-gray-300 mb-3" />
-               <h3 className="text-lg font-bold text-gray-900">No integrations found</h3>
-               <p className="text-gray-500 font-medium">Try adjusting your search or filters.</p>
+             <div className="col-span-full py-12 flex flex-col items-center justify-center text-center border-2 border-dashed border-line rounded-3xl bg-surface/50">
+               <SlidersHorizontal className="w-12 h-12 text-ink-faint mb-3" />
+               <h3 className="text-lg font-bold text-ink">No integrations found</h3>
+               <p className="text-ink-muted font-medium">Try adjusting your search or filters.</p>
              </div>
           )}
         </div>

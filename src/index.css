@@ -1,40 +1,90 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────
-   TIER 1 — Primitive tokens: raw values (Revenact Light Theme)
+   TIER 0 — Tailwind theme registration (Revenact Light Theme)
+
+   Tailwind v4 only emits a utility for a colour it knows about, and
+   it only learns colours from an @theme block. Without this block
+   `bg-surface`, `text-ink`, `border-line-subtle` and friends compile
+   to nothing — the class lands in the DOM and paints no colour. The
+   app is written against those names in ~4,700 places, so this is
+   where they come from.
+
+   Declare each hex ONCE here; the Tier 1 aliases below point back at
+   these, so `var(--bg-surface)` (used inline in ~40 components) and
+   `bg-surface` (used as a class everywhere else) can never drift.
+───────────────────────────────────────────────────────────── */
+@theme {
+  /* Backgrounds */
+  --color-base:         #F9FAFB; /* gray-50 */
+  --color-surface:      #FFFFFF; /* white */
+  --color-elevated:     #FFFFFF; /* white */
+  --color-subtle:       #F3F4F6; /* gray-100 */
+
+  /* Text */
+  --color-ink:          #111827; /* gray-900 */
+  --color-ink-muted:    #4B5563; /* gray-600 */
+  --color-ink-faint:    #9CA3AF; /* gray-400 */
+
+  /* Accent — Revenact Rose */
+  --color-accent:       #F43F5E; /* rose-500 */
+  --color-accent-dim:   #FFF1F2; /* rose-50 */
+  --color-accent-hover: #E11D48; /* rose-600 */
+
+  /* Semantic */
+  --color-success:      #10B981; /* emerald-500 */
+  --color-warning:      #F59E0B; /* amber-500 */
+  --color-danger:       #EF4444; /* red-500 */
+  --color-info:         #3B82F6; /* blue-500 */
+
+  --color-success-dim:  #ECFDF5; /* emerald-50 */
+  --color-warning-dim:  #FFFBEB; /* amber-50 */
+  --color-danger-dim:   #FEF2F2; /* red-50 */
+  --color-info-dim:     #EFF6FF; /* blue-50 */
+
+  /* Borders */
+  --color-line-subtle:  #F3F4F6; /* gray-100 */
+  --color-line:         #E5E7EB; /* gray-200 */
+  --color-line-strong:  #D1D5DB; /* gray-300 */
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TIER 1 — Primitive tokens: aliases of the theme above, kept so the
+   inline `style={{ color: 'var(--text-primary)' }}` usages already in
+   the codebase keep resolving to the same values as the utilities.
 ───────────────────────────────────────────────────────────── */
 :root {
   /* Backgrounds */
-  --bg-base:         #F9FAFB; /* gray-50 */
-  --bg-surface:      #FFFFFF; /* white */
-  --bg-elevated:     #FFFFFF; /* white */
-  --bg-subtle:       #F3F4F6; /* gray-100 */
+  --bg-base:         var(--color-base);
+  --bg-surface:      var(--color-surface);
+  --bg-elevated:     var(--color-elevated);
+  --bg-subtle:       var(--color-subtle);
 
   /* Text */
-  --text-primary:    #111827; /* gray-900 */
-  --text-secondary:  #4B5563; /* gray-600 */
-  --text-tertiary:   #9CA3AF; /* gray-400 */
+  --text-primary:    var(--color-ink);
+  --text-secondary:  var(--color-ink-muted);
+  --text-tertiary:   var(--color-ink-faint);
 
   /* Accent — Revenact Rose */
-  --accent:          #F43F5E; /* rose-500 */
-  --accent-dim:      #FFF1F2; /* rose-50 */
-  --accent-hover:    #E11D48; /* rose-600 */
+  --accent:          var(--color-accent);
+  --accent-dim:      var(--color-accent-dim);
+  --accent-hover:    var(--color-accent-hover);
 
   /* Semantic */
-  --success:         #10B981; /* emerald-500 */
-  --warning:         #F59E0B; /* amber-500 */
-  --danger:          #EF4444; /* red-500 */
-  --info:            #3B82F6; /* blue-500 */
+  --success:         var(--color-success);
+  --warning:         var(--color-warning);
+  --danger:          var(--color-danger);
+  --info:            var(--color-info);
 
-  --success-dim:     #ECFDF5; /* emerald-50 */
-  --warning-dim:     #FFFBEB; /* amber-50 */
-  --danger-dim:      #FEF2F2; /* red-50 */
-  --info-dim:        #EFF6FF; /* blue-50 */
+  --success-dim:     var(--color-success-dim);
+  --warning-dim:     var(--color-warning-dim);
+  --danger-dim:      var(--color-danger-dim);
+  --info-dim:        var(--color-info-dim);
 
   /* Borders */
-  --border-subtle:   #F3F4F6; /* gray-100 */
-  --border-default:  #E5E7EB; /* gray-200 */
-  --border-strong:   #D1D5DB; /* gray-300 */
+  --border-subtle:   var(--color-line-subtle);
+  --border-default:  var(--color-line);
+  --border-strong:   var(--color-line-strong);
 
   /* Motion */
   --ease-out:        cubic-bezier(0.0, 0.0, 0.2, 1);

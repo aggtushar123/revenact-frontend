@@ -56,7 +56,7 @@ export const CustomEdge = memo(({
 
   return (
     <>
-      <BaseEdge path={edgePath} markerEnd={markerEnd} style={{ ...style, strokeWidth: 2, stroke: label ? (label === 'Yes' ? '#10b981' : '#f43f5e') : '#cbd5e1' }} />
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={{ ...style, strokeWidth: 2, stroke: label ? (label === 'Yes' ? 'var(--success)' : 'var(--danger)') : 'var(--border-strong)' }} />
       <EdgeLabelRenderer>
         <div
           style={{
@@ -70,18 +70,18 @@ export const CustomEdge = memo(({
             onClick={onToggleLabel}
             className={`px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm border transition-all ${
               !label 
-                ? 'bg-white border-gray-200 text-gray-400 opacity-0 group-hover:opacity-100' 
+                ? 'bg-surface border-line text-ink-faint opacity-0 group-hover:opacity-100' 
                 : label === 'Yes' 
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-600' 
-                  : 'bg-rose-50 border-rose-200 text-rose-600'
+                  ? 'bg-success-dim border-success/40 text-success'
+                  : 'bg-danger-dim border-danger/40 text-danger'
             }`}
           >
             {label || 'Set Label'}
           </button>
-          
+
           <button
             onClick={onRemove}
-            className="w-5 h-5 bg-white border border-gray-100 rounded-full shadow-sm flex items-center justify-center text-gray-400 hover:text-rose-500 hover:border-rose-200 opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100"
+            className="w-5 h-5 bg-surface border border-line-subtle rounded-full shadow-sm flex items-center justify-center text-ink-faint hover:text-danger hover:border-danger/40 opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100"
           >
             <X className="w-3 h-3" />
           </button>

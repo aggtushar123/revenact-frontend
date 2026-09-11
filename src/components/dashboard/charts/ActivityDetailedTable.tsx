@@ -19,43 +19,43 @@ const tableData = [
 
 const getSentimentColor = (sentiment: string) => {
   switch (sentiment) {
-    case 'Positive': return 'bg-[#10b981] text-white';
-    case 'Negative': return 'bg-[#ea580c] text-white'; // Dark Orange/Red
-    case 'Neutral': return 'bg-[#f59e0b] text-white';  // Amber/Yellow
-    default: return 'bg-gray-200 text-gray-700';
+    case 'Positive': return 'bg-success text-white';
+    case 'Negative': return 'bg-danger text-white'; // Dark Orange/Red
+    case 'Neutral': return 'bg-warning text-white';  // Amber/Yellow
+    default: return 'bg-line text-ink-muted';
   }
 };
 
 export function ActivityDetailedTable() {
   return (
     <div className="w-full h-full p-6 flex flex-col">
-      <h3 className="text-[14px] font-bold text-gray-800 mb-4">Detailed Activity Breakdown</h3>
+      <h3 className="text-[14px] font-bold text-ink mb-4">Detailed Activity Breakdown</h3>
       
-      <div className="flex-1 overflow-x-auto border border-gray-200 rounded-lg max-h-[480px]">
+      <div className="flex-1 overflow-x-auto border border-line rounded-lg max-h-[480px]">
         <table className="w-full text-left border-collapse">
-          <thead className="sticky top-0 z-10 bg-[#1d4ed8]">
+          <thead className="sticky top-0 z-10 bg-elevated">
             <tr>
-              <th className="py-2.5 px-4 text-[12px] font-bold text-white border-b border-r border-[#1e40af] whitespace-nowrap">Source Type</th>
-              <th className="py-2.5 px-4 text-[12px] font-bold text-white border-b border-r border-[#1e40af] whitespace-nowrap">Account Name</th>
-              <th className="py-2.5 px-4 text-[12px] font-bold text-white border-b border-r border-[#1e40af] whitespace-nowrap">Sentiment</th>
-              <th className="py-2.5 px-4 text-[12px] font-bold text-white border-b border-r border-[#1e40af] whitespace-nowrap">AI Area</th>
-              <th className="py-2.5 px-4 text-[12px] font-bold text-white border-b border-r border-[#1e40af] whitespace-nowrap">AI Category</th>
-              <th className="py-2.5 px-4 text-[12px] font-bold text-white border-b border-[#1e40af] whitespace-nowrap">AI Subcategory</th>
+              <th className="py-2.5 px-4 text-[12px] font-bold text-ink-muted border-b border-r border-line whitespace-nowrap">Source Type</th>
+              <th className="py-2.5 px-4 text-[12px] font-bold text-ink-muted border-b border-r border-line whitespace-nowrap">Account Name</th>
+              <th className="py-2.5 px-4 text-[12px] font-bold text-ink-muted border-b border-r border-line whitespace-nowrap">Sentiment</th>
+              <th className="py-2.5 px-4 text-[12px] font-bold text-ink-muted border-b border-r border-line whitespace-nowrap">AI Area</th>
+              <th className="py-2.5 px-4 text-[12px] font-bold text-ink-muted border-b border-r border-line whitespace-nowrap">AI Category</th>
+              <th className="py-2.5 px-4 text-[12px] font-bold text-ink-muted border-b border-line whitespace-nowrap">AI Subcategory</th>
             </tr>
           </thead>
-          <tbody className="bg-white">
+          <tbody className="bg-surface">
             {tableData.map((row, idx) => (
-              <tr key={idx} className="hover:bg-gray-50/80 transition-colors border-b border-gray-100 last:border-0">
-                <td className="py-2 px-4 text-[13px] text-gray-600 border-r border-gray-100">{row.source}</td>
-                <td className="py-2 px-4 text-[13px] text-gray-800 font-medium border-r border-gray-100 truncate max-w-[200px]">{row.account}</td>
-                <td className="py-1.5 px-4 border-r border-gray-100">
+              <tr key={idx} className="hover:bg-subtle/80 transition-colors border-b border-line-subtle last:border-0">
+                <td className="py-2 px-4 text-[13px] text-ink-muted border-r border-line-subtle">{row.source}</td>
+                <td className="py-2 px-4 text-[13px] text-ink font-medium border-r border-line-subtle truncate max-w-[200px]">{row.account}</td>
+                <td className="py-1.5 px-4 border-r border-line-subtle">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold ${getSentimentColor(row.sentiment)}`}>
                     {row.sentiment}
                   </span>
                 </td>
-                <td className="py-2 px-4 text-[13px] text-gray-600 border-r border-gray-100">{row.area}</td>
-                <td className="py-2 px-4 text-[13px] text-gray-600 border-r border-gray-100">{row.category}</td>
-                <td className="py-2 px-4 text-[13px] text-gray-600">{row.subcategory}</td>
+                <td className="py-2 px-4 text-[13px] text-ink-muted border-r border-line-subtle">{row.area}</td>
+                <td className="py-2 px-4 text-[13px] text-ink-muted border-r border-line-subtle">{row.category}</td>
+                <td className="py-2 px-4 text-[13px] text-ink-muted">{row.subcategory}</td>
               </tr>
             ))}
           </tbody>

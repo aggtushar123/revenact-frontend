@@ -1,9 +1,9 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 
 const data = [
-  { name: 'Email', value: 876, color: '#3b82f6' }, // Blue
-  { name: 'Call', value: 534, color: '#eab308' },  // Yellow
-  { name: 'Ticket', value: 678, color: '#38bdf8' }, // Light Blue
+  { name: 'Email', value: 876, color: 'var(--info)' },
+  { name: 'Call', value: 534, color: 'var(--warning)' },
+  { name: 'Ticket', value: 678, color: 'var(--accent)' },
 ];
 
 export function ActivityTypeDonut() {
@@ -11,7 +11,7 @@ export function ActivityTypeDonut() {
 
   return (
     <div className="w-full h-full p-6 flex flex-col">
-      <h3 className="text-[14px] font-bold text-gray-800 mb-4">Activities By Type</h3>
+      <h3 className="text-[14px] font-bold text-ink mb-4">Activities By Type</h3>
       <div className="flex-1 relative min-h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -33,7 +33,7 @@ export function ActivityTypeDonut() {
                   <text 
                     x={x} 
                     y={y} 
-                    fill="#4b5563" 
+                    fill="var(--text-secondary)" 
                     textAnchor={x > cx ? 'start' : 'end'} 
                     dominantBaseline="central"
                     className="text-[12px] font-medium"
@@ -54,7 +54,7 @@ export function ActivityTypeDonut() {
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-2xl font-semibold text-gray-800 tracking-tight">{total.toLocaleString()}</span>
+          <span className="text-2xl font-semibold text-ink tracking-tight">{total.toLocaleString()}</span>
         </div>
       </div>
     </div>

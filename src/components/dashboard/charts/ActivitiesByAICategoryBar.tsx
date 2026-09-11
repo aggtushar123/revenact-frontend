@@ -16,7 +16,7 @@ const data = [
 export function ActivitiesByAICategoryBar() {
   return (
     <div className="w-full h-full p-6 flex flex-col">
-      <h3 className="text-[14px] font-bold text-gray-800 mb-4">Activities By AI Category</h3>
+      <h3 className="text-[14px] font-bold text-ink mb-4">Activities By AI Category</h3>
       
       <div className="flex-1 w-full min-h-[300px] relative">
         <ResponsiveContainer width="100%" height="100%">
@@ -25,27 +25,27 @@ export function ActivitiesByAICategoryBar() {
             layout="vertical"
             margin={{ top: 0, right: 30, left: 20, bottom: 0 }}
           >
-            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+            <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="var(--border-strong)" />
             <XAxis 
               type="number" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fill: '#9ca3af', fontSize: 12 }} 
+              tick={{ fill: 'var(--text-tertiary)', fontSize: 12 }} 
             />
             <YAxis 
               type="category" 
               dataKey="name" 
               axisLine={true} 
               tickLine={true} 
-              tick={{ fill: '#4b5563', fontSize: 11 }}
+              tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
               width={140}
             />
             <Tooltip 
-              cursor={{ fill: '#f8fafc' }}
+              cursor={{ fill: 'rgba(255,255,255,0.04)' }}
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
             />
-            <Bar dataKey="value" fill="#6366f1" radius={[0, 4, 4, 0]} barSize={16}>
-              <LabelList dataKey="value" position="right" fill="#6b7280" fontSize={11} />
+            <Bar dataKey="value" fill="var(--accent)" radius={[0, 4, 4, 0]} barSize={16}>
+              <LabelList dataKey="value" position="right" fill="var(--text-secondary)" fontSize={11} />
             </Bar>
           </BarChart>
         </ResponsiveContainer>
