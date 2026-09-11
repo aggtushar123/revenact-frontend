@@ -271,6 +271,38 @@
   color: #4f46e5;
 }
 
+/* Subtext under a page heading (ForgotPassword/ResetPassword) — pulled up
+   close under the h2 rather than inheriting its full 2rem bottom margin. */
+.auth-subtext {
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: #6b7280;
+  margin: -1.25rem 0 1.5rem 0;
+}
+
+/* A <Link> styled as the primary button (ForgotPassword/ResetPassword
+   success and dead-end states) — .login-btn covers everything else. */
+.auth-link-btn {
+  text-decoration: none;
+}
+
+/* Plain "back to login" link under the ForgotPassword form. */
+.back-to-login {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 1.25rem;
+  font-size: 0.8rem;
+  color: #6b7280;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.back-to-login:hover {
+  color: #4f46e5;
+}
+
 /* Server error banner */
 .server-error {
   background: #fef2f2;

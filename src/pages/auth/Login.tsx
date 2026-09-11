@@ -1,9 +1,10 @@
 import { useState, useEffect, type FormEvent } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, KeyRound, Info } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { login, clearError } from '../../features/auth/authSlice';
 import { loginSchema } from '../../features/auth/loginSchema';
+import { AuthLeftPanel } from './AuthLeftPanel';
 import './Login.css';
 
 export function Login() {
@@ -68,25 +69,7 @@ export function Login() {
       )}
 
       {/* Left Panel — Geometric Art */}
-      <div className="login-left">
-        <div className="geo-shape geo-shape-1" />
-        <div className="geo-shape geo-shape-2" />
-        <div className="geo-shape geo-shape-3" />
-        <div className="geo-shape geo-shape-4" />
-        <div className="geo-shape geo-shape-5" />
-        <div className="geo-shape geo-shape-6" />
-
-        <div className="login-left-content">
-          <h1>
-            <em>One platform,</em>
-            <br />
-            <strong>limitless Success</strong>
-          </h1>
-          <p>
-            Decrease churn. Nail operational cadence. Grow revenue. But most of all, set up your customers for success!
-          </p>
-        </div>
-      </div>
+      <AuthLeftPanel />
 
       {/* Right Panel — Login Form */}
       <div className="login-right">
@@ -158,13 +141,9 @@ export function Login() {
             </div>
 
             {/* Forgot password */}
-            <button
-              type="button"
-              className="forgot-password"
-              onClick={() => showToast('🚧 Password reset is coming soon!')}
-            >
+            <Link to="/forgot-password" className="forgot-password">
               Forgot your password?
-            </button>
+            </Link>
 
             {/* Submit */}
             <button

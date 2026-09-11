@@ -29,6 +29,7 @@ function renderLogin() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={<div>Dashboard Home</div>} />
+          <Route path="/forgot-password" element={<div>Forgot Password Page</div>} />
         </Routes>
       </MemoryRouter>
     </Provider>
@@ -98,5 +99,14 @@ describe('Login page', () => {
 
     expect(await screen.findByText('Please enter a valid email address')).toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it('links "Forgot your password?" to the forgot-password page', async () => {
+    const user = userEvent.setup();
+
+    renderLogin();
+    await user.click(screen.getByText('Forgot your password?'));
+
+    await waitFor(() => expect(screen.getByText('Forgot Password Page')).toBeInTheDocument());
   });
 });
