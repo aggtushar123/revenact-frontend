@@ -11,9 +11,9 @@ interface CurrentHealthDonutProps {
 }
 
 const STATUS_COLORS: Record<HealthStatus, string> = {
-  'Poor': '#ef4444',    // Red
-  'Average': '#eab308', // Yellow/Amber
-  'Good': '#14b8a6',    // Teal
+  'Poor': 'var(--danger)',
+  'Average': 'var(--warning)',
+  'Good': 'var(--success)',
 };
 
 export function CurrentHealthDonut({ data, activeFilter, onSegmentClick }: CurrentHealthDonutProps) {
@@ -33,12 +33,12 @@ export function CurrentHealthDonut({ data, activeFilter, onSegmentClick }: Curre
   return (
     <div className="w-full h-full p-4 flex flex-col relative group cursor-pointer">
       <div className="flex justify-between items-start mb-2">
-        <h3 className="text-[13px] font-bold text-gray-800">Current Health</h3>
+        <h3 className="text-[13px] font-bold text-ink">Current Health</h3>
         <div className="flex items-center gap-3">
           {chartData.map(d => (
             <div key={d.name} className="flex items-center gap-1.5 opacity-80">
               <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: d.color }} />
-              <span className="text-[11px] font-medium text-gray-500">{d.name}</span>
+              <span className="text-[11px] font-medium text-ink-muted">{d.name}</span>
             </div>
           ))}
         </div>
@@ -83,7 +83,7 @@ export function CurrentHealthDonut({ data, activeFilter, onSegmentClick }: Curre
                     className="text-[11px] font-bold"
                   >
                     <tspan x={x} dy="-0.6em">{name}</tspan>
-                    <tspan x={x} dy="1.2em" className="text-gray-500 font-medium">{`${value} (${(percent * 100).toFixed(0)}%)`}</tspan>
+                    <tspan x={x} dy="1.2em" className="text-ink-muted font-medium">{`${value} (${(percent * 100).toFixed(0)}%)`}</tspan>
                   </text>
                 );
               }}
@@ -104,14 +104,14 @@ export function CurrentHealthDonut({ data, activeFilter, onSegmentClick }: Curre
               })}
             </Pie>
             <Tooltip 
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-default)', boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
               itemStyle={{ fontSize: '13px', fontWeight: 500 }}
               formatter={(value, name) => [`${value}`, name]}
             />
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-3xl font-medium text-gray-800 tabular-nums">{total}</span>
+          <span className="text-3xl font-medium text-ink tabular-nums">{total}</span>
         </div>
       </div>
     </div>

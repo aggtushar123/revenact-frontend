@@ -1,0 +1,231 @@
+import { describe, it, expect } from 'vitest';
+import type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
+import { buildFlow, monthsOf, netMovement, renewalBuckets, renewalMonths } from './movement';
+
+/** Local midnight, matching the other suites, so calendar maths is stable. */
+const NOW = new Date(2026, 5, 15); // 15 Jun 2026
+
+const M = ['Jan 31, 2026', 'Feb 28, 2026', 'Mar 31, 2026', 'Apr 30, 2026'];
+
+function makeRow(
+  statuses: (HealthStatus | null)[],
+  overrides: Partial<HealthDataRow> = {},
+): HealthDataRow {
+  return {
+    id: '1',
+    account: 'Acme',
+    owner: 'Gerry Hill',
+    lifecycleStage: 'Customer - Active',
+    renewalDate: 'Dec 31, 2026',
+    healthStatus: statuses[statuses.length - 1] ?? 'Good',
+    healthScore: 8,
+    csmPulseScore: 4,
+    aiPulseScore: 4,
+    lastPulseModified: 'Feb 4, 2026',
+    aiPulseReason: 'Seat utilisation at 94% of contract',
+    activeSeats: 20,
+    history: statuses
+      .map((status, i) => (status ? { month: M[i], status } : null))
+      .filter((h): h is { month: string; status: HealthStatus } => h !== null),
+    ...overrides,
+  };
+}
+
+describe('monthsOf', () => {
+  it('takes the month list from the account with the most history', () => {
+    // At least one seeded row has no history at all; reading the first row
+    // would decide there are no months to draw.
+    const rows = [makeRow([]), makeRow(['Good', 'Good', 'Average'])];
+    expect(monthsOf(rows)).toEqual([M[0], M[1], M[2]]);
+  });
+
+  it('returns nothing when no account carries history', () => {
+    expect(monthsOf([makeRow([])])).toEqual([]);
+  });
+});
+
+describe('buildFlow', () => {
+  const book = [
+    makeRow(['Good', 'Good', 'Average'], { id: '1' }),
+    makeRow(['Good', 'Average', 'Poor'], { id: '2' }),
+    makeRow(['Average', 'Average', 'Average'], { id: '3' }),
+    makeRow(['Poor', 'Average', 'Good'], { id: '4' }),
+  ];
+
+  it('counts each month’s states', () => {
+    const flow = buildFlow(book);
+    expect(flow.months.map((m) => m.counts)).toEqual([
+      { Good: 2, Average: 1, Poor: 1 },
+      { Good: 1, Average: 3, Poor: 0 },
+      { Good: 1, Average: 2, Poor: 1 },
+    ]);
+  });
+
+  it('produces one fewer step than there are months', () => {
+    const flow = buildFlow(book);
+    expect(flow.months).toHaveLength(3);
+    expect(flow.steps).toHaveLength(2);
+  });
+
+  it('tallies transitions between consecutive months', () => {
+    const [firstStep] = buildFlow(book).steps;
+    const find = (from: HealthStatus, to: HealthStatus) =>
+      firstStep.find((t) => t.from === from && t.to === to)?.count ?? 0;
+
+    expect(find('Good', 'Good')).toBe(1);
+    expect(find('Good', 'Average')).toBe(1);
+    expect(find('Average', 'Average')).toBe(1);
+    expect(find('Poor', 'Average')).toBe(1);
+  });
+
+  it('labels each transition’s direction along the health ladder', () => {
+    const [, secondStep] = buildFlow(book).steps;
+    const byPair = Object.fromEntries(secondStep.map((t) => [`${t.from}>${t.to}`, t.direction]));
+    expect(byPair['Good>Average']).toBe('declined');
+    expect(byPair['Average>Poor']).toBe('declined');
+    expect(byPair['Average>Good']).toBe('improved');
+    expect(byPair['Average>Average']).toBe('held');
+  });
+
+  it('conserves accounts: every step moves the whole tracked book', () => {
+    const flow = buildFlow(book);
+    flow.steps.forEach((step, i) => {
+      const moved = step.reduce((sum, t) => sum + t.count, 0);
+      expect(moved).toBe(flow.months[i].total);
+    });
+  });
+
+  it('honours the window, keeping the most recent months', () => {
+    const flow = buildFlow(book, 2);
+    expect(flow.months.map((m) => m.label)).toEqual([M[1], M[2]]);
+    expect(flow.steps).toHaveLength(1);
+  });
+
+  it('matches accounts to months by label, not by position', () => {
+    // An account that only reported in the later months must land in those
+    // months rather than being shifted to the start of the axis.
+    const rows = [
+      makeRow(['Good', 'Good', 'Average'], { id: '1' }),
+      makeRow([null, null, 'Poor'], { id: '2' }),
+    ];
+    const flow = buildFlow(rows);
+    expect(flow.months[0].counts).toEqual({ Good: 1, Average: 0, Poor: 0 });
+    expect(flow.months[2].counts).toEqual({ Good: 0, Average: 1, Poor: 1 });
+    // The late arrival has no prior month, so it contributes to no transition.
+    expect(flow.steps[0].reduce((s, t) => s + t.count, 0)).toBe(1);
+  });
+
+  it('returns an empty flow when nothing has history', () => {
+    const flow = buildFlow([makeRow([])]);
+    expect(flow).toEqual({ months: [], steps: [], tracked: 0 });
+  });
+});
+
+describe('netMovement', () => {
+  it('counts moves in both directions and nets them', () => {
+    const flow = buildFlow([
+      makeRow(['Good', 'Average', 'Poor'], { id: '1' }), // two declines
+      makeRow(['Poor', 'Average', 'Good'], { id: '2' }), // two improvements
+      makeRow(['Good', 'Good', 'Good'], { id: '3' }), // two holds
+    ]);
+    expect(netMovement(flow)).toEqual({ improved: 2, declined: 2, held: 2, net: 0 });
+  });
+
+  it('counts an account that fell and recovered on both sides', () => {
+    // Deliberate: "how much did this book move" is not the same question as
+    // "where did it end up", and a round trip is real churn.
+    const flow = buildFlow([makeRow(['Good', 'Average', 'Good'])]);
+    expect(netMovement(flow)).toMatchObject({ improved: 1, declined: 1, net: 0 });
+  });
+});
+
+describe('renewalBuckets', () => {
+  const at = (renewalDate: string, healthStatus: HealthStatus = 'Good') =>
+    makeRow(['Good'], { renewalDate, healthStatus });
+
+  it('groups accounts by how far out they renew', () => {
+    const buckets = renewalBuckets(
+      [
+        at('Jul 1, 2026'), // 16d
+        at('Sep 1, 2026'), // 78d
+        at('Oct 1, 2026'), // 108d
+        at('Jan 1, 2027'), // 200d
+        at('Dec 1, 2027'), // 534d
+      ],
+      NOW,
+    );
+    expect(buckets.map((b) => b.total)).toEqual([2, 1, 1, 1]);
+  });
+
+  it('puts an already-overdue renewal in the most urgent bucket', () => {
+    const buckets = renewalBuckets([at('Jan 1, 2026')], NOW); // in the past
+    expect(buckets[0].total).toBe(1);
+  });
+
+  it('splits each bucket by current health and counts what is not Good', () => {
+    const buckets = renewalBuckets(
+      [at('Jul 1, 2026', 'Good'), at('Jul 2, 2026', 'Poor'), at('Jul 3, 2026', 'Average')],
+      NOW,
+    );
+    expect(buckets[0].counts).toEqual({ Good: 1, Average: 1, Poor: 1 });
+    expect(buckets[0].atRisk).toBe(2);
+  });
+
+  it('skips accounts whose renewal date does not parse', () => {
+    const buckets = renewalBuckets([at(''), at('whenever'), at('Jul 1, 2026')], NOW);
+    expect(buckets.reduce((sum, b) => sum + b.total, 0)).toBe(1);
+  });
+});
+
+describe('renewalMonths', () => {
+  const at = (renewalDate: string, healthStatus: HealthStatus = 'Good') =>
+    makeRow(['Good'], { renewalDate, healthStatus });
+
+  it('groups accounts by the calendar month they renew in', () => {
+    const months = renewalMonths(
+      [at('Jul 1, 2026'), at('Jul 28, 2026'), at('Aug 3, 2026')],
+      NOW,
+    );
+    expect(months.map((m) => [m.label, m.total])).toEqual([
+      ['Jul 2026', 2],
+      ['Aug 2026', 1],
+    ]);
+  });
+
+  it('keeps months where nothing renews, rather than closing the gap', () => {
+    // A compressed axis makes a quiet stretch look as busy as a crowded one.
+    const months = renewalMonths([at('Jul 1, 2026'), at('Oct 1, 2026')], NOW);
+    expect(months.map((m) => m.label)).toEqual([
+      'Jul 2026',
+      'Aug 2026',
+      'Sep 2026',
+      'Oct 2026',
+    ]);
+    expect(months[1].total).toBe(0);
+    expect(months[2].total).toBe(0);
+  });
+
+  it('splits each month by current health', () => {
+    const months = renewalMonths(
+      [at('Jul 1, 2026', 'Good'), at('Jul 2, 2026', 'Poor'), at('Jul 3, 2026', 'Poor')],
+      NOW,
+    );
+    expect(months[0].counts).toEqual({ Good: 1, Average: 0, Poor: 2 });
+  });
+
+  it('spans a year boundary in order', () => {
+    const months = renewalMonths([at('Nov 1, 2026'), at('Feb 1, 2027')], NOW);
+    expect(months.map((m) => m.label)).toEqual([
+      'Nov 2026',
+      'Dec 2026',
+      'Jan 2027',
+      'Feb 2027',
+    ]);
+  });
+
+  it('skips accounts whose renewal date does not parse, and returns nothing if none do', () => {
+    expect(renewalMonths([at(''), at('whenever')], NOW)).toEqual([]);
+    expect(renewalMonths([], NOW)).toEqual([]);
+    expect(renewalMonths([at(''), at('Jul 1, 2026')], NOW)).toHaveLength(1);
+  });
+});

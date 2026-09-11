@@ -9,6 +9,34 @@ import type { User, CurrencyCode } from '../auth/authSlice';
 // itself). DRF's DecimalField serializes as a string by default (e.g.
 // health_score: "9.3") — only FloatField/IntegerField come back as JSON
 // numbers, which is why the types below are a mix of `string` and `number`.
+/** One row of `Customer.health_breakdown`. `weight` and `points` are strings
+ *  for the same reason the decimal fields are — exact tenths, not floats. */
+export interface HealthComponent {
+  key: string;
+  label: string;
+  weight: string;
+  points: string;
+  /** 0..1, or null when the component couldn't be measured. */
+  ratio: number | null;
+  available: boolean;
+}
+
+/** One band of `Customer.csat_breakdown` — see the backend's CSAT_BANDS. */
+export interface CsatBand {
+  key: string;
+  label: string;
+  count: number;
+  /** Percentage of responses in this band, 0-100. */
+  share: number;
+}
+
+/** How a customer's answered CSAT surveys spread across the five bands.
+ *  `responses` is 0 when nobody has answered one. */
+export interface CsatBreakdown {
+  responses: number;
+  bands: CsatBand[];
+}
+
 export interface Customer {
   id: number;
   name: string;
@@ -42,6 +70,16 @@ export interface Customer {
   health_category: 'good' | 'average' | 'poor';
   pulse: number[];
   ai_pulse_score: 'very_satisfied' | 'satisfied' | 'moderate' | 'high_risk' | '';
+  /** The five weighted components `health_score` is calculated from — see the
+   *  backend's services/customers/health.py. The `points` of the available ones
+   *  sum to `health_score`; an unavailable one had nothing to measure and was
+   *  left out of the total rather than scored zero. */
+  health_breakdown: HealthComponent[];
+  /** The CSAT distribution behind `csat_score`, from answered surveys. */
+  csat_breakdown: CsatBreakdown;
+  /** True when someone pinned `health_score` by hand instead of letting the
+   *  rubric decide it. */
+  health_score_is_overridden: boolean;
   ai_pulse_reason: string;
   nps_score: number | null;
   csat_score: string | null;

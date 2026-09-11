@@ -1,0 +1,89 @@
+import { format, parseISO } from 'date-fns';
+import type { HealthDataRow, HealthHistoryEntry, HealthStatus } from './types';
+
+/** One row of `GET /api/v1/customers/health/`. */
+export interface CustomerHealthApiRow {
+  id: number;
+  name: string;
+  owner_name: string | null;
+  lifecycle_stage: string;
+  lifecycle_stage_display: string;
+  renewal_date: string | null;
+  health_score: string;
+  health_category: 'good' | 'average' | 'poor';
+  csm_pulse_score: number | null;
+  csm_pulse_modified_at: string | null;
+  ai_pulse_value: number | null;
+  ai_pulse_reason: string;
+  total_active_seats: number | null;
+  history: {
+    captured_on: string;
+    health_score: string;
+    health_category: 'good' | 'average' | 'poor';
+    csm_pulse_score: number | null;
+    ai_pulse_value: number | null;
+  }[];
+}
+
+export interface CustomerHealthApiResponse {
+  results: CustomerHealthApiRow[];
+  count: number;
+  history_months: number;
+  /** True when the book was larger than the endpoint's cap and rows were cut. */
+  truncated: boolean;
+}
+
+const STATUS_BY_CATEGORY: Record<CustomerHealthApiRow['health_category'], HealthStatus> = {
+  good: 'Good',
+  average: 'Average',
+  poor: 'Poor',
+};
+
+/** The date shape `triage.daysToRenewal` parses — see RENEWAL_DATE_FORMAT. */
+const DISPLAY_DATE = 'MMM d, yyyy';
+
+/** Backend dates are ISO; the screen reads them in its own display format. */
+function toDisplayDate(iso: string | null): string {
+  if (!iso) return '';
+  const parsed = parseISO(iso);
+  return Number.isNaN(parsed.getTime()) ? '' : format(parsed, DISPLAY_DATE);
+}
+
+function toHistory(rows: CustomerHealthApiRow['history']): HealthHistoryEntry[] {
+  return rows.map((entry) => ({
+    month: toDisplayDate(entry.captured_on),
+    status: STATUS_BY_CATEGORY[entry.health_category],
+  }));
+}
+
+/**
+ * Map one API row onto the shape the four tabs read.
+ *
+ * Nothing is invented here. Where the backend has nothing — an unrated pulse,
+ * a missing renewal date, no recorded seats — this passes the absence through
+ * rather than substituting a neutral-looking number, because every one of
+ * those substitutions would read as a real measurement downstream.
+ */
+export function toHealthDataRow(row: CustomerHealthApiRow): HealthDataRow {
+  return {
+    id: String(row.id),
+    account: row.name,
+    owner: row.owner_name ?? 'Unassigned',
+    lifecycleStage: row.lifecycle_stage_display || row.lifecycle_stage,
+    renewalDate: toDisplayDate(row.renewal_date),
+    healthStatus: STATUS_BY_CATEGORY[row.health_category],
+    healthScore: Number(row.health_score),
+    csmPulseScore: row.csm_pulse_score,
+    aiPulseScore: row.ai_pulse_value,
+    lastPulseModified: row.csm_pulse_modified_at
+      ? toDisplayDate(row.csm_pulse_modified_at.slice(0, 10))
+      : null,
+    aiPulseReason: row.ai_pulse_reason,
+    activeSeats: row.total_active_seats,
+    history: toHistory(row.history),
+  };
+}
+
+export function toHealthDataRows(rows: CustomerHealthApiRow[]): HealthDataRow[] {
+  return rows.map(toHealthDataRow);
+}

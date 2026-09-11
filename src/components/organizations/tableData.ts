@@ -1,3 +1,4 @@
+import type { CsatBreakdown, HealthComponent } from '../../features/customers/customersSlice';
 import type { CurrencyCode } from '../../features/auth/authSlice';
 
 export type ColumnId =
@@ -29,6 +30,15 @@ export interface OrgRow {
   stage: string;
   health: { val: number; clr: string };
   healthCategory: HealthCategory;
+  /** The components behind `health.val`, for the health column's popover.
+   *  Optional because the mock ORGANIZATIONS_DATA below predates the rubric
+   *  and is only a no-nav-state fallback, never real data. */
+  healthBreakdown?: HealthComponent[];
+  healthIsOverridden?: boolean;
+  /** The CSAT distribution behind `csat`, for that column's popover.
+   *  Optional for the same reason as healthBreakdown — the mock fallback
+   *  rows below predate it. */
+  csatBreakdown?: CsatBreakdown;
   lifecycleCategory: LifecycleCategory;
   pulse: number[];
   aiScore: string;

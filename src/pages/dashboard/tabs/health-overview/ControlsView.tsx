@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
-import { MOCK_HEALTH_DATA } from './mockData';
-import type { HealthStatus } from './mockData';
+import type { HealthStatus } from '../../../../features/health/types';
+import { useHealthOverview } from './useHealthOverview';
+import { HealthEmpty, HealthError, HealthLoading, HealthTruncatedNotice } from './HealthDataState';
 import { CurrentHealthDonut } from './charts/CurrentHealthDonut';
 import { HealthByOwnerStackedBar } from './charts/HealthByOwnerStackedBar';
 import { CSMPulseBar } from './charts/CSMPulseBar';
@@ -14,21 +15,28 @@ import { AccountsByRenewalDateBar } from './charts/AccountsByRenewalDateBar';
 export function ControlsView() {
   const [activeFilter, setActiveFilter] = useState<HealthStatus | null>(null);
 
+  const { rows, error, truncated, isInitialLoad, hasLoaded } = useHealthOverview();
+
   // Derived filtered dataset for all child charts
   const filteredData = useMemo(() => {
-    if (!activeFilter) return MOCK_HEALTH_DATA;
-    return MOCK_HEALTH_DATA.filter(row => row.healthStatus === activeFilter);
-  }, [activeFilter]);
+    if (!activeFilter) return rows;
+    return rows.filter(row => row.healthStatus === activeFilter);
+  }, [rows, activeFilter]);
+
+  if (isInitialLoad) return <HealthLoading />;
+  if (error) return <HealthError message={error} />;
+  if (hasLoaded && rows.length === 0) return <HealthEmpty />;
 
   return (
     <div className="w-full h-full flex flex-col gap-4 pb-12">
+      {truncated && <HealthTruncatedNotice />}
       <div className="flex items-center justify-end px-2 h-[24px]">
         {activeFilter && (
           <button 
             onClick={() => setActiveFilter(null)}
-            className="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold py-1 px-3 rounded-full transition-colors flex items-center gap-1.5 shadow-sm"
+            className="text-xs bg-danger-dim hover:opacity-80 text-danger font-bold py-1 px-3 rounded-full transition-colors flex items-center gap-1.5 shadow-sm"
           >
-            <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
+            <div className="w-1.5 h-1.5 rounded-full bg-danger" />
             Clear active filter: {activeFilter}
           </button>
         )}
@@ -43,9 +51,9 @@ export function ControlsView() {
           {/* Top Row inside Left Column */}
           <div className="flex flex-col xl:flex-row gap-4 h-[280px]">
              {/* Column 1: Donut */}
-            <div className="xl:w-[40%] bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden shrink-0 flex flex-col">
+            <div className="xl:w-[40%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 flex flex-col">
               <CurrentHealthDonut 
-                data={MOCK_HEALTH_DATA} 
+                data={rows} 
                 activeFilter={activeFilter}
                 onSegmentClick={setActiveFilter}
                 filteredCount={filteredData.length}
@@ -53,13 +61,13 @@ export function ControlsView() {
             </div>
 
             {/* Column 2: Health by Owner */}
-            <div className="flex-1 bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden flex flex-col">
+            <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
               <HealthByOwnerStackedBar data={filteredData} />
             </div>
           </div>
 
           {/* Bottom Row inside Left Column (Accounts by Last Touch) */}
-          <div className="bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden h-[280px]">
+          <div className="bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden h-[280px]">
             <AccountsLastTouchLine data={filteredData} />
           </div>
 
@@ -68,11 +76,11 @@ export function ControlsView() {
         {/* RIGHT COLUMN */}
         <div className="flex-[1] flex flex-col gap-4">
            {/* CSM Pulse */}
-           <div className="flex-1 bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden min-h-[280px]">
+           <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden min-h-[280px]">
             <CSMPulseBar data={filteredData} />
           </div>
            {/* AI Pulse */}
-           <div className="flex-1 bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden min-h-[280px]">
+           <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden min-h-[280px]">
             <AIPulseBar data={filteredData} />
           </div>
         </div>
@@ -80,24 +88,24 @@ export function ControlsView() {
       </div>
 
       {/* Full Width Renewal Graph */}
-      <div className="w-full bg-white border border-gray-100 shadow-sm rounded-lg flex flex-col overflow-hidden min-h-[300px]">
+      <div className="w-full bg-surface border border-line-subtle shadow-sm rounded-lg flex flex-col overflow-hidden min-h-[300px]">
         <AccountsByRenewalDateBar data={filteredData} />
       </div>
 
       {/* Analytics Insights Row */}
       <div className="flex flex-col xl:flex-row gap-4 h-[320px]">
         {/* Recruiter Stats */}
-        <div className="xl:w-[32%] bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden shrink-0">
+        <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
           <AccountHealthByRecruiters data={filteredData} />
         </div>
         {/* Time Tracking */}
-        <div className="xl:flex-1 bg-white border border-gray-100 shadow-sm rounded-lg overflow-hidden">
+        <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden">
           <HealthChangeOverTimeStacked data={filteredData} />
         </div>
       </div>
 
       {/* Detail Table */}
-      <div className="w-full bg-white border border-gray-100 shadow-sm rounded-lg flex flex-col overflow-hidden min-h-[400px]">
+      <div className="w-full bg-surface border border-line-subtle shadow-sm rounded-lg flex flex-col overflow-hidden min-h-[400px]">
         <AccountHealthDetailTable data={filteredData} />
       </div>
     </div>

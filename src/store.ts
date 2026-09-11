@@ -8,6 +8,7 @@ import customersReducer from './features/customers/customersSlice';
 import copilotSessionsReducer from './features/copilotSessions/copilotSessionsSlice';
 import notificationsReducer from './features/notifications/notificationsSlice';
 import ticketsReducer from './features/tickets/ticketsSlice';
+import healthReducer from './features/health/healthSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -21,6 +22,7 @@ export const store = configureStore({
     copilotSessions: copilotSessionsReducer,
     notifications: notificationsReducer,
     tickets: ticketsReducer,
+    health: healthReducer,
   },
 });
 

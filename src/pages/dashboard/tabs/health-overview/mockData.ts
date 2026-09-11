@@ -1,26 +1,106 @@
-export type HealthStatus = 'Poor' | 'Average' | 'Good';
+// The screen runs on the real `/customers/health/` endpoint now (see
+// features/health/healthSlice.ts). This generator is kept as a test fixture
+// and as the shape's own documentation; the type itself moved to
+// features/health/types.ts, where the domain modules read it from.
+export type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
+import type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
+
 export type Owner = 'Melak Anbessa' | 'Justin Middleton' | 'Joey Gilkey' | 'Gerry Hill';
 
-export interface HealthDataRow {
-  id: string;
-  account: string;
-  owner: Owner;
-  lifecycleStage: string;
-  renewalDate: string;
-  healthStatus: HealthStatus;
-  healthScore: number;
-  csmPulseScore: number;
-  aiPulseScore: number;
-  lastPulseModified: string;
-  aiPulseReason: string;
-  activeRecruiters: number;
-  history: {
-    month: string;
-    status: HealthStatus;
-  }[];
-}
-
 export const MOCK_OWNERS: Owner[] = ['Melak Anbessa', 'Justin Middleton', 'Joey Gilkey', 'Gerry Hill'];
+
+const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** Worst to best, so a step along it is one grade of health. */
+const STATUS_LADDER: HealthStatus[] = ['Poor', 'Average', 'Good'];
+
+/** How many months of health history each account carries. */
+export const HISTORY_MONTHS = 12;
+
+/**
+ * Month-end labels for the last `HISTORY_MONTHS` complete months, oldest first.
+ *
+ * Derived from today rather than hardcoded, so the history stays adjacent to
+ * the renewal dates instead of drifting into the past as the year turns.
+ */
+const historyMonthLabels = (): string[] =>
+  Array.from({ length: HISTORY_MONTHS }, (_, i) => {
+    const monthsBack = HISTORY_MONTHS - i;
+    const now = new Date();
+    // Day 0 of month m is the last day of month m-1.
+    const d = new Date(now.getFullYear(), now.getMonth() - monthsBack + 1, 0);
+    return `${MONTH_ABBR[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  });
+
+const HISTORY_LABELS = historyMonthLabels();
+
+/**
+ * A year of month-end health readings, ending at `end`.
+ *
+ * Walks backwards from the current state one grade at a time. It used to carry
+ * three months with the middle one hardcoded to 'Average' on every account,
+ * which made month-on-month movement impossible to read and left the flow and
+ * change-over-time charts nothing real to draw. Accounts mostly hold their
+ * grade month to month, so the walk stays put more often than it steps.
+ */
+const historyEndingAt = (end: HealthStatus): { month: string; status: HealthStatus }[] => {
+  const step = () => (Math.random() < 0.72 ? 0 : Math.random() < 0.5 ? -1 : 1);
+  const clamp = (i: number) => Math.min(STATUS_LADDER.length - 1, Math.max(0, i));
+
+  const statuses: HealthStatus[] = [end];
+  let idx = STATUS_LADDER.indexOf(end);
+  for (let i = 1; i < HISTORY_LABELS.length; i++) {
+    idx = clamp(idx + step());
+    statuses.unshift(STATUS_LADDER[idx]);
+  }
+
+  return HISTORY_LABELS.map((month, i) => ({ month, status: statuses[i] }));
+};
+
+/** What the AI Pulse claims to have spotted, by how the account is doing.
+ *  One shared string across all 60 rows made the reason column unreadable. */
+const AI_PULSE_REASONS: Record<HealthStatus, string[]> = {
+  Poor: [
+    'Support ticket volume up 3.1x over 60 days',
+    'Exec sponsor left; no replacement mapped',
+    'Career-site traffic down 42% QoQ',
+    'Two consecutive missed QBRs',
+    'Recruiter seats idle 21+ days',
+  ],
+  Average: [
+    'Usage flat while headcount grew 18%',
+    'Adoption concentrated in a single team',
+    'Renewal owner has not engaged since January',
+    'Sentiment dipped across the last four tickets',
+  ],
+  Good: [
+    'Career-site traffic surging; expansion likely',
+    'Seat utilisation at 94% of contract',
+    'Champion referred two new business units',
+    'Ticket sentiment positive nine weeks running',
+  ],
+};
+
+const reasonFor = (status: HealthStatus, aiPulse: number, csmPulse: number): string => {
+  // When the model reads colder than the CSM, the reason has to explain the
+  // risk it spotted — not congratulate an account it is quietly flagging.
+  const pool = csmPulse - aiPulse >= 2 ? AI_PULSE_REASONS.Poor : AI_PULSE_REASONS[status];
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
+/**
+ * A renewal date `days` out from today, in the "MMM d, yyyy" shape the rest of
+ * the app renders and `triage.ts` parses.
+ *
+ * Every generated row used to carry the same literal "Dec 31, 2026", which made
+ * renewal proximity a constant — the Triage view ranks on how close a renewal
+ * is, so it needs these to actually spread.
+ */
+const renewalDateIn = (days: number): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  return `${MONTH_ABBR[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+};
 
 // Generate ~50 diverse mock rows with varied health distributions
 const generateMockData = (): HealthDataRow[] => {
@@ -53,6 +133,20 @@ const generateMockData = (): HealthDataRow[] => {
       aiPulse = Math.floor(Math.random() * 2) + 4;
     }
 
+    // The two pulses were drawn in lockstep above — in every branch they land
+    // within one point of each other, so a real disagreement between the owner
+    // and the model was arithmetically impossible and the AI Pulse was only ever
+    // a ±1 echo of the CSM's. Two independent reads are the point of having
+    // both, so a share of the book genuinely diverges.
+    const divergence = Math.random();
+    if (divergence < 0.11) {
+      // The model reads the account colder than its owner does.
+      aiPulse = Math.max(1, csmPulse - (2 + Math.floor(Math.random() * 2)));
+    } else if (divergence < 0.17) {
+      // The owner has caught something the model hasn't.
+      csmPulse = Math.max(1, aiPulse - (2 + Math.floor(Math.random() * 2)));
+    }
+
     const owner = MOCK_OWNERS[Math.floor(Math.random() * MOCK_OWNERS.length)];
     const account = accounts[Math.floor(Math.random() * accounts.length)];
 
@@ -61,36 +155,38 @@ const generateMockData = (): HealthDataRow[] => {
       account: `${account} ${i}`,
       owner,
       lifecycleStage: Math.random() > 0.8 ? 'Pilot' : (Math.random() > 0.9 ? 'Closed Lost' : 'Customer - Active'),
-      renewalDate: `Dec 31, 2026`,
+      renewalDate: renewalDateIn(12 + Math.floor(Math.random() * 350)),
       healthStatus: status,
       healthScore: status === 'Good' ? 8 : (status === 'Average' ? 5 : 2),
       csmPulseScore: csmPulse,
       aiPulseScore: aiPulse,
       lastPulseModified: 'Feb 4, 2026',
-      aiPulseReason: 'AI detected higher potential due to surging career site traffic',
-      activeRecruiters: Math.floor(Math.random() * 50) + 10,
-      history: [
-        { month: 'Apr 30, 2025', status: Math.random() > 0.5 ? 'Average' : 'Good' },
-        { month: 'May 31, 2025', status: 'Average' },
-        { month: 'Jun 30, 2025', status: status },
-      ]
+      aiPulseReason: reasonFor(status, aiPulse, csmPulse),
+      activeSeats: Math.floor(Math.random() * 50) + 10,
+      history: historyEndingAt(status)
     });
   }
 
-  // Inject a few hardcoded 'Poor' ones from the screenshot to ensure exact matches
+  // Inject a few hardcoded 'Poor' ones from the screenshot to ensure exact matches.
+  // The id continues past the generated loop: this row used to reuse '2', which
+  // collided with the generated row 2 and gave React two children with the same
+  // key in every list that renders this data (the detail table, and now the
+  // triage queue and divergence lists).
   data.push({
-    id: '2',
+    id: String(data.length + 1),
     account: 'Nova Enterprises',
     owner: 'Gerry Hill',
     lifecycleStage: 'Customer - Active',
-    renewalDate: 'Dec 31, 2026',
+    renewalDate: renewalDateIn(23),
     healthStatus: 'Poor',
     healthScore: 2,
     csmPulseScore: 1,
     aiPulseScore: 2,
     lastPulseModified: 'Feb 4, 2026',
-    aiPulseReason: 'AI detected higher potential due to surging career site traffic',
-    activeRecruiters: 38,
+    aiPulseReason: 'Exec sponsor left; no replacement mapped',
+    activeSeats: 38,
+    // Deliberately empty: this hand-written row is the one account with no
+    // pulse history, which keeps the "no trajectory" path exercised on screen.
     history: []
   });
 

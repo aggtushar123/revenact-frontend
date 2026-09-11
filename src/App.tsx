@@ -42,6 +42,9 @@ import { ControlsView } from './pages/dashboard/tabs/ai-trending/ControlsView';
 import { PlaceholderView } from './pages/dashboard/tabs/ai-trending/PlaceholderView';
 import { HealthOverviewContainer } from './pages/dashboard/tabs/HealthOverviewContainer';
 import { ControlsView as HealthControlsView } from './pages/dashboard/tabs/health-overview/ControlsView';
+import { TriageView } from './pages/dashboard/tabs/health-overview/TriageView';
+import { DivergenceView } from './pages/dashboard/tabs/health-overview/DivergenceView';
+import { MovementView } from './pages/dashboard/tabs/health-overview/MovementView';
 import { TicketOverviewContainer } from './pages/dashboard/tabs/ticket-overview/TicketOverviewContainer';
 import { ControlsView as TicketControlsView } from './pages/dashboard/tabs/ticket-overview/ControlsView';
 // Company Brain pages
@@ -87,7 +90,13 @@ function App() {
                 <Route path="*" element={<PlaceholderView />} />
               </Route>
               <Route path="health" element={<HealthOverviewContainer />}>
-                <Route index element={<Navigate to="controls" replace />} />
+                {/* Triage lands first: it answers "who do I call today", which
+                    is what a CSM opens this screen for. Controls keeps the
+                    nine-card portfolio view for the manager's read. */}
+                <Route index element={<Navigate to="triage" replace />} />
+                <Route path="triage" element={<TriageView />} />
+                <Route path="divergence" element={<DivergenceView />} />
+                <Route path="movement" element={<MovementView />} />
                 <Route path="controls" element={<HealthControlsView />} />
                 <Route path="*" element={<PlaceholderView />} />
               </Route>

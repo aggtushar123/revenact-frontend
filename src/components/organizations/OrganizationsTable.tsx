@@ -59,9 +59,9 @@ export function OrganizationsTable({
   const endIndex = offset + rows.length;
   const allOnPageSelected = currentData.length > 0 && currentData.every((r) => selectedIds.has(r.id));
 
-  const [healthHover, setHealthHover] = useState<{ val: number, style: React.CSSProperties } | null>(null);
+  const [healthHover, setHealthHover] = useState<{ row: OrgRow, style: React.CSSProperties } | null>(null);
   const [reasonHover, setReasonHover] = useState<{ text: string, style: React.CSSProperties } | null>(null);
-  const [csatHover, setCsatHover] = useState<{ style: React.CSSProperties } | null>(null);
+  const [csatHover, setCsatHover] = useState<{ row: OrgRow, style: React.CSSProperties } | null>(null);
   const [activeRowPopup, setActiveRowPopup] = useState<{ id: number, name: string, style: React.CSSProperties } | null>(null);
 
   const handleRowActionClick = (e: React.MouseEvent, id: number, name: string) => {
@@ -89,10 +89,10 @@ export function OrganizationsTable({
     </div>
   );
 
-  const handleHealthMouseEnter = (e: React.MouseEvent, val: number) => {
+  const handleHealthMouseEnter = (e: React.MouseEvent, row: OrgRow) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setHealthHover({
-      val,
+      row,
       style: { bottom: window.innerHeight - rect.top + 8, left: rect.left + (rect.width / 2), transform: 'translateX(-50%)' }
     });
   };
@@ -105,9 +105,10 @@ export function OrganizationsTable({
     });
   };
 
-  const handleCsatMouseEnter = (e: React.MouseEvent) => {
+  const handleCsatMouseEnter = (e: React.MouseEvent, row: OrgRow) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setCsatHover({
+      row,
       style: { bottom: window.innerHeight - rect.top + 8, left: rect.left + (rect.width / 2), transform: 'translateX(-50%)' }
     });
   };
@@ -139,7 +140,7 @@ export function OrganizationsTable({
         return <td key={colId} className="px-6 py-4 border-b border-line-subtle text-ink-muted font-medium">{r.stage}</td>;
       case 'health':
         return (
-          <td key={colId} className="px-6 py-4 border-b border-line-subtle relative cursor-pointer" onMouseEnter={(e) => handleHealthMouseEnter(e, r.health.val)} onMouseLeave={handleMouseLeave}>
+          <td key={colId} className="px-6 py-4 border-b border-line-subtle relative cursor-pointer" onMouseEnter={(e) => handleHealthMouseEnter(e, r)} onMouseLeave={handleMouseLeave}>
             <div className="flex items-center gap-2 font-bold text-ink">
               <span className={`w-[7px] h-[7px] rounded-full ${r.health.clr}`}></span> {r.health.val}
             </div>
@@ -165,7 +166,7 @@ export function OrganizationsTable({
         );
       case 'csatScore':
         return (
-          <td key={colId} className="px-6 py-4 border-b border-line-subtle cursor-pointer" onMouseEnter={handleCsatMouseEnter} onMouseLeave={handleMouseLeave}>
+          <td key={colId} className="px-6 py-4 border-b border-line-subtle cursor-pointer" onMouseEnter={(e) => handleCsatMouseEnter(e, r)} onMouseLeave={handleMouseLeave}>
             <div className="flex justify-center w-full">
               <div className={`${r.csatColor} text-white px-[18px] py-[6px] rounded-[4px] font-bold text-[12px] min-w-[80px] text-center`}>{r.csat}</div>
             </div>
@@ -394,8 +395,21 @@ export function OrganizationsTable({
       </div>
 
       {/* Portal-like Popovers */}
-      {healthHover && <HealthPopover val={healthHover.val} style={healthHover.style} />}
-      {csatHover && <CsatPopover style={csatHover.style} />}
+      {/* Only opens where the API supplied a breakdown — the mock fallback
+          rows have none, and a popover with nothing in it says nothing. */}
+      {healthHover?.row.healthBreakdown?.length ? (
+        <HealthPopover
+          val={healthHover.row.health.val}
+          breakdown={healthHover.row.healthBreakdown}
+          isOverridden={healthHover.row.healthIsOverridden}
+          style={healthHover.style}
+        />
+      ) : null}
+      {/* Only opens where the API supplied a distribution — the mock fallback
+          rows have none, and an invented one is what this replaced. */}
+      {csatHover?.row.csatBreakdown ? (
+        <CsatPopover breakdown={csatHover.row.csatBreakdown} style={csatHover.style} />
+      ) : null}
 
       {reasonHover && (
         <div

@@ -3,54 +3,54 @@
 import type { HealthDataRow } from '../mockData';
 
 const STATUS_COLORS = {
-  Poor: 'bg-red-500 text-white',
-  Average: 'bg-amber-400 text-white',
-  Good: 'bg-teal-500 text-white',
+  Poor: 'bg-danger text-[#0D0F0E]',
+  Average: 'bg-warning text-[#0D0F0E]',
+  Good: 'bg-success text-[#0D0F0E]',
 };
 
 export function AccountHealthDetailTable({ data }: { data: HealthDataRow[] }) {
   return (
-    <div className="w-full flex flex-col h-full bg-white relative">
-      <div className="flex items-center justify-between p-4 border-b border-gray-100 shrink-0">
-        <h3 className="text-[14px] font-bold text-gray-800">Account Health Details</h3>
+    <div className="w-full flex flex-col h-full bg-surface relative">
+      <div className="flex items-center justify-between p-4 border-b border-line-subtle shrink-0">
+        <h3 className="text-[14px] font-bold text-ink">Account Health Details</h3>
       </div>
       
-      <div className="flex-1 overflow-auto bg-white min-h-[400px]">
+      <div className="flex-1 overflow-auto bg-surface min-h-[400px]">
         <table className="w-full text-left border-collapse select-none">
-          <thead className="sticky top-0 bg-indigo-500 z-10 shadow-sm">
+          <thead className="sticky top-0 bg-elevated z-10 shadow-sm border-b border-line">
             <tr>
               {['Account ID', 'Account', 'Primary Owner', 'Lifecycle Stage', 'Renewal Date', 'Health Status', 'Health Score', 'CSM Pulse Score', 'Latest Pulse Modified', 'AI Pulse Score', 'AI Pulse Reason'].map((heading, idx) => (
-                <th key={idx} className={`py-2 px-3 text-[11px] font-bold text-white uppercase tracking-wider ${idx === 0 ? 'w-[70px] text-right pr-4' : ''}`}>
+                <th key={idx} className={`py-2 px-3 text-[11px] font-mono font-bold text-ink-muted uppercase tracking-wider ${idx === 0 ? 'w-[70px] text-right pr-4' : ''}`}>
                   {heading}
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-line-subtle">
             {data.length === 0 ? (
               <tr>
-                <td colSpan={11} className="py-8 text-center text-sm text-gray-400">
+                <td colSpan={11} className="py-8 text-center text-sm text-ink-faint">
                   No accounts match the current filter.
                 </td>
               </tr>
             ) : data.map((row) => (
               <tr 
                 key={row.id} 
-                className="hover:bg-gray-50/70 transition-colors group cursor-default"
+                className="hover:bg-subtle transition-colors group cursor-default"
               >
-                <td className="py-2.5 px-3 text-[12px] font-medium text-gray-500 text-right pr-4">
+                <td className="py-2.5 px-3 text-[12px] font-medium text-ink-muted text-right pr-4">
                   {row.id}
                 </td>
-                <td className="py-2.5 px-3 text-[12px] font-medium text-gray-900">
+                <td className="py-2.5 px-3 text-[12px] font-medium text-ink">
                   {row.account}
                 </td>
-                <td className="py-2.5 px-3 text-[12px] text-gray-700">
+                <td className="py-2.5 px-3 text-[12px] text-ink-muted">
                   {row.owner}
                 </td>
-                <td className="py-2.5 px-3 text-[12px] text-gray-600">
+                <td className="py-2.5 px-3 text-[12px] text-ink-muted">
                   {row.lifecycleStage}
                 </td>
-                <td className="py-2.5 px-3 text-[12px] text-gray-500 font-medium">
+                <td className="py-2.5 px-3 text-[12px] text-ink-muted font-medium">
                   {row.renewalDate}
                 </td>
                 <td className="py-2.5 px-3">
@@ -58,19 +58,19 @@ export function AccountHealthDetailTable({ data }: { data: HealthDataRow[] }) {
                     {row.healthStatus}
                   </span>
                 </td>
-                <td className="py-2.5 px-3 text-[12px] text-gray-700 text-center">
+                <td className="py-2.5 px-3 text-[12px] text-ink-muted text-center">
                   {row.healthScore}
                 </td>
-                <td className="py-2.5 px-3 text-[12px] text-gray-700 text-center">
+                <td className="py-2.5 px-3 text-[12px] text-ink-muted text-center">
                   {row.csmPulseScore}
                 </td>
-                <td className="py-2.5 px-3 text-[12px] text-gray-500 font-medium whitespace-nowrap">
+                <td className="py-2.5 px-3 text-[12px] text-ink-muted font-medium whitespace-nowrap">
                   {row.lastPulseModified}
                 </td>
-                <td className="py-2.5 px-3 text-[12px] text-gray-700 text-center">
+                <td className="py-2.5 px-3 text-[12px] text-ink-muted text-center">
                   {row.aiPulseScore}
                 </td>
-                <td className="py-2.5 px-3 text-[11px] text-gray-500 max-w-[280px] truncate" title={row.aiPulseReason}>
+                <td className="py-2.5 px-3 text-[11px] text-ink-muted max-w-[280px] truncate" title={row.aiPulseReason}>
                   {row.aiPulseReason}
                 </td>
               </tr>

@@ -5,9 +5,9 @@ import type { HealthDataRow } from '../mockData';
 import { MOCK_OWNERS, MOCK_HEALTH_DATA } from '../mockData';
 
 const STATUS_COLORS = {
-  Poor: '#ef4444',
-  Average: '#eab308',
-  Good: '#14b8a6',
+  Poor: 'var(--danger)',
+  Average: 'var(--warning)',
+  Good: 'var(--success)',
 };
 
 export function HealthByOwnerStackedBar({ data }: { data: HealthDataRow[] }) {
@@ -54,19 +54,19 @@ export function HealthByOwnerStackedBar({ data }: { data: HealthDataRow[] }) {
   return (
     <div className="w-full h-full p-4 flex flex-col relative h-[300px]">
       <div className="flex flex-col mb-4">
-        <h3 className="text-[13px] font-bold text-gray-800 mb-2">Health By Owner</h3>
+        <h3 className="text-[13px] font-bold text-ink mb-2">Health By Owner</h3>
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1.5 opacity-90">
             <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: STATUS_COLORS.Average }} />
-            <span className="text-[11px] font-medium text-gray-500">Average</span>
+            <span className="text-[11px] font-medium text-ink-muted">Average</span>
           </div>
           <div className="flex items-center gap-1.5 opacity-90">
             <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: STATUS_COLORS.Good }} />
-            <span className="text-[11px] font-medium text-gray-500">Good</span>
+            <span className="text-[11px] font-medium text-ink-muted">Good</span>
           </div>
           <div className="flex items-center gap-1.5 opacity-90">
             <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: STATUS_COLORS.Poor }} />
-            <span className="text-[11px] font-medium text-gray-500">Poor</span>
+            <span className="text-[11px] font-medium text-ink-muted">Poor</span>
           </div>
         </div>
       </div>
@@ -86,11 +86,11 @@ export function HealthByOwnerStackedBar({ data }: { data: HealthDataRow[] }) {
               axisLine={false} 
               tickLine={false} 
               width={100}
-              tick={{ fontSize: 11, fill: '#6b7280', fontWeight: 500 }}
+              tick={{ fontSize: 11, fill: 'var(--text-secondary)', fontWeight: 500 }}
             />
             <Tooltip 
-              cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+              contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-default)', boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
               formatter={(value, name) => [`${value}%`, name]}
             />
 

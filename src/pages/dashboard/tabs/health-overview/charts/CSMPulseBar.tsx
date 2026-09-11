@@ -15,8 +15,11 @@ export function CSMPulseBar({ data }: { data: HealthDataRow[] }) {
     };
 
     data.forEach(d => {
-      if (d.csmPulseScore >= 1 && d.csmPulseScore <= 5) {
-        freqs[d.csmPulseScore][d.healthStatus]++;
+      // Null means nobody has rated this account — it belongs in no bucket
+      // rather than in the lowest one.
+      const score = d.csmPulseScore;
+      if (score !== null && score >= 1 && score <= 5) {
+        freqs[score][d.healthStatus]++;
       }
     });
 
@@ -32,7 +35,7 @@ export function CSMPulseBar({ data }: { data: HealthDataRow[] }) {
   return (
     <div className="w-full h-full p-4 flex flex-col relative h-[140px]">
       <div className="flex justify-between items-start mb-2">
-        <h3 className="text-[13px] font-bold text-gray-800">CSM Pulse Score</h3>
+        <h3 className="text-[13px] font-bold text-ink">CSM Pulse Score</h3>
       </div>
       
       <div className="flex-1 w-full mt-2 relative min-h-[90px]">
@@ -46,13 +49,13 @@ export function CSMPulseBar({ data }: { data: HealthDataRow[] }) {
               dataKey="score" 
               axisLine={false} 
               tickLine={false} 
-              tick={{ fontSize: 10, fill: '#9ca3af' }}
+              tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
               dy={5}
             />
             <YAxis hide />
             <Tooltip 
-              cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+              contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-default)', boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
             />
             
             {/* 
@@ -63,9 +66,9 @@ export function CSMPulseBar({ data }: { data: HealthDataRow[] }) {
               For cross-filtering, if ONLY poor is selected, they should all be red.
               Let's use stacked bars, which natively handles this! 
             */}
-            <Bar dataKey="Poor" stackId="a" fill="#ef4444" label={{ position: 'top', fill: '#6b7280', fontSize: 10 }} />
-            <Bar dataKey="Average" stackId="a" fill="#eab308" label={{ position: 'top', fill: '#6b7280', fontSize: 10 }} />
-            <Bar dataKey="Good" stackId="a" fill="#14b8a6" label={{ position: 'top', fill: '#6b7280', fontSize: 10 }} />
+            <Bar dataKey="Poor" stackId="a" fill="var(--danger)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
+            <Bar dataKey="Average" stackId="a" fill="var(--warning)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
+            <Bar dataKey="Good" stackId="a" fill="var(--success)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
           </BarChart>
         </ResponsiveContainer>
       </div>
