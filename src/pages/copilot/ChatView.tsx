@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { ArrowUp, Copy, ThumbsUp, ThumbsDown, Sparkles, AlertCircle, Users, Radio, UserPlus } from 'lucide-react';
+import { ArrowUp, Copy, ThumbsUp, ThumbsDown, Sparkles, AlertCircle, Users, Radio, UserPlus, ClipboardCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import type { Proposal } from '../../features/proposals/proposalsSlice';
 import { PresenceStrip } from '../../components/shared';
 import { HandoffModal } from './HandoffModal';
 import type { CopilotSession } from '../../features/copilotSessions/types';
@@ -22,6 +24,12 @@ interface Props {
   currentUserId?: number | null;
   onMakeLive?: () => void;
   onHandOff?: (toUserId: number, toUserName: string, note: string) => void;
+  /** What the facilitator has already written from this session — see
+   * the backend's SessionDecisionsView. */
+  decisions?: Proposal[];
+  onCaptureDecisions?: () => void;
+  isCapturing?: boolean;
+  captureError?: string | null;
 }
 
 // Real messages only — no more hardcoded chatStep turns/fixed-timer
@@ -53,6 +61,10 @@ export function ChatView({
   currentUserId,
   onMakeLive,
   onHandOff,
+  decisions = [],
+  onCaptureDecisions,
+  isCapturing,
+  captureError,
 }: Props) {
   const [inputText, setInputText] = useState('');
   const [isHandoffOpen, setIsHandoffOpen] = useState(false);
@@ -121,6 +133,21 @@ export function ChatView({
                       Hand off to…
                     </button>
                   )}
+                  {session && session.status !== 'private' && onCaptureDecisions && (
+                    // The facilitator: writes what the people in this
+                    // session decided into the Brain's review queue as
+                    // proposals. Any active participant may ask; nothing
+                    // runs until someone approves it there.
+                    <button
+                      onClick={onCaptureDecisions}
+                      disabled={isCapturing}
+                      title="Reads this session and writes what was decided into the review queue. This makes a paid model call."
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted hover:text-accent border border-line hover:border-accent/30 rounded-full px-2.5 py-1 transition-colors disabled:opacity-50"
+                    >
+                      <ClipboardCheck className="w-3 h-3" />
+                      {isCapturing ? 'Reading the session…' : 'Capture decisions'}
+                    </button>
+                  )}
                   {session?.status === 'awaiting_handoff' && (
                     <span className="text-[11px] font-bold text-warning">Awaiting hand-off</span>
                   )}
@@ -145,6 +172,37 @@ export function ChatView({
                   : `${event.actor?.name ?? 'Someone'} → ${event.payload.to_user_name} — "${event.payload.note}"`}
               </div>
             ))}
+
+            {captureError && (
+              <p className="text-[11.5px] font-semibold text-danger pl-1" role="alert">
+                {captureError}
+              </p>
+            )}
+            {decisions.length > 0 && (
+              <div className="bg-subtle border border-line-subtle rounded-lg px-3 py-2.5 flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted">
+                    Decisions from this session
+                  </span>
+                  <Link to="/brain/review" className="text-[11px] font-semibold text-accent hover:underline">
+                    Review queue
+                  </Link>
+                </div>
+                <ul className="flex flex-col gap-1">
+                  {decisions.map((d) => (
+                    <li key={d.id} className="text-[12px] text-ink flex items-baseline gap-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-ink-faint shrink-0">
+                        {d.kind_display}
+                      </span>
+                      <span className="font-medium">{d.title}</span>
+                      <span className={`text-[10px] font-bold uppercase tracking-wider ml-auto shrink-0 ${d.status === 'approved' ? 'text-success' : d.status === 'rejected' ? 'text-ink-faint' : 'text-info'}`}>
+                        {d.status_display}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
 

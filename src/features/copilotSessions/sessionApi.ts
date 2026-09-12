@@ -3,6 +3,7 @@
 // apiFetch-wrapper pattern as pages/copilot/copilotApi.ts.
 import { apiFetch } from '../../lib/apiClient';
 import type { CopilotSession, SessionInvite } from './types';
+import type { Proposal } from '../proposals/proposalsSlice';
 
 /** 404s (as an ApiError) when this conversation has no live session yet —
  * "explicit opt-in only" means most conversations never get one; the
@@ -76,5 +77,20 @@ export function respondToInvite(
   return apiFetch<SessionInvite>(`/copilot/sessions/invites/${inviteId}/respond/`, {
     method: 'POST',
     body: { status: responseStatus },
+  });
+}
+
+/** The proposals the facilitator already wrote from this session — 404s
+ * (as an ApiError) when the conversation has no session. */
+export function fetchSessionDecisions(conversationId: number): Promise<{ proposals: Proposal[] }> {
+  return apiFetch<{ proposals: Proposal[] }>(`/copilot/conversations/${conversationId}/session/decisions/`);
+}
+
+/** Ask the facilitator to read the session and write what the people
+ * decided into the review queue. A real, paid model call; any active
+ * participant may ask, approving still happens in the queue. */
+export function captureSessionDecisions(conversationId: number): Promise<{ proposals: Proposal[] }> {
+  return apiFetch<{ proposals: Proposal[] }>(`/copilot/conversations/${conversationId}/session/decisions/`, {
+    method: 'POST',
   });
 }

@@ -48,6 +48,8 @@ export interface Proposal {
   decision_note: string;
   result: Record<string, number>;
   generated_by: string | null;
+  /** Set when the facilitator wrote this from a multiplayer session's decisions. */
+  source: { session_id: number; conversation_id: number; title: string } | null;
   created_at: string;
 }
 

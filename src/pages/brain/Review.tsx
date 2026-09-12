@@ -52,7 +52,7 @@ export function ReviewQueuePage() {
           </div>
           <h1 className="text-[20px] font-bold text-ink tracking-tight">Review queue</h1>
           <p className="text-[13px] text-ink-faint font-medium mt-0.5">
-            What the Ops agent proposes from the figures. Nothing runs until you approve it.
+            What the Ops agent proposes from the figures, and what your sessions decided. Nothing runs until you approve it.
           </p>
         </div>
         {canSeeAll && (
@@ -161,6 +161,14 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
               {proposal.status_display}
             </span>
           </div>
+          {proposal.source && (
+            <p className="text-[11.5px] text-ink-faint mt-0.5">
+              Decided in session{' '}
+              <Link to="/copilot" className="text-accent hover:underline">
+                {proposal.source.title}
+              </Link>
+            </p>
+          )}
           {proposal.initiative && (
             <p className="text-[11.5px] text-ink-faint mt-0.5">
               Serves{' '}

@@ -11,9 +11,12 @@ import {
   fetchSession,
   makeSessionLive,
   handOffSession,
+  fetchSessionDecisions,
+  captureSessionDecisions,
   fetchMyInvites,
   respondToInvite,
 } from '../../features/copilotSessions/sessionApi';
+import type { Proposal } from '../../features/proposals/proposalsSlice';
 import { connectSessionSocket } from '../../features/copilotSessions/sessionSocket';
 import {
   sessionSnapshotReceived,
@@ -48,6 +51,9 @@ export function CopilotIndex() {
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [decisions, setDecisions] = useState<Proposal[]>([]);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
 
   // Set by the "Ask Copilot" entry point on the Organization/Account
   // Details pages (see Details.tsx's own button) — the real account
@@ -252,7 +258,10 @@ export function CopilotIndex() {
       setSendError(err instanceof ApiError ? err.message : 'Could not load this conversation.');
     }
     fetchSession(conversationId)
-      .then((session) => dispatch(sessionSnapshotReceived(session)))
+      .then((session) => {
+        dispatch(sessionSnapshotReceived(session));
+        return fetchSessionDecisions(conversationId).then((r) => setDecisions(r.proposals));
+      })
       .catch(() => {
         // No session for this conversation — nothing to show, not an error.
       });
@@ -266,6 +275,23 @@ export function CopilotIndex() {
     setMessages([]);
     setSendError(null);
     setIsSending(false);
+    setDecisions([]);
+    setCaptureError(null);
+  }
+
+  async function handleCaptureDecisions() {
+    if (!activeConversationId) return;
+    setIsCapturing(true);
+    setCaptureError(null);
+    try {
+      const { proposals } = await captureSessionDecisions(activeConversationId);
+      setDecisions((prev) => [...prev, ...proposals]);
+      if (proposals.length === 0) setCaptureError('Nothing was decided in this session yet.');
+    } catch (err) {
+      setCaptureError(err instanceof ApiError ? err.message : 'Could not capture the decisions.');
+    } finally {
+      setIsCapturing(false);
+    }
   }
 
   async function handleMakeLive() {
@@ -374,6 +400,10 @@ export function CopilotIndex() {
                   currentUserId={currentUser?.id ?? null}
                   onMakeLive={handleMakeLive}
                   onHandOff={handleHandOff}
+                  decisions={decisions}
+                  onCaptureDecisions={handleCaptureDecisions}
+                  isCapturing={isCapturing}
+                  captureError={captureError}
                 />
               )}
             </div>

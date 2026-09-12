@@ -16,7 +16,7 @@ const task = {
   evidence: ['Pizza Hut — owner Carl CSM, downside USD 17,400, renewal overdue by 34 days'],
   action: { customer_id: 7, customer_name: 'Pizza Hut', title: 'Save play: Pizza Hut', assignee_name: 'Carl CSM', due_date: '2026-09-15', priority: 'high' as const },
   initiative: { id: 1, title: 'Halve the ARR at risk on Product B' },
-  status: 'proposed' as const, status_display: 'Proposed', decided_by: null, decided_at: null, decision_note: '', result: {}, generated_by: 'Alice', created_at: '2026-09-12T17:00:00Z',
+  status: 'proposed' as const, status_display: 'Proposed', decided_by: null, decided_at: null, decision_note: '', result: {}, generated_by: 'Alice', source: null, created_at: '2026-09-12T17:00:00Z',
 };
 const initiative = {
   ...task, id: 8, kind: 'initiative' as const, kind_display: 'Initiative', title: 'Improve seat utilisation', initiative: null,
