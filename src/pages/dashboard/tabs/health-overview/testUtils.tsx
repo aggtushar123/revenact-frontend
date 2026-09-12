@@ -2,7 +2,8 @@ import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
-import healthReducer from '../../../../features/health/healthSlice';
+import healthReducer, { NO_FILTERS } from '../../../../features/health/healthSlice';
+import type { HealthFilters } from '../../../../features/health/healthSlice';
 import type { CurrencyCode } from '../../../../features/auth/authSlice';
 import type { HealthDataRow } from '../../../../features/health/types';
 
@@ -20,6 +21,7 @@ export function healthRow(overrides: Partial<HealthDataRow> = {}): HealthDataRow
     owner: 'Gerry Hill',
     ownerKey: '1',
     lifecycleStage: 'Customer - Active',
+    lifecycleKey: 'customer_active',
     renewalDate: 'Dec 31, 2026',
     healthStatus: 'Good',
     healthScore: 8,
@@ -53,7 +55,7 @@ export function renderWithHealth(
     loaded = true,
     currency = 'USD',
     unconvertedCount = 0,
-    ownerFilter = null,
+    filters = NO_FILTERS,
   }: {
     rows?: HealthDataRow[];
     isLoading?: boolean;
@@ -62,7 +64,7 @@ export function renderWithHealth(
     loaded?: boolean;
     currency?: CurrencyCode;
     unconvertedCount?: number;
-    ownerFilter?: string | null;
+    filters?: HealthFilters;
   } = {},
 ) {
   const store = configureStore({
@@ -77,7 +79,7 @@ export function renderWithHealth(
         loadedAt: loaded ? '2026-09-11T00:00:00.000Z' : null,
         currency,
         unconvertedCount,
-        ownerFilter,
+        filters,
       },
     },
   });

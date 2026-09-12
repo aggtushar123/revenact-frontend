@@ -33,17 +33,83 @@ interface HealthState {
    *  rather than quietly totalling a partial book. */
   unconvertedCount: number;
   /**
-   * The Primary Owner filter: a `HealthDataRow.ownerKey`, or null for "All".
+   * The bar's three filters. Null is "All".
    *
    * Here rather than in the container's own React state because all five tabs
-   * have to honour it, and they read their rows through one hook. State the
+   * have to honour them, and they read their rows through one hook. State the
    * hook can see is state a tab cannot forget to apply — a filter that silently
    * doesn't apply on one of five tabs is worse than no filter at all.
    *
-   * It survives a tab switch on purpose: narrowing to one CSM and then moving
+   * They survive a tab switch on purpose: narrowing to one CSM and then moving
    * from Triage to Movement is one thought, not two.
    */
-  ownerFilter: string | null;
+  filters: HealthFilters;
+}
+
+/**
+ * Owner / lifecycle stage / account, each a key off `HealthDataRow`.
+ *
+ * Keys, never labels — an owner's name, a stage's display text and a company's
+ * name are all things people rename, and a filter keyed on one of those merges
+ * or loses a book the day it changes. See `ownerKey`/`lifecycleKey` on the row.
+ */
+export interface HealthFilters {
+  /** `HealthDataRow.ownerKey` — an owner id, or 'unassigned'. */
+  owner: string | null;
+  /** `HealthDataRow.lifecycleKey`, e.g. 'customer_active'. */
+  lifecycle: string | null;
+  /** `HealthDataRow.id` — one company. */
+  account: string | null;
+}
+
+export const NO_FILTERS: HealthFilters = { owner: null, lifecycle: null, account: null };
+
+/** How each filter finds its value on a row. One place, so the dropdown that
+ *  offers a value and the predicate that applies it can't disagree. */
+export const FILTER_KEYS: Record<keyof HealthFilters, (row: HealthDataRow) => string> = {
+  owner: (row) => row.ownerKey,
+  lifecycle: (row) => row.lifecycleKey,
+  account: (row) => row.id,
+};
+
+/**
+ * Broadest to narrowest. A whole CSM's book, then a stage within it, then one
+ * company — which is the order someone narrows by, and the order that decides
+ * two things elsewhere: which dropdown is filtered by which (see
+ * `filterOptions`), and which filter gives way when two contradict.
+ */
+export const FILTER_ORDER = ['owner', 'lifecycle', 'account'] as const;
+
+export function matchesFilters(row: HealthDataRow, filters: HealthFilters): boolean {
+  return (Object.keys(FILTER_KEYS) as (keyof HealthFilters)[]).every(
+    (key) => filters[key] === null || FILTER_KEYS[key](row) === filters[key]
+  );
+}
+
+/**
+ * Drop any filter that would select nothing from `rows`.
+ *
+ * Two things need this. A refreshed book may no longer contain the CSM or the
+ * company being filtered by — someone left, an account was reassigned or
+ * archived. And narrowing by owner can strand an account filter on a company
+ * that owner doesn't hold.
+ *
+ * Either way the alternative is every tab going empty with a name still on the
+ * chip and nothing on screen saying that the *filter*, not the book, is what
+ * emptied them. Applied narrowest-first: an account filter is dropped before
+ * the owner filter that contradicts it, because the broader one is the choice
+ * the user just made.
+ */
+export function pruneFilters(rows: HealthDataRow[], filters: HealthFilters): HealthFilters {
+  const pruned = { ...filters };
+
+  for (const key of [...FILTER_ORDER].reverse()) {
+    if (pruned[key] === null) continue;
+    const survives = rows.some((row) => matchesFilters(row, { ...pruned, [key]: pruned[key] }));
+    if (!survives) pruned[key] = null;
+  }
+
+  return pruned;
 }
 
 const initialState: HealthState = {
@@ -57,7 +123,7 @@ const initialState: HealthState = {
   // before `loadedAt` is set.
   currency: 'USD',
   unconvertedCount: 0,
-  ownerFilter: null,
+  filters: NO_FILTERS,
 };
 
 interface HealthPayload {
@@ -94,8 +160,18 @@ export const healthSlice = createSlice({
   name: 'health',
   initialState,
   reducers: {
-    setOwnerFilter(state, action: PayloadAction<string | null>) {
-      state.ownerFilter = action.payload;
+    setHealthFilter(
+      state,
+      action: PayloadAction<{ key: keyof HealthFilters; value: string | null }>
+    ) {
+      const next = { ...state.filters, [action.payload.key]: action.payload.value };
+      // Pruned on every change, not only on refresh: picking an owner who
+      // doesn't hold the account currently filtered to would otherwise empty
+      // the dashboard with both chips looking perfectly reasonable.
+      state.filters = pruneFilters(state.rows, next);
+    },
+    clearHealthFilters(state) {
+      state.filters = NO_FILTERS;
     },
   },
   extraReducers: (builder) => {
@@ -111,16 +187,7 @@ export const healthSlice = createSlice({
         state.truncated = action.payload.truncated;
         state.currency = action.payload.currency;
         state.unconvertedCount = action.payload.unconvertedCount;
-        // Drop a filter the refreshed book can no longer honour — a CSM who
-        // left, or whose last account was reassigned. Keeping it would leave
-        // every tab empty with an owner name on the chip and no way to tell
-        // that the *filter*, not the book, is what emptied them.
-        if (
-          state.ownerFilter !== null &&
-          !action.payload.rows.some((row) => row.ownerKey === state.ownerFilter)
-        ) {
-          state.ownerFilter = null;
-        }
+        state.filters = pruneFilters(action.payload.rows, state.filters);
         state.loadedAt = new Date().toISOString();
       })
       .addCase(fetchHealthOverview.rejected, (state, action) => {
@@ -132,6 +199,6 @@ export const healthSlice = createSlice({
   },
 });
 
-export const { setOwnerFilter } = healthSlice.actions;
+export const { setHealthFilter, clearHealthFilters } = healthSlice.actions;
 
 export default healthSlice.reducer;

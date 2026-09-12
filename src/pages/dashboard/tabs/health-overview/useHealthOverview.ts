@@ -1,44 +1,72 @@
 import { useEffect, useMemo } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../../hooks';
-import { fetchHealthOverview } from '../../../../features/health/healthSlice';
-import { UNASSIGNED_KEY, UNASSIGNED_LABEL } from '../../../../features/health/toHealthDataRow';
+import {
+  FILTER_KEYS,
+  FILTER_ORDER,
+  fetchHealthOverview,
+  matchesFilters,
+} from '../../../../features/health/healthSlice';
+import { NO_FILTERS } from '../../../../features/health/healthSlice';
+import type { HealthFilters } from '../../../../features/health/healthSlice';
+import { UNASSIGNED_KEY } from '../../../../features/health/toHealthDataRow';
 import type { HealthDataRow } from '../../../../features/health/types';
 
-export interface OwnerOption {
-  /** `HealthDataRow.ownerKey` — an owner id, or 'unassigned'. */
+export interface FilterOption {
+  /** The value the filter stores — an owner id, a lifecycle value, a row id. */
   key: string;
   name: string;
   count: number;
 }
 
+/** Unassigned sorts last however many accounts it holds: it isn't a person,
+ *  and a book with a lot of unowned accounts shouldn't push the actual owners
+ *  down the list. */
+function compareOptions(a: FilterOption, b: FilterOption) {
+  if (a.key === UNASSIGNED_KEY) return 1;
+  if (b.key === UNASSIGNED_KEY) return -1;
+  return a.name.localeCompare(b.name);
+}
+
 /**
- * Every owner in the book, with how many accounts each holds.
+ * The values one filter can offer, with how many accounts each covers.
  *
- * Derived from the loaded rows rather than fetched: the filter can only
- * usefully offer owners who actually hold something here, and a CSM with an
- * empty book would otherwise sit in the dropdown returning nothing.
+ * Narrowed by the filters **broader** than this one, and only those — see
+ * FILTER_ORDER. Offering a company the selected owner doesn't hold is a choice
+ * whose only outcome is an empty dashboard, so the Account list follows the
+ * Owner and Lifecycle selections.
  *
- * Unassigned sorts last however many accounts it holds — it isn't a person,
- * and a book with a lot of unowned accounts shouldn't push the actual owners
- * down the list.
+ * The reverse would be a trap. If the Owner list were narrowed by the selected
+ * Account, picking a company would leave exactly one owner on offer and no way
+ * to switch without clearing first — a dashboard you can get stuck in. Widening
+ * instead is always reachable: changing a broader filter drops a narrower one
+ * that contradicts it (`pruneFilters`).
+ *
+ * Derived from loaded rows rather than fetched, so a CSM with nothing in this
+ * book can't sit in the dropdown returning nothing.
  */
-export function ownerOptions(rows: HealthDataRow[]): OwnerOption[] {
-  const byKey = new Map<string, OwnerOption>();
+export function filterOptions(
+  rows: HealthDataRow[],
+  key: keyof HealthFilters,
+  filters: HealthFilters,
+  label: (row: HealthDataRow) => string
+): FilterOption[] {
+  const broader = FILTER_ORDER.slice(0, FILTER_ORDER.indexOf(key));
+  const others = { ...NO_FILTERS };
+  for (const other of broader) others[other] = filters[other];
+  const byKey = new Map<string, FilterOption>();
 
   for (const row of rows) {
-    const existing = byKey.get(row.ownerKey);
+    if (!matchesFilters(row, others)) continue;
+    const value = FILTER_KEYS[key](row);
+    const existing = byKey.get(value);
     if (existing) {
       existing.count += 1;
     } else {
-      byKey.set(row.ownerKey, { key: row.ownerKey, name: row.owner, count: 1 });
+      byKey.set(value, { key: value, name: label(row), count: 1 });
     }
   }
 
-  return [...byKey.values()].sort((a, b) => {
-    if (a.key === UNASSIGNED_KEY) return 1;
-    if (b.key === UNASSIGNED_KEY) return -1;
-    return a.name.localeCompare(b.name);
-  });
+  return [...byKey.values()].sort(compareOptions);
 }
 
 /**
@@ -49,15 +77,15 @@ export function ownerOptions(rows: HealthDataRow[]): OwnerOption[] {
  * Renewal Date and Controls re-reads the same rows instead of re-fetching the
  * book.
  *
- * **The Primary Owner filter is applied here, not in the tabs.** All five read
- * their rows through this hook, so filtering in one place is the only version
- * of this that can't have a tab quietly ignoring the chip above it. `rows` is
- * always what the caller should render; `totalCount` is the unfiltered book, so
- * a tab can say what it is showing a part of.
+ * **The bar's filters are applied here, not in the tabs.** All five read their
+ * rows through this hook, so filtering in one place is the only version of this
+ * that can't have a tab quietly ignoring the chips above it. `rows` is always
+ * what the caller should render; `totalCount` is the unfiltered book, so a tab
+ * can say what it is showing a part of.
  */
 export function useHealthOverview() {
   const dispatch = useAppDispatch();
-  const { rows, isLoading, error, truncated, loadedAt, currency, unconvertedCount, ownerFilter } =
+  const { rows, isLoading, error, truncated, loadedAt, currency, unconvertedCount, filters } =
     useAppSelector((state) => state.health);
 
   useEffect(() => {
@@ -67,11 +95,28 @@ export function useHealthOverview() {
   }, [dispatch, loadedAt, isLoading]);
 
   const visible = useMemo(
-    () => (ownerFilter === null ? rows : rows.filter((row) => row.ownerKey === ownerFilter)),
-    [rows, ownerFilter]
+    () => rows.filter((row) => matchesFilters(row, filters)),
+    [rows, filters]
   );
 
-  const owners = useMemo(() => ownerOptions(rows), [rows]);
+  const owners = useMemo(
+    () => filterOptions(rows, 'owner', filters, (row) => row.owner),
+    [rows, filters]
+  );
+  const lifecycles = useMemo(
+    () => filterOptions(rows, 'lifecycle', filters, (row) => row.lifecycleStage),
+    [rows, filters]
+  );
+  const accounts = useMemo(
+    () => filterOptions(rows, 'account', filters, (row) => row.account),
+    [rows, filters]
+  );
+
+  /** What each chip shows: the chosen option's label, or "All". Falls back to
+   *  the stored key rather than "All" if an option somehow isn't listed — a
+   *  chip reading "All" over a filtered dashboard would be a lie. */
+  const labelFor = (options: FilterOption[], value: string | null) =>
+    value === null ? 'All' : (options.find((option) => option.key === value)?.name ?? value);
 
   return {
     rows: visible,
@@ -84,15 +129,17 @@ export function useHealthOverview() {
     isInitialLoad: isLoading && loadedAt === null,
     hasLoaded: loadedAt !== null,
     /** The filter bar's own state and options, so it needs no second source. */
-    ownerFilter,
+    filters,
     owners,
-    /** The whole book, before the owner filter. */
+    lifecycles,
+    accounts,
+    labels: {
+      owner: labelFor(owners, filters.owner),
+      lifecycle: labelFor(lifecycles, filters.lifecycle),
+      account: labelFor(accounts, filters.account),
+    },
+    activeCount: Object.values(filters).filter((value) => value !== null).length,
+    /** The whole book, before any filter. */
     totalCount: rows.length,
-    /** The owner's name when one is selected, for anything that wants to say
-     *  whose book is on screen. */
-    ownerName:
-      ownerFilter === null
-        ? null
-        : (owners.find((owner) => owner.key === ownerFilter)?.name ?? UNASSIGNED_LABEL),
   };
 }

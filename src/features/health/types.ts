@@ -28,7 +28,12 @@ export interface HealthDataRow {
    * missing value: "nobody owns this" is a finding, not an absence.
    */
   ownerKey: string;
+  /** The stage as a person reads it, e.g. "Customer - Active". */
   lifecycleStage: string;
+  /** The stage's stored value, e.g. "customer_active" — what the Lifecycle
+   *  Stage filter keys on. Same split as `owner`/`ownerKey`: labels are
+   *  renamed, and a filter keyed on a label breaks the day someone does. */
+  lifecycleKey: string;
   /** "MMM d, yyyy" — the shape `triage.daysToRenewal` parses. Empty when the
    *  account has no renewal date recorded. */
   renewalDate: string;

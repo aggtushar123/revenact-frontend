@@ -87,6 +87,7 @@ export function toHealthDataRow(row: CustomerHealthApiRow): HealthDataRow {
     owner: row.owner_name ?? UNASSIGNED_LABEL,
     ownerKey: row.owner_id === null ? UNASSIGNED_KEY : String(row.owner_id),
     lifecycleStage: row.lifecycle_stage_display || row.lifecycle_stage,
+    lifecycleKey: row.lifecycle_stage,
     renewalDate: toDisplayDate(row.renewal_date),
     healthStatus: STATUS_BY_CATEGORY[row.health_category],
     healthScore: Number(row.health_score),

@@ -11,6 +11,15 @@ export const MOCK_OWNERS: Owner[] = ['Melak Anbessa', 'Justin Middleton', 'Joey 
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+/** Label and stored value together, the way the API sends them — a fixture
+ *  that carried only the label would let a filter keyed on the value look
+ *  broken in tests and fine on screen. */
+function lifecycleOf(roll: number) {
+  if (roll > 0.8) return { lifecycleStage: 'Pilot', lifecycleKey: 'pilot' };
+  if (roll > 0.72) return { lifecycleStage: 'Closed Lost', lifecycleKey: 'closed_lost' };
+  return { lifecycleStage: 'Customer - Active', lifecycleKey: 'customer_active' };
+}
+
 /** Worst to best, so a step along it is one grade of health. */
 const STATUS_LADDER: HealthStatus[] = ['Poor', 'Average', 'Good'];
 
@@ -158,7 +167,7 @@ const generateMockData = (): HealthDataRow[] => {
       // for one, which is enough for a fixture and keeps the key stable per
       // owner the way a real id is.
       ownerKey: String(MOCK_OWNERS.indexOf(owner)),
-      lifecycleStage: Math.random() > 0.8 ? 'Pilot' : (Math.random() > 0.9 ? 'Closed Lost' : 'Customer - Active'),
+      ...lifecycleOf(Math.random()),
       renewalDate: renewalDateIn(12 + Math.floor(Math.random() * 350)),
       healthStatus: status,
       healthScore: status === 'Good' ? 8 : (status === 'Average' ? 5 : 2),
@@ -186,6 +195,7 @@ const generateMockData = (): HealthDataRow[] => {
     account: 'Nova Enterprises',
     owner: 'Gerry Hill',
     ownerKey: String(MOCK_OWNERS.indexOf('Gerry Hill')),
+    lifecycleKey: 'customer_active',
     lifecycleStage: 'Customer - Active',
     renewalDate: renewalDateIn(23),
     healthStatus: 'Poor',
