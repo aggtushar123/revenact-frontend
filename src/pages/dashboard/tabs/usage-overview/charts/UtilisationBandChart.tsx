@@ -48,7 +48,10 @@ export function UtilisationBandChart({ bands, currency, unmeasured }: Utilisatio
 
       <div className="flex-1 w-full min-h-0 px-2 pb-1">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 16, right: 12, left: 4, bottom: 4 }} barSize={44}>
+          {/* A bottom margin, not the default 4: the band names sit at the
+                very bottom of the plot and the footnote below the card starts
+                immediately after it, which read as one crowded line. */}
+          <BarChart data={data} margin={{ top: 16, right: 12, left: 4, bottom: 14 }} barSize={44}>
             <XAxis
               dataKey="name"
               axisLine={false}
