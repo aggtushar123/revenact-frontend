@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAppSelector } from '../../../../hooks';
+import { FilterSelect } from '../../../../components/shared/FilterSelect';
 import type { TicketOverviewContext } from './ControlsView';
 
 /** The date presets the "Ticket Date" filter offers. Relative to today
@@ -138,57 +139,5 @@ export function TicketOverviewContainer() {
         <Outlet context={context} />
       </div>
     </div>
-  );
-}
-
-/** A native `<select>` styled as the chip the bar already looked like.
- * Native rather than a custom popover so it stays keyboard-accessible
- * and behaves correctly on touch, and because the value it shows
- * doubles as the "All" suffix the original design called for. */
-function FilterSelect({
-  label,
-  value,
-  selected,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  selected: string;
-  onChange: (value: string) => void;
-  options: { value: string; label: string }[];
-}) {
-  const isActive = value !== 'All';
-
-  return (
-    <label className="relative flex items-center h-full group cursor-pointer">
-      <span className="sr-only">{label}</span>
-      <span
-        className={`flex items-center gap-1 px-2 text-[12.5px] font-bold whitespace-nowrap border-b-[2px] h-full transition-all ${
-          isActive
-            ? 'border-accent text-accent bg-accent-dim/20'
-            : 'border-transparent text-ink-muted group-hover:text-ink group-hover:bg-subtle/50'
-        }`}
-      >
-        {label}
-        <span
-          className={`ml-1 text-[11px] font-normal ${isActive ? 'text-accent' : 'text-ink-faint'}`}
-        >
-          {value}
-        </span>
-      </span>
-      <select
-        aria-label={label}
-        value={selected}
-        onChange={(e) => onChange(e.target.value)}
-        className="absolute inset-0 opacity-0 cursor-pointer"
-      >
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
   );
 }

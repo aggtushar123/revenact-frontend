@@ -87,7 +87,18 @@ function App() {
               <Route path="ai-trending" element={<AITrendingTopics />}>
                 <Route index element={<Navigate to="controls" replace />} />
                 <Route path="controls" element={<ControlsView />} />
-                <Route path="*" element={<PlaceholderView />} />
+                {/* Account Name / Activity Type / Sentiment / AI Area /
+                    AI Category / AI Subcategory / Revenue Bracket used to be
+                    routes here, each falling through to a placeholder — so
+                    clicking a control that reads "All" unmounted the
+                    dashboard. They're real filter dropdowns on the
+                    container's own bar now, and the old paths land back on
+                    Controls. Same fix, and same absolute-redirect reason, as
+                    the ticket block below. */}
+                <Route
+                  path="*"
+                  element={<Navigate to="/dashboard/advance/ai-trending/controls" replace />}
+                />
               </Route>
               <Route path="health" element={<HealthOverviewContainer />}>
                 {/* Triage lands first: it answers "who do I call today", which

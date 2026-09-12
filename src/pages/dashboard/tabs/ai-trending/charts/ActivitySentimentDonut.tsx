@@ -1,16 +1,10 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import type { InteractionBucket } from '../../../../../features/interactions/interactionsSlice';
+import { SENTIMENT_COLORS, FALLBACK_COLOR, compact, percentOf } from '../chartTheme';
 
-const data = [
-  { name: 'Negative', value: 300, color: 'var(--danger)' }, // Orange
-  { name: 'Neutral', value: 590, color: 'var(--warning)' },  // Yellow
-  { name: 'Positive', value: 1200, color: 'var(--success)' }, // Green
-];
-
-export function ActivitySentimentDonut() {
+/** Interactions by sentiment, across all three sources. */
+export function ActivitySentimentDonut({ data }: { data: InteractionBucket[] }) {
   const total = data.reduce((sum, item) => sum + item.value, 0);
-
-  // Format total using compact notation, e.g., 2090 -> 2.09K
-  const formattedTotal = total >= 1000 ? `${(total / 1000).toFixed(2)}K` : total.toString();
 
   return (
     <div className="w-full h-full p-6 flex flex-col relative">
@@ -27,15 +21,11 @@ export function ActivitySentimentDonut() {
               paddingAngle={0}
               dataKey="value"
               stroke="none"
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              label={({ name, percent = 0, value, cx, cy, midAngle = 0, outerRadius = 0 }: any) => {
+              label={({ name, value, cx, cy, midAngle = 0, outerRadius = 0 }) => {
                 const RADIAN = Math.PI / 180;
-                // Place text outside the pie chart
                 const radius = outerRadius + 15;
                 const x = cx + radius * Math.cos(-midAngle * RADIAN);
                 const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-                const formattedValue = value >= 1000 ? `${(value / 1000).toFixed(1)}K` : `${(value / 1000).toFixed(1)}K`; // 300 -> 0.3K
 
                 return (
                   <text
@@ -50,26 +40,29 @@ export function ActivitySentimentDonut() {
                       {name}
                     </tspan>
                     <tspan x={x} dy="1.4em">
-                      {`${formattedValue} (${(percent * 100).toFixed(0)}%)`}
+                      {`${compact(Number(value))} (${percentOf(Number(value), total)}%)`}
                     </tspan>
                   </text>
                 );
               }}
               labelLine={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
             >
-              {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={entry.color} />
+              {data.map((entry) => (
+                <Cell key={entry.key} fill={SENTIMENT_COLORS[entry.name] ?? FALLBACK_COLOR} />
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+              contentStyle={{
+                borderRadius: '8px',
+                border: 'none',
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
+              }}
               itemStyle={{ fontSize: '13px', fontWeight: 500 }}
             />
           </PieChart>
         </ResponsiveContainer>
-        {/* Center Text */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-2xl font-semibold text-ink tracking-tight">{formattedTotal}</span>
+          <span className="text-2xl font-semibold text-ink tracking-tight">{compact(total)}</span>
         </div>
       </div>
     </div>

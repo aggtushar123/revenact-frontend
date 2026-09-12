@@ -1,51 +1,104 @@
-import { ActivityTypeDonut } from '../../../../components/dashboard/charts/ActivityTypeDonut';
-import { ActivitySentimentDonut } from '../../../../components/dashboard/charts/ActivitySentimentDonut';
-import { ActivityDetailedTable } from '../../../../components/dashboard/charts/ActivityDetailedTable';
-import { SentimentOverTimeLine } from '../../../../components/dashboard/charts/SentimentOverTimeLine';
-import { ActivitiesByAIAreaDonut } from '../../../../components/dashboard/charts/ActivitiesByAIAreaDonut';
-import { ActivitiesByAICategoryBar } from '../../../../components/dashboard/charts/ActivitiesByAICategoryBar';
-import { ActivitiesByAISubCategoryBar } from '../../../../components/dashboard/charts/ActivitiesByAISubCategoryBar';
+import { useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import { useAppDispatch, useAppSelector } from '../../../../hooks';
+import { fetchInteractionStats } from '../../../../features/interactions/interactionsSlice';
+import { ActivityTypeDonut } from './charts/ActivityTypeDonut';
+import { ActivitySentimentDonut } from './charts/ActivitySentimentDonut';
+import { ActivityDetailedTable } from './charts/ActivityDetailedTable';
+import { SentimentOverTimeLine } from './charts/SentimentOverTimeLine';
+import { ActivitiesByAIAreaDonut } from './charts/ActivitiesByAIAreaDonut';
+import { ActivitiesByAICategoryBar } from './charts/ActivitiesByAICategoryBar';
+import { ActivitiesByAISubCategoryBar } from './charts/ActivitiesByAISubCategoryBar';
+
+/** The filter query string, handed down by AITrendingTopics' own filter bar.
+ *  Empty means unfiltered. */
+export interface AITrendingContext {
+  query: string;
+}
 
 export function ControlsView() {
+  const dispatch = useAppDispatch();
+  const { stats, isLoading, error } = useAppSelector((state) => state.interactions);
+
+  // Optional-safe so the view still renders if it's ever mounted outside the
+  // container — a test, or a future route. Same shape as the Ticket Overview's.
+  const context = useOutletContext<AITrendingContext | undefined>();
+  const query = context?.query ?? '';
+
+  useEffect(() => {
+    dispatch(fetchInteractionStats(query));
+  }, [dispatch, query]);
+
+  const total = stats?.total ?? 0;
+  const classified = stats?.classified ?? 0;
+
   return (
     <div className="w-full h-full flex flex-col gap-4 pb-12">
-      {/* Top Row: Type Donut (1/3) + Detailed Table (2/3) */}
-      <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[500px]">
-        {/* Top Left: Activity Type Donut */}
-        <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
-          <ActivityTypeDonut />
-        </div>
-        {/* Top Right: Detailed Activity Breakdown Table */}
-        <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
-          <ActivityDetailedTable />
-        </div>
-      </div>
+      {error && (
+        <p className="text-[12.5px] font-semibold text-danger" role="alert">
+          {error}
+        </p>
+      )}
 
-      {/* Bottom Row: Sentiment Donut (1/3) + Sentiment Line Chart (2/3) */}
-      <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px]">
-        {/* Bottom Left: Activity Sentiment Donut */}
-        <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
-          <ActivitySentimentDonut />
-        </div>
-        {/* Bottom Right: Sentiment Over Time Line Chart */}
-        <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
-          <SentimentOverTimeLine />
-        </div>
-      </div>
+      {stats && stats.total === 0 && !isLoading && (
+        <p className="text-[12.5px] text-ink-faint">
+          No emails, calls or tickets match these filters.
+        </p>
+      )}
 
-      {/* Third Row: AI Area Donut (1/3) + AI Category Bar (1/3) + AI Sub Category Bar (1/3) */}
-      <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px]">
-        {/* Left: Activities By AI Area Donut */}
-        <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
-          <ActivitiesByAIAreaDonut />
+      {/* Dimmed rather than replaced while a refetch runs: changing a filter
+          shouldn't blank the dashboard and reflow it, and the numbers on screen
+          are still the last true ones. */}
+      <div
+        className={`w-full h-full flex flex-col gap-4 transition-opacity ${
+          isLoading && stats ? 'opacity-60' : ''
+        }`}
+      >
+        {/* Top Row: Type Donut (1/3) + Detailed Table (2/3) */}
+        <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[500px]">
+          <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
+            <ActivityTypeDonut data={stats?.by_type ?? []} />
+          </div>
+          <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
+            <ActivityDetailedTable rows={stats?.recent ?? []} />
+          </div>
         </div>
-        {/* Middle: Activities By AI Category Bar */}
-        <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
-          <ActivitiesByAICategoryBar />
+
+        {/* Bottom Row: Sentiment Donut (1/3) + Sentiment Line Chart (2/3) */}
+        <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px]">
+          <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
+            <ActivitySentimentDonut data={stats?.sentiment ?? []} />
+          </div>
+          <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
+            <SentimentOverTimeLine data={stats?.sentiment_timeline ?? []} />
+          </div>
         </div>
-        {/* Right: Activities By AI Sub Category Bar */}
-        <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
-          <ActivitiesByAISubCategoryBar />
+
+        {/* Third Row: the AI taxonomy — area, category, subcategory. These three
+            count only classified interactions, which is why each carries the
+            total as well as its own rows. */}
+        <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px]">
+          <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
+            <ActivitiesByAIAreaDonut
+              data={stats?.areas ?? []}
+              classified={classified}
+              total={total}
+            />
+          </div>
+          <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
+            <ActivitiesByAICategoryBar
+              data={stats?.categories ?? []}
+              classified={classified}
+              total={total}
+            />
+          </div>
+          <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
+            <ActivitiesByAISubCategoryBar
+              data={stats?.subcategories ?? []}
+              classified={classified}
+              total={total}
+            />
+          </div>
         </div>
       </div>
     </div>
