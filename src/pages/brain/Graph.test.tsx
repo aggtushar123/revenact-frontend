@@ -87,6 +87,28 @@ describe('GraphPage', () => {
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument();
   });
 
+  it('filters to the accounts carrying downside and everything they connect to', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByRole('button', { name: 'customer Pizza Hut' });
+    await user.click(screen.getByLabelText('Only accounts carrying downside'));
+
+    expect(screen.queryByRole('button', { name: 'customer Fine' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'customer Pizza Hut' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'owner Carl CSM' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'product Product B' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^initiative / })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^proposal / })).toBeInTheDocument();
+    expect(screen.getByText(/Showing 5 of 6 nodes and 4 of 6 relations/)).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Product'), 'product:4');
+    expect(screen.getByText(/Showing 5 of 6 nodes/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByRole('button', { name: 'customer Fine' })).toBeInTheDocument();
+    expect(screen.getByText(/6 nodes, 6 relations/)).toBeInTheDocument();
+  });
+
   it('says why to someone without view-all-accounts and fetches nothing', () => {
     const spy = renderPage('csm');
     expect(screen.getByText(/needs the view-all-accounts capability/)).toBeInTheDocument();

@@ -4,6 +4,8 @@ import { Network, ShieldAlert, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchGraph } from '../../features/graph/graphSlice';
 import type { GraphNode, GraphPayload, NodeKind } from '../../features/graph/graphSlice';
+import { applyFilters } from '../../features/graph/filters';
+import type { GraphFilters } from '../../features/graph/filters';
 import { formatCompactMoney, formatDate } from '../../features/customers/formatters';
 import type { CurrencyCode } from '../../features/auth/authSlice';
 
@@ -140,22 +142,28 @@ export function GraphPage() {
   const canSeeAll = useCapability('view_all_accounts');
   const { data, isLoading, error } = useAppSelector((s) => s.graph);
   const [selected, setSelected] = useState<string | null>(null);
+  const [filters, setFilters] = useState<GraphFilters>({ onlyDownside: false, owner: null, product: null });
 
   useEffect(() => {
     if (canSeeAll) dispatch(fetchGraph());
   }, [dispatch, canSeeAll]);
 
-  const { placed, height } = useMemo(() => (data ? layout(data) : { placed: [], height: 160 }), [data]);
+  const shown = useMemo(() => (data ? applyFilters(data, filters) : null), [data, filters]);
+  const { placed, height } = useMemo(() => (shown ? layout(shown) : { placed: [], height: 160 }), [shown]);
+  const owners = useMemo(() => (data?.nodes ?? []).filter((n) => n.kind === 'owner'), [data]);
+  const products = useMemo(() => (data?.nodes ?? []).filter((n) => n.kind === 'product'), [data]);
+  const filtering = filters.onlyDownside || filters.owner !== null || filters.product !== null;
+  const selectClass = 'px-2 py-1 bg-surface border border-line rounded-lg text-[12px] text-ink focus:outline-none focus:border-accent';
   const byId = useMemo(() => new Map(placed.map((p) => [p.node.id, p])), [placed]);
   const neighbourIds = useMemo(() => {
-    if (!data || !selected) return new Set<string>();
+    if (!shown || !selected) return new Set<string>();
     const ids = new Set<string>();
-    data.edges.forEach((e) => {
+    shown.edges.forEach((e) => {
       if (e.from === selected) ids.add(e.to);
       if (e.to === selected) ids.add(e.from);
     });
     return ids;
-  }, [data, selected]);
+  }, [shown, selected]);
   const selectedNode = selected ? byId.get(selected)?.node ?? null : null;
   const dim = (id: string) => selected !== null && id !== selected && !neighbourIds.has(id);
 
@@ -186,15 +194,55 @@ export function GraphPage() {
       {isLoading && !data && <p className="text-[12px] text-ink-faint">Loading…</p>}
 
       {data && (
+        <div className="flex items-center gap-3 flex-wrap text-[12px]">
+          <label className="flex items-center gap-1.5 text-ink-muted">
+            <input
+              type="checkbox"
+              checked={filters.onlyDownside}
+              onChange={(e) => setFilters({ ...filters, onlyDownside: e.target.checked })}
+              className="accent-[var(--color-accent)]"
+            />
+            Only accounts carrying downside
+          </label>
+          <label className="flex items-center gap-1.5 text-ink-muted">
+            Owner
+            <select value={filters.owner ?? ''} onChange={(e) => setFilters({ ...filters, owner: e.target.value || null })} className={selectClass} aria-label="Owner">
+              <option value="">Everyone</option>
+              {owners.map((o) => (
+                <option key={o.id} value={o.id}>{o.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-1.5 text-ink-muted">
+            Product
+            <select value={filters.product ?? ''} onChange={(e) => setFilters({ ...filters, product: e.target.value || null })} className={selectClass} aria-label="Product">
+              <option value="">All products</option>
+              {products.map((p) => (
+                <option key={p.id} value={p.id}>{p.label}</option>
+              ))}
+            </select>
+          </label>
+          {filtering && (
+            <button type="button" onClick={() => { setFilters({ onlyDownside: false, owner: null, product: null }); setSelected(null); }} className="text-[12px] font-semibold text-accent hover:underline">
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
+      {data && shown && (
         <div className="flex flex-col lg:flex-row gap-4 items-start">
           <div className="bg-surface border border-line-subtle rounded-lg overflow-x-auto flex-1 min-w-0">
+            {shown.nodes.length === 0 && (
+              <p className="text-[12px] text-ink-faint px-4 py-3">No accounts match these filters.</p>
+            )}
             <svg viewBox={`0 0 ${WIDTH} ${height + 12}`} width="100%" style={{ minWidth: 720 }} role="img" aria-label="Knowledge graph">
               {COLUMNS.map((column, index) => (
                 <text key={column.title} x={COLUMN_X[index]} y={16} textAnchor="middle" className="fill-[var(--color-ink-faint)]" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   {column.title}
                 </text>
               ))}
-              {data.edges.map((edge) => {
+              {shown!.edges.map((edge) => {
                 const a = byId.get(edge.from);
                 const b = byId.get(edge.to);
                 if (!a || !b) return null;
@@ -250,7 +298,8 @@ export function GraphPage() {
       )}
       {data && (
         <p className="text-[11px] text-ink-faint">
-          Customers are coloured by health; node size follows ARR. {data.nodes.length} nodes, {data.edges.length} relations, as of {formatDate(data.as_of)}.
+          Customers are coloured by health; node size follows ARR.{' '}
+          {filtering && shown ? `Showing ${shown.nodes.length} of ${data.nodes.length} nodes and ${shown.edges.length} of ${data.edges.length} relations` : `${data.nodes.length} nodes, ${data.edges.length} relations`}, as of {formatDate(data.as_of)}.
         </p>
       )}
     </div>
