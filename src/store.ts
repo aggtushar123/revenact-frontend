@@ -21,6 +21,7 @@ import feedbackReducer from './features/feedback/feedbackSlice';
 import agentsReducer from './features/agents/agentsSlice';
 import skillsReducer from './features/skills/skillsSlice';
 import connectorsReducer from './features/connectors/connectorsSlice';
+import graphReducer from './features/graph/graphSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -47,6 +48,7 @@ export const store = configureStore({
     agents: agentsReducer,
     skills: skillsReducer,
     connectors: connectorsReducer,
+    graph: graphReducer,
   },
 });
 
