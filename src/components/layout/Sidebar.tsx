@@ -4,7 +4,7 @@ import {
   LayoutGrid, MessageSquare, Network, Layers, Users,
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
-  Brain
+  Brain, Flag
 } from 'lucide-react';
 import { useCapability } from '../../hooks';
 import { fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
@@ -128,6 +128,7 @@ export function Sidebar() {
         )}
 
         <NavItem to="/brain/dashboard" icon={<Brain className="w-[18px] h-[18px]" />} label="Brain Overview" isExpanded={isExpanded} />
+        <NavItem to="/brain/initiatives" icon={<Flag className="w-[18px] h-[18px]" />} label="Initiatives" isExpanded={isExpanded} />
 
         {/* SETUP Section */}
         {isExpanded ? (
