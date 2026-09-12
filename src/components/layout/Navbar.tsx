@@ -293,6 +293,7 @@ export function Navbar() {
               {[
                 { name: 'Data', path: '/settings/data' },
                 { name: 'Currency', path: '/settings/currency' },
+                { name: 'Products', path: '/settings/products' },
                 { name: 'Entity Uploads', path: '/settings/entity-uploads' },
                 { name: 'Webhooks', path: '/settings/webhooks' },
                 { name: 'Activities', path: '/settings/activities' },

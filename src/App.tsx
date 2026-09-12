@@ -21,6 +21,7 @@ import { ScenariosList } from './pages/scenarios/ScenariosList';
 import { SettingsPage } from './pages/settings/SettingsPage';
 import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
 import { CurrencyPage } from './pages/settings/CurrencyPage';
+import { ProductsPage } from './pages/settings/ProductsPage';
 import { GlobalPresetsPage } from './pages/settings/GlobalPresetsPage';
 import { AIAgentPage } from './pages/settings/AIAgentPage';
 import { EntityUploadsPage } from './pages/settings/EntityUploadsPage';
@@ -252,6 +253,7 @@ function App() {
             <Route index element={<Navigate to="data" replace />} />
             <Route path="data" element={<SettingsPage />} />
             <Route path="currency" element={<CurrencyPage />} />
+            <Route path="products" element={<ProductsPage />} />
             <Route path="entity-uploads" element={<EntityUploadsPage />} />
             <Route path="webhooks" element={<WebhooksPage />} />
             <Route path="activities" element={<SettingPlaceholder title="Activities" />} />
