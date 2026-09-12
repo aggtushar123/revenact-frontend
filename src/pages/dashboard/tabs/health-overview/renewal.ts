@@ -1,5 +1,8 @@
-import type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
-import { daysToRenewal, renewalDateOf } from './triage';
+import type {
+  HealthDataRow,
+  HealthStatus,
+} from "../../../../features/health/types";
+import { daysToRenewal, renewalDateOf } from "./triage";
 
 /**
  * The renewal book, read as money rather than as accounts.
@@ -27,14 +30,14 @@ import { daysToRenewal, renewalDateOf } from './triage';
 
 /** Windows the book is sliced into, nearest first. `to` is exclusive. */
 export const RENEWAL_WINDOWS = [
-  { key: 'overdue', label: 'Overdue', from: -Infinity, to: 0 },
-  { key: '30', label: 'Next 30 days', from: 0, to: 31 },
-  { key: '60', label: '31–60 days', from: 31, to: 61 },
-  { key: '90', label: '61–90 days', from: 61, to: 91 },
-  { key: '180', label: '91–180 days', from: 91, to: 181 },
+  { key: "overdue", label: "Overdue", from: -Infinity, to: 0 },
+  { key: "30", label: "Next 30 days", from: 0, to: 31 },
+  { key: "60", label: "31–60 days", from: 31, to: 61 },
+  { key: "90", label: "61–90 days", from: 61, to: 91 },
+  { key: "180", label: "91–180 days", from: 91, to: 181 },
 ] as const;
 
-export type RenewalWindowKey = (typeof RENEWAL_WINDOWS)[number]['key'];
+export type RenewalWindowKey = (typeof RENEWAL_WINDOWS)[number]["key"];
 
 /** The horizon the headline figures speak for. A quarter is the unit a renewal
  *  forecast is actually managed in, and it is far enough out that a save is
@@ -56,13 +59,13 @@ export const QUARTERS_AHEAD = 6;
 export const CONTACT_FRESH_DAYS = 30;
 export const CONTACT_COLD_DAYS = 60;
 
-export type Coverage = 'fresh' | 'ageing' | 'cold' | 'unknown';
+export type Coverage = "fresh" | "ageing" | "cold" | "unknown";
 
 export function coverageOf(row: HealthDataRow): Coverage {
-  if (row.daysSinceTouch === null) return 'unknown';
-  if (row.daysSinceTouch <= CONTACT_FRESH_DAYS) return 'fresh';
-  if (row.daysSinceTouch <= CONTACT_COLD_DAYS) return 'ageing';
-  return 'cold';
+  if (row.daysSinceTouch === null) return "unknown";
+  if (row.daysSinceTouch <= CONTACT_FRESH_DAYS) return "fresh";
+  if (row.daysSinceTouch <= CONTACT_COLD_DAYS) return "ageing";
+  return "cold";
 }
 
 /**
@@ -83,8 +86,9 @@ export function coverageOf(row: HealthDataRow): Coverage {
  * - **The two pulses disagree by 2+.** Somebody is wrong about this account,
  *   and being wrong about an account inside its renewal window is itself a
  *   risk — the Divergence tab exists for the same reason.
- * - **Still in pilot.** Nothing is embedded yet, so there is less to lose by
- *   walking away.
+ * - **Not yet embedded.** An account still onboarding or in kickoff has less
+ *   to walk away from, and a renewal inside that window is a renewal of
+ *   something that hasn't happened yet.
  *
  * Capped below 1: a renewal is never *certain* to be lost while it is still
  * open, and a 100% line item invites people to stop working it.
@@ -98,10 +102,21 @@ export const BASE_RISK: Record<HealthStatus, number> = {
 export const RISK_ADJUSTMENTS = {
   coldContact: 0.1,
   pulseDisagreement: 0.1,
-  pilot: 0.05,
+  notEmbedded: 0.05,
 } as const;
 
 export const MAX_RISK = 0.9;
+
+/**
+ * Stages where the customer hasn't landed yet, by their stored values.
+ *
+ * This used to test the *label* for "pilot" — a stage this product does not
+ * have. `Customer.LifecycleStage` is onboarding / kickoff / adoption / live /
+ * renewal / churn / expansion / other, so the factor could never fire on real
+ * data: it was worth 5 points to nobody, and the mock's own invented "Pilot"
+ * stage is why it looked like it worked.
+ */
+export const NOT_EMBEDDED_STAGES = new Set(["onboarding", "kickoff"]);
 
 /** How far apart the two pulses have to be to count as disagreement. Matches
  *  the Divergence tab's own threshold — one point is rounding on a five-point
@@ -113,11 +128,16 @@ export interface RiskFactor {
   points: number;
 }
 
-export function riskOfLoss(row: HealthDataRow): { risk: number; factors: RiskFactor[] } {
+export function riskOfLoss(row: HealthDataRow): {
+  risk: number;
+  factors: RiskFactor[];
+} {
   const base = BASE_RISK[row.healthStatus];
-  const factors: RiskFactor[] = [{ label: `${row.healthStatus} health`, points: base }];
+  const factors: RiskFactor[] = [
+    { label: `${row.healthStatus} health`, points: base },
+  ];
 
-  if (coverageOf(row) === 'cold') {
+  if (coverageOf(row) === "cold") {
     factors.push({
       label: `No contact in ${row.daysSinceTouch} days`,
       points: RISK_ADJUSTMENTS.coldContact,
@@ -129,16 +149,22 @@ export function riskOfLoss(row: HealthDataRow): { risk: number; factors: RiskFac
       ? Math.abs(row.csmPulseScore - row.aiPulseScore)
       : null;
   if (gap !== null && gap >= PULSE_GAP_THRESHOLD) {
-    factors.push({ label: 'CSM and AI pulse disagree', points: RISK_ADJUSTMENTS.pulseDisagreement });
+    factors.push({
+      label: "CSM and AI pulse disagree",
+      points: RISK_ADJUSTMENTS.pulseDisagreement,
+    });
   }
 
-  if (/pilot/i.test(row.lifecycleStage)) {
-    factors.push({ label: 'Still in pilot', points: RISK_ADJUSTMENTS.pilot });
+  if (NOT_EMBEDDED_STAGES.has(row.lifecycleKey)) {
+    factors.push({
+      label: `Still in ${row.lifecycleStage.toLowerCase()}`,
+      points: RISK_ADJUSTMENTS.notEmbedded,
+    });
   }
 
   const risk = Math.min(
     MAX_RISK,
-    factors.reduce((sum, f) => sum + f.points, 0)
+    factors.reduce((sum, f) => sum + f.points, 0),
   );
   return { risk, factors };
 }
@@ -170,7 +196,7 @@ function windowFor(days: number): RenewalWindowKey | null {
  */
 export function renewalRows(
   rows: HealthDataRow[],
-  now: Date = new Date()
+  now: Date = new Date(),
 ): { rows: RenewalRow[]; withoutDate: number } {
   const scored: RenewalRow[] = [];
   let withoutDate = 0;
@@ -240,7 +266,7 @@ export function summarise(scored: RenewalRow[]): RenewalSummary {
       summary.arr += item.row.arr;
       summary.exposure += item.exposure ?? 0;
     }
-    if (item.coverage === 'cold') {
+    if (item.coverage === "cold") {
       summary.coldCount += 1;
       summary.coldArr += item.row.arr ?? 0;
     }
@@ -277,10 +303,14 @@ const QUARTER_OF = (date: Date) => Math.floor(date.getMonth() / 3) + 1;
 export function quarterColumns(
   scored: RenewalRow[],
   now: Date = new Date(),
-  quarters: number = QUARTERS_AHEAD
+  quarters: number = QUARTERS_AHEAD,
 ): QuarterColumn[] {
   const columns: QuarterColumn[] = [];
-  const start = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+  const start = new Date(
+    now.getFullYear(),
+    Math.floor(now.getMonth() / 3) * 3,
+    1,
+  );
 
   for (let i = 0; i < quarters; i += 1) {
     const at = new Date(start.getFullYear(), start.getMonth() + i * 3, 1);
@@ -377,7 +407,7 @@ export interface OwnerLoad {
  */
 export function ownerLoad(
   scored: RenewalRow[],
-  horizonDays: number = 180
+  horizonDays: number = 180,
 ): OwnerLoad[] {
   const byOwner = new Map<string, OwnerLoad>();
 
@@ -395,7 +425,9 @@ export function ownerLoad(
     byOwner.set(item.row.owner, entry);
   }
 
-  return [...byOwner.values()].sort((a, b) => b.arr - a.arr || a.owner.localeCompare(b.owner));
+  return [...byOwner.values()].sort(
+    (a, b) => b.arr - a.arr || a.owner.localeCompare(b.owner),
+  );
 }
 
 /**
@@ -412,7 +444,7 @@ export function ownerLoad(
  */
 export function renewalQueue(
   scored: RenewalRow[],
-  horizonDays: number = HEADLINE_HORIZON_DAYS
+  horizonDays: number = HEADLINE_HORIZON_DAYS,
 ): RenewalRow[] {
   return scored
     .filter((item) => item.days <= horizonDays)

@@ -89,10 +89,36 @@ describe('riskOfLoss', () => {
     expect(risk).toBe(BASE_RISK.Good);
   });
 
-  it('adds for a pilot, which has less to lose by walking away', () => {
-    const { risk } = riskOfLoss(healthRow({ healthStatus: 'Good', lifecycleStage: 'Pilot' }));
+  it('adds for an account that has not landed yet', () => {
+    const { risk, factors } = riskOfLoss(
+      healthRow({ healthStatus: 'Good', lifecycleStage: 'Kickoff', lifecycleKey: 'kickoff' })
+    );
 
-    expect(risk).toBeCloseTo(BASE_RISK.Good + RISK_ADJUSTMENTS.pilot);
+    expect(risk).toBeCloseTo(BASE_RISK.Good + RISK_ADJUSTMENTS.notEmbedded);
+    expect(factors.map((f) => f.label)).toContain('Still in kickoff');
+  });
+
+  it('reads the stored stage, not the label', () => {
+    // The factor used to test the label for "pilot" — a stage this product
+    // does not have — so it never fired on real data. A renamed label must not
+    // be able to break it again.
+    const { risk } = riskOfLoss(
+      healthRow({
+        healthStatus: 'Good',
+        lifecycleStage: 'Getting started (renamed)',
+        lifecycleKey: 'onboarding',
+      })
+    );
+
+    expect(risk).toBeCloseTo(BASE_RISK.Good + RISK_ADJUSTMENTS.notEmbedded);
+  });
+
+  it('does not add for an account that is live', () => {
+    const { risk } = riskOfLoss(
+      healthRow({ healthStatus: 'Good', lifecycleStage: 'Live', lifecycleKey: 'live' })
+    );
+
+    expect(risk).toBe(BASE_RISK.Good);
   });
 
   it('never reaches certainty while the renewal is still open', () => {
@@ -102,7 +128,8 @@ describe('riskOfLoss', () => {
         daysSinceTouch: 400,
         csmPulseScore: 5,
         aiPulseScore: 1,
-        lifecycleStage: 'Pilot',
+        lifecycleStage: 'Onboarding',
+        lifecycleKey: 'onboarding',
       })
     );
 
