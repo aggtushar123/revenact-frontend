@@ -4,6 +4,7 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { HealthStatus } from '../../../../../features/health/types';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import type { QuarterColumn } from '../renewal';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 const STATUS_COLORS: Record<HealthStatus, string> = {
   Poor: 'var(--danger)',
@@ -93,7 +94,7 @@ export function RenewalQuarterChart({ columns, currency }: RenewalQuarterChartPr
               formatter={(value, name) => [formatMoney(Number(value ?? 0), currency), String(name)]}
             />
             {STACK.map((status) => (
-              <Bar key={status} dataKey={status} stackId="arr" fill={STATUS_COLORS[status]} />
+              <Bar {...STATIC_SERIES} key={status} dataKey={status} stackId="arr" fill={STATUS_COLORS[status]} />
             ))}
           </BarChart>
         </ResponsiveContainer>

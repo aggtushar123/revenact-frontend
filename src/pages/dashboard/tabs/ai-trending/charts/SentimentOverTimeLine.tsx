@@ -1,6 +1,7 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import type { SentimentPoint } from '../../../../../features/interactions/interactionsSlice';
 import { SENTIMENT_SERIES, niceMax } from '../chartTheme';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 /** How many weeks the line shows. A year of weekly points is 52 ticks on an axis
  *  about 700px wide, which is unreadable; the most recent half-year is what a
@@ -60,6 +61,7 @@ export function SentimentOverTimeLine({ data }: { data: SentimentPoint[] }) {
               {SENTIMENT_SERIES.map((series) => (
                 <Line
                   key={series.key}
+                  {...STATIC_SERIES}
                   type="monotone"
                   dataKey={series.key}
                   name={series.label}

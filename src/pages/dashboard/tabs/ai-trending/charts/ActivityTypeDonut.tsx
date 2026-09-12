@@ -1,6 +1,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { InteractionBucket } from '../../../../../features/interactions/interactionsSlice';
 import { SOURCE_COLORS, FALLBACK_COLOR, percentOf } from '../chartTheme';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 /** Interactions by where they came from: email, call or ticket.
  *
@@ -18,6 +19,7 @@ export function ActivityTypeDonut({ data }: { data: InteractionBucket[] }) {
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
+              {...STATIC_SERIES}
               data={data}
               cx="50%"
               cy="50%"

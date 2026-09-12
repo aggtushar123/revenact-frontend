@@ -3,6 +3,7 @@ import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { ForecastBridge } from '../../../../../features/forecast/forecastSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export interface ArrBridgeChartProps {
   bridge: ForecastBridge;
@@ -118,8 +119,8 @@ export function ArrBridgeChart({ bridge, currency, horizonDays }: ArrBridgeChart
             />
             {/* The invisible half of the waterfall: it lifts each step to
                 where the running total sits. */}
-            <Bar dataKey="base" stackId="bridge" fill="transparent" isAnimationActive={false} />
-            <Bar dataKey="value" stackId="bridge" radius={[3, 3, 0, 0]}>
+            <Bar {...STATIC_SERIES} dataKey="base" stackId="bridge" fill="transparent" />
+            <Bar {...STATIC_SERIES} dataKey="value" stackId="bridge" radius={[3, 3, 0, 0]}>
               {data.map((row) => (
                 <Cell key={row.name} fill={colour[row.kind]} />
               ))}

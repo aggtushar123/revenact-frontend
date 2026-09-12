@@ -2,6 +2,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Toolti
 import type { InteractionBucket } from '../../../../../features/interactions/interactionsSlice';
 import { niceMax } from '../chartTheme';
 import { UnclassifiedNote } from './UnclassifiedNote';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 /** Subcategories are finer-grained than categories, so a couple more bars earn
  *  their place here — but the same readability ceiling applies. */
@@ -65,7 +66,7 @@ export function ActivitiesByAISubCategoryBar({
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
               }}
             />
-            <Bar dataKey="value" fill="var(--info)" radius={[0, 4, 4, 0]} barSize={16}>
+            <Bar {...STATIC_SERIES} dataKey="value" fill="var(--info)" radius={[0, 4, 4, 0]} barSize={16}>
               <LabelList
                 dataKey="value"
                 position="right"

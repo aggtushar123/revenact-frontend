@@ -13,6 +13,7 @@ import {
 import type { HealthStatus } from '../mockData';
 import { PULSE_MIDPOINT, QUADRANT_LABEL } from '../divergence';
 import type { DivergenceRow } from '../divergence';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 const STATUS_COLORS: Record<HealthStatus, string> = {
   Poor: 'var(--danger)',
@@ -207,13 +208,13 @@ export function PulseDivergenceScatter({ laid }: PulseDivergenceScatterProps) {
             {bySeries.map(({ status, points }) => (
               <Scatter
                 key={status}
+                {...STATIC_SERIES}
                 name={status}
                 data={points}
                 fill={STATUS_COLORS[status]}
                 fillOpacity={0.82}
                 stroke="var(--bg-surface)"
                 strokeWidth={1.5}
-                isAnimationActive={false}
               />
             ))}
           </ScatterChart>

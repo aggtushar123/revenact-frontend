@@ -1,6 +1,7 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { TicketSentimentPoint } from '../../../../../features/tickets/ticketsSlice';
 import { niceMax, ticksTo } from '../chartTheme';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export function SentimentLineChart({ data }: { data: TicketSentimentPoint[] }) {
   // The mock's domain={[0, 100]} clipped any month past 100 tickets.
@@ -31,7 +32,7 @@ export function SentimentLineChart({ data }: { data: TicketSentimentPoint[] }) {
             <Tooltip 
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
             />
-            <Line 
+            <Line {...STATIC_SERIES}
               type="linear" 
               dataKey="positive" 
               stroke="var(--success)" 
@@ -39,9 +40,8 @@ export function SentimentLineChart({ data }: { data: TicketSentimentPoint[] }) {
               activeDot={{ r: 6, fill: 'var(--success)', strokeWidth: 0 }}
               dot={{ r: 4, fill: 'var(--success)', strokeWidth: 0 }}
               label={{ position: 'top', fill: 'var(--success)', fontSize: 11, fontWeight: 600, dy: -5 }}
-              isAnimationActive={false}
             />
-            <Line 
+            <Line {...STATIC_SERIES}
               type="linear" 
               dataKey="negative" 
               stroke="var(--warning)" 
@@ -49,7 +49,6 @@ export function SentimentLineChart({ data }: { data: TicketSentimentPoint[] }) {
               activeDot={{ r: 6, fill: 'var(--warning)', strokeWidth: 0 }}
               dot={{ r: 4, fill: 'var(--warning)', strokeWidth: 0 }}
               label={{ position: 'top', fill: 'var(--warning)', fontSize: 11, fontWeight: 600, dy: -5 }}
-              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>

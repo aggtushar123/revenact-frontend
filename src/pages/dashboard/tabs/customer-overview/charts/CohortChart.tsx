@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { CohortRow } from '../../../../../features/portfolio/portfolioSlice';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export interface CohortChartProps {
   rows: CohortRow[];
@@ -62,8 +63,9 @@ export function CohortChart({ rows, undated }: CohortChartProps) {
                 }
               />
               <Legend verticalAlign="top" height={20} iconType="square" />
-              <Bar dataKey="retained" name="Retained" stackId="cohort" fill="var(--success)" />
+              <Bar {...STATIC_SERIES} dataKey="retained" name="Retained" stackId="cohort" fill="var(--success)" />
               <Bar
+                {...STATIC_SERIES}
                 dataKey="churned"
                 name="Churned"
                 stackId="cohort"

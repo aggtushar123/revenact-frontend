@@ -12,6 +12,7 @@ import {
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { Concentration } from '../../../../../features/portfolio/portfolioSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 const HEALTH_COLORS: Record<string, string> = {
   good: 'var(--success)',
@@ -121,12 +122,13 @@ export function ConcentrationChart({ concentration, currency }: ConcentrationCha
                       ]
                 }
               />
-              <Bar yAxisId="arr" dataKey="arr" radius={[3, 3, 0, 0]}>
+              <Bar {...STATIC_SERIES} yAxisId="arr" dataKey="arr" radius={[3, 3, 0, 0]}>
                 {data.map((row) => (
                   <Cell key={row.name} fill={HEALTH_COLORS[row.health] ?? 'var(--info)'} />
                 ))}
               </Bar>
               <Line
+                {...STATIC_SERIES}
                 yAxisId="share"
                 type="monotone"
                 dataKey="cumulative"

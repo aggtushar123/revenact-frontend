@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import type { HealthDataRow } from '../mockData';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export function AccountsLastTouchLine({ data }: { data: HealthDataRow[] }) {
   const chartData = useMemo(() => {
@@ -41,7 +42,7 @@ export function AccountsLastTouchLine({ data }: { data: HealthDataRow[] }) {
               contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-default)', boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
             />
             
-            <Line 
+            <Line {...STATIC_SERIES}
               type="monotone" 
               dataKey="accounts" 
               stroke="var(--accent)" 

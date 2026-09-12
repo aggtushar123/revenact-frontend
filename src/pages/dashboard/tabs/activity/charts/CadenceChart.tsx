@@ -2,6 +2,7 @@ import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { CadenceBucket } from '../../../../../features/activity/activitySlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 /** Fresher is better, so this one *is* a scale — and "never" is grey rather
  *  than the darkest red, because it is a different kind of fact: an absence of
@@ -104,7 +105,7 @@ export function CadenceChart({ buckets, currency, threshold }: CadenceChartProps
                 item?.payload?.name ?? '',
               ]}
             />
-            <Bar dataKey="accounts" radius={[3, 3, 0, 0]}>
+            <Bar {...STATIC_SERIES} dataKey="accounts" radius={[3, 3, 0, 0]}>
               {buckets.map((bucket) => (
                 <Cell key={bucket.key} fill={BUCKET_COLORS[bucket.key] ?? 'var(--text-tertiary)'} />
               ))}

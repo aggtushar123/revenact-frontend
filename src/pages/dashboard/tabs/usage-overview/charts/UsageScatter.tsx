@@ -14,6 +14,7 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { UsageAccount } from '../../../../../features/usage/usageSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { BAND_COLORS, FALLBACK_COLOR, niceMax } from '../chartTheme';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export interface UsageScatterProps {
   points: UsageAccount[];
@@ -141,7 +142,7 @@ export function UsageScatter({
                   ];
                 }}
               />
-              <Scatter data={data} fillOpacity={0.75}>
+              <Scatter {...STATIC_SERIES} data={data} fillOpacity={0.75}>
                 {data.map((row) => (
                   <Cell
                     key={row.point.id}

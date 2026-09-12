@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { HealthDataRow } from '../mockData';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export function AccountHealthByRecruiters({ data }: { data: HealthDataRow[] }) {
   const chartData = useMemo(() => {
@@ -46,7 +47,7 @@ export function AccountHealthByRecruiters({ data }: { data: HealthDataRow[] }) {
               contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-default)', boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
             />
             
-            <Bar dataKey="value" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 11 }} />
+            <Bar {...STATIC_SERIES} dataKey="value" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 11 }} />
           </BarChart>
         </ResponsiveContainer>
       </div>

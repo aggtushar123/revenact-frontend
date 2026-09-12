@@ -4,6 +4,7 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { UsageBand } from '../../../../../features/usage/usageSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { BAND_COLORS, BAND_SHORT, FALLBACK_COLOR, niceMax } from '../chartTheme';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export interface UtilisationBandChartProps {
   bands: UsageBand[];
@@ -74,7 +75,7 @@ export function UtilisationBandChart({ bands, currency, unmeasured }: Utilisatio
                 item?.payload?.full ?? '',
               ]}
             />
-            <Bar dataKey="arr" radius={[4, 4, 0, 0]}>
+            <Bar {...STATIC_SERIES} dataKey="arr" radius={[4, 4, 0, 0]}>
               {data.map((row) => (
                 <Cell key={row.key} fill={BAND_COLORS[row.key] ?? FALLBACK_COLOR} />
               ))}

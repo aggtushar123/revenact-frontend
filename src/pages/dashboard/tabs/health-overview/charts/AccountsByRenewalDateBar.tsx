@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } 
 import type { HealthDataRow } from '../mockData';
 import { renewalMonths } from '../movement';
 import { HEALTH_STACK, makeStackedTotalLabel } from './stackedTotalLabel';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 const STATUS_COLORS = {
   Poor: 'var(--danger)',
@@ -90,6 +91,7 @@ export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
               {HEALTH_STACK.map((status) => (
                 <Bar
                   key={status}
+                  {...STATIC_SERIES}
                   dataKey={status}
                   stackId="renewal"
                   fill={STATUS_COLORS[status]}

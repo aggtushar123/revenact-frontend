@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { HealthDataRow } from '../mockData';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export function CSMPulseBar({ data }: { data: HealthDataRow[] }) {
   const chartData = useMemo(() => {
@@ -66,9 +67,9 @@ export function CSMPulseBar({ data }: { data: HealthDataRow[] }) {
               For cross-filtering, if ONLY poor is selected, they should all be red.
               Let's use stacked bars, which natively handles this! 
             */}
-            <Bar dataKey="Poor" stackId="a" fill="var(--danger)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
-            <Bar dataKey="Average" stackId="a" fill="var(--warning)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
-            <Bar dataKey="Good" stackId="a" fill="var(--success)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
+            <Bar {...STATIC_SERIES} dataKey="Poor" stackId="a" fill="var(--danger)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
+            <Bar {...STATIC_SERIES} dataKey="Average" stackId="a" fill="var(--warning)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
+            <Bar {...STATIC_SERIES} dataKey="Good" stackId="a" fill="var(--success)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
           </BarChart>
         </ResponsiveContainer>
       </div>

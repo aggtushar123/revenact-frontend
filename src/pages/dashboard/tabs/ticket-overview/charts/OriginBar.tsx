@@ -1,6 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { TicketOrigin } from '../../../../../features/tickets/ticketsSlice';
 import { niceMax, ticksTo } from '../chartTheme';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export function OriginBar({ data }: { data: TicketOrigin[] }) {
   // Computed, not hard-coded: the mock's domain={[0, 400]} silently
@@ -34,12 +35,11 @@ export function OriginBar({ data }: { data: TicketOrigin[] }) {
               cursor={{ fill: 'rgba(0,0,0,0.02)' }}
               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
             />
-            <Bar 
+            <Bar {...STATIC_SERIES}
               dataKey="value" 
               fill="var(--accent)"
               radius={[2, 2, 0, 0]}
               label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10, dy: -5 }} 
-              isAnimationActive={false} // for consistent pixel rendering 
             />
           </BarChart>
         </ResponsiveContainer>

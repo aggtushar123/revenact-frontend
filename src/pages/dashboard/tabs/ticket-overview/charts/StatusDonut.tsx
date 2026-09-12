@@ -1,6 +1,7 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { TicketBucket } from '../../../../../features/tickets/ticketsSlice';
 import { STATUS_COLORS, FALLBACK_COLOR } from '../chartTheme';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export function StatusDonut({ data }: { data: TicketBucket[] }) {
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
@@ -15,6 +16,7 @@ export function StatusDonut({ data }: { data: TicketBucket[] }) {
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
+              {...STATIC_SERIES}
               data={data}
               cx="50%"
               cy="50%"

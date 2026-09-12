@@ -14,6 +14,7 @@ import {
   formatCompactMoney,
   formatMoney,
 } from '../../../../../features/customers/formatters';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export interface ProductChurnChartProps {
   rows: ProductRow[];
@@ -120,20 +121,20 @@ export function ProductChurnChart({ rows, currency }: ProductChurnChartProps) {
                 }
               />
               <Bar
+                {...STATIC_SERIES}
                 yAxisId="money"
                 dataKey="lost"
                 fill="var(--danger)"
                 radius={[3, 3, 0, 0]}
-                isAnimationActive={false}
               />
               <Line
+                {...STATIC_SERIES}
                 yAxisId="rate"
                 type="monotone"
                 dataKey="rate"
                 stroke="var(--ink, #111827)"
                 strokeWidth={2}
                 dot={{ r: 2 }}
-                isAnimationActive={false}
               />
             </ComposedChart>
           </ResponsiveContainer>

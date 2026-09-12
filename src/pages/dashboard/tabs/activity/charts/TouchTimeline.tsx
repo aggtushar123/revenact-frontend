@@ -1,5 +1,6 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { ActivityWeek, SourceCount } from '../../../../../features/activity/activitySlice';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 /** One colour per source. Not semantic — a note is not better or worse than a
  *  call — so these are five distinguishable hues rather than a red-to-green
@@ -90,6 +91,7 @@ export function TouchTimeline({ weeks, sources, inbound, windowDays }: TouchTime
               {SOURCE_SERIES.map((series) => (
                 <Area
                   key={series.key}
+                  {...STATIC_SERIES}
                   type="monotone"
                   dataKey={series.key}
                   name={series.label}

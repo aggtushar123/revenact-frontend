@@ -2,6 +2,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Toolti
 import type { InteractionBucket } from '../../../../../features/interactions/interactionsSlice';
 import { niceMax } from '../chartTheme';
 import { UnclassifiedNote } from './UnclassifiedNote';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 /** How many bars fit before the labels stop being readable. The API ranks
  *  biggest-first, so this keeps the head of the distribution — which is what a
@@ -67,7 +68,7 @@ export function ActivitiesByAICategoryBar({
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
               }}
             />
-            <Bar dataKey="value" fill="var(--accent)" radius={[0, 4, 4, 0]} barSize={16}>
+            <Bar {...STATIC_SERIES} dataKey="value" fill="var(--accent)" radius={[0, 4, 4, 0]} barSize={16}>
               <LabelList
                 dataKey="value"
                 position="right"

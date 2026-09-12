@@ -6,6 +6,7 @@ import {
   formatCompactMoney,
   formatMoney,
 } from '../../../../../features/customers/formatters';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 /** The three segments, in the order they stack. Also the chart's own key. */
 const LABELS: Record<string, string> = {
@@ -129,23 +130,23 @@ export function ProductMoneyChart({ rows, currency }: ProductMoneyChartProps) {
                   were changing, and this screen is re-fetched on every filter
                   change — the comparison should be legible immediately. */}
               <Bar
+                {...STATIC_SERIES}
                 dataKey="healthy"
                 stackId="live"
                 fill="var(--success)"
-                isAnimationActive={false}
               />
               <Bar
+                {...STATIC_SERIES}
                 dataKey="unhealthy"
                 stackId="live"
                 fill="var(--danger)"
                 radius={[3, 3, 0, 0]}
-                isAnimationActive={false}
               />
               <Bar
+                {...STATIC_SERIES}
                 dataKey="lost"
                 fill="var(--text-tertiary)"
                 radius={[3, 3, 0, 0]}
-                isAnimationActive={false}
               />
             </BarChart>
           </ResponsiveContainer>

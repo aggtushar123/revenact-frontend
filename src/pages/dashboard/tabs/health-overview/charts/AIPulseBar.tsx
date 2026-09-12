@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { HealthDataRow } from '../mockData';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export function AIPulseBar({ data }: { data: HealthDataRow[] }) {
   const chartData = useMemo(() => {
@@ -58,9 +59,9 @@ export function AIPulseBar({ data }: { data: HealthDataRow[] }) {
               contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-default)', boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
             />
             
-            <Bar dataKey="Poor" stackId="a" fill="var(--danger)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
-            <Bar dataKey="Average" stackId="a" fill="var(--warning)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
-            <Bar dataKey="Good" stackId="a" fill="var(--success)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
+            <Bar {...STATIC_SERIES} dataKey="Poor" stackId="a" fill="var(--danger)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
+            <Bar {...STATIC_SERIES} dataKey="Average" stackId="a" fill="var(--warning)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
+            <Bar {...STATIC_SERIES} dataKey="Good" stackId="a" fill="var(--success)" label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }} />
           </BarChart>
         </ResponsiveContainer>
       </div>

@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { HealthDataRow } from '../mockData';
 import { buildFlow } from '../movement';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 const STATUS_COLORS = {
   Poor: 'var(--danger)',
@@ -80,7 +81,7 @@ export function HealthChangeOverTimeStacked({ data }: { data: HealthDataRow[] })
                   total is identical on all twelve bars whatever the filter.
                   The stacked split is what changes. */}
               {STACK.map((status) => (
-                <Bar key={status} dataKey={status} stackId="health" fill={STATUS_COLORS[status]} />
+                <Bar {...STATIC_SERIES} key={status} dataKey={status} stackId="health" fill={STATUS_COLORS[status]} />
               ))}
             </BarChart>
           </ResponsiveContainer>

@@ -4,6 +4,7 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import type { CoverageBand } from '../renewal';
 import { CONTACT_COLD_DAYS, CONTACT_FRESH_DAYS } from '../renewal';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 /** Contact age, not health — green is "somebody is in this deal", red is
  *  "nobody has spoken to them". Deliberately the same three hues the health
@@ -114,7 +115,7 @@ export function RenewalCoverageChart({ bands, currency }: RenewalCoverageChartPr
               ]}
             />
             {COVERAGE_SERIES.map((series) => (
-              <Bar key={series.key} dataKey={series.key} stackId="arr" fill={series.color} />
+              <Bar {...STATIC_SERIES} key={series.key} dataKey={series.key} stackId="arr" fill={series.color} />
             ))}
           </BarChart>
         </ResponsiveContainer>

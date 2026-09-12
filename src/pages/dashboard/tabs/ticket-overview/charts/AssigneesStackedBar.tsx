@@ -1,6 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { TicketAssigneeRow } from '../../../../../features/tickets/ticketsSlice';
 import { STATUS_COLORS, STATUS_ORDER, FALLBACK_COLOR, niceMax } from '../chartTheme';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
   // The mock's domain={[0, 80]} clipped any assignee past 80 tickets.
@@ -55,10 +56,9 @@ export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
             />
 
             {/* Total Label Hack: Invisible un-stacked bar reaching the row end */}
-            <Bar 
+            <Bar {...STATIC_SERIES}
               dataKey="total" 
               fill="transparent" 
-              isAnimationActive={false}
               label={{ position: 'right', fill: 'var(--text-secondary)', fontSize: 11, fontWeight: 600, dx: 5 }} 
             />
 
@@ -67,11 +67,11 @@ export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
             {STATUS_ORDER.map((statusLabel) => (
               <Bar
                 key={statusLabel}
+                {...STATIC_SERIES}
                 dataKey={statusLabel}
                 stackId="a"
                 fill={STATUS_COLORS[statusLabel] ?? FALLBACK_COLOR}
                 label={renderCustomBarLabel}
-                isAnimationActive={false}
               />
             ))}
           </BarChart>

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { HealthDataRow, HealthStatus } from '../mockData';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 interface CurrentHealthDonutProps {
   data: HealthDataRow[];
@@ -48,6 +49,7 @@ export function CurrentHealthDonut({ data, activeFilter, onSegmentClick }: Curre
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
+              {...STATIC_SERIES}
               data={chartData}
               cx="50%"
               cy="50%"

@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } 
 import type { HealthStatus } from '../mockData';
 import type { RenewalBucket } from '../movement';
 import { HEALTH_STACK, makeStackedTotalLabel } from './stackedTotalLabel';
+import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 
 const STATUS_COLORS: Record<HealthStatus, string> = {
   Poor: 'var(--danger)',
@@ -74,7 +75,7 @@ export function RenewalRunwayChart({ buckets }: RenewalRunwayChartProps) {
               }}
             />
             {HEALTH_STACK.map((status) => (
-              <Bar key={status} dataKey={status} stackId="renewal" fill={STATUS_COLORS[status]}>
+              <Bar {...STATIC_SERIES} key={status} dataKey={status} stackId="renewal" fill={STATUS_COLORS[status]}>
                 <LabelList content={makeStackedTotalLabel(status, data, 11)} />
               </Bar>
             ))}
