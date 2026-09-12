@@ -4,6 +4,7 @@ import { SignalsPanel } from '../../components/brain/SignalsPanel';
 import { DriversPanel } from '../../components/brain/DriversPanel';
 import { BriefPanel } from '../../components/brain/BriefPanel';
 import { QuestionsWaitingPanel } from '../../components/brain/QuestionsWaitingPanel';
+import { KnowledgeByFunctionPanel } from '../../components/brain/KnowledgeByFunctionPanel';
 
 /**
  * The Company Brain, as it actually stands.
@@ -38,6 +39,7 @@ export function BrainDashboard() {
       <BriefPanel />
       <SignalsPanel />
       <QuestionsWaitingPanel />
+      <KnowledgeByFunctionPanel />
       <MetricLayerPanel />
       <DriversPanel />
     </div>
