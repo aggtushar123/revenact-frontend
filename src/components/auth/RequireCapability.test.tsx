@@ -24,7 +24,7 @@ function renderGuard(permissions: Capability[]) {
           role_id: 3,
           role_name: 'Support Lead',
           permissions,
-          function: 'cs' as const, function_display: 'Customer Success',
+          function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
           organisation: {
             id: 1,
             name: 'Acme Inc',

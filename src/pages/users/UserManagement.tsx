@@ -141,6 +141,9 @@ function MembersTab({
                 Function
               </th>
               <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+                Manager
+              </th>
+              <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
                 Status
               </th>
               <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint text-right">
@@ -154,6 +157,7 @@ function MembersTab({
                 key={member.id}
                 member={member}
                 roles={roles}
+                members={members}
                 onEdit={() => onEdit(member)}
               />
             ))}
@@ -167,10 +171,12 @@ function MembersTab({
 function MemberRow({
   member,
   roles,
+  members,
   onEdit,
 }: {
   member: Member;
   roles: Role[];
+  members: Member[];
   onEdit: () => void;
 }) {
   const dispatch = useAppDispatch();
@@ -219,6 +225,24 @@ function MemberRow({
           {(Object.keys(FUNCTION_LABELS) as UserFunction[]).map((key) => (
             <option key={key} value={key}>
               {FUNCTION_LABELS[key]}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="px-4 py-3">
+        {/* The org chart. What a person may see of what others say —
+            contributions, questions, chat — is read from it. The backend
+            refuses a loop. */}
+        <select
+          value={member.reports_to?.id ?? ''}
+          aria-label={`Manager for ${member.name}`}
+          onChange={(e) => dispatch(updateMember({ id: member.id, reports_to_id: e.target.value ? Number(e.target.value) : null }))}
+          className="px-2 py-1 bg-subtle border border-line rounded-md text-[12px] text-ink focus:outline-none focus:border-accent max-w-[160px]"
+        >
+          <option value="">Nobody</option>
+          {members.filter((m) => m.id !== member.id).map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
             </option>
           ))}
         </select>

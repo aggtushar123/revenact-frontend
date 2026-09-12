@@ -37,6 +37,8 @@ interface Props {
   /** One click on a suggestion under an answer: ask that person, on the
    * customer the answer was about, keeping the user turn it came from. */
   onAskSuggested?: (userTurnId: number, suggestion: AskSuggestion) => void;
+  /** "partial" when the viewer was only mentioned and sees a slice — see the backend's visible_messages. */
+  visibility?: 'full' | 'partial';
 }
 
 // Real messages only — no more hardcoded chatStep turns/fixed-timer
@@ -75,6 +77,7 @@ export function ChatView({
   onCloseSession,
   isClosing,
   onAskSuggested,
+  visibility,
 }: Props) {
   const [inputText, setInputText] = useState('');
   const [isHandoffOpen, setIsHandoffOpen] = useState(false);
@@ -252,6 +255,14 @@ export function ChatView({
           </div>
         )}
 
+        {!isEmpty && visibility === 'partial' && (
+          <div className="w-full max-w-[860px] mx-auto mb-6 flex items-start gap-2.5 px-4 py-3 rounded-lg bg-info-dim border border-info/30 text-[12.5px] text-ink-muted" role="note">
+            <Users className="w-4 h-4 shrink-0 text-info mt-0.5" />
+            <span>
+              You were mentioned in this conversation. You are seeing the parts shared with you — messages from your team, from leadership above you, the ones that mention you, and the Copilot's replies to those — not the whole thread.
+            </span>
+          </div>
+        )}
         {!isEmpty && (
           <div className="flex flex-col gap-10 w-full max-w-[860px] mx-auto">
             {messages.map((message) => {
@@ -262,6 +273,9 @@ export function ChatView({
                     <span className="text-[11px] font-bold text-accent pr-1">
                       ↳ Redirected by {redirect.actor?.name ?? 'Someone'}
                     </span>
+                  )}
+                  {!redirect && message.author && message.author.id !== currentUserId && (
+                    <span className="text-[11px] font-semibold text-ink-faint pr-1">{message.author.name}</span>
                   )}
                   <div className="max-w-[65%] bg-accent-dim border border-accent/30 rounded-2xl rounded-tr-sm px-4 py-3 text-[13.5px] text-ink-muted font-medium leading-[1.65] shadow-sm whitespace-pre-wrap">
                     {message.content}

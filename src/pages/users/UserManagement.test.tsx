@@ -21,7 +21,7 @@ const alice = {
   role_id: 1,
   role_name: 'Admin',
   permissions: ['manage_users'],
-  function: 'cs' as const, function_display: 'Customer Success',
+  function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
   organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc' },
   is_active: true,
 };
@@ -35,7 +35,7 @@ const carl = {
   role_id: 2,
   role_name: 'CSM',
   permissions: [],
-  function: 'cs' as const, function_display: 'Customer Success',
+  function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
   organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc' },
   is_active: true,
 };
@@ -45,7 +45,7 @@ const adminRole = {
   name: 'Admin',
   slug: 'admin',
   permissions: ['manage_users', 'manage_integrations'],
-  function: 'cs' as const, function_display: 'Customer Success',
+  function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
   is_system: true,
   users_count: 1,
   created_at: '2026-09-07T00:00:00Z',
@@ -56,7 +56,7 @@ const csmRole = {
   name: 'CSM',
   slug: 'csm',
   permissions: [],
-  function: 'cs' as const, function_display: 'Customer Success',
+  function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
   is_system: true,
   users_count: 1,
   created_at: '2026-09-07T00:00:00Z',
@@ -110,8 +110,8 @@ describe('UserManagement page', () => {
     stubFetch();
     renderPage();
 
-    expect(await screen.findByText('Alice Admin')).toBeInTheDocument();
-    expect(screen.getByText('Carl CSM')).toBeInTheDocument();
+    expect(await screen.findAllByText('Alice Admin').then((els) => els[0])).toBeInTheDocument();
+    expect(screen.getAllByText('Carl CSM')[0]).toBeInTheDocument();
     expect(screen.getByText('alice@acme.io')).toBeInTheDocument();
   });
 
@@ -172,7 +172,7 @@ describe('UserManagement page', () => {
     const user = userEvent.setup();
 
     renderPage();
-    await screen.findByText('Carl CSM');
+    await screen.findAllByText('Carl CSM').then((els) => els[0]);
 
     await user.click(screen.getByRole('button', { name: /Add Team Member/ }));
     await user.type(screen.getByLabelText('Name'), 'Dana New');
@@ -181,7 +181,7 @@ describe('UserManagement page', () => {
     await user.type(screen.getByLabelText('Temporary password'), 'danapassword1');
     await user.click(screen.getByRole('button', { name: 'Add Member' }));
 
-    expect(await screen.findByText('Dana New')).toBeInTheDocument();
+    expect((await screen.findAllByText('Dana New'))[0]).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         expect.stringContaining('/auth/users/'),
@@ -206,7 +206,7 @@ describe('UserManagement page', () => {
     const user = userEvent.setup();
 
     renderPage();
-    await screen.findByText('Carl CSM');
+    await screen.findAllByText('Carl CSM').then((els) => els[0]);
 
     await user.click(screen.getAllByRole('button', { name: 'Deactivate' })[1]);
 
@@ -220,7 +220,7 @@ describe('UserManagement page', () => {
     const user = userEvent.setup();
 
     renderPage();
-    await screen.findByText('Carl CSM');
+    await screen.findAllByText('Carl CSM').then((els) => els[0]);
 
     await user.click(screen.getAllByRole('button', { name: 'Edit' })[1]);
     const nameInput = screen.getByLabelText('Name');
@@ -228,7 +228,7 @@ describe('UserManagement page', () => {
     await user.type(nameInput, 'Carl Renamed');
     await user.click(screen.getByRole('button', { name: 'Save changes' }));
 
-    expect(await screen.findByText('Carl Renamed')).toBeInTheDocument();
+    expect((await screen.findAllByText('Carl Renamed'))[0]).toBeInTheDocument();
   });
 });
 
@@ -240,7 +240,7 @@ describe('UserManagement page — Roles tab', () => {
   async function openRolesTab() {
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText('Carl CSM');
+    await screen.findAllByText('Carl CSM').then((els) => els[0]);
     await user.click(screen.getByRole('button', { name: 'roles' }));
     return user;
   }
@@ -277,7 +277,7 @@ describe('UserManagement page — Roles tab', () => {
           name: 'Support Lead',
           slug: 'support-lead',
           permissions: ['manage_integrations'],
-          function: 'cs' as const, function_display: 'Customer Success',
+          function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
           is_system: false,
           users_count: 0,
           created_at: '2026-09-07T00:00:00Z',
@@ -295,7 +295,7 @@ describe('UserManagement page — Roles tab', () => {
     await user.click(within(form).getByLabelText('Manage integrations & webhooks'));
     await user.click(within(form).getByRole('button', { name: 'Create Role' }));
 
-    expect(await screen.findByText('Support Lead')).toBeInTheDocument();
+    expect((await screen.findAllByText('Support Lead'))[0]).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
         expect.stringContaining('/auth/roles/'),
@@ -313,7 +313,7 @@ describe('UserManagement page — Roles tab', () => {
       name: 'Support Lead',
       slug: 'support-lead',
       permissions: [],
-      function: 'cs' as const, function_display: 'Customer Success',
+      function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
       is_system: false,
       users_count: 0,
       created_at: '2026-09-07T00:00:00Z',

@@ -13,7 +13,7 @@ const contributions = [
   { id: 2, customer_id: 7, customer_name: 'Pizza Hut', author: { id: 6, name: 'Raj Mehta' }, function: 'sales' as const, function_display: 'Sales', body: 'Renewal at 15% uplift stalled on procurement.', created_at: '2026-09-12T08:00:00Z', updated_at: '2026-09-12T08:00:00Z' },
 ];
 const responsible = [
-  { function: 'cs' as const, function_display: 'Customer Success', user: { id: 2, name: 'Carl CSM' } },
+  { function: 'cs' as const, function_display: 'Customer Success', reports_to: null, user: { id: 2, name: 'Carl CSM' } },
   { function: 'engineering' as const, function_display: 'Engineering', user: { id: 5, name: 'Priya Nair' } },
   { function: 'sales' as const, function_display: 'Sales', user: null },
   { function: 'analytics' as const, function_display: 'Analytics', user: null },
@@ -49,7 +49,7 @@ function renderTab(role: 'admin' | 'csm' = 'admin') {
         user: {
           id: 1, email: 'alice@acme.io', name: 'Alice', avatar: '', role, role_id: 1,
           role_name: role === 'admin' ? 'Admin' : 'CSM', permissions: capabilitiesForRole(role),
-          function: 'leadership' as const, function_display: 'Leadership',
+          function: 'leadership' as const, function_display: 'Leadership', reports_to: null,
           organisation: {
             id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)',
             default_lifecycle_stage: '', ai_agent_enabled: true, ai_agent_tone: 'professional' as const, ai_agent_tone_display: 'Professional',

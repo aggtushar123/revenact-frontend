@@ -18,7 +18,7 @@ const open = {
 const answered = {
   ...open, id: 12, status: 'answered' as const, status_display: 'Answered', text: 'Is the SSO fix on track?',
   assignee: { id: 6, name: 'Priya Nair', function: 'engineering' as const },
-  answer: { id: 40, customer_id: 7, customer_name: 'Pizza Hut', author: { id: 6, name: 'Priya Nair' }, function: 'engineering' as const, function_display: 'Engineering', body: 'In answer to Alice Admin\'s question "Is the SSO fix on track?": Yes, 25 Sep.', created_at: '2026-09-13T10:00:00Z', updated_at: '2026-09-13T10:00:00Z' },
+  answer: { id: 40, customer_id: 7, customer_name: 'Pizza Hut', author: { id: 6, name: 'Priya Nair' }, function: 'engineering' as const, function_display: 'Engineering', reports_to: null, body: 'In answer to Alice Admin\'s question "Is the SSO fix on track?": Yes, 25 Sep.', created_at: '2026-09-13T10:00:00Z', updated_at: '2026-09-13T10:00:00Z' },
   answered_at: '2026-09-13T10:00:00Z',
 };
 
@@ -27,7 +27,7 @@ function mockApi() {
     const ok = (body: unknown, status = 200) => Promise.resolve({ ok: true, status, json: async () => body });
     if (url.includes('/answer/')) {
       const body = JSON.parse(String(init?.body));
-      return ok({ ...open, status: 'answered', status_display: 'Answered', answer: { ...answered.answer, id: 41, author: { id: 5, name: 'Mei Tanaka' }, function: 'analytics', function_display: 'Analytics', body: `In answer to Alice Admin's question "${open.text}": ${body.body}` } });
+      return ok({ ...open, status: 'answered', status_display: 'Answered', answer: { ...answered.answer, id: 41, author: { id: 5, name: 'Mei Tanaka' }, function: 'analytics', function_display: 'Analytics', reports_to: null, body: `In answer to Alice Admin's question "${open.text}": ${body.body}` } });
     }
     if (init?.method === 'POST') {
       const body = JSON.parse(String(init.body));
@@ -47,7 +47,7 @@ function renderPanel(userId: number) {
         user: {
           id: userId, email: 'x@acme.io', name: userId === 5 ? 'Mei Tanaka' : 'Alice Admin', avatar: '', role: 'admin', role_id: 1,
           role_name: 'Admin', permissions: capabilitiesForRole('admin'),
-          function: userId === 5 ? ('analytics' as const) : ('leadership' as const), function_display: 'x',
+          function: userId === 5 ? ('analytics' as const) : ('leadership' as const), function_display: 'x', reports_to: null,
           organisation: {
             id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)',
             default_lifecycle_stage: '', ai_agent_enabled: true, ai_agent_tone: 'professional' as const, ai_agent_tone_display: 'Professional',

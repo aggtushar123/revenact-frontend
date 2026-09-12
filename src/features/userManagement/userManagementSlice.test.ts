@@ -16,7 +16,7 @@ const carl = {
   role_id: 2,
   role_name: 'CSM',
   permissions: [],
-  function: 'cs' as const, function_display: 'Customer Success',
+  function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
   organisation: { id: 1, name: 'Acme Inc', slug: 'acme-inc' },
   is_active: true,
 };

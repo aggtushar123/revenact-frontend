@@ -72,6 +72,8 @@ export interface User {
    * and is what "the responsible person" is looked up by. Not a permission. */
   function: UserFunction;
   function_display: string;
+  /** Their manager — the org chart. What they may see of what others say is read from it. */
+  reports_to: { id: number; name: string } | null;
   organisation: Organisation;
   is_active: boolean;
 }

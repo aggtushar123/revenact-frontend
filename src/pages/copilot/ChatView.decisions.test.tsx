@@ -91,8 +91,8 @@ describe('ChatView decisions', () => {
     const reply = {
       ...message, id: 3, role: 'assistant' as const, content: 'Here is what I know.',
       ask_suggestions: [
-        { user_id: 5, name: 'Mei Tanaka', function: 'analytics', function_display: 'Analytics', customer_id: 7, customer_name: 'Pizza Hut' },
-        { user_id: 6, name: 'Priya Nair', function: 'engineering', function_display: 'Engineering', customer_id: 7, customer_name: 'Pizza Hut' },
+        { user_id: 5, name: 'Mei Tanaka', function: 'analytics', function_display: 'Analytics', reports_to: null, customer_id: 7, customer_name: 'Pizza Hut' },
+        { user_id: 6, name: 'Priya Nair', function: 'engineering', function_display: 'Engineering', reports_to: null, customer_id: 7, customer_name: 'Pizza Hut' },
       ],
     };
     const asked = { ...message, id: 2, questions: [{ id: 9, assignee: { id: 6, name: 'Priya Nair' }, status: 'open' as const }] };
@@ -102,6 +102,13 @@ describe('ChatView decisions', () => {
     expect(screen.queryByRole('button', { name: /Priya Nair/ })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: /Mei Tanaka/ }));
     expect(onAsk).toHaveBeenCalledWith(2, expect.objectContaining({ user_id: 5, customer_id: 7 }));
+  });
+
+  it('tells a mentioned viewer they see a slice, and names who wrote each turn', () => {
+    const rajTurn = { ...message, id: 5, content: 'Raj here', author: { id: 6, name: 'Raj Mehta', function: 'sales' } };
+    renderView({ messages: [message, rajTurn], visibility: 'partial', currentUserId: 1 });
+    expect(screen.getByRole('note')).toHaveTextContent('You were mentioned in this conversation');
+    expect(screen.getByText('Raj Mehta')).toBeInTheDocument();
   });
 
   it('offers no close to a participant who is not the owner', () => {

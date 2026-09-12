@@ -63,7 +63,7 @@ export const fetchMembers = createAsyncThunk<Member[], void, { rejectValue: stri
 
 export const addMember = createAsyncThunk<
   Member,
-  { name: string; email: string; password: string; role_id?: number; function?: UserFunction },
+  { name: string; email: string; password: string; role_id?: number; function?: UserFunction; reports_to_id?: number | null },
   { rejectValue: string }
 >('userManagement/addMember', async (data, { rejectWithValue }) => {
   try {
@@ -81,6 +81,7 @@ interface UpdateMemberArgs {
   role_id?: number;
   password?: string;
   function?: UserFunction;
+  reports_to_id?: number | null;
 }
 
 export const updateMember = createAsyncThunk<Member, UpdateMemberArgs, { rejectValue: string }>(

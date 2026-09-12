@@ -145,7 +145,7 @@ function renderPage() {
           role_id: 1,
           role_name: 'Admin',
           permissions: ALL_CAPABILITIES,
-          function: 'cs' as const, function_display: 'Customer Success',
+          function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
           organisation: {
             id: 1,
             name: 'Acme Inc',

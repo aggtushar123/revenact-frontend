@@ -30,6 +30,8 @@ export interface CopilotMessage {
   /** Assistant turns: the people responsible for the customer this answer
    * was about, offered as one-click "ask" — see services.knowledge. */
   ask_suggestions?: AskSuggestion[];
+  /** Who wrote a user turn; null on assistant turns. */
+  author?: { id: number; name: string; function: string } | null;
   created_at: string;
 }
 
@@ -54,4 +56,6 @@ export interface ConversationSummary {
 // Adds `messages` — the shape `fetchConversation`/`sendMessage` return.
 export interface Conversation extends ConversationSummary {
   messages: CopilotMessage[];
+  /** "full" for the owner and session participants; "partial" for someone who was only mentioned and sees a slice. */
+  visibility?: 'full' | 'partial';
 }

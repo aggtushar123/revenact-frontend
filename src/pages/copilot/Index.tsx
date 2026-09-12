@@ -57,6 +57,7 @@ export function CopilotIndex() {
   const [decisions, setDecisions] = useState<Proposal[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
+  const [visibility, setVisibility] = useState<'full' | 'partial'>('full');
   const [captureError, setCaptureError] = useState<string | null>(null);
 
   // Set by the "Ask Copilot" entry point on the Organization/Account
@@ -226,6 +227,7 @@ export function CopilotIndex() {
       });
       setActiveConversationId(conversation.id);
       setMessages(conversation.messages);
+      setVisibility(conversation.visibility ?? 'full');
       setConversations((prev) => {
         const withoutThisOne = prev.filter((c) => c.id !== conversation.id);
         return [
@@ -265,6 +267,7 @@ export function CopilotIndex() {
     try {
       const conversation = await fetchConversation(conversationId);
       setMessages(conversation.messages);
+      setVisibility(conversation.visibility ?? 'full');
     } catch (err) {
       setSendError(err instanceof ApiError ? err.message : 'Could not load this conversation.');
     }
@@ -288,6 +291,7 @@ export function CopilotIndex() {
     setIsSending(false);
     setDecisions([]);
     setCaptureError(null);
+    setVisibility('full');
   }
 
   async function handleCaptureDecisions() {
@@ -449,6 +453,7 @@ export function CopilotIndex() {
                   onCloseSession={handleCloseSession}
                   isClosing={isClosing}
                   onAskSuggested={handleAskSuggested}
+                  visibility={visibility}
                 />
               )}
             </div>
