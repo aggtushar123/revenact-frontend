@@ -53,6 +53,8 @@ import { ForecastContainer } from './pages/dashboard/tabs/ForecastContainer';
 import { ControlsView as ForecastControlsView } from './pages/dashboard/tabs/forecast/ControlsView';
 import { UsageOverviewContainer } from './pages/dashboard/tabs/UsageOverviewContainer';
 import { ControlsView as UsageControlsView } from './pages/dashboard/tabs/usage-overview/ControlsView';
+import { ProductUsageContainer } from './pages/dashboard/tabs/ProductUsageContainer';
+import { ControlsView as ProductControlsView } from './pages/dashboard/tabs/product-usage/ControlsView';
 import { TicketOverviewContainer } from './pages/dashboard/tabs/ticket-overview/TicketOverviewContainer';
 import { ControlsView as TicketControlsView } from './pages/dashboard/tabs/ticket-overview/ControlsView';
 // Company Brain pages
@@ -163,6 +165,14 @@ function App() {
                 <Route
                   path="*"
                   element={<Navigate to="/dashboard/advance/usage/controls" replace />}
+                />
+              </Route>
+              <Route path="product" element={<ProductUsageContainer />}>
+                <Route index element={<Navigate to="controls" replace />} />
+                <Route path="controls" element={<ProductControlsView />} />
+                <Route
+                  path="*"
+                  element={<Navigate to="/dashboard/advance/product/controls" replace />}
                 />
               </Route>
               <Route path="ticket" element={<TicketOverviewContainer />}>

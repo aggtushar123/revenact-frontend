@@ -1,0 +1,151 @@
+import { useMemo } from 'react';
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
+import type { CurrencyCode } from '../../../../../features/auth/authSlice';
+import type { ProductRow } from '../../../../../features/products/productsSlice';
+import {
+  formatCompactMoney,
+  formatMoney,
+} from '../../../../../features/customers/formatters';
+
+export interface ProductChurnChartProps {
+  rows: ProductRow[];
+  currency: CurrencyCode;
+}
+
+/**
+ * Churn by product: the bar is the ARR that left, the line is the share of
+ * everyone the product ever led.
+ *
+ * Both, because either alone misleads. A product with one $150K departure and
+ * a product with ten $15K departures lost the same money and are not the same
+ * problem, and a 50% churn rate on two customers is a coin toss rather than a
+ * verdict. Ranked by money, with the rate riding on top so a small product
+ * bleeding out is still visible.
+ *
+ * Products that have never lost anyone are left out — they are the good news,
+ * and a row of zeroes would squash the bars that matter.
+ */
+export function ProductChurnChart({ rows, currency }: ProductChurnChartProps) {
+  const data = useMemo(
+    () =>
+      rows
+        .filter((row) => row.churned > 0)
+        .map((row) => ({
+          name: row.product,
+          lost: row.churned_arr,
+          rate: row.churn_rate,
+          customers: row.churned,
+        }))
+        .sort((a, b) => b.lost - a.lost),
+    [rows]
+  );
+
+  const clean = rows.length - data.length;
+
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div className="px-4 pt-3">
+        <h3 className="text-[13px] font-bold text-ink">Churn by product</h3>
+        <p className="text-[11px] text-ink-faint mt-[1px]">
+          ARR that left, with the share of everyone the product ever led · ranked by money
+        </p>
+      </div>
+
+      <div className="flex-1 w-full min-h-0 px-2 pb-1">
+        {data.length === 0 ? (
+          <p className="px-2 py-6 text-[12px] text-ink-faint">
+            No customers in this selection have churned.
+          </p>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            {/* Capped for the same reason as the ARR chart: one product
+                selected should not mean one card-wide bar. */}
+            <ComposedChart
+              data={data}
+              margin={{ top: 14, right: 8, left: -6, bottom: 4 }}
+              maxBarSize={84}
+            >
+              <XAxis
+                dataKey="name"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: 'var(--text-tertiary)', fontSize: 9 }}
+                interval={0}
+                angle={-25}
+                textAnchor="end"
+                height={56}
+              />
+              <YAxis
+                yAxisId="money"
+                axisLine={false}
+                tickLine={false}
+                width={56}
+                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
+                tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+              />
+              <YAxis
+                yAxisId="rate"
+                orientation="right"
+                axisLine={false}
+                tickLine={false}
+                width={38}
+                domain={[0, 100]}
+                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
+                tickFormatter={(value: number) => `${value}%`}
+              />
+              <Tooltip
+                cursor={{ fill: 'var(--bg-subtle)' }}
+                contentStyle={{
+                  borderRadius: '8px',
+                  border: '1px solid var(--border-default)',
+                  fontSize: '12px',
+                }}
+                formatter={(value, name, item) =>
+                  name === 'rate'
+                    ? [`${value}% of everyone it ever led`, item?.payload?.name ?? '']
+                    : [
+                        `${formatMoney(Number(value ?? 0), currency)} · ${
+                          item?.payload?.customers ?? 0
+                        } left`,
+                        item?.payload?.name ?? '',
+                      ]
+                }
+              />
+              <Bar
+                yAxisId="money"
+                dataKey="lost"
+                fill="var(--danger)"
+                radius={[3, 3, 0, 0]}
+                isAnimationActive={false}
+              />
+              <Line
+                yAxisId="rate"
+                type="monotone"
+                dataKey="rate"
+                stroke="var(--ink, #111827)"
+                strokeWidth={2}
+                dot={{ r: 2 }}
+                isAnimationActive={false}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+
+      {clean > 0 && (
+        <p className="px-4 pb-3 text-[10.5px] text-ink-faint">
+          {clean} product{clean === 1 ? '' : 's'} here {clean === 1 ? 'has' : 'have'} never lost a
+          customer and {clean === 1 ? 'is' : 'are'} not charted.
+        </p>
+      )}
+    </div>
+  );
+}
