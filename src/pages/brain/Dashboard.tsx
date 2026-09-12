@@ -2,6 +2,7 @@ import { Brain } from 'lucide-react';
 import { MetricLayerPanel } from '../../components/brain/MetricLayerPanel';
 import { SignalsPanel } from '../../components/brain/SignalsPanel';
 import { DriversPanel } from '../../components/brain/DriversPanel';
+import { BriefPanel } from '../../components/brain/BriefPanel';
 
 /**
  * The Company Brain, as it actually stands.
@@ -33,6 +34,7 @@ export function BrainDashboard() {
         </p>
       </div>
 
+      <BriefPanel />
       <SignalsPanel />
       <MetricLayerPanel />
       <DriversPanel />

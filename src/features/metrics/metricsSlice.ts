@@ -79,6 +79,19 @@ export interface MetricsPayload {
   metrics: Metric[];
 }
 
+/** The management brief — the metric layer written out by Claude. */
+export interface Brief {
+  id: number;
+  as_of: string;
+  baseline: string | null;
+  headline: string;
+  /** Paragraphs separated by blank lines. */
+  body: string;
+  watch: string[];
+  generated_at: string;
+  generated_by: string | null;
+}
+
 interface MetricsState {
   data: MetricsPayload | null;
   isLoading: boolean;
@@ -89,6 +102,10 @@ interface MetricsState {
   slices: Record<string, SlicePayload>;
   sliceLoading: string | null;
   sliceError: string | null;
+  /** Null before the first brief is written; undefined until fetched. */
+  brief: Brief | null | undefined;
+  briefGenerating: boolean;
+  briefError: string | null;
 }
 
 const initialState: MetricsState = {
@@ -100,7 +117,33 @@ const initialState: MetricsState = {
   slices: {},
   sliceLoading: null,
   sliceError: null,
+  brief: undefined,
+  briefGenerating: false,
+  briefError: null,
 };
+
+export const fetchBrief = createAsyncThunk<Brief | null, void, { rejectValue: string }>(
+  'metrics/fetchBrief',
+  async (_, { rejectWithValue }) => {
+    try {
+      return (await apiFetch<{ brief: Brief | null }>('/metrics/brief/')).brief;
+    } catch (err) {
+      return rejectWithValue(err instanceof ApiError ? err.message : 'Could not load the brief.');
+    }
+  }
+);
+
+/** A real, paid model call — only ever from an explicit click. */
+export const generateBrief = createAsyncThunk<Brief, void, { rejectValue: string }>(
+  'metrics/generateBrief',
+  async (_, { rejectWithValue }) => {
+    try {
+      return (await apiFetch<{ brief: Brief }>('/metrics/brief/generate/', { method: 'POST' })).brief;
+    } catch (err) {
+      return rejectWithValue(err instanceof ApiError ? err.message : 'Could not write the brief.');
+    }
+  }
+);
 
 export const sliceKey = (metric: string, dimension: string) => `${metric}:${dimension}`;
 
@@ -177,6 +220,25 @@ const metricsSlice = createSlice({
       .addCase(fetchMetricSlice.rejected, (state, action) => {
         state.sliceLoading = null;
         state.sliceError = action.payload ?? 'Could not load that cut.';
+      })
+      .addCase(fetchBrief.fulfilled, (state, action) => {
+        state.brief = action.payload;
+      })
+      .addCase(fetchBrief.rejected, (state, action) => {
+        state.brief = null;
+        state.briefError = action.payload ?? 'Could not load the brief.';
+      })
+      .addCase(generateBrief.pending, (state) => {
+        state.briefGenerating = true;
+        state.briefError = null;
+      })
+      .addCase(generateBrief.fulfilled, (state, action) => {
+        state.briefGenerating = false;
+        state.brief = action.payload;
+      })
+      .addCase(generateBrief.rejected, (state, action) => {
+        state.briefGenerating = false;
+        state.briefError = action.payload ?? 'Could not write the brief.';
       });
   },
 });
