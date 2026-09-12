@@ -1,0 +1,428 @@
+import type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
+import { daysToRenewal, renewalDateOf } from './triage';
+
+/**
+ * The renewal book, read as money rather than as accounts.
+ *
+ * Every other Health Overview tab counts accounts. This one counts dollars,
+ * because a renewal is a revenue event: twelve healthy logos renewing next
+ * quarter and one shaky one worth more than all of them is a good quarter with
+ * a problem in it, and a chart of account counts says the opposite.
+ *
+ * The Movement tab's renewal runway is deliberately not this. That one answers
+ * "how many accounts renew when, and how healthy are they" as context for a
+ * trend; this answers "what is the money, where is it exposed, and who has to
+ * act on it this month".
+ *
+ * ## Rows with no ARR
+ *
+ * `arr` is null when the customer's contract currency has no exchange rate
+ * configured, so the backend refused to guess (see the health endpoint). Those
+ * rows are counted in the *account* figures and left out of every *money*
+ * figure, and each total reports how many it left out. The alternative —
+ * treating an unconverted amount as if it were already in the reporting
+ * currency — produces a confident wrong number, which is the one outcome worse
+ * than an incomplete one.
+ */
+
+/** Windows the book is sliced into, nearest first. `to` is exclusive. */
+export const RENEWAL_WINDOWS = [
+  { key: 'overdue', label: 'Overdue', from: -Infinity, to: 0 },
+  { key: '30', label: 'Next 30 days', from: 0, to: 31 },
+  { key: '60', label: '31–60 days', from: 31, to: 61 },
+  { key: '90', label: '61–90 days', from: 61, to: 91 },
+  { key: '180', label: '91–180 days', from: 91, to: 181 },
+] as const;
+
+export type RenewalWindowKey = (typeof RENEWAL_WINDOWS)[number]['key'];
+
+/** The horizon the headline figures speak for. A quarter is the unit a renewal
+ *  forecast is actually managed in, and it is far enough out that a save is
+ *  still possible — inside 30 days the outcome is largely already decided. */
+export const HEADLINE_HORIZON_DAYS = 90;
+
+/** How far out the quarterly chart looks. Six quarters covers this year and
+ *  next year's first half, which is as far as a renewal date is worth
+ *  planning against; beyond that the dates themselves are guesses. */
+export const QUARTERS_AHEAD = 6;
+
+/**
+ * Contact age thresholds, in days since the last logged activity.
+ *
+ * `FRESH` is a month because that is the cadence a CSM is expected to keep on
+ * a named account; `COLD` is two, the point at which a renewal conversation
+ * has to start from scratch rather than continue.
+ */
+export const CONTACT_FRESH_DAYS = 30;
+export const CONTACT_COLD_DAYS = 60;
+
+export type Coverage = 'fresh' | 'ageing' | 'cold' | 'unknown';
+
+export function coverageOf(row: HealthDataRow): Coverage {
+  if (row.daysSinceTouch === null) return 'unknown';
+  if (row.daysSinceTouch <= CONTACT_FRESH_DAYS) return 'fresh';
+  if (row.daysSinceTouch <= CONTACT_COLD_DAYS) return 'ageing';
+  return 'cold';
+}
+
+/**
+ * Probability this renewal is lost, as a plain stated assumption.
+ *
+ * **This is a business rule, not a model.** Nothing here was fitted to
+ * historical churn — this product has no churn history to fit to. It is the
+ * judgement a CSM leader already applies in a forecast review, written down so
+ * every chart applies it the same way and so it can be argued with in one
+ * place instead of being re-invented per chart.
+ *
+ * Base rate by current health, then three adjustments, each for a thing that
+ * genuinely changes the odds independently of the grade:
+ *
+ * - **No recent contact.** A renewal you haven't discussed is a renewal you
+ *   are not in. Worth more than the pulse disagreement below, because it is a
+ *   fact rather than an opinion.
+ * - **The two pulses disagree by 2+.** Somebody is wrong about this account,
+ *   and being wrong about an account inside its renewal window is itself a
+ *   risk — the Divergence tab exists for the same reason.
+ * - **Still in pilot.** Nothing is embedded yet, so there is less to lose by
+ *   walking away.
+ *
+ * Capped below 1: a renewal is never *certain* to be lost while it is still
+ * open, and a 100% line item invites people to stop working it.
+ */
+export const BASE_RISK: Record<HealthStatus, number> = {
+  Good: 0.05,
+  Average: 0.25,
+  Poor: 0.5,
+};
+
+export const RISK_ADJUSTMENTS = {
+  coldContact: 0.1,
+  pulseDisagreement: 0.1,
+  pilot: 0.05,
+} as const;
+
+export const MAX_RISK = 0.9;
+
+/** How far apart the two pulses have to be to count as disagreement. Matches
+ *  the Divergence tab's own threshold — one point is rounding on a five-point
+ *  scale, two is a difference of opinion. */
+export const PULSE_GAP_THRESHOLD = 2;
+
+export interface RiskFactor {
+  label: string;
+  points: number;
+}
+
+export function riskOfLoss(row: HealthDataRow): { risk: number; factors: RiskFactor[] } {
+  const base = BASE_RISK[row.healthStatus];
+  const factors: RiskFactor[] = [{ label: `${row.healthStatus} health`, points: base }];
+
+  if (coverageOf(row) === 'cold') {
+    factors.push({
+      label: `No contact in ${row.daysSinceTouch} days`,
+      points: RISK_ADJUSTMENTS.coldContact,
+    });
+  }
+
+  const gap =
+    row.csmPulseScore !== null && row.aiPulseScore !== null
+      ? Math.abs(row.csmPulseScore - row.aiPulseScore)
+      : null;
+  if (gap !== null && gap >= PULSE_GAP_THRESHOLD) {
+    factors.push({ label: 'CSM and AI pulse disagree', points: RISK_ADJUSTMENTS.pulseDisagreement });
+  }
+
+  if (/pilot/i.test(row.lifecycleStage)) {
+    factors.push({ label: 'Still in pilot', points: RISK_ADJUSTMENTS.pilot });
+  }
+
+  const risk = Math.min(
+    MAX_RISK,
+    factors.reduce((sum, f) => sum + f.points, 0)
+  );
+  return { risk, factors };
+}
+
+export interface RenewalRow {
+  row: HealthDataRow;
+  days: number;
+  windowKey: RenewalWindowKey | null;
+  coverage: Coverage;
+  risk: number;
+  factors: RiskFactor[];
+  /** ARR × risk — the money this renewal is expected to cost if it goes the
+   *  way the factors above suggest. Null when the ARR couldn't be converted. */
+  exposure: number | null;
+}
+
+function windowFor(days: number): RenewalWindowKey | null {
+  const found = RENEWAL_WINDOWS.find((w) => days >= w.from && days < w.to);
+  return found ? found.key : null;
+}
+
+/**
+ * Every account with a renewal date, scored.
+ *
+ * An account with no renewal date recorded is absent, not sorted to the end:
+ * this tab is about dated commitments, and a blank date is a CRM gap rather
+ * than a renewal far in the future. `withoutDate` counts them so the view can
+ * say how much of the book it can't speak for.
+ */
+export function renewalRows(
+  rows: HealthDataRow[],
+  now: Date = new Date()
+): { rows: RenewalRow[]; withoutDate: number } {
+  const scored: RenewalRow[] = [];
+  let withoutDate = 0;
+
+  for (const row of rows) {
+    const days = daysToRenewal(row, now);
+    if (days === null) {
+      withoutDate += 1;
+      continue;
+    }
+    const { risk, factors } = riskOfLoss(row);
+    scored.push({
+      row,
+      days,
+      windowKey: windowFor(days),
+      coverage: coverageOf(row),
+      risk,
+      factors,
+      exposure: row.arr === null ? null : row.arr * risk,
+    });
+  }
+
+  return { rows: scored, withoutDate };
+}
+
+export interface RenewalSummary {
+  /** Renewals inside the headline horizon. */
+  count: number;
+  arr: number;
+  /** Rows in the horizon whose ARR couldn't be converted. */
+  unpriced: number;
+  /** Σ ARR × risk across the horizon — the forecast loss, not the whole book. */
+  exposure: number;
+  /** Renewals in the horizon with no contact in CONTACT_COLD_DAYS. */
+  coldCount: number;
+  coldArr: number;
+  /** Renewal dates already passed, which is a real and urgent state: either
+   *  the renewal slipped or nobody updated the record after it closed. */
+  overdueCount: number;
+  overdueArr: number;
+}
+
+export function summarise(scored: RenewalRow[]): RenewalSummary {
+  const summary: RenewalSummary = {
+    count: 0,
+    arr: 0,
+    unpriced: 0,
+    exposure: 0,
+    coldCount: 0,
+    coldArr: 0,
+    overdueCount: 0,
+    overdueArr: 0,
+  };
+
+  for (const item of scored) {
+    if (item.days < 0) {
+      summary.overdueCount += 1;
+      summary.overdueArr += item.row.arr ?? 0;
+      continue;
+    }
+    if (item.days > HEADLINE_HORIZON_DAYS) continue;
+
+    summary.count += 1;
+    if (item.row.arr === null) {
+      summary.unpriced += 1;
+    } else {
+      summary.arr += item.row.arr;
+      summary.exposure += item.exposure ?? 0;
+    }
+    if (item.coverage === 'cold') {
+      summary.coldCount += 1;
+      summary.coldArr += item.row.arr ?? 0;
+    }
+  }
+
+  return summary;
+}
+
+export interface QuarterColumn {
+  /** Sortable key, e.g. "2026-Q3". */
+  key: string;
+  /** Axis label, e.g. "Q3 '26". */
+  label: string;
+  arr: Record<HealthStatus, number>;
+  total: number;
+  count: number;
+}
+
+const QUARTER_OF = (date: Date) => Math.floor(date.getMonth() / 3) + 1;
+
+/**
+ * ARR by the calendar quarter it renews in, split by current health.
+ *
+ * Quarters rather than months because a renewal book is planned and reported
+ * quarterly, and twelve monthly bars of a fifteen-account book are mostly
+ * empty. The series runs continuously from the current quarter so a quarter
+ * with nothing renewing reads as a gap in the schedule rather than vanishing
+ * and making the next one look adjacent.
+ *
+ * Overdue renewals are not here. They belong to a date that has passed, and
+ * hanging them off the current quarter would inflate a number people commit
+ * to; the summary calls them out separately instead.
+ */
+export function quarterColumns(
+  scored: RenewalRow[],
+  now: Date = new Date(),
+  quarters: number = QUARTERS_AHEAD
+): QuarterColumn[] {
+  const columns: QuarterColumn[] = [];
+  const start = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+
+  for (let i = 0; i < quarters; i += 1) {
+    const at = new Date(start.getFullYear(), start.getMonth() + i * 3, 1);
+    const quarter = QUARTER_OF(at);
+    columns.push({
+      key: `${at.getFullYear()}-Q${quarter}`,
+      label: `Q${quarter} '${String(at.getFullYear()).slice(2)}`,
+      arr: { Good: 0, Average: 0, Poor: 0 },
+      total: 0,
+      count: 0,
+    });
+  }
+
+  const byKey = new Map(columns.map((c) => [c.key, c]));
+
+  for (const item of scored) {
+    if (item.days < 0) continue;
+    const date = renewalDateOf(item.row, now);
+    if (date === null) continue;
+
+    const column = byKey.get(`${date.getFullYear()}-Q${QUARTER_OF(date)}`);
+    if (!column) continue;
+
+    column.count += 1;
+    const arr = item.row.arr ?? 0;
+    column.arr[item.row.healthStatus] += arr;
+    column.total += arr;
+  }
+
+  return columns;
+}
+
+export interface CoverageBand {
+  key: RenewalWindowKey;
+  label: string;
+  fresh: number;
+  ageing: number;
+  cold: number;
+  unknown: number;
+  total: number;
+  count: number;
+}
+
+/**
+ * ARR per renewal window, split by how recently the account was contacted.
+ *
+ * The chart a renewals meeting is actually run off: it shows the money that
+ * renews soon *and* has nobody talking to it, which is the only combination
+ * worth interrupting someone's week over. Health is deliberately absent —
+ * that's the quarter chart's axis, and a Good account nobody has spoken to in
+ * three months is exactly the case a health-only view misses.
+ */
+export function coverageBands(scored: RenewalRow[]): CoverageBand[] {
+  return RENEWAL_WINDOWS.map((window) => {
+    const band: CoverageBand = {
+      key: window.key,
+      label: window.label,
+      fresh: 0,
+      ageing: 0,
+      cold: 0,
+      unknown: 0,
+      total: 0,
+      count: 0,
+    };
+
+    for (const item of scored) {
+      if (item.windowKey !== window.key) continue;
+      const arr = item.row.arr ?? 0;
+      band[item.coverage] += arr;
+      band.total += arr;
+      band.count += 1;
+    }
+
+    return band;
+  });
+}
+
+export interface OwnerLoad {
+  owner: string;
+  /** ARR renewing inside the horizon. */
+  arr: number;
+  /** Σ ARR × risk for the same set — the part of that book at risk. */
+  exposure: number;
+  count: number;
+}
+
+/**
+ * Renewal load per owner inside a horizon, heaviest first.
+ *
+ * A management view, not a leaderboard: it answers "who is carrying the
+ * quarter, and is anyone carrying more exposure than one person can work".
+ * Exposure rather than a simple at-risk count, because six shaky small
+ * accounts and one shaky large one are not the same amount of trouble.
+ */
+export function ownerLoad(
+  scored: RenewalRow[],
+  horizonDays: number = 180
+): OwnerLoad[] {
+  const byOwner = new Map<string, OwnerLoad>();
+
+  for (const item of scored) {
+    if (item.days < 0 || item.days > horizonDays) continue;
+    const entry = byOwner.get(item.row.owner) ?? {
+      owner: item.row.owner,
+      arr: 0,
+      exposure: 0,
+      count: 0,
+    };
+    entry.arr += item.row.arr ?? 0;
+    entry.exposure += item.exposure ?? 0;
+    entry.count += 1;
+    byOwner.set(item.row.owner, entry);
+  }
+
+  return [...byOwner.values()].sort((a, b) => b.arr - a.arr || a.owner.localeCompare(b.owner));
+}
+
+/**
+ * The renewals to work, highest expected loss first.
+ *
+ * Ranked by exposure rather than by ARR or by health alone: the biggest
+ * contract is not the one most likely to leave, and the sickest account may be
+ * worth a rounding error. Overdue renewals sort first regardless of size,
+ * because a date that has already passed needs an answer today whatever it is
+ * worth.
+ *
+ * Rows with no convertible ARR can't be ranked by money, so they sort last on
+ * risk alone rather than being dropped — the account still needs working.
+ */
+export function renewalQueue(
+  scored: RenewalRow[],
+  horizonDays: number = HEADLINE_HORIZON_DAYS
+): RenewalRow[] {
+  return scored
+    .filter((item) => item.days <= horizonDays)
+    .sort((a, b) => {
+      const overdue = Number(b.days < 0) - Number(a.days < 0);
+      if (overdue !== 0) return overdue;
+      if (a.exposure === null || b.exposure === null) {
+        if (a.exposure !== b.exposure) return a.exposure === null ? 1 : -1;
+        return b.risk - a.risk;
+      }
+      return b.exposure - a.exposure || a.days - b.days;
+    });
+}

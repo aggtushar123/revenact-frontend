@@ -12,7 +12,9 @@ export function HealthOverviewContainer() {
     { label: 'Divergence', path: 'divergence' },
     { label: 'Movement', path: 'movement' },
     { label: 'Controls', path: 'controls' },
-    { label: 'Renewal Date', suffix: 'All', path: 'renewal-date' },
+    // No "All" suffix any more: this used to render as a filter chip and route
+    // to a placeholder. It's a real tab — the renewal book read as money.
+    { label: 'Renewal Date', path: 'renewal-date' },
     { label: 'Primary Owner', suffix: 'All', path: 'primary-owner' },
     { label: 'Lifecycle Stage', suffix: 'All', path: 'lifecycle-stage' },
     { label: 'Account', suffix: 'All', path: 'account' },

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
 import { buildFlow, monthsOf, netMovement, renewalBuckets, renewalMonths } from './movement';
+import { healthRow } from './testUtils';
 
 /** Local midnight, matching the other suites, so calendar maths is stable. */
 const NOW = new Date(2026, 5, 15); // 15 Jun 2026
@@ -11,24 +12,13 @@ function makeRow(
   statuses: (HealthStatus | null)[],
   overrides: Partial<HealthDataRow> = {},
 ): HealthDataRow {
-  return {
-    id: '1',
-    account: 'Acme',
-    owner: 'Gerry Hill',
-    lifecycleStage: 'Customer - Active',
-    renewalDate: 'Dec 31, 2026',
+  return healthRow({
     healthStatus: statuses[statuses.length - 1] ?? 'Good',
-    healthScore: 8,
-    csmPulseScore: 4,
-    aiPulseScore: 4,
-    lastPulseModified: 'Feb 4, 2026',
-    aiPulseReason: 'Seat utilisation at 94% of contract',
-    activeSeats: 20,
     history: statuses
       .map((status, i) => (status ? { month: M[i], status } : null))
       .filter((h): h is { month: string; status: HealthStatus } => h !== null),
     ...overrides,
-  };
+  });
 }
 
 describe('monthsOf', () => {

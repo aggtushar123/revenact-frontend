@@ -11,7 +11,8 @@ import { fetchHealthOverview } from '../../../../features/health/healthSlice';
  */
 export function useHealthOverview() {
   const dispatch = useAppDispatch();
-  const { rows, isLoading, error, truncated, loadedAt } = useAppSelector((state) => state.health);
+  const { rows, isLoading, error, truncated, loadedAt, currency, unconvertedCount } =
+    useAppSelector((state) => state.health);
 
   useEffect(() => {
     if (loadedAt === null && !isLoading) {
@@ -23,6 +24,9 @@ export function useHealthOverview() {
     rows,
     error,
     truncated,
+    /** For the Renewal tab's money totals — see the slice's own notes. */
+    currency,
+    unconvertedCount,
     /** True only on the first load — a refresh keeps the old rows on screen. */
     isInitialLoad: isLoading && loadedAt === null,
     hasLoaded: loadedAt !== null,

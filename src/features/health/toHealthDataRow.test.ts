@@ -20,7 +20,9 @@ function apiRow(overrides: Partial<CustomerHealthApiRow> = {}): CustomerHealthAp
     csm_pulse_modified_at: '2026-08-19T09:30:00Z',
     ai_pulse_value: 2,
     ai_pulse_reason: 'Career-site traffic down 42% QoQ',
-    total_active_seats: 822,
+    arr: 120000,
+  days_since_touch: 14,
+  total_active_seats: 822,
     history: [
       {
         captured_on: '2025-09-30',

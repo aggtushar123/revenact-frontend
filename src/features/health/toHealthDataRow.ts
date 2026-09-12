@@ -1,4 +1,5 @@
 import { format, parseISO } from 'date-fns';
+import type { CurrencyCode } from '../auth/authSlice';
 import type { HealthDataRow, HealthHistoryEntry, HealthStatus } from './types';
 
 /** One row of `GET /api/v1/customers/health/`. */
@@ -15,6 +16,9 @@ export interface CustomerHealthApiRow {
   csm_pulse_modified_at: string | null;
   ai_pulse_value: number | null;
   ai_pulse_reason: string;
+  /** In the organisation's reporting currency; null when unconvertible. */
+  arr: number | null;
+  days_since_touch: number | null;
   total_active_seats: number | null;
   history: {
     captured_on: string;
@@ -31,6 +35,11 @@ export interface CustomerHealthApiResponse {
   history_months: number;
   /** True when the book was larger than the endpoint's cap and rows were cut. */
   truncated: boolean;
+  /** The reporting currency every `arr` above is denominated in. */
+  currency: CurrencyCode;
+  /** Rows whose ARR couldn't be converted into it. The Renewal tab names this
+   *  rather than quietly totalling a partial book. */
+  unconverted_count: number;
 }
 
 const STATUS_BY_CATEGORY: Record<CustomerHealthApiRow['health_category'], HealthStatus> = {
@@ -79,6 +88,8 @@ export function toHealthDataRow(row: CustomerHealthApiRow): HealthDataRow {
       ? toDisplayDate(row.csm_pulse_modified_at.slice(0, 10))
       : null,
     aiPulseReason: row.ai_pulse_reason,
+    arr: row.arr,
+    daysSinceTouch: row.days_since_touch,
     activeSeats: row.total_active_seats,
     history: toHistory(row.history),
   };

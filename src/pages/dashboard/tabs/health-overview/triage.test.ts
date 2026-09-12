@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
+import type { HealthStatus } from '../../../../features/health/types';
+import { healthRow } from './testUtils';
 import {
   ACTION_THRESHOLD,
   daysToRenewal,
@@ -16,24 +17,7 @@ import {
 /** Local midnight, so date-fns' calendar-day maths doesn't straddle a TZ edge. */
 const NOW = new Date(2026, 5, 15); // 15 Jun 2026
 
-function makeRow(overrides: Partial<HealthDataRow> = {}): HealthDataRow {
-  return {
-    id: '1',
-    account: 'Acme',
-    owner: 'Gerry Hill',
-    lifecycleStage: 'Customer - Active',
-    renewalDate: 'Dec 31, 2026',
-    healthStatus: 'Good',
-    healthScore: 8,
-    csmPulseScore: 4,
-    aiPulseScore: 4,
-    lastPulseModified: 'Feb 4, 2026',
-    aiPulseReason: 'Seat utilisation at 94% of contract',
-    activeSeats: 20,
-    history: [],
-    ...overrides,
-  };
-}
+const makeRow = healthRow;
 
 const history = (...statuses: HealthStatus[]) =>
   statuses.map((status, i) => ({ month: `M${i}`, status }));

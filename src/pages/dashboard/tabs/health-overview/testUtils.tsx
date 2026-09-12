@@ -3,7 +3,36 @@ import { Provider } from 'react-redux';
 import { render } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import healthReducer from '../../../../features/health/healthSlice';
+import type { CurrencyCode } from '../../../../features/auth/authSlice';
 import type { HealthDataRow } from '../../../../features/health/types';
+
+/**
+ * One `HealthDataRow` with sane defaults, overridable field by field.
+ *
+ * Every test file used to carry its own copy of this. They drifted the moment
+ * the row type gained a field — five identical edits, four of which are easy to
+ * forget — so it lives here now, next to the store helper the same tests use.
+ */
+export function healthRow(overrides: Partial<HealthDataRow> = {}): HealthDataRow {
+  return {
+    id: '1',
+    account: 'Acme',
+    owner: 'Gerry Hill',
+    lifecycleStage: 'Customer - Active',
+    renewalDate: 'Dec 31, 2026',
+    healthStatus: 'Good',
+    healthScore: 8,
+    csmPulseScore: 4,
+    aiPulseScore: 4,
+    lastPulseModified: 'Feb 4, 2026',
+    aiPulseReason: 'Seat utilisation at 94% of contract',
+    arr: 100_000,
+    daysSinceTouch: 10,
+    activeSeats: 20,
+    history: [],
+    ...overrides,
+  };
+}
 
 /**
  * Render a Health Overview tab over a given book.
@@ -21,12 +50,16 @@ export function renderWithHealth(
     error = null,
     truncated = false,
     loaded = true,
+    currency = 'USD',
+    unconvertedCount = 0,
   }: {
     rows?: HealthDataRow[];
     isLoading?: boolean;
     error?: string | null;
     truncated?: boolean;
     loaded?: boolean;
+    currency?: CurrencyCode;
+    unconvertedCount?: number;
   } = {},
 ) {
   const store = configureStore({
@@ -39,6 +72,8 @@ export function renderWithHealth(
         historyMonths: 12,
         truncated,
         loadedAt: loaded ? '2026-09-11T00:00:00.000Z' : null,
+        currency,
+        unconvertedCount,
       },
     },
   });

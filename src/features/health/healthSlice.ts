@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiFetch, ApiError } from '../../lib/apiClient';
+import type { CurrencyCode } from '../auth/authSlice';
 import { toHealthDataRows } from './toHealthDataRow';
 import type { CustomerHealthApiResponse } from './toHealthDataRow';
 import type { HealthDataRow } from './types';
@@ -24,6 +25,12 @@ interface HealthState {
   truncated: boolean;
   /** Null until the first successful load. */
   loadedAt: string | null;
+  /** The currency every row's `arr` is denominated in — the organisation's own
+   *  reporting currency, per the backend's conversion. */
+  currency: CurrencyCode;
+  /** Rows whose ARR couldn't be converted into it. The Renewal tab names this
+   *  rather than quietly totalling a partial book. */
+  unconvertedCount: number;
 }
 
 const initialState: HealthState = {
@@ -33,12 +40,18 @@ const initialState: HealthState = {
   historyMonths: 0,
   truncated: false,
   loadedAt: null,
+  // A placeholder until the first load, not a claim: nothing renders money
+  // before `loadedAt` is set.
+  currency: 'USD',
+  unconvertedCount: 0,
 };
 
 interface HealthPayload {
   rows: HealthDataRow[];
   historyMonths: number;
   truncated: boolean;
+  currency: CurrencyCode;
+  unconvertedCount: number;
 }
 
 export const fetchHealthOverview = createAsyncThunk<
@@ -54,6 +67,8 @@ export const fetchHealthOverview = createAsyncThunk<
       rows: toHealthDataRows(data.results),
       historyMonths: data.history_months,
       truncated: data.truncated,
+      currency: data.currency,
+      unconvertedCount: data.unconverted_count,
     };
   } catch (err) {
     const message = err instanceof ApiError ? err.message : 'Could not load account health.';
@@ -76,6 +91,8 @@ export const healthSlice = createSlice({
         state.rows = action.payload.rows;
         state.historyMonths = action.payload.historyMonths;
         state.truncated = action.payload.truncated;
+        state.currency = action.payload.currency;
+        state.unconvertedCount = action.payload.unconvertedCount;
         state.loadedAt = new Date().toISOString();
       })
       .addCase(fetchHealthOverview.rejected, (state, action) => {

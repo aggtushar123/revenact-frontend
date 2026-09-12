@@ -4,6 +4,7 @@ import type { HealthDataRow, HealthStatus } from '../../../../../features/health
 import { AccountsByRenewalDateBar } from './AccountsByRenewalDateBar';
 import { HealthChangeOverTimeStacked } from './HealthChangeOverTimeStacked';
 import { topSegment } from './stackedTotalLabel';
+import { healthRow } from '../testUtils';
 
 // Both of these charts used to ignore the data they were handed and draw
 // invented numbers — a hardcoded month list scaled by row count, and a
@@ -13,26 +14,12 @@ import { topSegment } from './stackedTotalLabel';
 
 const M = ['Jan 31, 2026', 'Feb 28, 2026', 'Mar 31, 2026', 'Apr 30, 2026'];
 
-function makeRow(
-  statuses: HealthStatus[],
-  overrides: Partial<HealthDataRow> = {},
-): HealthDataRow {
-  return {
-    id: '1',
-    account: 'Acme',
-    owner: 'Gerry Hill',
-    lifecycleStage: 'Customer - Active',
-    renewalDate: 'Dec 31, 2026',
+function makeRow(statuses: HealthStatus[], overrides: Partial<HealthDataRow> = {}): HealthDataRow {
+  return healthRow({
     healthStatus: statuses[statuses.length - 1] ?? 'Good',
-    healthScore: 8,
-    csmPulseScore: 4,
-    aiPulseScore: 4,
-    lastPulseModified: 'Feb 4, 2026',
-    aiPulseReason: 'Seat utilisation at 94% of contract',
-    activeSeats: 20,
     history: statuses.map((status, i) => ({ month: M[i], status })),
     ...overrides,
-  };
+  });
 }
 
 describe('AccountsByRenewalDateBar', () => {

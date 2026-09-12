@@ -41,6 +41,24 @@ export interface HealthDataRow {
   lastPulseModified: string | null;
   aiPulseReason: string;
   /**
+   * Annual recurring revenue, already converted into the organisation's own
+   * reporting currency by the backend — **null when it couldn't be**.
+   *
+   * Null means that customer's contract currency has no exchange rate
+   * configured, not that the contract is worth nothing. Every money total on
+   * the Renewal tab leaves those rows out and says how many it left out;
+   * treating an unconverted figure as if it were already in the reporting
+   * currency is the one outcome worse than excluding it.
+   */
+  arr: number | null;
+  /**
+   * Days since the last logged activity — the same number the health score's
+   * Customer Touch component is built from, not a second definition of
+   * "touched". An account nobody has ever touched is measured from when it
+   * arrived, so a logo onboarded last week doesn't read as neglected.
+   */
+  daysSinceTouch: number | null;
+  /**
    * Seats in active use. The mock called this `activeRecruiters` and invented
    * it; the backend has `total_active_seats` and no recruiter count at all.
    */

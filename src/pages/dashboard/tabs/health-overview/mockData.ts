@@ -162,6 +162,11 @@ const generateMockData = (): HealthDataRow[] => {
       aiPulseScore: aiPulse,
       lastPulseModified: 'Feb 4, 2026',
       aiPulseReason: reasonFor(status, aiPulse, csmPulse),
+      // Log-ish spread rather than uniform: a real book has a few large
+      // contracts carrying most of the revenue, which is the shape the Renewal
+      // tab's money charts are read against.
+      arr: Math.round((5_000 + Math.random() ** 3 * 400_000) / 1000) * 1000,
+      daysSinceTouch: Math.floor(Math.random() * 120),
       activeSeats: Math.floor(Math.random() * 50) + 10,
       history: historyEndingAt(status)
     });
@@ -184,6 +189,8 @@ const generateMockData = (): HealthDataRow[] => {
     aiPulseScore: 2,
     lastPulseModified: 'Feb 4, 2026',
     aiPulseReason: 'Exec sponsor left; no replacement mapped',
+    arr: 180_000,
+    daysSinceTouch: 96,
     activeSeats: 38,
     // Deliberately empty: this hand-written row is the one account with no
     // pulse history, which keeps the "no trajectory" path exercised on screen.
