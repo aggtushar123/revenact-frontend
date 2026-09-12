@@ -106,7 +106,10 @@ export function CopilotIndex() {
 
     const refreshMessages = () => {
       fetchConversation(activeConversationId)
-        .then((conversation) => setMessages(conversation.messages))
+        .then((conversation) => {
+          setMessages(conversation.messages);
+          setVisibility(conversation.visibility ?? 'full');
+        })
         .catch(() => {});
     };
 
@@ -159,7 +162,10 @@ export function CopilotIndex() {
     setMessages([]);
     setSendError(null);
     fetchConversation(conversationId)
-      .then((conversation) => setMessages(conversation.messages))
+      .then((conversation) => {
+        setMessages(conversation.messages);
+        setVisibility(conversation.visibility ?? 'full');
+      })
       .catch((err) =>
         setSendError(
           err instanceof ApiError && err.status === 404
