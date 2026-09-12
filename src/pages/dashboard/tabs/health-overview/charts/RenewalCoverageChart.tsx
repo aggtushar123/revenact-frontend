@@ -53,8 +53,12 @@ export function RenewalCoverageChart({ bands, currency }: RenewalCoverageChartPr
     [bands]
   );
 
+  // The three windows inside 90 days — not 91–180, and **not overdue**: an
+  // overdue renewal is not "renewing in 90 days", and counting it here made
+  // this headline contradict the tile above it, which reads the same book.
+  const NINETY_DAY_WINDOWS = ['30', '60', '90'];
   const exposed = bands
-    .filter((band) => band.key !== '180')
+    .filter((band) => NINETY_DAY_WINDOWS.includes(band.key))
     .reduce((sum, band) => sum + band.cold, 0);
 
   return (

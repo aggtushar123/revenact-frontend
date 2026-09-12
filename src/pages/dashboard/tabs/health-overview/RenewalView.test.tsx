@@ -158,6 +158,23 @@ describe('RenewalView', () => {
     expect(screen.getByText(/\$240\.0K renewing in 90 days with no recent contact/)).toBeInTheDocument();
   });
 
+  it('does not count an overdue renewal as "renewing in 90 days"', () => {
+    // Caught on screen: the coverage headline read $69.6K while the tile
+    // beside it, reading the same book, read $0 — the difference was one
+    // overdue account being counted as if it were still ahead.
+    renderWithHealth(<RenewalView />, {
+      rows: [renewingIn(-40, { id: '7', account: 'Slipped Ltd', arr: 70_000, daysSinceTouch: 200 })],
+    });
+
+    // Asserted on the tile's own sentence rather than on "$0": Intl renders a
+    // compact zero as "$0.0" under Node's ICU and "$0" under Chrome's, and the
+    // claim being tested is about the count, not the formatter.
+    expect(
+      within(tile('No recent contact')).getByText(/0 renewing with nothing logged in 60 days/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/renewing in 90 days with no recent contact/)).not.toBeInTheDocument();
+  });
+
   it('says the book is empty rather than drawing empty charts', () => {
     renderWithHealth(<RenewalView />, { rows: [] });
 
