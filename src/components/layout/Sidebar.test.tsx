@@ -5,11 +5,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
-import brainReducer from '../../features/brain/brainSlice';
 import { Sidebar } from './Sidebar';
 
 // Integration tier (see the `testing` skill): real store (auth for the
-// admin-only Users link, brain for the review-count badge) + real
+// admin-only Users link) + real
 // router context; only the fetch boundary for the sidebar's own real
 // "CUSTOM OBJECTS" section is mocked.
 
@@ -18,7 +17,7 @@ function jsonResponse(status: number, body: unknown) {
 }
 
 function renderSidebar() {
-  const store = configureStore({ reducer: { auth: authReducer, brain: brainReducer } });
+  const store = configureStore({ reducer: { auth: authReducer } });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={['/dashboard']}>

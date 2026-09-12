@@ -5,7 +5,6 @@ import { Provider } from 'react-redux';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
-import brainReducer from '../../features/brain/brainSlice';
 import customersReducer from '../../features/customers/customersSlice';
 import notificationsReducer from '../../features/notifications/notificationsSlice';
 import type { Notification } from '../../features/notifications/types';
@@ -112,7 +111,6 @@ function renderNavbar(
   const store = configureStore({
     reducer: {
       auth: authReducer,
-      brain: brainReducer,
       customers: customersReducer,
       notifications: notificationsReducer,
     },

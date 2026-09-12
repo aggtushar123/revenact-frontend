@@ -60,14 +60,6 @@ import { TicketOverviewContainer } from './pages/dashboard/tabs/ticket-overview/
 import { ControlsView as TicketControlsView } from './pages/dashboard/tabs/ticket-overview/ControlsView';
 // Company Brain pages
 import { BrainDashboard } from './pages/brain/Dashboard';
-import { KnowledgeGraph } from './pages/brain/Graph';
-import { KnowledgeNodes } from './pages/brain/Nodes';
-import { NodeDetail } from './pages/brain/NodeDetail';
-import { SkillsLibrary } from './pages/brain/Skills';
-import { SkillDetail } from './pages/brain/SkillDetail';
-import { ConnectorsPage } from './pages/brain/Connectors';
-import { ReviewQueue } from './pages/brain/Review';
-import { FeedbackLog } from './pages/brain/Feedback';
 
 function RootRedirect() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -281,18 +273,12 @@ function App() {
             <Route path="board" element={<PipelinesPage view="board" />} />
           </Route>
 
-          {/* Company Brain routes */}
+          {/* Company Brain: one real page now (the metric layer). The mock
+              knowledge-graph pages that lived under here were removed. */}
           <Route path="brain">
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<BrainDashboard />} />
-            <Route path="graph" element={<KnowledgeGraph />} />
-            <Route path="nodes" element={<KnowledgeNodes />} />
-            <Route path="nodes/:id" element={<NodeDetail />} />
-            <Route path="skills" element={<SkillsLibrary />} />
-            <Route path="skills/:id" element={<SkillDetail />} />
-            <Route path="connectors" element={<ConnectorsPage />} />
-            <Route path="review" element={<ReviewQueue />} />
-            <Route path="feedback" element={<FeedbackLog />} />
+            <Route path="*" element={<Navigate to="/brain/dashboard" replace />} />
           </Route>
           
           {/* Catch-all route to avoid losing layout on unimplemented tabs */}

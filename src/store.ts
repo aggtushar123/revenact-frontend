@@ -2,7 +2,6 @@ import { configureStore } from '@reduxjs/toolkit';
 import counterReducer from './features/counter/counterSlice';
 import authReducer, { loggedOut, refreshSession } from './features/auth/authSlice';
 import tasksReducer from './features/tasks/tasksSlice';
-import brainReducer from './features/brain/brainSlice';
 import userManagementReducer from './features/userManagement/userManagementSlice';
 import customersReducer from './features/customers/customersSlice';
 import copilotSessionsReducer from './features/copilotSessions/copilotSessionsSlice';
@@ -23,7 +22,6 @@ export const store = configureStore({
     counter: counterReducer,
     auth: authReducer,
     tasks: tasksReducer,
-    brain: brainReducer,
     userManagement: userManagementReducer,
     customers: customersReducer,
     copilotSessions: copilotSessionsReducer,

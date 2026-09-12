@@ -4,9 +4,9 @@ import {
   LayoutGrid, MessageSquare, Network, Layers, Users,
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
-  Brain, GitMerge, BookOpen, CheckSquare, Zap
+  Brain
 } from 'lucide-react';
-import { useAppSelector, useCapability } from '../../hooks';
+import { useCapability } from '../../hooks';
 import { fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
 import type { CustomObjectDefinition } from '../../features/customObjects/types';
 
@@ -15,7 +15,6 @@ export function Sidebar() {
   const location = useLocation();
 
   const isOrgsActive = location.pathname.includes('/organizations');
-  const reviewCount = useAppSelector(s => s.brain.metrics.nodesPendingReview);
   // The Users link gates on the capability its page actually needs, not
   // on holding a role called "admin" — an org can define any role it
   // likes now, including one that grants exactly this and nothing else.
@@ -129,12 +128,6 @@ export function Sidebar() {
         )}
 
         <NavItem to="/brain/dashboard" icon={<Brain className="w-[18px] h-[18px]" />} label="Brain Overview" isExpanded={isExpanded} />
-        <NavItem to="/brain/graph" icon={<GitMerge className="w-[18px] h-[18px]" />} label="Knowledge Graph" isExpanded={isExpanded} />
-        <NavItem to="/brain/nodes" icon={<Network className="w-[18px] h-[18px]" />} label="Nodes" isExpanded={isExpanded} badge={reviewCount} />
-        <NavItem to="/brain/skills" icon={<BookOpen className="w-[18px] h-[18px]" />} label="Skills" isExpanded={isExpanded} />
-        <NavItem to="/brain/connectors" icon={<Plug className="w-[18px] h-[18px]" />} label="Connectors" isExpanded={isExpanded} />
-        <NavItem to="/brain/review" icon={<CheckSquare className="w-[18px] h-[18px]" />} label="Review Queue" isExpanded={isExpanded} badge={reviewCount} />
-        <NavItem to="/brain/feedback" icon={<Zap className="w-[18px] h-[18px]" />} label="Feedback" isExpanded={isExpanded} />
 
         {/* SETUP Section */}
         {isExpanded ? (
