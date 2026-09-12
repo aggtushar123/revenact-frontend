@@ -43,7 +43,7 @@ function SkillCard({ skill }: { skill: Skill }) {
         <div className="text-[11px] text-ink-faint text-right shrink-0">
           <div>
             <span className="text-ink-faint">Runs when </span>
-            <span className="text-ink font-medium">{skill.trigger.toLowerCase()}</span>
+            <span className="text-ink font-medium">{skill.trigger.charAt(0).toLowerCase() + skill.trigger.slice(1)}</span>
           </div>
           <div>
             <span className="text-ink-faint">Shows on </span>
