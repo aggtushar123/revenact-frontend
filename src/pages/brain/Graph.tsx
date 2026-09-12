@@ -19,19 +19,19 @@ const COLUMNS: { kind: NodeKind[]; title: string }[] = [
   { kind: ['product'], title: 'Products' },
   { kind: ['initiative', 'proposal'], title: 'Decisions' },
 ];
-const WIDTH = 1040;
-const COLUMN_X = [90, 380, 670, 950];
+const WIDTH = 1080;
+const COLUMN_X = [110, 340, 600, 830];
 const ROW = 30;
 const TOP = 36;
 
 const FILL: Record<string, string> = {
-  owner: 'var(--info)',
-  product: 'var(--accent)',
-  initiative: 'var(--ink)',
-  proposal: 'var(--ink-faint)',
-  good: 'var(--success)',
-  average: 'var(--warning)',
-  poor: 'var(--danger)',
+  owner: 'var(--color-info)',
+  product: 'var(--color-accent)',
+  initiative: 'var(--color-ink)',
+  proposal: 'var(--color-ink-faint)',
+  good: 'var(--color-success)',
+  average: 'var(--color-warning)',
+  poor: 'var(--color-danger)',
 };
 
 function fillFor(node: GraphNode): string {
@@ -41,7 +41,7 @@ function fillFor(node: GraphNode): string {
 function radiusFor(node: GraphNode): number {
   const arr = 'arr' in node ? node.arr : 0;
   if (!arr) return 6;
-  return Math.max(6, Math.min(18, 4 + Math.sqrt(arr) / 40));
+  return Math.max(6, Math.min(12, 4 + Math.sqrt(arr) / 60));
 }
 
 type Placed = { node: GraphNode; x: number; y: number; r: number };
@@ -190,7 +190,7 @@ export function GraphPage() {
           <div className="bg-surface border border-line-subtle rounded-lg overflow-x-auto flex-1 min-w-0">
             <svg viewBox={`0 0 ${WIDTH} ${height + 12}`} width="100%" style={{ minWidth: 720 }} role="img" aria-label="Knowledge graph">
               {COLUMNS.map((column, index) => (
-                <text key={column.title} x={COLUMN_X[index]} y={16} textAnchor="middle" className="fill-[var(--ink-faint)]" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <text key={column.title} x={COLUMN_X[index]} y={16} textAnchor="middle" className="fill-[var(--color-ink-faint)]" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                   {column.title}
                 </text>
               ))}
@@ -206,7 +206,7 @@ export function GraphPage() {
                     key={`${edge.from}-${edge.to}`}
                     d={`M ${l.x + l.r} ${l.y} C ${mid} ${l.y}, ${mid} ${r.y}, ${r.x - r.r} ${r.y}`}
                     fill="none"
-                    stroke={active ? 'var(--accent)' : 'var(--line)'}
+                    stroke={active ? 'var(--color-accent)' : 'var(--color-line)'}
                     strokeWidth={active ? 1.8 : 1}
                     opacity={selected !== null && !active ? 0.25 : 1}
                     data-kind={edge.kind}
@@ -230,9 +230,9 @@ export function GraphPage() {
                   style={{ cursor: 'pointer' }}
                   opacity={dim(node.id) ? 0.3 : 1}
                 >
-                  <circle cx={x} cy={y} r={r} fill={fillFor(node)} stroke={selected === node.id ? 'var(--ink)' : 'var(--surface)'} strokeWidth={selected === node.id ? 2 : 1.5} />
-                  <text x={node.kind === 'owner' ? x - r - 6 : x + r + 6} y={y + 4} textAnchor={node.kind === 'owner' ? 'end' : 'start'} className="fill-[var(--ink)]" style={{ fontSize: 11, fontWeight: selected === node.id ? 700 : 500 }}>
-                    {node.label.length > 26 ? `${node.label.slice(0, 25)}…` : node.label}
+                  <circle cx={x} cy={y} r={r} fill={fillFor(node)} stroke={selected === node.id ? 'var(--color-ink)' : 'var(--color-surface)'} strokeWidth={selected === node.id ? 2 : 1.5} />
+                  <text x={node.kind === 'owner' ? x - r - 6 : x + r + 6} y={y + 4} textAnchor={node.kind === 'owner' ? 'end' : 'start'} className="fill-[var(--color-ink)]" style={{ fontSize: 11, fontWeight: selected === node.id ? 700 : 500 }}>
+                    {node.label.length > 34 ? `${node.label.slice(0, 33)}…` : node.label}
                   </text>
                 </g>
               ))}
