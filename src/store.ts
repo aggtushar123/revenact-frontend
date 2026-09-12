@@ -18,6 +18,7 @@ import metricsReducer from './features/metrics/metricsSlice';
 import initiativesReducer from './features/initiatives/initiativesSlice';
 import proposalsReducer from './features/proposals/proposalsSlice';
 import feedbackReducer from './features/feedback/feedbackSlice';
+import agentsReducer from './features/agents/agentsSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -41,6 +42,7 @@ export const store = configureStore({
     initiatives: initiativesReducer,
     proposals: proposalsReducer,
     feedback: feedbackReducer,
+    agents: agentsReducer,
   },
 });
 

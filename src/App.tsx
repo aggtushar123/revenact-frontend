@@ -63,6 +63,7 @@ import { BrainDashboard } from './pages/brain/Dashboard';
 import { InitiativesPage } from './pages/brain/Initiatives';
 import { ReviewQueuePage } from './pages/brain/Review';
 import { FeedbackLogPage } from './pages/brain/Feedback';
+import { AgentsPage } from './pages/brain/Agents';
 
 function RootRedirect() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -284,6 +285,7 @@ function App() {
             <Route path="initiatives" element={<InitiativesPage />} />
             <Route path="review" element={<ReviewQueuePage />} />
             <Route path="feedback" element={<FeedbackLogPage />} />
+            <Route path="agents" element={<AgentsPage />} />
             <Route path="*" element={<Navigate to="/brain/dashboard" replace />} />
           </Route>
           
