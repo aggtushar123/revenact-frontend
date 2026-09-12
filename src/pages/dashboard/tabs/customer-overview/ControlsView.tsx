@@ -1,0 +1,186 @@
+import { useEffect } from 'react';
+import { useOutletContext } from 'react-router-dom';
+import { useAppDispatch, useAppSelector } from '../../../../hooks';
+import { fetchPortfolio } from '../../../../features/portfolio/portfolioSlice';
+import { formatCompactMoney } from '../../../../features/customers/formatters';
+import { ConcentrationChart } from './charts/ConcentrationChart';
+import { CohortChart } from './charts/CohortChart';
+import { ChurnReasonList } from './charts/ChurnReasonList';
+import { CompositionSplit } from './charts/CompositionSplit';
+
+/** The filter query string, handed down by CustomerOverviewContainer's bar. */
+export interface CustomerOverviewContext {
+  query: string;
+}
+
+interface TileProps {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: 'neutral' | 'danger' | 'success';
+}
+
+function Tile({ label, value, detail, tone = 'neutral' }: TileProps) {
+  const accent = {
+    neutral: 'border-l-info',
+    danger: 'border-l-danger',
+    success: 'border-l-success',
+  }[tone];
+  const figure = { neutral: 'text-ink', danger: 'text-danger', success: 'text-success' }[tone];
+
+  return (
+    <div
+      className={`bg-surface border border-line-subtle rounded-lg shadow-sm px-[13px] py-[11px] border-l-[3px] ${accent}`}
+    >
+      <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">{label}</div>
+      <div
+        className={`text-[25px] font-semibold leading-tight tracking-tight mt-[3px] tabular-nums ${figure}`}
+      >
+        {value}
+      </div>
+      <div className="text-[11px] text-ink-muted mt-[1px]">{detail}</div>
+    </div>
+  );
+}
+
+/**
+ * Customer Overview: what the book is made of.
+ *
+ * The only screen here that counts customers you no longer have — which is
+ * what makes logo retention, cohort survival and churn reasons possible at
+ * all. Every other dashboard asks how the customers you *have* are doing.
+ *
+ * Composition first (how many, how big), then exposure (concentration), then
+ * history (cohorts, and why the leavers left).
+ */
+export function ControlsView() {
+  const dispatch = useAppDispatch();
+  const { stats, isLoading, error } = useAppSelector((state) => state.portfolio);
+
+  const context = useOutletContext<CustomerOverviewContext | undefined>();
+  const query = context?.query ?? '';
+
+  useEffect(() => {
+    dispatch(fetchPortfolio(query));
+  }, [dispatch, query]);
+
+  const kpis = stats?.kpis;
+  const currency = stats?.currency ?? 'USD';
+  const money = (value: number) => formatCompactMoney(value, currency);
+  const concentrated =
+    stats?.concentration.top_three_share !== null &&
+    stats?.concentration.top_three_share !== undefined &&
+    stats.concentration.top_three_share >= 50;
+
+  return (
+    <div className="w-full flex flex-col gap-4 pb-12">
+      {error && (
+        <p className="text-[12.5px] font-semibold text-danger" role="alert">
+          {error}
+        </p>
+      )}
+
+      {stats && kpis && kpis.active === 0 && kpis.churned === 0 && !isLoading && (
+        <p className="text-[12.5px] text-ink-faint">No customers match these filters.</p>
+      )}
+
+      {kpis && kpis.unpriced > 0 && (
+        <p className="text-[11px] text-warning px-2">
+          {kpis.unpriced} customer{kpis.unpriced === 1 ? '' : 's'} counted in the logo figures and
+          in none of the money ones — no exchange rate for their contract currency.
+        </p>
+      )}
+
+      <div
+        className={`w-full flex flex-col gap-4 transition-opacity ${
+          isLoading && stats ? 'opacity-60' : ''
+        }`}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          <Tile
+            label="Customers"
+            value={kpis ? String(kpis.active) : '—'}
+            detail={
+              kpis
+                ? `${money(kpis.active_arr)}${kpis.average_arr !== null ? ` · ${money(kpis.average_arr)} average` : ''}`
+                : 'loading'
+            }
+          />
+          <Tile
+            label="Logo retention"
+            value={
+              kpis?.logo_retention === null || kpis === undefined
+                ? '—'
+                : `${kpis.logo_retention}%`
+            }
+            detail={
+              kpis ? `${kpis.churned} of ${kpis.active + kpis.churned} ever signed have left` : 'loading'
+            }
+            tone={kpis && kpis.logo_retention !== null && kpis.logo_retention < 90 ? 'danger' : 'success'}
+          />
+          <Tile
+            label="Churned in 12 months"
+            value={kpis ? String(kpis.churned_12m) : '—'}
+            detail={
+              kpis
+                ? `${money(kpis.churned_arr_12m)} left · ${money(kpis.churned_arr)} all time`
+                : 'loading'
+            }
+            tone={kpis && kpis.churned_12m > 0 ? 'danger' : 'success'}
+          />
+          <Tile
+            label="Top 3 concentration"
+            value={
+              stats?.concentration.top_three_share === null ||
+              stats?.concentration.top_three_share === undefined
+                ? '—'
+                : `${stats.concentration.top_three_share}%`
+            }
+            detail="of ARR in the three largest accounts"
+            tone={concentrated ? 'danger' : 'neutral'}
+          />
+        </div>
+
+        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
+          {stats && (
+            <ConcentrationChart concentration={stats.concentration} currency={currency} />
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[300px]">
+            <CohortChart
+              rows={stats?.cohorts.rows ?? []}
+              undated={stats?.cohorts.undated ?? 0}
+            />
+          </div>
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden max-h-[300px]">
+            <ChurnReasonList reasons={stats?.churn_reasons ?? []} currency={currency} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
+            <CompositionSplit
+              title="By size"
+              subtitle="Active customers per ARR band — the smallest band is usually the most logos and the least money"
+              rows={stats?.segments.rows ?? []}
+              currency={currency}
+              unplaced={stats?.segments.unplaced ?? 0}
+              emptyMessage="No active customers in this selection."
+            />
+          </div>
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
+            <CompositionSplit
+              title="By lifecycle stage"
+              subtitle="Where the active book sits today"
+              rows={stats?.lifecycle ?? []}
+              currency={currency}
+              emptyMessage="No active customers in this selection."
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

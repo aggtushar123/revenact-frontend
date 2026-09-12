@@ -13,6 +13,7 @@ import interactionsReducer from './features/interactions/interactionsSlice';
 import usageReducer from './features/usage/usageSlice';
 import forecastReducer from './features/forecast/forecastSlice';
 import activityReducer from './features/activity/activitySlice';
+import portfolioReducer from './features/portfolio/portfolioSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -31,6 +32,7 @@ export const store = configureStore({
     usage: usageReducer,
     forecast: forecastReducer,
     activity: activityReducer,
+    portfolio: portfolioReducer,
   },
 });
 
