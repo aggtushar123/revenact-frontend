@@ -54,6 +54,8 @@ const stats = {
       area: 'Customer Success',
       category: 'Account Management',
       subcategory: 'User Access',
+      keys: { sentiment: 'neutral', area: 'product_growth', category: 'bug_report', subcategory: 'ui_bug' },
+      corrected: false,
       occurred_on: '2026-09-10',
     },
     {
@@ -65,6 +67,8 @@ const stats = {
       area: '',
       category: '',
       subcategory: '',
+      keys: { sentiment: 'neutral', area: 'product_growth', category: 'bug_report', subcategory: 'ui_bug' },
+      corrected: false,
       occurred_on: '2026-09-08',
     },
   ],

@@ -32,6 +32,7 @@ export interface SentimentPoint {
  *  label already — the taxonomy ones are empty strings for an interaction
  *  nothing has classified yet, which the table shows as a dash. */
 export interface InteractionRow {
+  /** `ticket:12` — kind and primary key, the handle a correction is sent for. */
   id: string;
   source: string;
   account: string;
@@ -40,8 +41,37 @@ export interface InteractionRow {
   area: string;
   category: string;
   subcategory: string;
+  /** The stored values behind the labels above, for prefilling a correction. */
+  keys: { sentiment: string; area: string; category: string; subcategory: string };
+  /** True once a person has corrected the tags by hand; a reclassify then leaves the row alone. */
+  corrected: boolean;
   occurred_on: string;
 }
+
+export interface CorrectionResult {
+  id: string;
+  keys: InteractionRow['keys'];
+  labels: { area: string; category: string; subcategory: string; sentiment: string };
+  corrected: boolean;
+}
+
+/** A person correcting the model's tags on one row — logged on the backend
+ *  as feedback, and outranking every later reclassify. */
+export const correctClassification = createAsyncThunk<
+  CorrectionResult,
+  { id: string; fields: Partial<InteractionRow['keys']>; note?: string },
+  { rejectValue: string }
+>('interactions/correct', async ({ id, fields, note }, { rejectWithValue }) => {
+  const [kind, pk] = id.split(':');
+  try {
+    return await apiFetch<CorrectionResult>(`/interactions/${kind}/${pk}/classification/`, {
+      method: 'PATCH',
+      body: { ...fields, note: note ?? '' },
+    });
+  } catch (err) {
+    return rejectWithValue(err instanceof ApiError ? err.message : 'Could not save that correction.');
+  }
+});
 
 export interface InteractionFilterOption {
   value: string;
@@ -120,6 +150,17 @@ const interactionsSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
+      .addCase(correctClassification.fulfilled, (state, action) => {
+        const row = state.stats?.recent.find((r) => r.id === action.payload.id);
+        if (row) {
+          row.keys = action.payload.keys;
+          row.area = action.payload.labels.area;
+          row.category = action.payload.labels.category;
+          row.subcategory = action.payload.labels.subcategory;
+          row.sentiment = action.payload.labels.sentiment;
+          row.corrected = action.payload.corrected;
+        }
+      })
       .addCase(fetchInteractionStats.pending, (state) => {
         state.isLoading = true;
         state.error = null;

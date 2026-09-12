@@ -4,7 +4,7 @@ import {
   LayoutGrid, MessageSquare, Network, Layers, Users,
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
-  Brain, Flag, CheckSquare
+  Brain, Flag, CheckSquare, MessageSquareWarning
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchProposals } from '../../features/proposals/proposalsSlice';
@@ -140,6 +140,7 @@ export function Sidebar() {
         <NavItem to="/brain/dashboard" icon={<Brain className="w-[18px] h-[18px]" />} label="Brain Overview" isExpanded={isExpanded} />
         <NavItem to="/brain/initiatives" icon={<Flag className="w-[18px] h-[18px]" />} label="Initiatives" isExpanded={isExpanded} />
         <NavItem to="/brain/review" icon={<CheckSquare className="w-[18px] h-[18px]" />} label="Review Queue" isExpanded={isExpanded} badge={pendingProposals} />
+        <NavItem to="/brain/feedback" icon={<MessageSquareWarning className="w-[18px] h-[18px]" />} label="Feedback Log" isExpanded={isExpanded} />
 
         {/* SETUP Section */}
         {isExpanded ? (
