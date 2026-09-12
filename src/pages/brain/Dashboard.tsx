@@ -4,6 +4,7 @@ import { useAppSelector } from '../../hooks';
 import { BrainMetricCard } from '../../components/brain/molecules/BrainMetricCard';
 import { DomainCoverageBar } from '../../components/brain/molecules/DomainCoverageBar';
 import { BrainActivityFeed } from '../../components/brain/organisms/BrainActivityFeed';
+import { MetricLayerPanel } from '../../components/brain/MetricLayerPanel';
 
 export function BrainDashboard() {
   const navigate = useNavigate();
@@ -76,6 +77,10 @@ export function BrainDashboard() {
           </button>
         )}
       </div>
+
+      {/* The metric layer — the first real data on this page. Everything
+          below it is still the knowledge-graph mock. */}
+      <MetricLayerPanel />
 
       {/* Empty state — no connectors */}
       {!hasConnectors ? (
