@@ -15,6 +15,7 @@ import { formatCompactMoney } from '../../features/customers/formatters';
 const GROUPS: { title: string; keys: string[] }[] = [
   { title: 'Revenue', keys: ['active_arr', 'forecast_arr', 'nrr', 'at_risk_arr', 'average_arr'] },
   { title: 'Retention', keys: ['logo_retention', 'churned_arr_12m', 'top_three_share'] },
+  { title: 'Usage', keys: ['seat_utilisation', 'shelfware_arr', 'at_capacity_arr'] },
   { title: 'Engagement', keys: ['coverage', 'dark_accounts', 'dark_arr'] },
   { title: 'Health', keys: ['healthy_share', 'poor_health_count', 'active_customers'] },
   { title: 'Support', keys: ['open_tickets'] },
