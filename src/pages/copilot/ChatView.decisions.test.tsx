@@ -86,6 +86,24 @@ describe('ChatView decisions', () => {
     expect(screen.getByText('· open')).toBeInTheDocument();
   });
 
+  it('offers the responsible people under an answer, skipping anyone already asked', async () => {
+    const onAsk = vi.fn();
+    const reply = {
+      ...message, id: 3, role: 'assistant' as const, content: 'Here is what I know.',
+      ask_suggestions: [
+        { user_id: 5, name: 'Mei Tanaka', function: 'analytics', function_display: 'Analytics', customer_id: 7, customer_name: 'Pizza Hut' },
+        { user_id: 6, name: 'Priya Nair', function: 'engineering', function_display: 'Engineering', customer_id: 7, customer_name: 'Pizza Hut' },
+      ],
+    };
+    const asked = { ...message, id: 2, questions: [{ id: 9, assignee: { id: 6, name: 'Priya Nair' }, status: 'open' as const }] };
+    renderView({ messages: [asked, reply], onAskSuggested: onAsk });
+
+    expect(screen.getByText('Not answered? Ask')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Priya Nair/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /Mei Tanaka/ }));
+    expect(onAsk).toHaveBeenCalledWith(2, expect.objectContaining({ user_id: 5, customer_id: 7 }));
+  });
+
   it('offers no close to a participant who is not the owner', () => {
     renderView({ onCloseSession: () => {}, currentUserId: 2 });
     expect(screen.queryByRole('button', { name: 'Close session' })).not.toBeInTheDocument();

@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import knowledgeReducer from '../../features/knowledge/knowledgeSlice';
 import { MemoryRouter } from 'react-router-dom';
 import authReducer from '../../features/auth/authSlice';
 import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
@@ -44,7 +45,7 @@ function conversationDetail(overrides: Partial<Conversation> = {}): Conversation
 
 function makeStore() {
   return configureStore({
-    reducer: { auth: authReducer, copilotSessions: copilotSessionsReducer },
+    reducer: { auth: authReducer, copilotSessions: copilotSessionsReducer, knowledge: knowledgeReducer },
     preloadedState: {
       auth: {
         user: {
@@ -104,7 +105,8 @@ describe('Copilot (/copilot)', () => {
   });
 
   it('loads real conversation history on mount and renders it in the sidebar', async () => {
-    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, [existingConversation]))));
+    // The questions inbox asks /questions/ on mount; everything else here is the history list.
+    vi.stubGlobal('fetch', vi.fn((url: string) => Promise.resolve(jsonResponse(200, String(url).includes('/questions/') ? [] : [existingConversation]))));
     const user = userEvent.setup();
     renderCopilot();
 

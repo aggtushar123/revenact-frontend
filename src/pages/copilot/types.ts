@@ -27,7 +27,19 @@ export interface CopilotMessage {
   /** The people this turn @mentioned — each became a routed question
    * (see services.knowledge). Empty on assistant turns. */
   questions: { id: number; assignee: { id: number; name: string }; status: 'open' | 'answered' }[];
+  /** Assistant turns: the people responsible for the customer this answer
+   * was about, offered as one-click "ask" — see services.knowledge. */
+  ask_suggestions?: AskSuggestion[];
   created_at: string;
+}
+
+export interface AskSuggestion {
+  user_id: number;
+  name: string;
+  function: string;
+  function_display: string;
+  customer_id: number;
+  customer_name: string;
 }
 
 // No nested `messages` — the shape `fetchConversations` returns, for the

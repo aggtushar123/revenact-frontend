@@ -80,7 +80,7 @@ export const fetchMyQuestions = createAsyncThunk<Question[], void, { rejectValue
 
 export const askQuestion = createAsyncThunk<
   { customerId: number; rows: Question[] },
-  { customerId: number; text: string; assignee_id?: number },
+  { customerId: number; text: string; assignee_id?: number; message_id?: number },
   { rejectValue: string }
 >('knowledge/askQuestion', async ({ customerId, ...body }, { rejectWithValue }) => {
   try {

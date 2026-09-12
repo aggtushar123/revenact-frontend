@@ -18,6 +18,8 @@ import {
   respondToInvite,
 } from '../../features/copilotSessions/sessionApi';
 import type { Proposal } from '../../features/proposals/proposalsSlice';
+import type { AskSuggestion } from './types';
+import { askQuestion, fetchMyQuestions } from '../../features/knowledge/knowledgeSlice';
 import { connectSessionSocket } from '../../features/copilotSessions/sessionSocket';
 import {
   sessionSnapshotReceived,
@@ -71,6 +73,13 @@ export function CopilotIndex() {
   } | null>(null);
 
   const activeSession = activeConversationId ? sessions[activeConversationId] : null;
+
+  useEffect(() => {
+
+    dispatch(fetchMyQuestions());
+
+  }, [dispatch]);
+
 
   useEffect(() => {
     fetchConversations()
@@ -313,6 +322,20 @@ export function CopilotIndex() {
     }
   }
 
+  async function handleAskSuggested(userTurnId: number, suggestion: AskSuggestion) {
+    const userTurn = messages.find((m) => m.id === userTurnId);
+    if (!userTurn) return;
+    const result = await dispatch(
+      askQuestion({ customerId: suggestion.customer_id, text: userTurn.content, assignee_id: suggestion.user_id, message_id: userTurnId })
+    );
+    if (askQuestion.fulfilled.match(result)) {
+      const asked = result.payload.rows.map((q) => ({ id: q.id, assignee: q.assignee, status: q.status }));
+      setMessages((prev) => prev.map((m) => (m.id === userTurnId ? { ...m, questions: [...m.questions, ...asked] } : m)));
+    } else {
+      setSendError(result.payload ?? 'Could not ask that.');
+    }
+  }
+
   async function handleMakeLive() {
     if (!activeConversationId) return;
     try {
@@ -425,6 +448,7 @@ export function CopilotIndex() {
                   captureError={captureError}
                   onCloseSession={handleCloseSession}
                   isClosing={isClosing}
+                  onAskSuggested={handleAskSuggested}
                 />
               )}
             </div>

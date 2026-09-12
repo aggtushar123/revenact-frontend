@@ -1,7 +1,9 @@
 import { useState } from 'react';
-import { ChevronRight, ChevronLeft, Edit, ChevronDown, Radio, Inbox, Check, X } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Edit, ChevronDown, Radio, Inbox, Check, X, MessageCircleQuestion } from 'lucide-react';
 import { formatRelativeTime } from '../../features/customers/formatters';
 import type { CopilotSession, SessionInvite } from '../../features/copilotSessions/types';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { answerQuestion } from '../../features/knowledge/knowledgeSlice';
 import type { ConversationSummary } from './types';
 
 interface Props {
@@ -61,6 +63,8 @@ export function CopilotSidebar({
       </div>
 
       <div className="px-5 py-4 flex flex-col gap-6 overflow-y-auto custom-scrollbar flex-1">
+        <QuestionsForYou />
+
         {myInvites.length > 0 && (
           <div>
             <div className="flex items-center gap-2 text-warning font-bold text-[13px] mb-2.5">
@@ -203,6 +207,59 @@ function ChatItem({
         )}
       </div>
       {subtext && <div className="text-[11px] text-ink-faint font-medium truncate">{subtext}</div>}
+    </div>
+  );
+}
+
+/**
+ * The questions waiting on the signed-in user, from anywhere in the
+ * company — asked in a Copilot chat or on a Company View. Answering here
+ * stores the answer as knowledge under their function (see
+ * services.knowledge) and clears it from the list.
+ */
+function QuestionsForYou() {
+  const dispatch = useAppDispatch();
+  const mine = useAppSelector((s) => s.knowledge.mine);
+  const [openId, setOpenId] = useState<number | null>(null);
+  const [body, setBody] = useState('');
+  if (mine.length === 0) return null;
+  return (
+    <div>
+      <div className="flex items-center gap-2 text-accent font-bold text-[13px] mb-2.5">
+        <MessageCircleQuestion className="w-3.5 h-3.5" />
+        Questions for you · {mine.length}
+      </div>
+      <div className="flex flex-col gap-1.5 ml-2 border-l-2 border-accent/30 pl-2">
+        {mine.map((q) => (
+          <div key={q.id} className="rounded-md px-2.5 py-1.5" aria-label={`Question from ${q.asked_by.name}`}>
+            <div className="text-[12.5px] font-bold text-ink truncate">{q.customer?.name ?? 'General'}</div>
+            <div className="text-[11px] text-ink-faint font-medium mb-1">{q.asked_by.name} · {formatRelativeTime(q.created_at)}</div>
+            <p className="text-[12px] text-ink-muted mb-1.5 line-clamp-3">{q.text}</p>
+            {openId === q.id ? (
+              <form
+                className="flex flex-col gap-1"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!body.trim()) return;
+                  dispatch(answerQuestion({ id: q.id, body: body.trim() }));
+                  setOpenId(null);
+                  setBody('');
+                }}
+              >
+                <textarea aria-label={`Answer ${q.asked_by.name}`} value={body} onChange={(e) => setBody(e.target.value)} rows={3} autoFocus className="w-full px-2 py-1.5 bg-surface border border-line rounded-md text-[12px] text-ink focus:outline-none focus:border-accent" />
+                <div className="flex gap-1.5">
+                  <button type="submit" className="text-[11px] font-bold text-[#0D0F0E] bg-accent rounded-full px-2.5 py-0.5">Send answer</button>
+                  <button type="button" onClick={() => setOpenId(null)} className="text-[11px] font-bold text-ink-faint">Cancel</button>
+                </div>
+              </form>
+            ) : (
+              <button type="button" onClick={() => { setOpenId(q.id); setBody(''); }} className="text-[11px] font-bold text-accent bg-accent-dim border border-accent/30 rounded-full px-2 py-0.5">
+                Answer
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

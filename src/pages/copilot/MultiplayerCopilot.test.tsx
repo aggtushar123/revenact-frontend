@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
+import knowledgeReducer from '../../features/knowledge/knowledgeSlice';
 import { MemoryRouter } from 'react-router-dom';
 import authReducer from '../../features/auth/authSlice';
 import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
@@ -24,7 +25,7 @@ function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
-const PLACEHOLDER = "Type '/' to add variables, like {Account} and {Organization}";
+const PLACEHOLDER = "Ask anything — @mention a colleague to route a question to them";
 const alice = { id: 1, name: 'Alice' };
 
 function conversationWith(userMessages: string[]): Conversation {
@@ -38,7 +39,7 @@ function conversationWith(userMessages: string[]): Conversation {
 
 function makeStore() {
   return configureStore({
-    reducer: { auth: authReducer, copilotSessions: copilotSessionsReducer },
+    reducer: { auth: authReducer, copilotSessions: copilotSessionsReducer, knowledge: knowledgeReducer },
     preloadedState: {
       auth: {
         user: {

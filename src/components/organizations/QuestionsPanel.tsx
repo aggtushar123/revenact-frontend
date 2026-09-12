@@ -6,6 +6,7 @@ import type { Question } from '../../features/knowledge/knowledgeSlice';
 import { FUNCTION_LABELS } from '../../features/auth/authSlice';
 import type { User } from '../../features/auth/authSlice';
 import { formatDate } from '../../features/customers/formatters';
+import { MentionTextarea } from '../shared/MentionTextarea';
 
 /**
  * Questions on this customer, routed to people. Ask one by picking who
@@ -50,10 +51,10 @@ export function QuestionsPanel({ customerId, customerName, members }: { customer
         <label htmlFor={`ask-${customerId}`} className="sr-only">
           Ask a question about {customerName}
         </label>
-        <textarea
+        <MentionTextarea
           id={`ask-${customerId}`}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={setText}
           rows={2}
           placeholder="Ask someone — pick a person below, or @mention them."
           className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"

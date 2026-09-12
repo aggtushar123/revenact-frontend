@@ -5,7 +5,8 @@ import type { Proposal } from '../../features/proposals/proposalsSlice';
 import { PresenceStrip } from '../../components/shared';
 import { HandoffModal } from './HandoffModal';
 import type { CopilotSession } from '../../features/copilotSessions/types';
-import type { CopilotMessage } from './types';
+import type { AskSuggestion, CopilotMessage } from './types';
+import { MentionTextarea } from '../../components/shared/MentionTextarea';
 import { MessageSources } from './MessageSources';
 
 interface Props {
@@ -33,6 +34,9 @@ interface Props {
   /** Owner-only: close the session, capturing its decisions first or not. */
   onCloseSession?: (captureDecisions: boolean) => void;
   isClosing?: boolean;
+  /** One click on a suggestion under an answer: ask that person, on the
+   * customer the answer was about, keeping the user turn it came from. */
+  onAskSuggested?: (userTurnId: number, suggestion: AskSuggestion) => void;
 }
 
 // Real messages only — no more hardcoded chatStep turns/fixed-timer
@@ -70,6 +74,7 @@ export function ChatView({
   captureError,
   onCloseSession,
   isClosing,
+  onAskSuggested,
 }: Props) {
   const [inputText, setInputText] = useState('');
   const [isHandoffOpen, setIsHandoffOpen] = useState(false);
@@ -283,6 +288,32 @@ export function ChatView({
                     {message.content}
                   </p>
                   <MessageSources sources={message.sources} />
+                  {(message.ask_suggestions ?? []).length > 0 && onAskSuggested && (() => {
+                    // The question this answer replied to — the user turn just
+                    // before it — is what a one-click ask sends on.
+                    const index = messages.findIndex((m) => m.id === message.id);
+                    const userTurn = [...messages.slice(0, index)].reverse().find((m) => m.role === 'user');
+                    if (!userTurn) return null;
+                    const already = new Set(userTurn.questions.map((q) => q.assignee.id));
+                    const offered = message.ask_suggestions!.filter((s) => !already.has(s.user_id));
+                    if (offered.length === 0) return null;
+                    return (
+                      <div className="flex items-center gap-2 flex-wrap mt-2 text-[11.5px] text-ink-faint">
+                        <span>Not answered? Ask</span>
+                        {offered.map((s) => (
+                          <button
+                            key={s.user_id}
+                            type="button"
+                            onClick={() => onAskSuggested(userTurn.id, s)}
+                            className="inline-flex items-center gap-1 font-bold text-accent border border-accent/30 bg-accent-dim rounded-full px-2 py-0.5 hover:bg-accent-dim/70"
+                          >
+                            {s.name}
+                            <span className="font-medium text-ink-faint">· {s.function_display}</span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
                   <div className="flex items-center gap-[18px] mt-4 text-ink-faint">
                     <button className="hover:text-ink-muted hover:bg-subtle rounded-md p-1.5 transition-colors -ml-1.5">
                       <Copy className="w-4 h-4 stroke-[2px]" />
@@ -329,17 +360,13 @@ export function ChatView({
         <div className="w-full max-w-[860px] mx-auto relative pl-4">
           <div className="absolute -inset-[3px] rounded-xl bg-gradient-to-r from-accent/20 to-accent-hover/20 blur-sm pointer-events-none"></div>
           <div className="relative bg-surface border-2 border-accent/30 rounded-xl flex items-end min-h-[72px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] focus-within:ring-4 focus-within:ring-accent/10 transition-shadow">
-            <textarea
+            <MentionTextarea
               className="w-full h-full min-h-[64px] bg-transparent resize-none outline-none border-none p-4 text-[15px] placeholder:text-ink-faint placeholder:italic text-ink-muted font-medium leading-relaxed"
-              placeholder="Type '/' to add variables, like {Account} and {Organization}"
+              placeholder="Ask anything — @mention a colleague to route a question to them"
+              aria-label="Message Copilot"
               value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
+              onChange={setInputText}
+              onSubmit={submit}
             />
             <button
               onClick={submit}
