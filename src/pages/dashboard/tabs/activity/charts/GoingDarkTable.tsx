@@ -81,9 +81,7 @@ export function GoingDarkTable({ rows, currency, threshold }: GoingDarkTableProp
                       {row.lifecycle_stage}
                       {/* The rubric's narrower measure, when it disagrees.
                           Both are true; they count different things. */}
-                      {row.days_since_activity !== null &&
-                        row.days_since_activity !== row.days_since_contact &&
-                        ` · ${row.days_since_activity}d since an activity`}
+
                     </p>
                   </td>
                   <td className="px-2 py-[7px] text-[12px] font-semibold text-danger tabular-nums whitespace-nowrap">

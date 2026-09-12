@@ -115,8 +115,8 @@ export function CadenceChart({ buckets, currency, threshold }: CadenceChartProps
       </div>
 
       <p className="px-4 pb-3 text-[10.5px] text-ink-faint">
-        Counts any logged contact — call, email, note, meeting or activity. The health score's
-        own Customer Touch component counts logged activities only, so the two can differ.
+        Counts any logged contact — call, email, note, meeting or activity — on the company or
+        any of its accounts. The same rule the health score's Customer Touch component reads.
         {buckets.find((b) => b.key === 'never')?.accounts
           ? ` ${formatCompactMoney(
               buckets.find((b) => b.key === 'never')?.arr ?? 0,

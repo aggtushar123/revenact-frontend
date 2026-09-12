@@ -70,7 +70,6 @@ export interface DarkAccount {
   days_since_contact: number | null;
   /** The health rubric's narrower measure — activities only. Shown beside the
    *  broader one because the two can legitimately differ. */
-  days_since_activity: number | null;
   renewal_date: string | null;
 }
 

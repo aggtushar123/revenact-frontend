@@ -60,7 +60,6 @@ const stats = {
       lifecycle_stage: 'Churn',
       last_contact: null,
       days_since_contact: null,
-      days_since_activity: 412,
       renewal_date: null,
     },
     {
@@ -72,7 +71,6 @@ const stats = {
       lifecycle_stage: 'Live',
       last_contact: '2026-06-20',
       days_since_contact: 84,
-      days_since_activity: 194,
       renewal_date: '2026-08-09',
     },
   ],
@@ -212,17 +210,6 @@ describe('Activity Tracking', () => {
     expect(within(rows[1]).getByText('84d')).toBeInTheDocument();
   });
 
-  it('shows the rubric\'s narrower measure when it disagrees', async () => {
-    // Both numbers are true; they count different things, and a row that
-    // showed one without the other would look like a contradiction.
-    mockFetch();
-    renderDashboard();
-
-    const rows = (await screen.findAllByRole('row')).slice(1);
-
-    expect(within(rows[1]).getByText(/194d since an activity/)).toBeInTheDocument();
-  });
-
   it('shows coverage per book and says it is not a productivity score', async () => {
     mockFetch();
     renderDashboard();
@@ -239,7 +226,7 @@ describe('Activity Tracking', () => {
     renderDashboard();
 
     expect(await screen.findByText('Contact cadence')).toBeInTheDocument();
-    expect(screen.getByText(/counts logged activities only, so the two can differ/)).toBeInTheDocument();
+    expect(screen.getByText(/The same rule the health score's Customer Touch component reads/)).toBeInTheDocument();
   });
 
   it('draws the timeline with its own totals', async () => {
