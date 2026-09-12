@@ -66,7 +66,11 @@ export function mapCustomerToOrgRow(c: Customer): OrgRow {
     tcvRenewal: formatMoney(c.total_forecasted_renewal_revenue, c.currency),
     contractStart: formatDate(c.contract_start_date),
     contractEnd: formatDate(c.contract_end_date),
-    productsUtilized: { primary: c.primary_product || '-', additional: c.additional_products_count },
+    productsUtilized: {
+      // The name, not the id: this row is what the table prints.
+      primary: c.primary_product_name || '-',
+      additional: c.additional_products_count,
+    },
     topSourceChannel: c.top_source_channel || '-',
     totalContractedSeats: c.total_contracted_seats ?? 0,
     totalActiveSeats: c.total_active_seats ?? 0,
@@ -75,7 +79,9 @@ export function mapCustomerToOrgRow(c: Customer): OrgRow {
     scopeWebApp: c.scope_web_app || 'N/A',
     cesPercentage: formatPercent(c.ces_percentage),
     churnDate: formatDate(c.churn_date),
-    churnReason: c.churn_reason || '-',
+    // The label from the API, not our own lookup — the taxonomy has one home
+    // (see ChurnReason in customersSlice).
+    churnReason: c.churn_reason_display || '-',
     churnComment: c.churn_comment || '-',
     domain: c.domain || '-',
     createdBy: c.created_by?.name ?? 'System',

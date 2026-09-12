@@ -8,12 +8,15 @@ import type { CurrencyCode } from '../auth/authSlice';
 // One row per product, compared against each other. Like the Customer
 // Overview payload and unlike the working dashboards, it includes churned
 // customers: churn by product is half of what this screen is for.
+//
+// Products became rows in backend migration 0030 (/api/v1/products/), so a
+// row carries an id, the filter takes one, and the `spellings` count this
+// payload used to carry is gone — there is nothing left to fold.
 
 export interface ProductRow {
+  /** The Product id, or null for the "no product recorded" bucket. */
+  id: number | null;
   product: string;
-  /** Distinct raw spellings folded into this row. Above one means the grouping
-   *  is doing work a set of choices should be doing instead. */
-  spellings: number;
   customers: number;
   arr: number;
   /** Share of the whole book's ARR. Set server-side across all rows. */
@@ -57,6 +60,10 @@ export interface ProductKpis {
     healthy: number;
   } | null;
   worst_churn: { product: string; churned: number; churned_arr: number } | null;
+  /** Products in the catalogue with nobody on them **in this selection** —
+   *  the rows are the whole catalogue while the customers are scoped to the
+   *  caller's book and the filters, so this is not "unsold". */
+  without_customers: string[];
 }
 
 /** Why these numbers are not a revenue split. Stated on the screen. */

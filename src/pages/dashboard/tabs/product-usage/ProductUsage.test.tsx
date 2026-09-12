@@ -14,8 +14,8 @@ import { ControlsView } from './ControlsView';
 // headline and footnote text; the tiles and the scorecard table are plain DOM.
 
 const row = (overrides: Record<string, unknown> = {}) => ({
+  id: 1,
   product: 'Product A',
-  spellings: 1,
   customers: 4,
   arr: 443_600,
   share: 64.4,
@@ -40,6 +40,7 @@ const stats = {
   rows: [
     row(),
     row({
+      id: 2,
       product: 'Product B',
       customers: 3,
       arr: 203_000,
@@ -57,6 +58,7 @@ const stats = {
       churn_rate: 25.0,
     }),
     row({
+      id: 3,
       product: 'Integrations Module',
       customers: 1,
       arr: 0,
@@ -89,6 +91,7 @@ const stats = {
       healthy: 0,
     },
     worst_churn: { product: 'Integrations Module', churned: 1, churned_arr: 152_600 },
+    without_customers: [],
   },
   attribution: {
     basis: 'primary_product',
@@ -97,8 +100,8 @@ const stats = {
   currency: 'USD' as const,
   filters: {
     products: [
-      { value: 'Product A', name: 'Product A' },
-      { value: 'No product recorded', name: 'No product recorded' },
+      { value: '1', name: 'Product A' },
+      { value: 'none', name: 'No product recorded' },
     ],
     owners: [{ value: '5', name: 'Carl CSM' }],
     lifecycles: [{ value: 'live', name: 'Live' }],
@@ -239,7 +242,18 @@ describe('Product Usage', () => {
   it('flags a product with no customers left', async () => {
     mockFetch({
       ...stats,
-      rows: [row({ product: 'Dead Product', customers: 0, arr: 0, healthy_share: null, churned: 2, churned_arr: 90_000, churn_rate: 100.0 })],
+      rows: [
+        row({
+          id: 9,
+          product: 'Dead Product',
+          customers: 0,
+          arr: 0,
+          healthy_share: null,
+          churned: 2,
+          churned_arr: 90_000,
+          churn_rate: 100.0,
+        }),
+      ],
     });
     renderDashboard();
 
@@ -247,20 +261,42 @@ describe('Product Usage', () => {
     expect(within(productRow('Dead Product')).getByText('nobody left')).toBeInTheDocument();
   });
 
-  it('admits product names are free text when it has merged spellings', async () => {
-    mockFetch({ ...stats, rows: [row({ spellings: 3 })] });
+  it('names the products nobody in this selection is on', async () => {
+    // Only sayable because products are rows: a free-text field has no entry
+    // for a product with no customers. Deliberately not "unsold" — the rows
+    // are the whole catalogue, the customers are the caller's own book.
+    mockFetch({
+      ...stats,
+      kpis: { ...stats.kpis, without_customers: ['Product D', 'Pilot Add-on'] },
+    });
     renderDashboard();
 
-    expect(await screen.findByText(/Product names are free text/)).toBeInTheDocument();
-    expect(screen.getByText(/1 row here merges several spellings/)).toBeInTheDocument();
+    expect(
+      await screen.findByText('Nobody in this selection is on Product D, Pilot Add-on.')
+    ).toBeInTheDocument();
   });
 
-  it('stays quiet about spellings when no row folded any', async () => {
+  it('stays quiet when every product has somebody on it', async () => {
     mockFetch();
     renderDashboard();
 
     await screen.findByText('Product by product');
-    expect(screen.queryByText(/Product names are free text/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Nobody in this selection/)).not.toBeInTheDocument();
+  });
+
+  it('tells a product that lost everyone apart from one nobody is on', async () => {
+    mockFetch({
+      ...stats,
+      rows: [
+        row({ id: 9, product: 'Dead Product', customers: 0, arr: 0, churned: 2 }),
+        row({ id: 10, product: 'Never Sold', customers: 0, arr: 0, churned: 0 }),
+      ],
+    });
+    renderDashboard();
+
+    await screen.findByText('Product by product');
+    expect(within(productRow('Dead Product')).getByText('nobody left')).toBeInTheDocument();
+    expect(within(productRow('Never Sold')).getByText('nobody on it')).toBeInTheDocument();
   });
 
   it('names customers left out of the money figures', async () => {
@@ -302,10 +338,24 @@ describe('Product Usage', () => {
   });
 
   it('reports an empty selection rather than drawing empty charts', async () => {
-    mockFetch({ ...stats, rows: [], kpis: { ...stats.kpis, products: 0, customers: 0, arr: 0, largest: null, weakest: null, worst_churn: null } });
+    mockFetch({
+      ...stats,
+      rows: [],
+      kpis: {
+        ...stats.kpis,
+        products: 0,
+        customers: 0,
+        arr: 0,
+        largest: null,
+        weakest: null,
+        worst_churn: null,
+      },
+    });
     renderDashboard();
 
-    expect(await screen.findByText('No customers match these filters.')).toBeInTheDocument();
+    expect(
+      await screen.findByText(/No products on this organisation's list yet/)
+    ).toBeInTheDocument();
     expect(screen.getByText('No products match these filters.')).toBeInTheDocument();
   });
 
@@ -329,9 +379,9 @@ describe('Product Usage', () => {
     renderDashboard();
 
     await screen.findByLabelText('Product');
-    await user.selectOptions(screen.getByLabelText('Product'), 'Product A');
+    await user.selectOptions(screen.getByLabelText('Product'), '1');
 
-    await waitFor(() => expect(lastUrl(fetchMock)).toContain('product=Product+A'));
+    await waitFor(() => expect(lastUrl(fetchMock)).toContain('product=1'));
   });
 
   it('clears the filters', async () => {

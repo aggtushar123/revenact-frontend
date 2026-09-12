@@ -72,9 +72,13 @@ const stats = {
     ],
     undated: 1,
   },
+  // Every reason on the closed list comes back, including the ones nobody
+  // left for — see the backend's own portfolio.py.
   churn_reasons: [
-    { reason: 'Budget cuts', customers: 2, arr: 212_100, spellings: 2 },
-    { reason: 'Budget Cut', customers: 1, arr: 24_000, spellings: 1 },
+    { value: 'other', reason: 'Other', customers: 2, arr: 212_100 },
+    { value: 'budget', reason: 'Budget cut', customers: 2, arr: 24_000 },
+    { value: 'price', reason: 'Price', customers: 0, arr: 0 },
+    { value: 'product_gap', reason: 'Missing capability', customers: 0, arr: 0 },
   ],
   segments: {
     rows: [
@@ -219,16 +223,38 @@ describe('Customer Overview', () => {
     ).toBeInTheDocument();
   });
 
-  it('ranks churn reasons by money and admits the field is free text', async () => {
+  it('ranks churn reasons by the money that left', async () => {
     mockFetch();
     renderDashboard();
 
     await screen.findByText('Why they left');
-    expect(screen.getByText('Budget cuts')).toBeInTheDocument();
+    expect(screen.getByText('Other')).toBeInTheDocument();
     expect(screen.getByText(/\$212\.1K · 2/)).toBeInTheDocument();
-    // The footnote is the argument for giving the field choices.
-    expect(screen.getByText(/similar wordings stay separate/)).toBeInTheDocument();
-    expect(screen.getByText(/1 row here already merges several spellings/)).toBeInTheDocument();
+  });
+
+  it('summarises the reasons nobody left for instead of drawing empty bars', async () => {
+    // A closed list makes "nothing lost to a missing capability" sayable at
+    // all — the free-text field it replaced had no row for a reason nobody
+    // typed. It is one line, though: an empty reason is worth knowing and is
+    // not worth a bar of its own.
+    mockFetch();
+    renderDashboard();
+
+    await screen.findByText('Why they left');
+    expect(screen.getByText('Nothing lost to: Price, Missing capability.')).toBeInTheDocument();
+    expect(screen.queryByText(/similar wordings stay separate/)).not.toBeInTheDocument();
+  });
+
+  it('says nothing has churned when every reason is at zero', async () => {
+    mockFetch({
+      ...stats,
+      churn_reasons: [{ value: 'price', reason: 'Price', customers: 0, arr: 0 }],
+    });
+    renderDashboard();
+
+    expect(
+      await screen.findByText('No customers in this selection have churned.')
+    ).toBeInTheDocument();
   });
 
   it('says so when nothing has churned', async () => {

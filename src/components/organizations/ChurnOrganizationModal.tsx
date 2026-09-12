@@ -2,7 +2,8 @@ import { useId, useState, type FormEvent } from 'react';
 import { X, AlertCircle } from 'lucide-react';
 import { useAppDispatch } from '../../hooks';
 import { ApiError } from '../../lib/apiClient';
-import { updateCustomer } from '../../features/customers/customersSlice';
+import { updateCustomer, CHURN_REASONS } from '../../features/customers/customersSlice';
+import type { ChurnReason } from '../../features/customers/customersSlice';
 
 interface ChurnOrganizationModalProps {
   /** One id for a single row's "..." menu; several for a bulk churn from
@@ -23,7 +24,7 @@ function today(): string {
 export function ChurnOrganizationModal({ customerIds, customerNames, onClose }: ChurnOrganizationModalProps) {
   const dispatch = useAppDispatch();
   const [churnDate, setChurnDate] = useState(today());
-  const [churnReason, setChurnReason] = useState('');
+  const [churnReason, setChurnReason] = useState<ChurnReason | ''>('');
   const [churnComment, setChurnComment] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +47,7 @@ export function ChurnOrganizationModal({ customerIds, customerNames, onClose }: 
               id,
               lifecycle_stage: 'churn',
               churn_date: churnDate || null,
-              churn_reason: churnReason.trim(),
+              churn_reason: churnReason,
               churn_comment: churnComment.trim(),
             })
           ).unwrap()
@@ -94,15 +95,26 @@ export function ChurnOrganizationModal({ customerIds, customerNames, onClose }: 
             <label htmlFor={reasonId} className="block text-[12px] font-semibold text-ink-muted mb-1">
               Reason
             </label>
-            <input
+            {/* A list, not a text box. It used to be free text, and the
+                Customer Overview's "why they left" chart spent its life
+                apologising for it: "Budget cuts" and "Budget Cut" were two
+                rows, and no amount of folding could merge them. Anything
+                worth writing down beyond the reason goes in the comment
+                below — which is what it was always for. */}
+            <select
               id={reasonId}
-              type="text"
               value={churnReason}
-              onChange={(e) => setChurnReason(e.target.value)}
-              placeholder="e.g. Budget Cut"
+              onChange={(e) => setChurnReason(e.target.value as ChurnReason | '')}
               autoFocus
               className="w-full px-3 py-2 bg-subtle border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-danger/10 focus:border-danger transition-all"
-            />
+            >
+              <option value="">Not recorded</option>
+              {CHURN_REASONS.map((reason) => (
+                <option key={reason.value} value={reason.value}>
+                  {reason.label}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label htmlFor={commentId} className="block text-[12px] font-semibold text-ink-muted mb-1">

@@ -94,7 +94,7 @@ export function ProductUsageContainer() {
           {activeCount > 0 && (
             <>
               <span className="ml-2 text-[11px] text-ink-faint whitespace-nowrap">
-                {customers} customers
+                {customers} {customers === 1 ? 'customer' : 'customers'}
               </span>
               <button
                 type="button"

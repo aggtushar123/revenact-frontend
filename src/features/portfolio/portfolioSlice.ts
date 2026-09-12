@@ -56,12 +56,13 @@ export interface CohortRow {
 }
 
 export interface ChurnReason {
+  /** The stored value — one of Customer.ChurnReason, or '' for a churned
+   *  customer whose reason nobody recorded (not the same as 'other'). */
+  value: string;
+  /** The label, from the API, so this screen keeps no copy of the taxonomy. */
   reason: string;
   customers: number;
   arr: number;
-  /** How many distinct raw spellings folded into this row. Above one means the
-   *  grouping is doing work a set of choices should be doing instead. */
-  spellings: number;
 }
 
 export interface CompositionRow {

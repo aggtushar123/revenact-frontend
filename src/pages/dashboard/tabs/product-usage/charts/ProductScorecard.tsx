@@ -33,7 +33,6 @@ const cesTone = (ces: number | null) =>
  * ceiling to compare against.
  */
 export function ProductScorecard({ rows, currency }: ProductScorecardProps) {
-  const anyFolded = rows.filter((row) => row.spellings > 1).length;
   const unpriced = rows.reduce((total, row) => total + row.unpriced, 0);
 
   return (
@@ -65,11 +64,20 @@ export function ProductScorecard({ rows, currency }: ProductScorecardProps) {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.product} className="border-t border-line-subtle">
+                <tr key={row.id ?? "none"} className="border-t border-line-subtle">
                   <td className="px-2 py-[7px] font-semibold text-ink">
                     {row.product}
                     {row.customers === 0 && (
-                      <span className="ml-1.5 text-[10px] font-bold text-danger">nobody left</span>
+                      // Two different stories, and the churn figures tell
+                      // them apart: a product whose customers all left, and
+                      // one nobody in this selection is on.
+                      <span
+                        className={`ml-1.5 text-[10px] font-bold ${
+                          row.churned > 0 ? 'text-danger' : 'text-ink-faint'
+                        }`}
+                      >
+                        {row.churned > 0 ? 'nobody left' : 'nobody on it'}
+                      </span>
                     )}
                   </td>
                   <td className="px-2 py-[7px] text-right tabular-nums text-ink-muted">
@@ -128,21 +136,12 @@ export function ProductScorecard({ rows, currency }: ProductScorecardProps) {
         </div>
       )}
 
-      {(anyFolded > 0 || unpriced > 0) && (
-        <div className="px-4 pb-3 flex flex-col gap-[2px]">
-          {anyFolded > 0 && (
-            <p className="text-[10.5px] text-ink-faint">
-              Product names are free text. {anyFolded} row{anyFolded === 1 ? '' : 's'} here{' '}
-              {anyFolded === 1 ? 'merges' : 'merge'} several spellings of the same name; anything
-              that differs by more than case stays a separate product.
-            </p>
-          )}
-          {unpriced > 0 && (
-            <p className="text-[10.5px] text-warning">
-              {unpriced} customer{unpriced === 1 ? '' : 's'} counted in every seat and health figure
-              and in none of the money ones — no exchange rate for their contract currency.
-            </p>
-          )}
+      {unpriced > 0 && (
+        <div className="px-4 pb-3">
+          <p className="text-[10.5px] text-warning">
+            {unpriced} customer{unpriced === 1 ? '' : 's'} counted in every seat and health figure
+            and in none of the money ones — no exchange rate for their contract currency.
+          </p>
         </div>
       )}
     </div>

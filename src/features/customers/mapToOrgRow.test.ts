@@ -72,7 +72,8 @@ function appleCustomer(overrides: Partial<Customer> = {}): Customer {
     implementation_fee: '70000.00',
     total_contract_value: '179500.00',
     total_forecasted_renewal_revenue: '188475.00',
-    primary_product: 'Product A',
+    primary_product: 1,
+  primary_product_name: 'Product A',
     additional_products_count: 3,
     top_source_channel: 'Talent Pool Re-engage',
     total_contracted_seats: 560,
@@ -82,7 +83,8 @@ function appleCustomer(overrides: Partial<Customer> = {}): Customer {
     scope_web_app: 'N/A',
     ces_percentage: '98.00',
     churn_date: null,
-    churn_reason: '',
+    churn_reason: '' as const,
+    churn_reason_display: '',
     churn_comment: '',
     is_archived: false,
     ...overrides,
@@ -173,7 +175,8 @@ describe('mapCustomerToOrgRow', () => {
         health_category: 'poor',
         nps_score: -100,
         churn_date: '2025-01-31',
-        churn_reason: 'Budget Cut',
+        churn_reason: 'budget' as const,
+        churn_reason_display: 'Budget cut',
         churn_comment: 'Leadership restructuring led to budget realignment.',
       })
     );
@@ -183,7 +186,8 @@ describe('mapCustomerToOrgRow', () => {
     expect(row.nps).toBe('-100');
     expect(row.npsColor).toBe('bg-[var(--danger)]');
     expect(row.churnDate).toBe('31 Jan 2025');
-    expect(row.churnReason).toBe('Budget Cut');
+    // The API's own label, not the stored value and not a lookup of ours.
+    expect(row.churnReason).toBe('Budget cut');
     expect(row.churnComment).toBe('Leadership restructuring led to budget realignment.');
   });
 

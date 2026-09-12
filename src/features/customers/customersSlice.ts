@@ -37,6 +37,47 @@ export interface CsatBreakdown {
   bands: CsatBand[];
 }
 
+/**
+ * Why a customer left — `Customer.ChurnReason` on the backend, a closed list
+ * since migration 0028.
+ *
+ * The labels live in CHURN_REASONS below and on every record as
+ * `churn_reason_display`, so a screen showing an existing reason should print
+ * that field rather than looking it up here. This list is for the pickers,
+ * which need the options before a reason exists.
+ *
+ * Hardcoded rather than fetched, the same as LIFECYCLE_OPTIONS: it is part of
+ * the API contract, and one round-trip to learn eleven words nobody changes is
+ * a worse trade than the duplication.
+ */
+export type ChurnReason =
+  | 'price'
+  | 'budget'
+  | 'product_gap'
+  | 'adoption'
+  | 'competitor'
+  | 'champion_left'
+  | 'acquired'
+  | 'shut_down'
+  | 'consolidation'
+  | 'support'
+  | 'other';
+
+/** The picker's options, in the order the backend declares them. */
+export const CHURN_REASONS: { value: ChurnReason; label: string }[] = [
+  { value: 'price', label: 'Price' },
+  { value: 'budget', label: 'Budget cut' },
+  { value: 'product_gap', label: 'Missing capability' },
+  { value: 'adoption', label: 'Never adopted' },
+  { value: 'competitor', label: 'Switched to a competitor' },
+  { value: 'champion_left', label: 'Champion left' },
+  { value: 'acquired', label: 'Acquired or merged' },
+  { value: 'shut_down', label: 'Went out of business' },
+  { value: 'consolidation', label: 'Vendor consolidation' },
+  { value: 'support', label: 'Service or support' },
+  { value: 'other', label: 'Other' },
+];
+
 export interface Customer {
   id: number;
   name: string;
@@ -98,7 +139,14 @@ export interface Customer {
   implementation_fee: string;
   total_contract_value: string;
   total_forecasted_renewal_revenue: string;
-  primary_product: string;
+  /** A Product id — the tenant's own catalogue, /api/v1/products/. Free text
+   *  until backend migration 0030. Null when nobody recorded one. */
+  primary_product: number | null;
+  /** The product's name, read-only, so a screen that only prints what they
+   *  bought needn't fetch the catalogue. Empty string when there is none. */
+  primary_product_name: string;
+  /** How many *other* products, never which — nobody records that, which is
+   *  the limit the Product Usage dashboard states on screen. */
   additional_products_count: number | null;
   top_source_channel: string;
   total_contracted_seats: number | null;
@@ -108,7 +156,12 @@ export interface Customer {
   scope_web_app: string;
   ces_percentage: string | null;
   churn_date: string | null;
-  churn_reason: string;
+  /** One of CHURN_REASONS below, or '' when nobody recorded one — which is
+   *  not the same as 'other'. A closed list since backend migration 0028. */
+  churn_reason: ChurnReason | '';
+  /** The label for churn_reason, served by the API so no screen keeps its own
+   *  copy of the taxonomy. */
+  churn_reason_display: string;
   churn_comment: string;
   is_archived: boolean;
 }
@@ -527,7 +580,7 @@ export interface CustomerWritePayload {
   contract_end_date?: string | null;
   currency?: CurrencyCode;
   churn_date?: string | null;
-  churn_reason?: string;
+  churn_reason?: ChurnReason | '';
   churn_comment?: string;
   is_archived?: boolean;
 }

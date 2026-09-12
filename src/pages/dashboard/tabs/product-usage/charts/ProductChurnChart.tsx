@@ -49,7 +49,9 @@ export function ProductChurnChart({ rows, currency }: ProductChurnChartProps) {
     [rows]
   );
 
-  const clean = rows.length - data.length;
+  // Products that have had customers and kept them. A product nobody has ever
+  // been on is not a retention record, so it is counted in neither number.
+  const clean = rows.filter((row) => row.churned === 0 && row.customers > 0).length;
 
   return (
     <div className="w-full h-full flex flex-col">

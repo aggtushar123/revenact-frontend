@@ -14,14 +14,18 @@ export interface ChurnReasonListProps {
  * over price and one large one leaving over a missing feature are not the same
  * problem, and a count chart says they are.
  *
- * `churn_reason` is a free-text field. The backend folds case and whitespace
- * and nothing more, so near-duplicates like "Budget Cut" and "Budget cuts"
- * survive as separate rows. That is reported rather than hidden — the footnote
- * is the argument for giving the field a set of choices.
+ * The reasons are a closed list since backend migration 0028, which changes what
+ * this chart can show. It used to carry a footnote apologising for free text —
+ * "Budget cuts" and "Budget Cut" were two rows and folding could not merge
+ * them. Now the payload includes **every** reason on the list, including the
+ * ones nobody left for, and those are summarised in one line rather than
+ * given nine equal-weight rows of zero: an empty reason is worth knowing and
+ * is not worth a bar.
  */
 export function ChurnReasonList({ reasons, currency }: ChurnReasonListProps) {
-  const widest = Math.max(1, ...reasons.map((reason) => reason.arr));
-  const folded = reasons.filter((reason) => reason.spellings > 1).length;
+  const happened = reasons.filter((reason) => reason.customers > 0);
+  const never = reasons.filter((reason) => reason.customers === 0);
+  const widest = Math.max(1, ...happened.map((reason) => reason.arr));
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -32,15 +36,15 @@ export function ChurnReasonList({ reasons, currency }: ChurnReasonListProps) {
         </p>
       </div>
 
-      {reasons.length === 0 ? (
+      {happened.length === 0 ? (
         <p className="px-4 py-6 text-[12px] text-ink-faint">
           No customers in this selection have churned.
         </p>
       ) : (
         <>
           <ul className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-[10px]">
-            {reasons.map((reason) => (
-              <li key={reason.reason}>
+            {happened.map((reason) => (
+              <li key={reason.value}>
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-[12px] font-medium text-ink truncate">
                     {reason.reason}
@@ -58,11 +62,13 @@ export function ChurnReasonList({ reasons, currency }: ChurnReasonListProps) {
               </li>
             ))}
           </ul>
-          <p className="px-4 pb-3 text-[10.5px] text-ink-faint">
-            Reasons are free text, grouped on case only — similar wordings stay separate.
-            {folded > 0 &&
-              ` ${folded} ${folded === 1 ? 'row here already merges' : 'rows here already merge'} several spellings.`}
-          </p>
+          {never.length > 0 && (
+            <p className="px-4 pb-3 text-[10.5px] text-ink-faint">
+              {/* The labels as the API writes them — lowercasing them read
+                  badly the moment one of them was "Other". */}
+              Nothing lost to: {never.map((reason) => reason.reason).join(', ')}.
+            </p>
+          )}
         </>
       )}
     </div>

@@ -90,7 +90,18 @@ export function ControlsView() {
       )}
 
       {stats && stats.rows.length === 0 && !isLoading && (
-        <p className="text-[12.5px] text-ink-faint">No customers match these filters.</p>
+        <p className="text-[12.5px] text-ink-faint">
+          No products on this organisation's list yet, and no customers to put on them.
+        </p>
+      )}
+
+      {kpis && kpis.without_customers.length > 0 && (
+        <p className="text-[11px] text-ink-faint px-2">
+          {/* Deliberately "in this selection": the rows are the whole product
+              list while the customers are the caller's own book plus whatever
+              filters are set, so this is not a claim that nobody bought it. */}
+          Nobody in this selection is on {kpis.without_customers.join(', ')}.
+        </p>
       )}
 
       <div
@@ -103,7 +114,9 @@ export function ControlsView() {
             label="Products"
             value={kpis ? String(kpis.products) : '—'}
             detail={
-              kpis ? `${kpis.customers} customers · ${money(kpis.arr)} led` : 'loading'
+              kpis
+                ? `${kpis.customers} ${kpis.customers === 1 ? 'customer' : 'customers'} · ${money(kpis.arr)} led`
+                : 'loading'
             }
           />
           <Tile
