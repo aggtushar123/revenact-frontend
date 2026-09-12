@@ -4,13 +4,23 @@ import {
   LayoutGrid, MessageSquare, Network, Layers, Users,
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
-  Brain, Flag
+  Brain, Flag, CheckSquare
 } from 'lucide-react';
-import { useCapability } from '../../hooks';
+import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
+import { fetchProposals } from '../../features/proposals/proposalsSlice';
 import { fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
 import type { CustomObjectDefinition } from '../../features/customObjects/types';
 
 export function Sidebar() {
+  const pendingProposals = useAppSelector((state) => state.proposals?.pending ?? 0);
+  // The badge is the real queue, so it needs the queue loaded on any page —
+  // a paid model call is never made here, only a read; and only for those
+  // who could open the queue at all.
+  const dispatch = useAppDispatch();
+  const canSeeAll = useCapability('view_all_accounts');
+  useEffect(() => {
+    if (canSeeAll) dispatch(fetchProposals());
+  }, [dispatch, canSeeAll]);
   const [isExpanded, setIsExpanded] = useState(false);
   const location = useLocation();
 
@@ -129,6 +139,7 @@ export function Sidebar() {
 
         <NavItem to="/brain/dashboard" icon={<Brain className="w-[18px] h-[18px]" />} label="Brain Overview" isExpanded={isExpanded} />
         <NavItem to="/brain/initiatives" icon={<Flag className="w-[18px] h-[18px]" />} label="Initiatives" isExpanded={isExpanded} />
+        <NavItem to="/brain/review" icon={<CheckSquare className="w-[18px] h-[18px]" />} label="Review Queue" isExpanded={isExpanded} badge={pendingProposals} />
 
         {/* SETUP Section */}
         {isExpanded ? (

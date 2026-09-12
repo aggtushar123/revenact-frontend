@@ -61,6 +61,7 @@ import { ControlsView as TicketControlsView } from './pages/dashboard/tabs/ticke
 // Company Brain pages
 import { BrainDashboard } from './pages/brain/Dashboard';
 import { InitiativesPage } from './pages/brain/Initiatives';
+import { ReviewQueuePage } from './pages/brain/Review';
 
 function RootRedirect() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
@@ -280,6 +281,7 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<BrainDashboard />} />
             <Route path="initiatives" element={<InitiativesPage />} />
+            <Route path="review" element={<ReviewQueuePage />} />
             <Route path="*" element={<Navigate to="/brain/dashboard" replace />} />
           </Route>
           

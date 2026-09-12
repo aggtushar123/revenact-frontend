@@ -16,6 +16,7 @@ import portfolioReducer from './features/portfolio/portfolioSlice';
 import productsReducer from './features/products/productsSlice';
 import metricsReducer from './features/metrics/metricsSlice';
 import initiativesReducer from './features/initiatives/initiativesSlice';
+import proposalsReducer from './features/proposals/proposalsSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -37,6 +38,7 @@ export const store = configureStore({
     products: productsReducer,
     metrics: metricsReducer,
     initiatives: initiativesReducer,
+    proposals: proposalsReducer,
   },
 });
 
