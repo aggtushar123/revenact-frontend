@@ -8,7 +8,7 @@ export type MessageRole = 'user' | 'assistant';
  * `_source_ref` for why. `id` is kept so the UI can still offer a link,
  * which simply won't resolve if the record has since been deleted. */
 export interface MessageSource {
-  type: 'email' | 'note' | 'ticket' | 'activity';
+  type: 'email' | 'note' | 'ticket' | 'activity' | 'contribution';
   id: number;
   label: string;
   date: string;

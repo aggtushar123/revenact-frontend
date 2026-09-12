@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Mail, FileText, LifeBuoy, CheckCircle } from 'lucide-react';
+import { Mail, FileText, LifeBuoy, CheckCircle, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { MessageSource } from './types';
 
@@ -8,6 +8,8 @@ const ICONS: Record<MessageSource['type'], ReactNode> = {
   note: <FileText className="w-3 h-3" />,
   ticket: <LifeBuoy className="w-3 h-3" />,
   activity: <CheckCircle className="w-3 h-3" />,
+  // A colleague's note from another function — see services.knowledge.
+  contribution: <Users className="w-3 h-3" />,
 };
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];

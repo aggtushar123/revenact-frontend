@@ -44,6 +44,16 @@ export type Capability =
   // renders a checkbox per key.
   | 'view_all_accounts';
 
+export type UserFunction = 'cs' | 'engineering' | 'sales' | 'analytics' | 'leadership' | 'other';
+export const FUNCTION_LABELS: Record<UserFunction, string> = {
+  cs: 'Customer Success',
+  engineering: 'Engineering',
+  sales: 'Sales',
+  analytics: 'Analytics',
+  leadership: 'Leadership',
+  other: 'Other',
+};
+
 export interface User {
   id: number;
   email: string;
@@ -58,6 +68,10 @@ export interface User {
   role_name: string;
   /** What this user can actually do — see useCapability in hooks.ts. */
   permissions: Capability[];
+  /** Which part of the company they work in — stamps their contributions
+   * and is what "the responsible person" is looked up by. Not a permission. */
+  function: UserFunction;
+  function_display: string;
   organisation: Organisation;
   is_active: boolean;
 }

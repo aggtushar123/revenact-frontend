@@ -1,5 +1,7 @@
 import { useEffect, useId, useState, type FormEvent } from 'react';
 import { Plus, X, AlertCircle, Trash2, ShieldCheck } from 'lucide-react';
+import { FUNCTION_LABELS } from '../../features/auth/authSlice';
+import type { UserFunction } from '../../features/auth/authSlice';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 import {
@@ -136,6 +138,9 @@ function MembersTab({
                 Role
               </th>
               <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
+                Function
+              </th>
+              <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
                 Status
               </th>
               <th className="px-4 py-2.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint text-right">
@@ -197,6 +202,23 @@ function MemberRow({
           {roles.map((role) => (
             <option key={role.id} value={role.id}>
               {role.name}
+            </option>
+          ))}
+        </select>
+      </td>
+      <td className="px-4 py-3">
+        {/* Which part of the company they work in — stamps their
+            contributions on accounts and is what "the responsible
+            person" is looked up by. Not a permission. */}
+        <select
+          value={member.function}
+          aria-label={`Function for ${member.name}`}
+          onChange={(e) => dispatch(updateMember({ id: member.id, function: e.target.value as UserFunction }))}
+          className="px-2 py-1 bg-subtle border border-line rounded-md text-[12px] text-ink focus:outline-none focus:border-accent"
+        >
+          {(Object.keys(FUNCTION_LABELS) as UserFunction[]).map((key) => (
+            <option key={key} value={key}>
+              {FUNCTION_LABELS[key]}
             </option>
           ))}
         </select>
@@ -552,6 +574,7 @@ function AddMemberModal({ roles, onClose }: { roles: Role[]; onClose: () => void
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [roleId, setRoleId] = useState('');
+  const [fn, setFn] = useState<UserFunction>('cs');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -565,7 +588,7 @@ function AddMemberModal({ roles, onClose }: { roles: Role[]; onClose: () => void
     setIsSaving(true);
     try {
       await dispatch(
-        addMember({ name, email, password, ...(roleId ? { role_id: Number(roleId) } : {}) })
+        addMember({ name, email, password, function: fn, ...(roleId ? { role_id: Number(roleId) } : {}) })
       ).unwrap();
       onClose();
     } catch (err) {
@@ -580,6 +603,13 @@ function AddMemberModal({ roles, onClose }: { roles: Role[]; onClose: () => void
       <form onSubmit={handleSubmit} className="space-y-4">
         <FormField label="Name" value={name} onChange={setName} type="text" autoFocus />
         <FormField label="Email" value={email} onChange={setEmail} type="email" />
+        <SelectField label="Function" value={fn} onChange={(v) => setFn(v as UserFunction)}>
+          {(Object.keys(FUNCTION_LABELS) as UserFunction[]).map((key) => (
+            <option key={key} value={key}>
+              {FUNCTION_LABELS[key]}
+            </option>
+          ))}
+        </SelectField>
         <SelectField label="Role" value={roleId} onChange={setRoleId}>
           <option value="">CSM (default)</option>
           {roles.map((role) => (

@@ -4,6 +4,7 @@ import { MessageSquare, RefreshCw, MoreHorizontal, Globe, ChevronUp, Search, Max
 import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab, CustomObjectsTab } from '../../components/shared';
+import { CompanyViewTab } from '../../components/organizations/CompanyViewTab';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
 import { formatCompactMoney, formatMoney } from '../../features/customers/formatters';
@@ -94,6 +95,7 @@ export function Details() {
 
   const tabs = [
     { name: 'General', count: null },
+    { name: 'Company View', count: null },
     { name: 'Accounts', count: accounts.length },
     { name: 'Contacts', count: contacts.length },
     { name: 'Pipelines', count: pipelineOpportunities.length + pipelineRisks.length },
@@ -160,6 +162,9 @@ export function Details() {
 
       {/* Tab Content */}
       <main className="flex-1 overflow-y-auto custom-scrollbar bg-subtle/50 px-6 pt-5 pb-4">
+        {activeTab === 'Company View' && organization && (
+          <CompanyViewTab customerId={orgId} customerName={organization.org} />
+        )}
         {activeTab === 'General' && !organization && (
           <div className="flex items-center justify-center h-full">
             <span className={`text-[13px] font-medium ${selectedCustomerError ? 'text-danger' : 'text-ink-faint'}`}>

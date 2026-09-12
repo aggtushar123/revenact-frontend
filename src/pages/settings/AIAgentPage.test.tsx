@@ -28,6 +28,7 @@ function makeStore(role: 'admin' | 'csm' = 'admin', enabled = true, tone: 'profe
           role_id: 1,
           role_name: role === 'admin' ? 'Admin' : 'CSM',
           permissions: capabilitiesForRole(role),
+          function: 'cs' as const, function_display: 'Customer Success',
           organisation: {
             id: 1,
             name: 'Acme Inc',

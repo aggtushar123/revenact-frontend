@@ -22,6 +22,7 @@ import agentsReducer from './features/agents/agentsSlice';
 import skillsReducer from './features/skills/skillsSlice';
 import connectorsReducer from './features/connectors/connectorsSlice';
 import graphReducer from './features/graph/graphSlice';
+import knowledgeReducer from './features/knowledge/knowledgeSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -49,6 +50,7 @@ export const store = configureStore({
     skills: skillsReducer,
     connectors: connectorsReducer,
     graph: graphReducer,
+    knowledge: knowledgeReducer,
   },
 });
 

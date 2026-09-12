@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { apiFetch, ApiError } from '../../lib/apiClient';
-import type { Capability, User } from '../auth/authSlice';
+import type { Capability, User, UserFunction } from '../auth/authSlice';
 
 // A member is just a User as seen by someone with `manage_users` — the
 // same shape UserSerializer returns everywhere else. See
@@ -63,7 +63,7 @@ export const fetchMembers = createAsyncThunk<Member[], void, { rejectValue: stri
 
 export const addMember = createAsyncThunk<
   Member,
-  { name: string; email: string; password: string; role_id?: number },
+  { name: string; email: string; password: string; role_id?: number; function?: UserFunction },
   { rejectValue: string }
 >('userManagement/addMember', async (data, { rejectWithValue }) => {
   try {
@@ -80,6 +80,7 @@ interface UpdateMemberArgs {
   is_active?: boolean;
   role_id?: number;
   password?: string;
+  function?: UserFunction;
 }
 
 export const updateMember = createAsyncThunk<Member, UpdateMemberArgs, { rejectValue: string }>(

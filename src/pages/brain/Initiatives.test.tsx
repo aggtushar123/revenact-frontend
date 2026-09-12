@@ -86,6 +86,7 @@ function renderPage(role: 'admin' | 'csm' = 'admin') {
         user: {
           id: 1, email: 'alice@acme.io', name: 'Alice', avatar: '', role, role_id: 1,
           role_name: role === 'admin' ? 'Admin' : 'CSM', permissions: capabilitiesForRole(role),
+          function: 'cs' as const, function_display: 'Customer Success',
           organisation: {
             id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)',
             default_lifecycle_stage: '', ai_agent_enabled: true, ai_agent_tone: 'professional' as const, ai_agent_tone_display: 'Professional',

@@ -37,6 +37,7 @@ function makeStore() {
           role_id: 1,
           role_name: 'Admin',
           permissions: ALL_CAPABILITIES,
+          function: 'cs' as const, function_display: 'Customer Success',
           organisation: {
             id: 1,
             name: 'Acme Inc',
