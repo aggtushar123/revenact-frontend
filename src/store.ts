@@ -10,6 +10,7 @@ import notificationsReducer from './features/notifications/notificationsSlice';
 import ticketsReducer from './features/tickets/ticketsSlice';
 import healthReducer from './features/health/healthSlice';
 import interactionsReducer from './features/interactions/interactionsSlice';
+import usageReducer from './features/usage/usageSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -25,6 +26,7 @@ export const store = configureStore({
     tickets: ticketsReducer,
     health: healthReducer,
     interactions: interactionsReducer,
+    usage: usageReducer,
   },
 });
 

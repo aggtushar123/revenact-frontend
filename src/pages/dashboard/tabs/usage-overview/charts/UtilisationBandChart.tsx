@@ -1,0 +1,95 @@
+import { useMemo } from 'react';
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import type { CurrencyCode } from '../../../../../features/auth/authSlice';
+import type { UsageBand } from '../../../../../features/usage/usageSlice';
+import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
+import { BAND_COLORS, BAND_SHORT, FALLBACK_COLOR, niceMax } from '../chartTheme';
+
+export interface UtilisationBandChartProps {
+  bands: UsageBand[];
+  currency: CurrencyCode;
+  /** Accounts with no seat data — named under the chart rather than left out
+   *  of it silently. */
+  unmeasured: number;
+}
+
+/**
+ * The shape of the book: how much ARR sits in each utilisation band.
+ *
+ * Bars are money, not account counts. Three dormant ten-seat pilots and one
+ * dormant enterprise rollout are the same bar on a count chart and nothing
+ * like the same problem, and this screen exists to tell them apart.
+ */
+export function UtilisationBandChart({ bands, currency, unmeasured }: UtilisationBandChartProps) {
+  const data = useMemo(
+    () =>
+      bands.map((band) => ({
+        key: band.key,
+        name: BAND_SHORT[band.key] ?? band.name,
+        full: band.name,
+        arr: band.arr,
+        accounts: band.accounts,
+        idle: band.idle_seats,
+      })),
+    [bands]
+  );
+
+  const max = niceMax(data.map((row) => row.arr));
+
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div className="px-4 pt-3">
+        <h3 className="text-[13px] font-bold text-ink">Where the money sits</h3>
+        <p className="text-[11px] text-ink-faint mt-[1px]">
+          ARR by how much of the contracted seats each account actually uses
+        </p>
+      </div>
+
+      <div className="flex-1 w-full min-h-0 px-2 pb-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 16, right: 12, left: 4, bottom: 4 }} barSize={44}>
+            <XAxis
+              dataKey="name"
+              axisLine={false}
+              tickLine={false}
+              tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+            />
+            <YAxis
+              axisLine={false}
+              tickLine={false}
+              width={64}
+              domain={[0, max]}
+              tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
+              tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+            />
+            <Tooltip
+              cursor={{ fill: 'var(--bg-subtle)' }}
+              contentStyle={{
+                borderRadius: '8px',
+                border: '1px solid var(--border-default)',
+                fontSize: '12px',
+              }}
+              formatter={(value, _name, item) => [
+                `${formatMoney(Number(value ?? 0), currency)} · ${item?.payload?.accounts ?? 0} accounts · ${item?.payload?.idle ?? 0} idle seats`,
+                item?.payload?.full ?? '',
+              ]}
+            />
+            <Bar dataKey="arr" radius={[4, 4, 0, 0]}>
+              {data.map((row) => (
+                <Cell key={row.key} fill={BAND_COLORS[row.key] ?? FALLBACK_COLOR} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {unmeasured > 0 && (
+        <p className="px-4 pb-3 text-[11px] text-ink-faint">
+          {unmeasured} {unmeasured === 1 ? 'account has' : 'accounts have'} no seat data and{' '}
+          {unmeasured === 1 ? 'is' : 'are'} not counted here — no seats recorded is not the same as
+          none used.
+        </p>
+      )}
+    </div>
+  );
+}

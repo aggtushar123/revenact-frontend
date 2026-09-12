@@ -45,6 +45,8 @@ import { TriageView } from './pages/dashboard/tabs/health-overview/TriageView';
 import { DivergenceView } from './pages/dashboard/tabs/health-overview/DivergenceView';
 import { MovementView } from './pages/dashboard/tabs/health-overview/MovementView';
 import { RenewalView } from './pages/dashboard/tabs/health-overview/RenewalView';
+import { UsageOverviewContainer } from './pages/dashboard/tabs/UsageOverviewContainer';
+import { ControlsView as UsageControlsView } from './pages/dashboard/tabs/usage-overview/ControlsView';
 import { TicketOverviewContainer } from './pages/dashboard/tabs/ticket-overview/TicketOverviewContainer';
 import { ControlsView as TicketControlsView } from './pages/dashboard/tabs/ticket-overview/ControlsView';
 // Company Brain pages
@@ -120,6 +122,17 @@ function App() {
                 <Route
                   path="*"
                   element={<Navigate to="/dashboard/advance/health/triage" replace />}
+                />
+              </Route>
+              <Route path="usage" element={<UsageOverviewContainer />}>
+                <Route index element={<Navigate to="controls" replace />} />
+                <Route path="controls" element={<UsageControlsView />} />
+                {/* Same absolute redirect as the other dashboards — a relative
+                    "controls" resolves against the unmatched path and would
+                    match this catch-all again, appending forever. */}
+                <Route
+                  path="*"
+                  element={<Navigate to="/dashboard/advance/usage/controls" replace />}
                 />
               </Route>
               <Route path="ticket" element={<TicketOverviewContainer />}>
