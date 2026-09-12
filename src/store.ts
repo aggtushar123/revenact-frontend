@@ -11,6 +11,7 @@ import ticketsReducer from './features/tickets/ticketsSlice';
 import healthReducer from './features/health/healthSlice';
 import interactionsReducer from './features/interactions/interactionsSlice';
 import usageReducer from './features/usage/usageSlice';
+import forecastReducer from './features/forecast/forecastSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -27,6 +28,7 @@ export const store = configureStore({
     health: healthReducer,
     interactions: interactionsReducer,
     usage: usageReducer,
+    forecast: forecastReducer,
   },
 });
 

@@ -45,6 +45,8 @@ import { TriageView } from './pages/dashboard/tabs/health-overview/TriageView';
 import { DivergenceView } from './pages/dashboard/tabs/health-overview/DivergenceView';
 import { MovementView } from './pages/dashboard/tabs/health-overview/MovementView';
 import { RenewalView } from './pages/dashboard/tabs/health-overview/RenewalView';
+import { ForecastContainer } from './pages/dashboard/tabs/ForecastContainer';
+import { ControlsView as ForecastControlsView } from './pages/dashboard/tabs/forecast/ControlsView';
 import { UsageOverviewContainer } from './pages/dashboard/tabs/UsageOverviewContainer';
 import { ControlsView as UsageControlsView } from './pages/dashboard/tabs/usage-overview/ControlsView';
 import { TicketOverviewContainer } from './pages/dashboard/tabs/ticket-overview/TicketOverviewContainer';
@@ -122,6 +124,14 @@ function App() {
                 <Route
                   path="*"
                   element={<Navigate to="/dashboard/advance/health/triage" replace />}
+                />
+              </Route>
+              <Route path="revenue" element={<ForecastContainer />}>
+                <Route index element={<Navigate to="controls" replace />} />
+                <Route path="controls" element={<ForecastControlsView />} />
+                <Route
+                  path="*"
+                  element={<Navigate to="/dashboard/advance/revenue/controls" replace />}
                 />
               </Route>
               <Route path="usage" element={<UsageOverviewContainer />}>
