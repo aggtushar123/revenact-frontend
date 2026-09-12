@@ -13,6 +13,7 @@ import {
   handOffSession,
   fetchSessionDecisions,
   captureSessionDecisions,
+  closeSession,
   fetchMyInvites,
   respondToInvite,
 } from '../../features/copilotSessions/sessionApi';
@@ -53,6 +54,7 @@ export function CopilotIndex() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [decisions, setDecisions] = useState<Proposal[]>([]);
   const [isCapturing, setIsCapturing] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const [captureError, setCaptureError] = useState<string | null>(null);
 
   // Set by the "Ask Copilot" entry point on the Organization/Account
@@ -294,6 +296,23 @@ export function CopilotIndex() {
     }
   }
 
+  async function handleCloseSession(captureDecisions: boolean) {
+    if (!activeConversationId) return;
+    setIsClosing(true);
+    setCaptureError(null);
+    try {
+      const { decisions, decisions_error, ...session } = await closeSession(activeConversationId, captureDecisions);
+      dispatch(sessionSnapshotReceived(session));
+      if (decisions?.length) setDecisions((prev) => [...prev, ...decisions]);
+      if (captureDecisions && decisions_error) setCaptureError(decisions_error);
+      else if (captureDecisions && !decisions?.length) setCaptureError('Nothing was decided in this session.');
+    } catch (err) {
+      setSendError(err instanceof ApiError ? err.message : 'Could not close this session.');
+    } finally {
+      setIsClosing(false);
+    }
+  }
+
   async function handleMakeLive() {
     if (!activeConversationId) return;
     try {
@@ -404,6 +423,8 @@ export function CopilotIndex() {
                   onCaptureDecisions={handleCaptureDecisions}
                   isCapturing={isCapturing}
                   captureError={captureError}
+                  onCloseSession={handleCloseSession}
+                  isClosing={isClosing}
                 />
               )}
             </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { ChatView } from './ChatView';
@@ -63,6 +63,25 @@ describe('ChatView decisions', () => {
     expect(screen.getByText('Book the exec sponsor call with Fine')).toBeInTheDocument();
     expect(screen.getByText('Proposed')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Review queue' })).toHaveAttribute('href', '/brain/review');
+  });
+
+  it('lets the owner close the session, capturing decisions first by default', async () => {
+    const onClose = vi.fn();
+    renderView({ onCloseSession: onClose });
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close session' }));
+    const choice = screen.getByRole('group', { name: 'Close this session' });
+    await userEvent.click(within(choice).getByRole('button', { name: 'Close and capture decisions' }));
+    expect(onClose).toHaveBeenCalledWith(true);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close session' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Close without capturing' }));
+    expect(onClose).toHaveBeenLastCalledWith(false);
+  });
+
+  it('offers no close to a participant who is not the owner', () => {
+    renderView({ onCloseSession: () => {}, currentUserId: 2 });
+    expect(screen.queryByRole('button', { name: 'Close session' })).not.toBeInTheDocument();
   });
 
   it('shows the facilitator busy and its error, and hides the control on a private session', () => {

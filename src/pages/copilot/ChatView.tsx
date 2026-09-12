@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUp, Copy, ThumbsUp, ThumbsDown, Sparkles, AlertCircle, Users, Radio, UserPlus, ClipboardCheck } from 'lucide-react';
+import { ArrowUp, Copy, ThumbsUp, ThumbsDown, Sparkles, AlertCircle, Users, Radio, UserPlus, ClipboardCheck, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Proposal } from '../../features/proposals/proposalsSlice';
 import { PresenceStrip } from '../../components/shared';
@@ -30,6 +30,9 @@ interface Props {
   onCaptureDecisions?: () => void;
   isCapturing?: boolean;
   captureError?: string | null;
+  /** Owner-only: close the session, capturing its decisions first or not. */
+  onCloseSession?: (captureDecisions: boolean) => void;
+  isClosing?: boolean;
 }
 
 // Real messages only — no more hardcoded chatStep turns/fixed-timer
@@ -65,9 +68,12 @@ export function ChatView({
   onCaptureDecisions,
   isCapturing,
   captureError,
+  onCloseSession,
+  isClosing,
 }: Props) {
   const [inputText, setInputText] = useState('');
   const [isHandoffOpen, setIsHandoffOpen] = useState(false);
+  const [isClosingOpen, setIsClosingOpen] = useState(false);
   const isOwner = !!session && !!currentUserId && session.owner.id === currentUserId;
 
   function submit() {
@@ -148,6 +154,16 @@ export function ChatView({
                       {isCapturing ? 'Reading the session…' : 'Capture decisions'}
                     </button>
                   )}
+                  {isOwner && (session.status === 'live' || session.status === 'awaiting_handoff') && onCloseSession && !isClosingOpen && (
+                    <button
+                      onClick={() => setIsClosingOpen(true)}
+                      disabled={isClosing}
+                      className="inline-flex items-center gap-1.5 text-[11px] font-bold text-ink-muted hover:text-danger border border-line hover:border-danger/30 rounded-full px-2.5 py-1 transition-colors disabled:opacity-50"
+                    >
+                      <XCircle className="w-3 h-3" />
+                      {isClosing ? 'Closing…' : 'Close session'}
+                    </button>
+                  )}
                   {session?.status === 'awaiting_handoff' && (
                     <span className="text-[11px] font-bold text-warning">Awaiting hand-off</span>
                   )}
@@ -173,6 +189,31 @@ export function ChatView({
               </div>
             ))}
 
+            {isClosingOpen && onCloseSession && (
+              // Closing is the moment decisions are most likely to be lost,
+              // so the choice is put here rather than left to a button
+              // someone has to remember afterwards.
+              <div className="bg-subtle border border-line-subtle rounded-lg px-3 py-2.5 flex items-center gap-3 flex-wrap" role="group" aria-label="Close this session">
+                <span className="text-[12px] text-ink">Close this session? Capture what was decided into the review queue first.</span>
+                <button
+                  type="button"
+                  onClick={() => { setIsClosingOpen(false); onCloseSession(true); }}
+                  className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold"
+                >
+                  Close and capture decisions
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsClosingOpen(false); onCloseSession(false); }}
+                  className="text-[12px] font-semibold text-ink-muted hover:text-ink"
+                >
+                  Close without capturing
+                </button>
+                <button type="button" onClick={() => setIsClosingOpen(false)} className="text-[12px] font-semibold text-ink-faint hover:text-ink">
+                  Cancel
+                </button>
+              </div>
+            )}
             {captureError && (
               <p className="text-[11.5px] font-semibold text-danger pl-1" role="alert">
                 {captureError}

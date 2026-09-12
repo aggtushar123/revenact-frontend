@@ -57,10 +57,17 @@ export function handOffSession(
   });
 }
 
-export function closeSession(conversationId: number): Promise<CopilotSession> {
-  return apiFetch<CopilotSession>(`/copilot/conversations/${conversationId}/session/close/`, {
-    method: 'POST',
-  });
+/** Owner-only. With `captureDecisions` the facilitator runs in the same
+ * request once the session is closed, and the closed session comes back
+ * with `decisions` and `decisions_error`; the close stands either way. */
+export function closeSession(
+  conversationId: number,
+  captureDecisions = false
+): Promise<CopilotSession & { decisions?: Proposal[]; decisions_error?: string | null }> {
+  return apiFetch<CopilotSession & { decisions?: Proposal[]; decisions_error?: string | null }>(
+    `/copilot/conversations/${conversationId}/session/close/`,
+    { method: 'POST', body: { capture_decisions: captureDecisions } }
+  );
 }
 
 /** The caller's own pending invites — real data behind the sidebar's
