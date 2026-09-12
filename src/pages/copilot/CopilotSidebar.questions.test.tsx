@@ -11,7 +11,7 @@ const question = {
   asked_by: { id: 1, name: 'Alice Admin', function: 'leadership' as const },
   assignee: { id: 5, name: 'Mei Tanaka', function: 'analytics' as const },
   text: 'Why is usage down?', status: 'open' as const, status_display: 'Open',
-  answer: null, message_id: null, created_at: new Date().toISOString(), answered_at: null,
+  answer: null, message_id: null, days_open: 0, created_at: new Date().toISOString(), answered_at: null,
 };
 
 describe('CopilotSidebar questions inbox', () => {

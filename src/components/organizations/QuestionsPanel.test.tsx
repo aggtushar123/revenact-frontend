@@ -13,7 +13,7 @@ const alice = { id: 1, name: 'Alice Admin', function: 'leadership' as const };
 const open = {
   id: 11, customer: { id: 7, name: 'Pizza Hut' }, asked_by: alice, assignee: mei,
   text: '@Mei Tanaka why is Pizza Hut usage down?', status: 'open' as const, status_display: 'Open',
-  answer: null, message_id: null, created_at: '2026-09-13T09:00:00Z', answered_at: null,
+  answer: null, message_id: null, days_open: 0, created_at: '2026-09-13T09:00:00Z', answered_at: null,
 };
 const answered = {
   ...open, id: 12, status: 'answered' as const, status_display: 'Answered', text: 'Is the SSO fix on track?',

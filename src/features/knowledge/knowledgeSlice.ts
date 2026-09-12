@@ -36,6 +36,8 @@ export interface Question {
   /** The contribution the answer was stored as. */
   answer: Contribution | null;
   message_id: number | null;
+  /** Whole days since asked (until answered, if it was). */
+  days_open: number;
   created_at: string;
   answered_at: string | null;
 }

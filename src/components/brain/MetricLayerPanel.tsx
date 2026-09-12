@@ -20,6 +20,7 @@ const GROUPS: { title: string; keys: string[] }[] = [
   { title: 'Engagement', keys: ['coverage', 'dark_accounts', 'dark_arr'] },
   { title: 'Health', keys: ['healthy_share', 'poor_health_count', 'active_customers'] },
   { title: 'Support', keys: ['open_tickets'] },
+  { title: 'Knowledge', keys: ['open_questions', 'stale_questions', 'contributions_30d'] },
 ];
 
 function formatValue(metric: Metric, value: number | null, currency: CurrencyCode): string {
