@@ -92,6 +92,22 @@ export interface Brief {
   generated_by: string | null;
 }
 
+/** Why one metric is where it is, in Claude's words, as of one day. */
+export interface Explanation {
+  id: number;
+  metric: string;
+  metric_label: string;
+  as_of: string;
+  baseline: string | null;
+  value: number | null;
+  previous_value: number | null;
+  text: string;
+  /** The figures the model cited, as they were given to it. */
+  evidence: string[];
+  generated_at: string;
+  generated_by: string | null;
+}
+
 interface MetricsState {
   data: MetricsPayload | null;
   isLoading: boolean;
@@ -106,6 +122,10 @@ interface MetricsState {
   brief: Brief | null | undefined;
   briefGenerating: boolean;
   briefError: string | null;
+  /** Per metric key: null before one is written; absent until fetched. */
+  explanations: Record<string, Explanation | null>;
+  explaining: string | null;
+  explainErrors: Record<string, string>;
 }
 
 const initialState: MetricsState = {
@@ -120,7 +140,37 @@ const initialState: MetricsState = {
   brief: undefined,
   briefGenerating: false,
   briefError: null,
+  explanations: {},
+  explaining: null,
+  explainErrors: {},
 };
+
+export const fetchExplanation = createAsyncThunk<
+  { key: string; explanation: Explanation | null },
+  string,
+  { rejectValue: string }
+>('metrics/fetchExplanation', async (key, { rejectWithValue }) => {
+  try {
+    const { explanation } = await apiFetch<{ explanation: Explanation | null }>(`/metrics/${key}/explanation/`);
+    return { key, explanation };
+  } catch (err) {
+    return rejectWithValue(err instanceof ApiError ? err.message : 'Could not load the explanation.');
+  }
+});
+
+/** A real, paid model call — only ever from an explicit click. */
+export const generateExplanation = createAsyncThunk<
+  { key: string; explanation: Explanation },
+  string,
+  { rejectValue: string }
+>('metrics/generateExplanation', async (key, { rejectWithValue }) => {
+  try {
+    const { explanation } = await apiFetch<{ explanation: Explanation }>(`/metrics/${key}/explain/`, { method: 'POST' });
+    return { key, explanation };
+  } catch (err) {
+    return rejectWithValue(err instanceof ApiError ? err.message : 'Could not write the explanation.');
+  }
+});
 
 export const fetchBrief = createAsyncThunk<Brief | null, void, { rejectValue: string }>(
   'metrics/fetchBrief',
@@ -239,6 +289,24 @@ const metricsSlice = createSlice({
       .addCase(generateBrief.rejected, (state, action) => {
         state.briefGenerating = false;
         state.briefError = action.payload ?? 'Could not write the brief.';
+      })
+      .addCase(fetchExplanation.fulfilled, (state, action) => {
+        state.explanations[action.payload.key] = action.payload.explanation;
+      })
+      .addCase(fetchExplanation.rejected, (state, action) => {
+        state.explainErrors[action.meta.arg] = action.payload ?? 'Could not load the explanation.';
+      })
+      .addCase(generateExplanation.pending, (state, action) => {
+        state.explaining = action.meta.arg;
+        delete state.explainErrors[action.meta.arg];
+      })
+      .addCase(generateExplanation.fulfilled, (state, action) => {
+        state.explaining = null;
+        state.explanations[action.payload.key] = action.payload.explanation;
+      })
+      .addCase(generateExplanation.rejected, (state, action) => {
+        state.explaining = null;
+        state.explainErrors[action.meta.arg] = action.payload ?? 'Could not write the explanation.';
       });
   },
 });

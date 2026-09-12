@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
@@ -21,8 +22,10 @@ const payload = {
 };
 
 function mockFetch(body: unknown = payload, status = 200) {
-  const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>(() =>
-    Promise.resolve({ ok: status < 400, status, json: async () => body })
+  const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url) =>
+    String(url).includes('/explanation/')
+      ? Promise.resolve({ ok: true, status: 200, json: async () => ({ explanation: null }) })
+      : Promise.resolve({ ok: status < 400, status, json: async () => body })
   );
   vi.stubGlobal('fetch', spy);
   return spy;
@@ -54,7 +57,7 @@ function renderPanel(role: 'admin' | 'csm' = 'admin') {
   );
 }
 
-const tile = (label: string) => screen.getByText(label).parentElement as HTMLElement;
+const tile = (label: string) => screen.getByText(label).closest('div.bg-surface') as HTMLElement;
 
 describe('MetricLayerPanel', () => {
   beforeEach(() => vi.unstubAllGlobals());
@@ -98,6 +101,21 @@ describe('MetricLayerPanel', () => {
 
     await screen.findByText('Something new');
     expect(screen.getByText('Other')).toBeInTheDocument();
+  });
+
+  it("opens one explanation at a time, full width under the tile's group", async () => {
+    mockFetch();
+    renderPanel();
+
+    await screen.findByText('ARR');
+    await userEvent.click(screen.getByRole('button', { name: 'Why ARR' }));
+    expect(await screen.findByText('Nobody has asked why yet.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ask Claude why' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Why ARR' })).toHaveAttribute('aria-expanded', 'true');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Why Net revenue retention' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Why ARR' })).toHaveAttribute('aria-expanded', 'false'));
+    expect(screen.getAllByText('Nobody has asked why yet.')).toHaveLength(1);
   });
 
   it('does not fetch for someone without view-all-accounts, and says why', () => {

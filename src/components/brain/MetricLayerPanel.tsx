@@ -1,10 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Minus, ShieldAlert } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchMetrics } from '../../features/metrics/metricsSlice';
 import type { Metric } from '../../features/metrics/metricsSlice';
 import type { CurrencyCode } from '../../features/auth/authSlice';
 import { formatCompactMoney } from '../../features/customers/formatters';
+import { ExplanationCard } from './ExplanationCard';
 
 /**
  * The metric layer, grouped the way a manager reads it rather than the way
@@ -42,7 +43,17 @@ function monthName(iso: string): string {
   });
 }
 
-function MetricTile({ metric, currency }: { metric: Metric; currency: CurrencyCode }) {
+function MetricTile({
+  metric,
+  currency,
+  open,
+  onWhy,
+}: {
+  metric: Metric;
+  currency: CurrencyCode;
+  open: boolean;
+  onWhy: () => void;
+}) {
   const t = tone(metric);
   const colour = { success: 'text-success', danger: 'text-danger', neutral: 'text-ink-faint' }[t];
   const Arrow =
@@ -57,8 +68,19 @@ function MetricTile({ metric, currency }: { metric: Metric; currency: CurrencyCo
       className="bg-surface border border-line-subtle rounded-lg px-[13px] py-[11px] flex flex-col gap-[3px]"
       title={metric.note}
     >
-      <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint truncate">
-        {metric.label}
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint truncate">
+          {metric.label}
+        </span>
+        <button
+          type="button"
+          onClick={onWhy}
+          aria-expanded={open}
+          aria-label={`Why ${metric.label}`}
+          className={`text-[11px] font-bold shrink-0 hover:underline ${open ? 'text-ink' : 'text-accent'}`}
+        >
+          {open ? 'Hide' : 'Why?'}
+        </button>
       </div>
       <div className="text-[22px] font-semibold leading-tight tracking-tight tabular-nums text-ink">
         {formatValue(metric, metric.value, currency)}
@@ -97,6 +119,8 @@ export function MetricLayerPanel() {
   const dispatch = useAppDispatch();
   const canSeeAll = useCapability('view_all_accounts');
   const { data, isLoading, error } = useAppSelector((state) => state.metrics);
+  // One open explanation at a time; it renders full-width under its group.
+  const [whyKey, setWhyKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (canSeeAll) dispatch(fetchMetrics());
@@ -152,9 +176,20 @@ export function MetricLayerPanel() {
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2.5">
             {group.metrics.map((metric) => (
-              <MetricTile key={metric.key} metric={metric} currency={data!.currency} />
+              <MetricTile
+                key={metric.key}
+                metric={metric}
+                currency={data!.currency}
+                open={whyKey === metric.key}
+                onWhy={() => setWhyKey(whyKey === metric.key ? null : metric.key)}
+              />
             ))}
           </div>
+          {whyKey && group.metrics.some((m) => m.key === whyKey) && (
+            <div className="mt-2">
+              <ExplanationCard metricKey={whyKey} asOf={data?.as_of} />
+            </div>
+          )}
         </div>
       ))}
     </section>

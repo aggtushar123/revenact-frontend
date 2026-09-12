@@ -1,9 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ArrowDownRight, ArrowUpRight, Minus } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchSignals } from '../../features/metrics/metricsSlice';
 import type { Signal } from '../../features/metrics/metricsSlice';
 import { formatMetricChange, formatMetricValue, monthName } from './formatMetric';
+import { ExplanationCard } from './ExplanationCard';
 
 /**
  * What moved since the last month-end — the metrics that moved materially,
@@ -57,7 +58,7 @@ export function SignalsPanel() {
       {signals && signals.signals.length > 0 && (
         <ul className="flex flex-col gap-2">
           {signals.signals.map((signal) => (
-            <SignalRow key={signal.key} signal={signal} currency={signals.currency} />
+            <SignalRow key={signal.key} signal={signal} currency={signals.currency} asOf={signals.as_of} />
           ))}
         </ul>
       )}
@@ -65,7 +66,8 @@ export function SignalsPanel() {
   );
 }
 
-function SignalRow({ signal, currency }: { signal: Signal; currency: Parameters<typeof formatMetricValue>[2] }) {
+function SignalRow({ signal, currency, asOf }: { signal: Signal; currency: Parameters<typeof formatMetricValue>[2]; asOf: string }) {
+  const [why, setWhy] = useState(false);
   const tone =
     signal.improved === null ? 'text-ink-muted' : signal.improved ? 'text-success' : 'text-danger';
   const accent =
@@ -83,12 +85,22 @@ function SignalRow({ signal, currency }: { signal: Signal; currency: Parameters<
             {formatMetricValue(signal.unit, signal.value, currency)}
           </span>
         </div>
-        <span className={`flex items-center gap-1 text-[12px] font-semibold tabular-nums ${tone}`}>
-          <Arrow className="w-3.5 h-3.5" />
-          {formatMetricChange(signal.unit, signal.change, currency)}
-          <span className="text-ink-faint font-normal">
-            from {formatMetricValue(signal.unit, signal.previous.value, currency)}
+        <span className="flex items-center gap-3">
+          <span className={`flex items-center gap-1 text-[12px] font-semibold tabular-nums ${tone}`}>
+            <Arrow className="w-3.5 h-3.5" />
+            {formatMetricChange(signal.unit, signal.change, currency)}
+            <span className="text-ink-faint font-normal">
+              from {formatMetricValue(signal.unit, signal.previous.value, currency)}
+            </span>
           </span>
+          <button
+            type="button"
+            onClick={() => setWhy((open) => !open)}
+            aria-expanded={why}
+            className="text-[11.5px] font-bold text-accent hover:underline"
+          >
+            {why ? 'Hide' : 'Why?'}
+          </button>
         </span>
       </div>
       {signal.drivers.length > 0 && (
@@ -105,6 +117,11 @@ function SignalRow({ signal, currency }: { signal: Signal; currency: Parameters<
             </span>
           ))}
         </p>
+      )}
+      {why && (
+        <div className="mt-2">
+          <ExplanationCard metricKey={signal.key} asOf={asOf} />
+        </div>
       )}
     </li>
   );
