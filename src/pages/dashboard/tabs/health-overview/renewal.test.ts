@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import {
-  BASE_RISK,
-  CONTACT_COLD_DAYS,
-  MAX_RISK,
-  RISK_ADJUSTMENTS,
   coverageBands,
   coverageOf,
   ownerLoad,
@@ -51,89 +47,33 @@ describe('coverageOf', () => {
 });
 
 describe('riskOfLoss', () => {
-  it('starts from the health grade', () => {
-    expect(riskOfLoss(healthRow({ healthStatus: 'Good' })).risk).toBe(BASE_RISK.Good);
-    expect(riskOfLoss(healthRow({ healthStatus: 'Poor' })).risk).toBe(BASE_RISK.Poor);
+  // The rule itself is the backend's (services/customers/churn.py) and is
+  // tested there. What matters here is that this tab reads what it is served
+  // rather than deriving a second opinion — the bug that version would cause
+  // is the Renewal tab and the Revenue Forecast disagreeing about one account.
+
+  it('reads the risk the backend sent', () => {
+    const { risk } = riskOfLoss(healthRow({ riskOfLoss: 0.6, healthStatus: 'Good' }));
+
+    expect(risk).toBe(0.6);
   });
 
-  it('adds for a cold account, and names the reason', () => {
-    const { risk, factors } = riskOfLoss(
-      healthRow({ healthStatus: 'Average', daysSinceTouch: CONTACT_COLD_DAYS + 1 })
-    );
+  it('does not re-derive from health, which would drift from the rule', () => {
+    // A Poor account the backend scored gently stays gently scored here.
+    const { risk } = riskOfLoss(healthRow({ healthStatus: 'Poor', riskOfLoss: 0.05 }));
 
-    expect(risk).toBeCloseTo(BASE_RISK.Average + RISK_ADJUSTMENTS.coldContact);
-    expect(factors.map((f) => f.label)).toContain('No contact in 61 days');
+    expect(risk).toBe(0.05);
   });
 
-  it('adds when the two pulses disagree, because somebody is wrong', () => {
-    const { risk } = riskOfLoss(
-      healthRow({ healthStatus: 'Good', csmPulseScore: 5, aiPulseScore: 2 })
+  it('passes the reasons through for the row to print', () => {
+    const factors = [
+      { label: 'Poor health', points: 0.5 },
+      { label: 'No contact in 95 days', points: 0.1 },
+    ];
+
+    expect(riskOfLoss(healthRow({ riskOfLoss: 0.6, riskFactors: factors })).factors).toEqual(
+      factors
     );
-
-    expect(risk).toBeCloseTo(BASE_RISK.Good + RISK_ADJUSTMENTS.pulseDisagreement);
-  });
-
-  it('treats one point of pulse difference as rounding, not disagreement', () => {
-    const { risk } = riskOfLoss(
-      healthRow({ healthStatus: 'Good', csmPulseScore: 4, aiPulseScore: 3 })
-    );
-
-    expect(risk).toBe(BASE_RISK.Good);
-  });
-
-  it('does not read an unrated pulse as agreement or as disagreement', () => {
-    const { risk } = riskOfLoss(
-      healthRow({ healthStatus: 'Good', csmPulseScore: null, aiPulseScore: 1 })
-    );
-
-    expect(risk).toBe(BASE_RISK.Good);
-  });
-
-  it('adds for an account that has not landed yet', () => {
-    const { risk, factors } = riskOfLoss(
-      healthRow({ healthStatus: 'Good', lifecycleStage: 'Kickoff', lifecycleKey: 'kickoff' })
-    );
-
-    expect(risk).toBeCloseTo(BASE_RISK.Good + RISK_ADJUSTMENTS.notEmbedded);
-    expect(factors.map((f) => f.label)).toContain('Still in kickoff');
-  });
-
-  it('reads the stored stage, not the label', () => {
-    // The factor used to test the label for "pilot" — a stage this product
-    // does not have — so it never fired on real data. A renamed label must not
-    // be able to break it again.
-    const { risk } = riskOfLoss(
-      healthRow({
-        healthStatus: 'Good',
-        lifecycleStage: 'Getting started (renamed)',
-        lifecycleKey: 'onboarding',
-      })
-    );
-
-    expect(risk).toBeCloseTo(BASE_RISK.Good + RISK_ADJUSTMENTS.notEmbedded);
-  });
-
-  it('does not add for an account that is live', () => {
-    const { risk } = riskOfLoss(
-      healthRow({ healthStatus: 'Good', lifecycleStage: 'Live', lifecycleKey: 'live' })
-    );
-
-    expect(risk).toBe(BASE_RISK.Good);
-  });
-
-  it('never reaches certainty while the renewal is still open', () => {
-    const { risk } = riskOfLoss(
-      healthRow({
-        healthStatus: 'Poor',
-        daysSinceTouch: 400,
-        csmPulseScore: 5,
-        aiPulseScore: 1,
-        lifecycleStage: 'Onboarding',
-        lifecycleKey: 'onboarding',
-      })
-    );
-
-    expect(risk).toBeLessThanOrEqual(MAX_RISK);
   });
 });
 
@@ -149,9 +89,12 @@ describe('renewalRows', () => {
   });
 
   it('multiplies ARR by risk to get exposure', () => {
-    const [item] = renewalRows([renewingIn(10, { arr: 200_000, healthStatus: 'Poor' })], NOW).rows;
+    const [item] = renewalRows(
+      [renewingIn(10, { arr: 200_000, healthStatus: 'Poor', riskOfLoss: 0.5 })],
+      NOW
+    ).rows;
 
-    expect(item.exposure).toBeCloseTo(200_000 * BASE_RISK.Poor);
+    expect(item.exposure).toBeCloseTo(200_000 * 0.5);
   });
 
   it('leaves exposure null when the ARR could not be converted', () => {
@@ -167,9 +110,21 @@ describe('summarise', () => {
   const book = () =>
     renewalRows(
       [
-        renewingIn(10, { id: '1', arr: 100_000, healthStatus: 'Poor', daysSinceTouch: 90 }),
-        renewingIn(80, { id: '2', arr: 50_000, healthStatus: 'Good', daysSinceTouch: 5 }),
-        renewingIn(200, { id: '3', arr: 900_000, healthStatus: 'Poor' }),
+        renewingIn(10, {
+          id: '1',
+          arr: 100_000,
+          healthStatus: 'Poor',
+          daysSinceTouch: 90,
+          riskOfLoss: 0.6,
+        }),
+        renewingIn(80, {
+          id: '2',
+          arr: 50_000,
+          healthStatus: 'Good',
+          daysSinceTouch: 5,
+          riskOfLoss: 0.05,
+        }),
+        renewingIn(200, { id: '3', arr: 900_000, healthStatus: 'Poor', riskOfLoss: 0.5 }),
         renewingIn(-12, { id: '4', arr: 30_000 }),
         renewingIn(20, { id: '5', arr: null }),
       ],
@@ -210,7 +165,7 @@ describe('summarise', () => {
   it('weights exposure by risk rather than calling the whole window at risk', () => {
     const summary = summarise(book());
 
-    // 100k Poor + cold (0.5 + 0.1) + 50k Good (0.05).
+    // 100k at the 0.6 the backend sent, 50k at 0.05.
     expect(summary.exposure).toBeCloseTo(100_000 * 0.6 + 50_000 * 0.05);
     expect(summary.exposure).toBeLessThan(summary.arr);
   });
@@ -310,8 +265,13 @@ describe('renewalQueue', () => {
     // The biggest contract is not the one most likely to leave.
     const { rows } = renewalRows(
       [
-        renewingIn(30, { id: 'big-healthy', arr: 500_000, healthStatus: 'Good' }),
-        renewingIn(30, { id: 'small-sick', arr: 200_000, healthStatus: 'Poor' }),
+        renewingIn(30, {
+          id: 'big-healthy',
+          arr: 500_000,
+          healthStatus: 'Good',
+          riskOfLoss: 0.05,
+        }),
+        renewingIn(30, { id: 'small-sick', arr: 200_000, healthStatus: 'Poor', riskOfLoss: 0.5 }),
       ],
       NOW
     );
@@ -322,8 +282,8 @@ describe('renewalQueue', () => {
   it('puts overdue renewals first whatever they are worth', () => {
     const { rows } = renewalRows(
       [
-        renewingIn(30, { id: 'large', arr: 900_000, healthStatus: 'Poor' }),
-        renewingIn(-3, { id: 'overdue', arr: 1_000, healthStatus: 'Good' }),
+        renewingIn(30, { id: 'large', arr: 900_000, healthStatus: 'Poor', riskOfLoss: 0.5 }),
+        renewingIn(-3, { id: 'overdue', arr: 1_000, healthStatus: 'Good', riskOfLoss: 0.05 }),
       ],
       NOW
     );
@@ -335,8 +295,8 @@ describe('renewalQueue', () => {
     // It still needs working; it just can't be ranked by money.
     const { rows } = renewalRows(
       [
-        renewingIn(30, { id: 'priced', arr: 10_000, healthStatus: 'Good' }),
-        renewingIn(30, { id: 'unpriced', arr: null, healthStatus: 'Poor' }),
+        renewingIn(30, { id: 'priced', arr: 10_000, healthStatus: 'Good', riskOfLoss: 0.05 }),
+        renewingIn(30, { id: 'unpriced', arr: null, healthStatus: 'Poor', riskOfLoss: 0.5 }),
       ],
       NOW
     );

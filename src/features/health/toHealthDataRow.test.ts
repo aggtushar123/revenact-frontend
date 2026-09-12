@@ -23,6 +23,11 @@ function apiRow(overrides: Partial<CustomerHealthApiRow> = {}): CustomerHealthAp
     ai_pulse_reason: 'Career-site traffic down 42% QoQ',
     arr: 120000,
   days_since_touch: 14,
+  risk_of_loss: 0.35,
+  risk_factors: [
+    { label: 'Average health', points: 0.25 },
+    { label: 'CSM and AI pulse disagree', points: 0.1 },
+  ],
   total_active_seats: 822,
     history: [
       {

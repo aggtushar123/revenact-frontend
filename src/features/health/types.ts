@@ -77,6 +77,20 @@ export interface HealthDataRow {
    * it; the backend has `total_active_seats` and no recruiter count at all.
    */
   activeSeats: number | null;
+  /**
+   * Probability this renewal is lost, 0–1, from the backend's shared churn
+   * rule (`services/customers/churn.py`).
+   *
+   * Served rather than computed here: the Revenue Forecast needs the same
+   * number about the same account, and two implementations of a churn model
+   * that both drive money on screen is a discrepancy with a date on it. It is
+   * a stated business rule, not a fitted model — see that module.
+   */
+  riskOfLoss: number;
+  /** Every contribution behind `riskOfLoss`, in the order it was applied. The
+   *  Renewal tab prints them on the row: a ranking nobody can interrogate is a
+   *  ranking nobody acts on. */
+  riskFactors: { label: string; points: number }[];
   /** Oldest month first. Empty when nothing has been recorded. */
   history: HealthHistoryEntry[];
 }

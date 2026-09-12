@@ -180,6 +180,10 @@ const generateMockData = (): HealthDataRow[] => {
       // tab's money charts are read against.
       arr: Math.round((5_000 + Math.random() ** 3 * 400_000) / 1000) * 1000,
       daysSinceTouch: Math.floor(Math.random() * 120),
+      // The fixture stands in for the backend's rule rather than reimplementing
+      // it — this generator is a test fixture, not a second churn model.
+      riskOfLoss: status === 'Poor' ? 0.5 : status === 'Average' ? 0.25 : 0.05,
+      riskFactors: [{ label: `${status} health`, points: status === 'Poor' ? 0.5 : status === 'Average' ? 0.25 : 0.05 }],
       activeSeats: Math.floor(Math.random() * 50) + 10,
       history: historyEndingAt(status)
     });
@@ -206,6 +210,11 @@ const generateMockData = (): HealthDataRow[] => {
     aiPulseReason: 'Exec sponsor left; no replacement mapped',
     arr: 180_000,
     daysSinceTouch: 96,
+    riskOfLoss: 0.6,
+    riskFactors: [
+      { label: 'Poor health', points: 0.5 },
+      { label: 'No contact in 96 days', points: 0.1 },
+    ],
     activeSeats: 38,
     // Deliberately empty: this hand-written row is the one account with no
     // pulse history, which keeps the "no trajectory" path exercised on screen.

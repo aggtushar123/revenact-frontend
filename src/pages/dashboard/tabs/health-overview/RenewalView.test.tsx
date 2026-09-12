@@ -33,6 +33,12 @@ const BOOK = [
     arr: 240_000,
     healthStatus: 'Poor',
     daysSinceTouch: 95,
+    // Poor health + no contact in 95 days, as the backend's rule scores it.
+    riskOfLoss: 0.6,
+    riskFactors: [
+      { label: 'Poor health', points: 0.5 },
+      { label: 'No contact in 95 days', points: 0.1 },
+    ],
   }),
   renewingIn(45, {
     id: '2',
@@ -41,6 +47,8 @@ const BOOK = [
     arr: 120_000,
     healthStatus: 'Good',
     daysSinceTouch: 4,
+    riskOfLoss: 0.05,
+    riskFactors: [{ label: 'Good health', points: 0.05 }],
   }),
   renewingIn(200, {
     id: '3',
@@ -49,6 +57,8 @@ const BOOK = [
     arr: 600_000,
     healthStatus: 'Average',
     daysSinceTouch: 20,
+    riskOfLoss: 0.25,
+    riskFactors: [{ label: 'Average health', points: 0.25 }],
   }),
 ];
 

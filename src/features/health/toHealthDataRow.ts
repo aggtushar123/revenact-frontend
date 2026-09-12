@@ -20,6 +20,8 @@ export interface CustomerHealthApiRow {
   /** In the organisation's reporting currency; null when unconvertible. */
   arr: number | null;
   days_since_touch: number | null;
+  risk_of_loss: number;
+  risk_factors: { label: string; points: number }[];
   total_active_seats: number | null;
   history: {
     captured_on: string;
@@ -99,6 +101,8 @@ export function toHealthDataRow(row: CustomerHealthApiRow): HealthDataRow {
     aiPulseReason: row.ai_pulse_reason,
     arr: row.arr,
     daysSinceTouch: row.days_since_touch,
+    riskOfLoss: row.risk_of_loss,
+    riskFactors: row.risk_factors ?? [],
     activeSeats: row.total_active_seats,
     history: toHistory(row.history),
   };

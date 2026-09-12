@@ -31,6 +31,8 @@ export function healthRow(overrides: Partial<HealthDataRow> = {}): HealthDataRow
     aiPulseReason: 'Seat utilisation at 94% of contract',
     arr: 100_000,
     daysSinceTouch: 10,
+    riskOfLoss: 0.05,
+    riskFactors: [{ label: 'Good health', points: 0.05 }],
     activeSeats: 20,
     history: [],
     ...overrides,

@@ -69,104 +69,24 @@ export function coverageOf(row: HealthDataRow): Coverage {
 }
 
 /**
- * Probability this renewal is lost, as a plain stated assumption.
+ * The probability this renewal is lost, and what produced it.
  *
- * **This is a business rule, not a model.** Nothing here was fitted to
- * historical churn — this product has no churn history to fit to. It is the
- * judgement a CSM leader already applies in a forecast review, written down so
- * every chart applies it the same way and so it can be argued with in one
- * place instead of being re-invented per chart.
+ * **The rule itself lives in the backend** (`services/customers/churn.py`) and
+ * arrives on the row. It used to live here, which was fine while this tab was
+ * its only reader; the Revenue Forecast needs the same number about the same
+ * account, and two implementations of a churn model that both drive money on
+ * screen is a discrepancy with a date on it.
  *
- * Base rate by current health, then three adjustments, each for a thing that
- * genuinely changes the odds independently of the grade:
- *
- * - **No recent contact.** A renewal you haven't discussed is a renewal you
- *   are not in. Worth more than the pulse disagreement below, because it is a
- *   fact rather than an opinion.
- * - **The two pulses disagree by 2+.** Somebody is wrong about this account,
- *   and being wrong about an account inside its renewal window is itself a
- *   risk — the Divergence tab exists for the same reason.
- * - **Not yet embedded.** An account still onboarding or in kickoff has less
- *   to walk away from, and a renewal inside that window is a renewal of
- *   something that hasn't happened yet.
- *
- * Capped below 1: a renewal is never *certain* to be lost while it is still
- * open, and a 100% line item invites people to stop working it.
+ * What stays here is the *reading* of it — which thresholds this tab shows,
+ * and how it ranks by the result.
  */
-export const BASE_RISK: Record<HealthStatus, number> = {
-  Good: 0.05,
-  Average: 0.25,
-  Poor: 0.5,
-};
-
-export const RISK_ADJUSTMENTS = {
-  coldContact: 0.1,
-  pulseDisagreement: 0.1,
-  notEmbedded: 0.05,
-} as const;
-
-export const MAX_RISK = 0.9;
-
-/**
- * Stages where the customer hasn't landed yet, by their stored values.
- *
- * This used to test the *label* for "pilot" — a stage this product does not
- * have. `Customer.LifecycleStage` is onboarding / kickoff / adoption / live /
- * renewal / churn / expansion / other, so the factor could never fire on real
- * data: it was worth 5 points to nobody, and the mock's own invented "Pilot"
- * stage is why it looked like it worked.
- */
-export const NOT_EMBEDDED_STAGES = new Set(["onboarding", "kickoff"]);
-
-/** How far apart the two pulses have to be to count as disagreement. Matches
- *  the Divergence tab's own threshold — one point is rounding on a five-point
- *  scale, two is a difference of opinion. */
-export const PULSE_GAP_THRESHOLD = 2;
-
 export interface RiskFactor {
   label: string;
   points: number;
 }
 
-export function riskOfLoss(row: HealthDataRow): {
-  risk: number;
-  factors: RiskFactor[];
-} {
-  const base = BASE_RISK[row.healthStatus];
-  const factors: RiskFactor[] = [
-    { label: `${row.healthStatus} health`, points: base },
-  ];
-
-  if (coverageOf(row) === "cold") {
-    factors.push({
-      label: `No contact in ${row.daysSinceTouch} days`,
-      points: RISK_ADJUSTMENTS.coldContact,
-    });
-  }
-
-  const gap =
-    row.csmPulseScore !== null && row.aiPulseScore !== null
-      ? Math.abs(row.csmPulseScore - row.aiPulseScore)
-      : null;
-  if (gap !== null && gap >= PULSE_GAP_THRESHOLD) {
-    factors.push({
-      label: "CSM and AI pulse disagree",
-      points: RISK_ADJUSTMENTS.pulseDisagreement,
-    });
-  }
-
-  if (NOT_EMBEDDED_STAGES.has(row.lifecycleKey)) {
-    factors.push({
-      label: `Still in ${row.lifecycleStage.toLowerCase()}`,
-      points: RISK_ADJUSTMENTS.notEmbedded,
-    });
-  }
-
-  const risk = Math.min(
-    MAX_RISK,
-    factors.reduce((sum, f) => sum + f.points, 0),
-  );
-  return { risk, factors };
+export function riskOfLoss(row: HealthDataRow): { risk: number; factors: RiskFactor[] } {
+  return { risk: row.riskOfLoss, factors: row.riskFactors };
 }
 
 export interface RenewalRow {
