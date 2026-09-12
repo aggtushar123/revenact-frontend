@@ -26,6 +26,25 @@ export interface InitiativeProgress {
   better: MetricDirection | null;
 }
 
+export interface InitiativeTask {
+  id: number;
+  title: string;
+  parent_name: string;
+  parent_type: 'customer' | 'account';
+  parent_id: number;
+  assignee_name: string;
+  due_date: string;
+  priority: 'high' | 'medium' | 'low';
+  status: 'pending' | 'in-progress' | 'completed';
+}
+
+/** The tasks under a decision — open first, soonest due first. */
+export interface InitiativeWork {
+  open: number;
+  done: number;
+  tasks: InitiativeTask[];
+}
+
 export interface Initiative {
   id: number;
   title: string;
@@ -46,6 +65,7 @@ export interface Initiative {
   baseline_as_of: string;
   progress: InitiativeProgress;
   history: { period_end: string; value: number | null }[];
+  work: InitiativeWork;
   created_at: string;
   updated_at: string;
   closed_at: string | null;

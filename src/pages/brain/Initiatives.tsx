@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Flag, Plus, ShieldAlert } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import {
   createInitiative,
@@ -197,6 +198,47 @@ function InitiativeCard({ initiative }: { initiative: Initiative }) {
           {p.baseline !== null &&
             ` · started at ${formatMetricValue(unit, p.baseline, currency)} on ${formatDate(initiative.baseline_as_of)}`}
         </p>
+      </div>
+
+      <div>
+        <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted mb-1">
+          Work under this decision
+          {initiative.work.open + initiative.work.done > 0 && (
+            <span className="text-ink-faint font-semibold tracking-normal normal-case">
+              {' '}· {initiative.work.open} open · {initiative.work.done} done
+            </span>
+          )}
+        </div>
+        {initiative.work.tasks.length === 0 ? (
+          <p className="text-[12px] text-ink-faint">
+            Nothing yet. Approve a proposal that serves this decision in the{' '}
+            <Link to="/brain/review" className="text-accent hover:underline">review queue</Link> and
+            its task lands here.
+          </p>
+        ) : (
+          <ul className="flex flex-col gap-1">
+            {initiative.work.tasks.map((task) => (
+              <li key={task.id} className="text-[12px] flex items-baseline gap-2">
+                <span className={`font-medium ${task.status === 'completed' ? 'text-ink-faint line-through' : 'text-ink'}`}>
+                  {task.title}
+                </span>
+                <span className="text-ink-faint">
+                  on{' '}
+                  <Link
+                    to={task.parent_type === 'customer' ? `/organizations/${task.parent_id}` : `/accounts/${task.parent_id}`}
+                    className="text-accent hover:underline"
+                  >
+                    {task.parent_name}
+                  </Link>{' '}
+                  · {task.assignee_name} · due {formatDate(task.due_date)}
+                </span>
+                <span className={`ml-auto text-[10px] font-bold uppercase tracking-wider shrink-0 ${task.status === 'completed' ? 'text-success' : task.status === 'in-progress' ? 'text-info' : 'text-ink-faint'}`}>
+                  {task.status === 'in-progress' ? 'in progress' : task.status}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {isClosed && initiative.outcome && (

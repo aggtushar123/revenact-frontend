@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import metricsReducer from '../../features/metrics/metricsSlice';
@@ -29,6 +30,14 @@ const initiative = {
   baseline_as_of: '2026-09-12',
   progress: { baseline: 64_090, current: 48_000, target: 32_000, progress_pct: 50.1, days_left: 79, direction: 'down' as const, unit: 'money' as const, better: 'down' as const },
   history: [],
+  work: {
+    open: 1,
+    done: 1,
+    tasks: [
+      { id: 21, title: 'Save play: Pizza Hut', parent_name: 'Pizza Hut', parent_type: 'customer' as const, parent_id: 7, assignee_name: 'Carl CSM', due_date: '2026-09-19', priority: 'high' as const, status: 'pending' as const },
+      { id: 20, title: 'Usage review', parent_name: 'Uber', parent_type: 'customer' as const, parent_id: 3, assignee_name: 'Carl CSM', due_date: '2026-09-05', priority: 'medium' as const, status: 'completed' as const },
+    ],
+  },
   created_at: '2026-09-12T16:00:00Z',
   updated_at: '2026-09-12T16:00:00Z',
   closed_at: null,
@@ -89,13 +98,25 @@ function renderPage(role: 'admin' | 'csm' = 'admin') {
   });
   render(
     <Provider store={store}>
-      <InitiativesPage />
+      <MemoryRouter>
+        <InitiativesPage />
+      </MemoryRouter>
     </Provider>
   );
 }
 
 describe('InitiativesPage', () => {
   beforeEach(() => vi.unstubAllGlobals());
+
+  it('lists the work under a decision, open first, and links each task to its account', async () => {
+    mockApi([initiative]);
+    renderPage();
+
+    await screen.findByText('Save play: Pizza Hut');
+    expect(screen.getByText(/1 open · 1 done/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Pizza Hut' })).toHaveAttribute('href', '/organizations/7');
+    expect(screen.getByText('Usage review')).toHaveClass('line-through');
+  });
 
   it('shows each decision judged against the live number', async () => {
     mockApi();
