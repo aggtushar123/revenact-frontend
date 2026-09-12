@@ -18,6 +18,7 @@ export function healthRow(overrides: Partial<HealthDataRow> = {}): HealthDataRow
     id: '1',
     account: 'Acme',
     owner: 'Gerry Hill',
+    ownerKey: '1',
     lifecycleStage: 'Customer - Active',
     renewalDate: 'Dec 31, 2026',
     healthStatus: 'Good',
@@ -52,6 +53,7 @@ export function renderWithHealth(
     loaded = true,
     currency = 'USD',
     unconvertedCount = 0,
+    ownerFilter = null,
   }: {
     rows?: HealthDataRow[];
     isLoading?: boolean;
@@ -60,6 +62,7 @@ export function renderWithHealth(
     loaded?: boolean;
     currency?: CurrencyCode;
     unconvertedCount?: number;
+    ownerFilter?: string | null;
   } = {},
 ) {
   const store = configureStore({
@@ -74,6 +77,7 @@ export function renderWithHealth(
         loadedAt: loaded ? '2026-09-11T00:00:00.000Z' : null,
         currency,
         unconvertedCount,
+        ownerFilter,
       },
     },
   });

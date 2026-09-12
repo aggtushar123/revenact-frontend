@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import type { PayloadAction } from '@reduxjs/toolkit';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import type { CurrencyCode } from '../auth/authSlice';
 import { toHealthDataRows } from './toHealthDataRow';
@@ -31,6 +32,18 @@ interface HealthState {
   /** Rows whose ARR couldn't be converted into it. The Renewal tab names this
    *  rather than quietly totalling a partial book. */
   unconvertedCount: number;
+  /**
+   * The Primary Owner filter: a `HealthDataRow.ownerKey`, or null for "All".
+   *
+   * Here rather than in the container's own React state because all five tabs
+   * have to honour it, and they read their rows through one hook. State the
+   * hook can see is state a tab cannot forget to apply — a filter that silently
+   * doesn't apply on one of five tabs is worse than no filter at all.
+   *
+   * It survives a tab switch on purpose: narrowing to one CSM and then moving
+   * from Triage to Movement is one thought, not two.
+   */
+  ownerFilter: string | null;
 }
 
 const initialState: HealthState = {
@@ -44,6 +57,7 @@ const initialState: HealthState = {
   // before `loadedAt` is set.
   currency: 'USD',
   unconvertedCount: 0,
+  ownerFilter: null,
 };
 
 interface HealthPayload {
@@ -79,7 +93,11 @@ export const fetchHealthOverview = createAsyncThunk<
 export const healthSlice = createSlice({
   name: 'health',
   initialState,
-  reducers: {},
+  reducers: {
+    setOwnerFilter(state, action: PayloadAction<string | null>) {
+      state.ownerFilter = action.payload;
+    },
+  },
   extraReducers: (builder) => {
     builder
       .addCase(fetchHealthOverview.pending, (state) => {
@@ -93,6 +111,16 @@ export const healthSlice = createSlice({
         state.truncated = action.payload.truncated;
         state.currency = action.payload.currency;
         state.unconvertedCount = action.payload.unconvertedCount;
+        // Drop a filter the refreshed book can no longer honour — a CSM who
+        // left, or whose last account was reassigned. Keeping it would leave
+        // every tab empty with an owner name on the chip and no way to tell
+        // that the *filter*, not the book, is what emptied them.
+        if (
+          state.ownerFilter !== null &&
+          !action.payload.rows.some((row) => row.ownerKey === state.ownerFilter)
+        ) {
+          state.ownerFilter = null;
+        }
         state.loadedAt = new Date().toISOString();
       })
       .addCase(fetchHealthOverview.rejected, (state, action) => {
@@ -103,5 +131,7 @@ export const healthSlice = createSlice({
       });
   },
 });
+
+export const { setOwnerFilter } = healthSlice.actions;
 
 export default healthSlice.reducer;

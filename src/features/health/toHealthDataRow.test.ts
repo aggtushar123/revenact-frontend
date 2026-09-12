@@ -10,7 +10,8 @@ function apiRow(overrides: Partial<CustomerHealthApiRow> = {}): CustomerHealthAp
   return {
     id: 10,
     name: 'Hyatt Hotels Corporation',
-    owner_name: 'Carl CSM',
+    owner_id: 5,
+  owner_name: 'Carl CSM',
     lifecycle_stage: 'live',
     lifecycle_stage_display: 'Live',
     renewal_date: '2026-02-02',

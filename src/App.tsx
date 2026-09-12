@@ -39,7 +39,6 @@ import { useAppSelector } from './hooks';
 import { AdvanceDashboard } from './pages/dashboard/AdvanceDashboard';
 import { AITrendingTopics } from './pages/dashboard/tabs/AITrendingTopics';
 import { ControlsView } from './pages/dashboard/tabs/ai-trending/ControlsView';
-import { PlaceholderView } from './pages/dashboard/tabs/ai-trending/PlaceholderView';
 import { HealthOverviewContainer } from './pages/dashboard/tabs/HealthOverviewContainer';
 import { ControlsView as HealthControlsView } from './pages/dashboard/tabs/health-overview/ControlsView';
 import { TriageView } from './pages/dashboard/tabs/health-overview/TriageView';
@@ -111,7 +110,17 @@ function App() {
                 <Route path="movement" element={<MovementView />} />
                 <Route path="renewal-date" element={<RenewalView />} />
                 <Route path="controls" element={<HealthControlsView />} />
-                <Route path="*" element={<PlaceholderView />} />
+                {/* Primary Owner / Lifecycle Stage / Account used to be
+                    routes here, each falling through to a placeholder. Primary
+                    Owner is a real filter on the container's own bar now; the
+                    other two are gone rather than left as dead ends. Old paths
+                    land back on Triage, same as the other two dashboards.
+                    Absolute, not relative: a relative "triage" resolves against
+                    the unmatched path and would match this catch-all again. */}
+                <Route
+                  path="*"
+                  element={<Navigate to="/dashboard/advance/health/triage" replace />}
+                />
               </Route>
               <Route path="ticket" element={<TicketOverviewContainer />}>
                 <Route index element={<Navigate to="controls" replace />} />

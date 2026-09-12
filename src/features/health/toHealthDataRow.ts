@@ -6,6 +6,7 @@ import type { HealthDataRow, HealthHistoryEntry, HealthStatus } from './types';
 export interface CustomerHealthApiRow {
   id: number;
   name: string;
+  owner_id: number | null;
   owner_name: string | null;
   lifecycle_stage: string;
   lifecycle_stage_display: string;
@@ -48,6 +49,12 @@ const STATUS_BY_CATEGORY: Record<CustomerHealthApiRow['health_category'], Health
   poor: 'Poor',
 };
 
+/** The bucket every unowned account lands in. A real bucket rather than a
+ *  missing value — "nobody owns this" is one of the more useful things the
+ *  Primary Owner filter can show you. */
+export const UNASSIGNED_KEY = 'unassigned';
+export const UNASSIGNED_LABEL = 'Unassigned';
+
 /** The date shape `triage.daysToRenewal` parses — see RENEWAL_DATE_FORMAT. */
 const DISPLAY_DATE = 'MMM d, yyyy';
 
@@ -77,7 +84,8 @@ export function toHealthDataRow(row: CustomerHealthApiRow): HealthDataRow {
   return {
     id: String(row.id),
     account: row.name,
-    owner: row.owner_name ?? 'Unassigned',
+    owner: row.owner_name ?? UNASSIGNED_LABEL,
+    ownerKey: row.owner_id === null ? UNASSIGNED_KEY : String(row.owner_id),
     lifecycleStage: row.lifecycle_stage_display || row.lifecycle_stage,
     renewalDate: toDisplayDate(row.renewal_date),
     healthStatus: STATUS_BY_CATEGORY[row.health_category],

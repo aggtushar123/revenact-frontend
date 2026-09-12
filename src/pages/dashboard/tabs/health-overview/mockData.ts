@@ -154,6 +154,10 @@ const generateMockData = (): HealthDataRow[] => {
       id: `${i}`,
       account: `${account} ${i}`,
       owner,
+      // The generator has names, not ids; the index into MOCK_OWNERS stands in
+      // for one, which is enough for a fixture and keeps the key stable per
+      // owner the way a real id is.
+      ownerKey: String(MOCK_OWNERS.indexOf(owner)),
       lifecycleStage: Math.random() > 0.8 ? 'Pilot' : (Math.random() > 0.9 ? 'Closed Lost' : 'Customer - Active'),
       renewalDate: renewalDateIn(12 + Math.floor(Math.random() * 350)),
       healthStatus: status,
@@ -181,6 +185,7 @@ const generateMockData = (): HealthDataRow[] => {
     id: String(data.length + 1),
     account: 'Nova Enterprises',
     owner: 'Gerry Hill',
+    ownerKey: String(MOCK_OWNERS.indexOf('Gerry Hill')),
     lifecycleStage: 'Customer - Active',
     renewalDate: renewalDateIn(23),
     healthStatus: 'Poor',

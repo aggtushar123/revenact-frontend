@@ -19,6 +19,15 @@ export interface HealthDataRow {
   account: string;
   /** The owning CSM's name, or a placeholder when unassigned. */
   owner: string;
+  /**
+   * The owning CSM's id as a string, or `'unassigned'`.
+   *
+   * What the Primary Owner filter keys on. Two CSMs called "John Smith" is an
+   * ordinary thing in a real org, and filtering on the label would merge their
+   * books without anyone noticing. `'unassigned'` is a real bucket, not a
+   * missing value: "nobody owns this" is a finding, not an absence.
+   */
+  ownerKey: string;
   lifecycleStage: string;
   /** "MMM d, yyyy" — the shape `triage.daysToRenewal` parses. Empty when the
    *  account has no renewal date recorded. */
