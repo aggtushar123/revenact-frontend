@@ -1,5 +1,7 @@
 import { Brain } from 'lucide-react';
 import { MetricLayerPanel } from '../../components/brain/MetricLayerPanel';
+import { SignalsPanel } from '../../components/brain/SignalsPanel';
+import { DriversPanel } from '../../components/brain/DriversPanel';
 
 /**
  * The Company Brain, as it actually stands.
@@ -9,10 +11,11 @@ import { MetricLayerPanel } from '../../components/brain/MetricLayerPanel';
  * anything. It was removed rather than kept as decoration: a page that
  * looks like a system of record and isn't one is worse than an empty page.
  *
- * What is real is the metric layer (Phase 1): every headline number defined
+ * What is real: the metric layer (Phase 1) — every headline number defined
  * once on the backend, read from the same rollups the dashboards draw, with
- * its move since the last month-end. Phase 2 — what moved each number, and
- * signals with evidence — lands beside it.
+ * its move since the last month-end — and, from Phase 2, the signals (what
+ * moved materially, with its drivers) above it and the cuts (one number,
+ * decomposed by owner, product, size band or lifecycle) below.
  */
 export function BrainDashboard() {
   return (
@@ -30,7 +33,9 @@ export function BrainDashboard() {
         </p>
       </div>
 
+      <SignalsPanel />
       <MetricLayerPanel />
+      <DriversPanel />
     </div>
   );
 }

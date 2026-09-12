@@ -25,6 +25,52 @@ export interface Metric {
   previous: { period_end: string; value: number | null } | null;
   /** Null whenever either side is unmeasured: "unknown" to 40 is not a rise of 40. */
   change: number | null;
+  /** The cuts this metric has — 'owner', 'product', 'segment', 'lifecycle'. */
+  dimensions: string[];
+}
+
+/** One member of a cut: an owner, a product, a size band, a lifecycle stage. */
+export interface SliceMember {
+  member: string;
+  label: string;
+  value: number | null;
+  previous: { period_end: string; value: number | null } | null;
+  change: number | null;
+}
+
+export interface SlicePayload {
+  metric: Pick<Metric, 'key' | 'label' | 'unit' | 'better' | 'note' | 'dimensions'>;
+  dimension: { key: string; label: string };
+  currency: CurrencyCode;
+  members: SliceMember[];
+}
+
+/** A member that moved a signalled metric. */
+export interface Driver {
+  dimension: string;
+  dimension_label: string;
+  member: string;
+  label: string;
+  value: number;
+  change: number;
+}
+
+/** A metric that moved materially since the last month-end. */
+export interface Signal extends Omit<Metric, 'previous' | 'change' | 'value'> {
+  value: number;
+  previous: { period_end: string; value: number };
+  change: number;
+  /** Null when the metric's `better` is 'none'. */
+  improved: boolean | null;
+  drivers: Driver[];
+}
+
+export interface SignalsPayload {
+  as_of: string;
+  /** The month-end everything is compared against; null before the first exists. */
+  baseline: string | null;
+  currency: CurrencyCode;
+  signals: Signal[];
 }
 
 export interface MetricsPayload {
@@ -37,9 +83,49 @@ interface MetricsState {
   data: MetricsPayload | null;
   isLoading: boolean;
   error: string | null;
+  signals: SignalsPayload | null;
+  signalsError: string | null;
+  /** Keyed `${metric}:${dimension}` — a cut fetched once is kept. */
+  slices: Record<string, SlicePayload>;
+  sliceLoading: string | null;
+  sliceError: string | null;
 }
 
-const initialState: MetricsState = { data: null, isLoading: false, error: null };
+const initialState: MetricsState = {
+  data: null,
+  isLoading: false,
+  error: null,
+  signals: null,
+  signalsError: null,
+  slices: {},
+  sliceLoading: null,
+  sliceError: null,
+};
+
+export const sliceKey = (metric: string, dimension: string) => `${metric}:${dimension}`;
+
+export const fetchSignals = createAsyncThunk<SignalsPayload, void, { rejectValue: string }>(
+  'metrics/fetchSignals',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<SignalsPayload>('/metrics/signals/');
+    } catch (err) {
+      return rejectWithValue(err instanceof ApiError ? err.message : 'Could not load the signals.');
+    }
+  }
+);
+
+export const fetchMetricSlice = createAsyncThunk<
+  SlicePayload,
+  { metric: string; dimension: string },
+  { rejectValue: string }
+>('metrics/fetchSlice', async ({ metric, dimension }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<SlicePayload>(`/metrics/${metric}/by/${dimension}/`);
+  } catch (err) {
+    return rejectWithValue(err instanceof ApiError ? err.message : 'Could not load that cut.');
+  }
+});
 
 export const fetchMetrics = createAsyncThunk<MetricsPayload, void, { rejectValue: string }>(
   'metrics/fetch',
@@ -69,6 +155,28 @@ const metricsSlice = createSlice({
       .addCase(fetchMetrics.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload ?? 'Could not load the metrics.';
+      })
+      .addCase(fetchSignals.pending, (state) => {
+        state.signalsError = null;
+      })
+      .addCase(fetchSignals.fulfilled, (state, action) => {
+        state.signals = action.payload;
+      })
+      .addCase(fetchSignals.rejected, (state, action) => {
+        state.signalsError = action.payload ?? 'Could not load the signals.';
+      })
+      .addCase(fetchMetricSlice.pending, (state, action) => {
+        state.sliceLoading = sliceKey(action.meta.arg.metric, action.meta.arg.dimension);
+        state.sliceError = null;
+      })
+      .addCase(fetchMetricSlice.fulfilled, (state, action) => {
+        state.sliceLoading = null;
+        state.slices[sliceKey(action.payload.metric.key, action.payload.dimension.key)] =
+          action.payload;
+      })
+      .addCase(fetchMetricSlice.rejected, (state, action) => {
+        state.sliceLoading = null;
+        state.sliceError = action.payload ?? 'Could not load that cut.';
       });
   },
 });

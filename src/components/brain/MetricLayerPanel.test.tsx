@@ -11,12 +11,12 @@ const payload = {
   as_of: '2026-09-12',
   currency: 'USD' as const,
   metrics: [
-    { key: 'active_arr', label: 'ARR', unit: 'money' as const, better: 'up' as const, note: 'n', value: 688_600, previous: { period_end: '2026-08-31', value: 640_200 }, change: 48_400 },
-    { key: 'at_risk_arr', label: 'ARR at risk', unit: 'money' as const, better: 'down' as const, note: 'n', value: 114_540, previous: { period_end: '2026-08-31', value: 100_000 }, change: 14_540 },
-    { key: 'nrr', label: 'Net revenue retention', unit: 'percent' as const, better: 'up' as const, note: 'n', value: 99.6, previous: null, change: null },
-    { key: 'coverage', label: 'Coverage', unit: 'percent' as const, better: 'up' as const, note: 'n', value: null, previous: { period_end: '2026-08-31', value: null }, change: null },
-    { key: 'open_tickets', label: 'Open support tickets', unit: 'count' as const, better: 'down' as const, note: 'n', value: 280, previous: { period_end: '2026-08-31', value: 280 }, change: 0 },
-    { key: 'brand_new', label: 'Something new', unit: 'count' as const, better: 'none' as const, note: 'n', value: 3, previous: null, change: null },
+    { key: 'active_arr', label: 'ARR', unit: 'money' as const, better: 'up' as const, note: 'n', dimensions: [], value: 688_600, previous: { period_end: '2026-08-31', value: 640_200 }, change: 48_400 },
+    { key: 'at_risk_arr', label: 'ARR at risk', unit: 'money' as const, better: 'down' as const, note: 'n', dimensions: [], value: 114_540, previous: { period_end: '2026-08-31', value: 100_000 }, change: 14_540 },
+    { key: 'nrr', label: 'Net revenue retention', unit: 'percent' as const, better: 'up' as const, note: 'n', dimensions: [], value: 99.6, previous: null, change: null },
+    { key: 'coverage', label: 'Coverage', unit: 'percent' as const, better: 'up' as const, note: 'n', dimensions: [], value: null, previous: { period_end: '2026-08-31', value: null }, change: null },
+    { key: 'open_tickets', label: 'Open support tickets', unit: 'count' as const, better: 'down' as const, note: 'n', dimensions: [], value: 280, previous: { period_end: '2026-08-31', value: 280 }, change: 0 },
+    { key: 'brand_new', label: 'Something new', unit: 'count' as const, better: 'none' as const, note: 'n', dimensions: [], value: 3, previous: null, change: null },
   ],
 };
 
