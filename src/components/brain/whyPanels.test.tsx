@@ -61,6 +61,10 @@ function mockApi(overrides: { signals?: unknown } = {}) {
     if (url.includes('/metrics/signals/')) return ok(overrides.signals ?? signals);
     if (url.includes('/by/product/')) return ok(byProduct);
     if (url.includes('/by/owner/')) return ok(byOwner);
+    // Any other cut: a valid, empty slice — the reducer keys the result by
+    // metric and dimension, so a list body here would crash it.
+    const cut = url.match(/\/metrics\/([^/]+)\/by\/([^/]+)\//);
+    if (cut) return ok({ ...byProduct, metric: { ...byProduct.metric, key: cut[1] }, dimension: { key: cut[2], label: cut[2] }, members: [] });
     return ok(list);
   });
   vi.stubGlobal('fetch', spy);
