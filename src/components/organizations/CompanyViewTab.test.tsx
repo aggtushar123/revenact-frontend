@@ -30,6 +30,7 @@ function mockApi() {
       return ok({ responsible: responsible.map((r) => (r.function === body.function ? { ...r, user: { id: body.user_id, name: 'Raj Mehta' } } : r)) });
     }
     if (url.includes('/responsible/')) return ok({ responsible });
+    if (url.includes('/questions/')) return ok([]);
     if (init?.method === 'POST') {
       const body = JSON.parse(String(init.body));
       return ok({ ...contributions[0], id: 9, author: { id: 1, name: 'Alice' }, function: 'leadership', function_display: 'Leadership', body: body.body }, 201);
@@ -109,6 +110,6 @@ describe('CompanyViewTab', () => {
     await screen.findByText(/SSO drops sessions/);
     expect(screen.queryByLabelText('Engineering owner')).not.toBeInTheDocument();
     expect(screen.getAllByText('Priya Nair').length).toBeGreaterThan(0);
-    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    expect(screen.queryAllByRole('combobox', { name: /owner$/ })).toHaveLength(0);
   });
 });

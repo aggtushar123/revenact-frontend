@@ -205,7 +205,7 @@ export function CopilotIndex() {
         id: optimisticId,
         role: 'user',
         content: trimmed,
-        sources: [],
+        sources: [], questions: [],
         created_at: new Date().toISOString(),
       },
     ]);

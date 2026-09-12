@@ -261,6 +261,21 @@ export function ChatView({
                   <div className="max-w-[65%] bg-accent-dim border border-accent/30 rounded-2xl rounded-tr-sm px-4 py-3 text-[13.5px] text-ink-muted font-medium leading-[1.65] shadow-sm whitespace-pre-wrap">
                     {message.content}
                   </div>
+                  {(message.questions ?? []).length > 0 && (
+                    // The @mentions in this turn became routed questions
+                    // (services.knowledge): the person is notified and their
+                    // answer becomes knowledge the Copilot reads.
+                    <span className="text-[11px] font-semibold text-ink-faint pr-1">
+                      Asked{' '}
+                      {message.questions.map((q, i) => (
+                        <span key={q.id}>
+                          {i > 0 ? ', ' : ''}
+                          <span className="text-ink">{q.assignee.name}</span>
+                          <span className={q.status === 'answered' ? 'text-success' : 'text-warning'}> · {q.status}</span>
+                        </span>
+                      ))}
+                    </span>
+                  )}
                 </div>
               ) : (
                 <div key={message.id} className="flex flex-col gap-1 border-l-2 border-accent/30 pl-7 py-1">

@@ -13,6 +13,7 @@ import { FUNCTION_LABELS } from '../../features/auth/authSlice';
 import type { User, UserFunction } from '../../features/auth/authSlice';
 import { apiFetch } from '../../lib/apiClient';
 import { formatDate } from '../../features/customers/formatters';
+import { QuestionsPanel } from './QuestionsPanel';
 
 const FUNCTION_TONE: Record<UserFunction, string> = {
   cs: 'bg-info-dim text-info',
@@ -49,11 +50,10 @@ export function CompanyViewTab({ customerId, customerName }: { customerId: numbe
   }, [dispatch, customerId]);
 
   useEffect(() => {
-    if (!canAssign) return;
     apiFetch<User[]>('/auth/members/')
       .then(setMembers)
       .catch(() => setMembers([]));
-  }, [canAssign]);
+  }, []);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -102,6 +102,8 @@ export function CompanyViewTab({ customerId, customerName }: { customerId: numbe
           ))}
         </div>
       </section>
+
+      <QuestionsPanel customerId={customerId} customerName={customerName} members={members} />
 
       {(error || saveError) && (
         <p className="text-[12.5px] font-semibold text-danger" role="alert">

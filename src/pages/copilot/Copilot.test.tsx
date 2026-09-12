@@ -35,8 +35,8 @@ function conversationDetail(overrides: Partial<Conversation> = {}): Conversation
   return {
     ...existingConversation,
     messages: [
-      { id: 1, role: 'user', content: "What's my churn risk?", sources: [], created_at: '2026-09-01T00:00:00Z' },
-      { id: 2, role: 'assistant', content: 'Two accounts look at risk.', sources: [], created_at: '2026-09-01T00:00:05Z' },
+      { id: 1, role: 'user', content: "What's my churn risk?", sources: [], questions: [], created_at: '2026-09-01T00:00:00Z' },
+      { id: 2, role: 'assistant', content: 'Two accounts look at risk.', sources: [], questions: [], created_at: '2026-09-01T00:00:05Z' },
     ],
     ...overrides,
   };

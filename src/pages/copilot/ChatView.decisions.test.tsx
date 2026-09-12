@@ -42,7 +42,7 @@ const decision: Proposal = {
   created_at: '2026-09-12T10:05:00Z',
 };
 
-const message = { id: 1, role: 'user' as const, content: 'What do we do about Fine?', sources: [], created_at: '2026-09-12T10:00:00Z' };
+const message = { id: 1, role: 'user' as const, content: 'What do we do about Fine?', sources: [], questions: [], created_at: '2026-09-12T10:00:00Z' };
 
 function renderView(props: Partial<React.ComponentProps<typeof ChatView>> = {}) {
   return render(
@@ -77,6 +77,13 @@ describe('ChatView decisions', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Close session' }));
     await userEvent.click(screen.getByRole('button', { name: 'Close without capturing' }));
     expect(onClose).toHaveBeenLastCalledWith(false);
+  });
+
+  it('shows whom a turn asked, and whether they have answered', () => {
+    const asked = { ...message, id: 2, content: '@Mei Tanaka why is usage down?', questions: [{ id: 9, assignee: { id: 5, name: 'Mei Tanaka' }, status: 'open' as const }] };
+    renderView({ messages: [message, asked] });
+    expect(screen.getByText('Mei Tanaka')).toBeInTheDocument();
+    expect(screen.getByText('· open')).toBeInTheDocument();
   });
 
   it('offers no close to a participant who is not the owner', () => {

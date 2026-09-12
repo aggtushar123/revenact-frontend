@@ -25,16 +25,81 @@ export interface Responsible {
   user: { id: number; name: string } | null;
 }
 
+export interface Question {
+  id: number;
+  customer: { id: number; name: string } | null;
+  asked_by: { id: number; name: string; function: UserFunction };
+  assignee: { id: number; name: string; function: UserFunction };
+  text: string;
+  status: 'open' | 'answered';
+  status_display: string;
+  /** The contribution the answer was stored as. */
+  answer: Contribution | null;
+  message_id: number | null;
+  created_at: string;
+  answered_at: string | null;
+}
+
 interface KnowledgeState {
   /** Keyed by customer id. */
   contributions: Record<number, Contribution[]>;
   responsible: Record<number, Responsible[]>;
+  /** Keyed by customer id. */
+  questions: Record<number, Question[]>;
+  /** Open questions waiting on the signed-in user, everywhere. */
+  mine: Question[];
   isLoading: boolean;
   error: string | null;
   saveError: string | null;
 }
 
-const initialState: KnowledgeState = { contributions: {}, responsible: {}, isLoading: false, error: null, saveError: null };
+const initialState: KnowledgeState = { contributions: {}, responsible: {}, questions: {}, mine: [], isLoading: false, error: null, saveError: null };
+
+export const fetchQuestions = createAsyncThunk<
+  { customerId: number; rows: Question[] },
+  number,
+  { rejectValue: string }
+>('knowledge/fetchQuestions', async (customerId, { rejectWithValue }) => {
+  try {
+    return { customerId, rows: await apiFetch<Question[]>(`/customers/${customerId}/questions/`) };
+  } catch (err) {
+    return rejectWithValue(message(err, 'Could not load the questions.'));
+  }
+});
+
+export const fetchMyQuestions = createAsyncThunk<Question[], void, { rejectValue: string }>(
+  'knowledge/fetchMyQuestions',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Question[]>('/questions/?mine=true&status=open');
+    } catch (err) {
+      return rejectWithValue(message(err, 'Could not load your questions.'));
+    }
+  }
+);
+
+export const askQuestion = createAsyncThunk<
+  { customerId: number; rows: Question[] },
+  { customerId: number; text: string; assignee_id?: number },
+  { rejectValue: string }
+>('knowledge/askQuestion', async ({ customerId, ...body }, { rejectWithValue }) => {
+  try {
+    return { customerId, rows: await apiFetch<Question[]>(`/customers/${customerId}/questions/`, { method: 'POST', body }) };
+  } catch (err) {
+    return rejectWithValue(message(err, 'Could not ask that.'));
+  }
+});
+
+export const answerQuestion = createAsyncThunk<Question, { id: number; body: string }, { rejectValue: string }>(
+  'knowledge/answerQuestion',
+  async ({ id, body }, { rejectWithValue }) => {
+    try {
+      return await apiFetch<Question>(`/questions/${id}/answer/`, { method: 'POST', body: { body } });
+    } catch (err) {
+      return rejectWithValue(message(err, 'Could not save that answer.'));
+    }
+  }
+);
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
 export const fetchContributions = createAsyncThunk<
@@ -134,6 +199,40 @@ const knowledgeSlice = createSlice({
       })
       .addCase(deleteContribution.rejected, (state, action) => {
         state.saveError = action.payload ?? 'Could not remove that.';
+      })
+      .addCase(fetchQuestions.fulfilled, (state, action) => {
+        state.questions[action.payload.customerId] = action.payload.rows;
+      })
+      .addCase(fetchMyQuestions.fulfilled, (state, action) => {
+        state.mine = action.payload;
+      })
+      .addCase(askQuestion.pending, (state) => {
+        state.saveError = null;
+      })
+      .addCase(askQuestion.fulfilled, (state, action) => {
+        const rows = state.questions[action.payload.customerId] ?? [];
+        state.questions[action.payload.customerId] = [...action.payload.rows, ...rows];
+      })
+      .addCase(askQuestion.rejected, (state, action) => {
+        state.saveError = action.payload ?? 'Could not ask that.';
+      })
+      .addCase(answerQuestion.pending, (state) => {
+        state.saveError = null;
+      })
+      .addCase(answerQuestion.fulfilled, (state, action) => {
+        const q = action.payload;
+        state.mine = state.mine.filter((m) => m.id !== q.id);
+        if (q.customer) {
+          const rows = state.questions[q.customer.id] ?? [];
+          state.questions[q.customer.id] = rows.map((r) => (r.id === q.id ? q : r));
+          if (q.answer) {
+            const contributions = state.contributions[q.customer.id] ?? [];
+            state.contributions[q.customer.id] = [q.answer, ...contributions];
+          }
+        }
+      })
+      .addCase(answerQuestion.rejected, (state, action) => {
+        state.saveError = action.payload ?? 'Could not save that answer.';
       })
       .addCase(fetchResponsible.fulfilled, (state, action) => {
         state.responsible[action.payload.customerId] = action.payload.rows;

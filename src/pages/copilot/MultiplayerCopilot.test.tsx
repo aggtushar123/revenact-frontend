@@ -30,8 +30,8 @@ const alice = { id: 1, name: 'Alice' };
 function conversationWith(userMessages: string[]): Conversation {
   const messages: Conversation['messages'] = [];
   userMessages.forEach((text, i) => {
-    messages.push({ id: i * 2 + 1, role: 'user', content: text, sources: [], created_at: '2026-09-05T10:00:00Z' });
-    messages.push({ id: i * 2 + 2, role: 'assistant', content: `Real reply #${i + 1}`, sources: [], created_at: '2026-09-05T10:00:05Z' });
+    messages.push({ id: i * 2 + 1, role: 'user', content: text, sources: [], questions: [], created_at: '2026-09-05T10:00:00Z' });
+    messages.push({ id: i * 2 + 2, role: 'assistant', content: `Real reply #${i + 1}`, sources: [], questions: [], created_at: '2026-09-05T10:00:05Z' });
   });
   return { id: 99, title: userMessages[0], messages, created_at: '2026-09-05T10:00:00Z', updated_at: '2026-09-05T10:00:05Z' };
 }

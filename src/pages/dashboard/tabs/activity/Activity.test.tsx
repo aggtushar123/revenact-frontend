@@ -239,7 +239,7 @@ describe('Activity Tracking', () => {
   });
 
   it('says so when nothing was logged in the window', async () => {
-    mockFetch({ ...stats, timeline: [], sources: [] });
+    mockFetch({ ...stats, timeline: [], sources: [], questions: [] });
     renderDashboard();
 
     expect(

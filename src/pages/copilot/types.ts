@@ -24,6 +24,9 @@ export interface CopilotMessage {
   /** Always present; empty on user turns and on answers that had
    * nothing specific to quote. */
   sources: MessageSource[];
+  /** The people this turn @mentioned — each became a routed question
+   * (see services.knowledge). Empty on assistant turns. */
+  questions: { id: number; assignee: { id: number; name: string }; status: 'open' | 'answered' }[];
   created_at: string;
 }
 

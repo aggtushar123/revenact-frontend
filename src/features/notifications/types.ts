@@ -12,7 +12,9 @@ export type NotificationKind =
   | 'copilot_invite'
   | 'copilot_handoff'
   | 'customer_assigned'
-  | 'account_assigned';
+  | 'account_assigned'
+  | 'question_asked'
+  | 'question_answered';
 
 export interface Notification {
   id: number;
