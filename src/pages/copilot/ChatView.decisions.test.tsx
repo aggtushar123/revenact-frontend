@@ -104,11 +104,14 @@ describe('ChatView decisions', () => {
     expect(onAsk).toHaveBeenCalledWith(2, expect.objectContaining({ user_id: 5, customer_id: 7 }));
   });
 
-  it('tells a mentioned viewer they see a slice, and names who wrote each turn', () => {
-    const rajTurn = { ...message, id: 5, content: 'Raj here', author: { id: 6, name: 'Raj Mehta', function: 'sales' } };
-    renderView({ messages: [message, rajTurn], visibility: 'partial', currentUserId: 1 });
-    expect(screen.getByRole('note')).toHaveTextContent('You were mentioned in this conversation');
-    expect(screen.getByText('Raj Mehta')).toBeInTheDocument();
+  it('tells a sliced viewer what they see, and labels who replied to whom', () => {
+    const ask = { ...message, id: 4, content: '@Dana CSM when is the QBR?', author: { id: 1, name: 'Alice Admin', function: 'leadership' }, questions: [{ id: 9, assignee: { id: 3, name: 'Dana CSM' }, status: 'open' as const }] };
+    const reply = { ...message, id: 5, content: 'QBR is on the 20th.', author: { id: 3, name: 'Dana CSM', function: 'cs' } };
+    renderView({ messages: [ask, reply], visibility: 'partial', currentUserId: 2 });
+    expect(screen.getByRole('note')).toHaveTextContent('questions routed to you or to people who report to you');
+    const labels = screen.getAllByText('Dana CSM').map((el) => el.parentElement?.textContent);
+    expect(labels).toContain('Dana CSM · Customer Success, replying to Alice Admin');
+    expect(screen.getByText('Alice Admin').parentElement).toHaveTextContent('Alice Admin · Leadership');
   });
 
   it('offers no close to a participant who is not the owner', () => {

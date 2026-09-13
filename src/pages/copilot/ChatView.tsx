@@ -7,6 +7,8 @@ import { HandoffModal } from './HandoffModal';
 import type { CopilotSession } from '../../features/copilotSessions/types';
 import type { AskSuggestion, CopilotMessage } from './types';
 import { MentionTextarea } from '../../components/shared/MentionTextarea';
+import { FUNCTION_LABELS } from '../../features/auth/authSlice';
+import type { UserFunction } from '../../features/auth/authSlice';
 import { MessageSources } from './MessageSources';
 
 interface Props {
@@ -259,7 +261,7 @@ export function ChatView({
           <div className="w-full max-w-[860px] mx-auto mb-6 flex items-start gap-2.5 px-4 py-3 rounded-lg bg-info-dim border border-info/30 text-[12.5px] text-ink-muted" role="note">
             <Users className="w-4 h-4 shrink-0 text-info mt-0.5" />
             <span>
-              You were mentioned in this conversation. You are seeing the parts shared with you — messages from your team, from leadership above you, the ones that mention you, and the Copilot's replies to those — not the whole thread.
+              You were not in this conversation from the start. You are seeing the parts shared with you — messages from your team and from leadership above you, the questions routed to you or to people who report to you, their replies, and the Copilot's responses to those — not the whole thread.
             </span>
           </div>
         )}
@@ -274,9 +276,27 @@ export function ChatView({
                       ↳ Redirected by {redirect.actor?.name ?? 'Someone'}
                     </span>
                   )}
-                  {!redirect && message.author && message.author.id !== currentUserId && (
-                    <span className="text-[11px] font-semibold text-ink-faint pr-1">{message.author.name}</span>
-                  )}
+                  {!redirect && message.author && message.author.id !== currentUserId && (() => {
+                    // Who wrote this, and — when it answers a question routed
+                    // to them earlier in the thread — whose question. A manager
+                    // reading a sliced thread sees "Dana CSM · Customer Success,
+                    // replying to Alice Admin", not an unlabelled bubble.
+                    const index = messages.findIndex((m) => m.id === message.id);
+                    const asked = [...messages.slice(0, index)]
+                      .reverse()
+                      .find((m) => m.role === 'user' && (m.questions ?? []).some((q) => q.assignee.id === message.author?.id));
+                    return (
+                      <span className="text-[11px] font-semibold text-ink-faint pr-1">
+                        <span className="text-ink">{message.author.name}</span>
+                        {message.author.function && FUNCTION_LABELS[message.author.function as UserFunction] && (
+                          <span> · {FUNCTION_LABELS[message.author.function as UserFunction]}</span>
+                        )}
+                        {asked && asked.author && asked.author.id !== message.author.id && (
+                          <span>, replying to {asked.author.name}</span>
+                        )}
+                      </span>
+                    );
+                  })()}
                   <div className="max-w-[65%] bg-accent-dim border border-accent/30 rounded-2xl rounded-tr-sm px-4 py-3 text-[13.5px] text-ink-muted font-medium leading-[1.65] shadow-sm whitespace-pre-wrap">
                     {message.content}
                   </div>
