@@ -149,7 +149,7 @@ export function CompanyViewTab({ customerId, customerName }: { customerId: numbe
         </div>
 
         {rows && rows.length === 0 && (
-          <p className="text-[12.5px] text-ink-faint">Nothing from the rest of the company yet. Be the first.</p>
+          <p className="text-[12.5px] text-ink-faint">Nothing here that you can see yet — what your team, your reports and leadership write about this customer will appear here. Be the first.</p>
         )}
         <ul className="flex flex-col gap-2">
           {shown.map((c) => (

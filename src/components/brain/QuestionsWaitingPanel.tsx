@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageCircleQuestion } from 'lucide-react';
 import { apiFetch } from '../../lib/apiClient';
+import { useCapability } from '../../hooks';
 import type { Question } from '../../features/knowledge/knowledgeSlice';
 import { FUNCTION_LABELS } from '../../features/auth/authSlice';
 
@@ -14,14 +15,19 @@ const STALE_DAYS = 3;
  * the maintenance job, and answering is the only thing that clears it.
  */
 export function QuestionsWaitingPanel() {
+  const canSeeAll = useCapability('view_all_accounts');
   const [rows, setRows] = useState<Question[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!canSeeAll) return;
     apiFetch<Question[]>('/questions/?status=open')
       .then((data) => setRows([...data].sort((a, b) => b.days_open - a.days_open)))
       .catch(() => setError('Could not load the open questions.'));
-  }, []);
+  }, [canSeeAll]);
+
+  // Organisation-wide: hidden rather than shown empty for a role that cannot load it.
+  if (!canSeeAll) return null;
 
   const stale = (rows ?? []).filter((q) => q.days_open >= STALE_DAYS).length;
 

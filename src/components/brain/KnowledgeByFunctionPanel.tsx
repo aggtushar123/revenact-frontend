@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { PenLine } from 'lucide-react';
 import { apiFetch } from '../../lib/apiClient';
+import { useCapability } from '../../hooks';
 
 interface FunctionRow {
   function: string;
@@ -28,14 +29,19 @@ interface Payload {
  * out — an empty row for "Other" says nothing.
  */
 export function KnowledgeByFunctionPanel() {
+  const canSeeAll = useCapability('view_all_accounts');
   const [data, setData] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!canSeeAll) return;
     apiFetch<Payload>('/knowledge/activity/?days=30')
       .then(setData)
       .catch(() => setError('Could not load knowledge activity.'));
-  }, []);
+  }, [canSeeAll]);
+
+  // Organisation-wide: hidden rather than shown empty for a role that cannot load it.
+  if (!canSeeAll) return null;
 
   const rows = (data?.functions ?? []).filter((r) => r.members > 0 || r.contributions > 0 || r.questions_asked > 0);
 

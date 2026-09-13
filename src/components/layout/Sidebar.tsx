@@ -128,22 +128,30 @@ export function Sidebar() {
         <NavItem to="/campaigns" icon={<Columns className="w-[18px] h-[18px]" />} label="Campaigns" isExpanded={isExpanded} />
         <NavItem to="/canvas" icon={<PenTool className="w-[18px] h-[18px]" />} label="Canvas" isExpanded={isExpanded} />
 
-        {/* KNOWLEDGE BRAIN Section */}
-        {isExpanded ? (
-          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
-            KNOWLEDGE BRAIN <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
-          </div>
-        ) : (
-          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
-        )}
+        {/* KNOWLEDGE BRAIN Section — organisation-wide figures and the
+            agents that act on them. Hidden, not greyed, for anyone whose
+            role cannot load any of it (view_all_accounts). */}
+        {canSeeAll && (
+          <>
+          {/* KNOWLEDGE BRAIN Section */}
+          {isExpanded ? (
+            <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
+              KNOWLEDGE BRAIN <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
+            </div>
+          ) : (
+            <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
+          )}
 
-        <NavItem to="/brain/dashboard" icon={<Brain className="w-[18px] h-[18px]" />} label="Brain Overview" isExpanded={isExpanded} />
-        <NavItem to="/brain/graph" icon={<Network className="w-[18px] h-[18px]" />} label="Knowledge Graph" isExpanded={isExpanded} />
-        <NavItem to="/brain/initiatives" icon={<Flag className="w-[18px] h-[18px]" />} label="Initiatives" isExpanded={isExpanded} />
-        <NavItem to="/brain/review" icon={<CheckSquare className="w-[18px] h-[18px]" />} label="Review Queue" isExpanded={isExpanded} badge={pendingProposals} />
-        <NavItem to="/brain/feedback" icon={<MessageSquareWarning className="w-[18px] h-[18px]" />} label="Feedback Log" isExpanded={isExpanded} />
-        <NavItem to="/brain/agents" icon={<Bot className="w-[18px] h-[18px]" />} label="Agents" isExpanded={isExpanded} />
-        <NavItem to="/brain/skills" icon={<Wand2 className="w-[18px] h-[18px]" />} label="Skills" isExpanded={isExpanded} />
+          <NavItem to="/brain/dashboard" icon={<Brain className="w-[18px] h-[18px]" />} label="Brain Overview" isExpanded={isExpanded} />
+          <NavItem to="/brain/graph" icon={<Network className="w-[18px] h-[18px]" />} label="Knowledge Graph" isExpanded={isExpanded} />
+          <NavItem to="/brain/initiatives" icon={<Flag className="w-[18px] h-[18px]" />} label="Initiatives" isExpanded={isExpanded} />
+          <NavItem to="/brain/review" icon={<CheckSquare className="w-[18px] h-[18px]" />} label="Review Queue" isExpanded={isExpanded} badge={pendingProposals} />
+          <NavItem to="/brain/feedback" icon={<MessageSquareWarning className="w-[18px] h-[18px]" />} label="Feedback Log" isExpanded={isExpanded} />
+          <NavItem to="/brain/agents" icon={<Bot className="w-[18px] h-[18px]" />} label="Agents" isExpanded={isExpanded} />
+          <NavItem to="/brain/skills" icon={<Wand2 className="w-[18px] h-[18px]" />} label="Skills" isExpanded={isExpanded} />
+
+          </>
+        )}
 
         {/* SETUP Section */}
         {isExpanded ? (

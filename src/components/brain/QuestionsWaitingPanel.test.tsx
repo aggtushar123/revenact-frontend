@@ -3,6 +3,33 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QuestionsWaitingPanel } from './QuestionsWaitingPanel';
 
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from '../../features/auth/authSlice';
+import { capabilitiesForRole } from '../../test/capabilities';
+
+function withAdmin(children: React.ReactNode) {
+  const store = configureStore({
+    reducer: { auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1, email: 'alice@acme.io', name: 'Alice', avatar: '', role: 'admin', role_id: 1,
+          role_name: 'Admin', permissions: capabilitiesForRole('admin'),
+          function: 'leadership' as const, function_display: 'Leadership', reports_to: null,
+          organisation: {
+            id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '', ai_agent_enabled: true, ai_agent_tone: 'professional' as const, ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token', refreshToken: 'refresh', isAuthenticated: true, isLoading: false, error: null,
+      },
+    },
+  });
+  return <Provider store={store}>{children}</Provider>;
+}
+
 const base = {
   customer: { id: 7, name: 'Pizza Hut' },
   asked_by: { id: 1, name: 'Alice Admin', function: 'leadership' as const },
@@ -19,7 +46,7 @@ describe('QuestionsWaitingPanel', () => {
 
   it('lists open questions oldest first and marks the stale ones', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => rows })));
-    render(<MemoryRouter><QuestionsWaitingPanel /></MemoryRouter>);
+    render(withAdmin(<MemoryRouter><QuestionsWaitingPanel /></MemoryRouter>));
 
     const items = await screen.findAllByRole('listitem');
     expect(items[0]).toHaveTextContent('Renewal response?');
@@ -33,7 +60,7 @@ describe('QuestionsWaitingPanel', () => {
 
   it('says so when nothing is waiting', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => [] })));
-    render(<MemoryRouter><QuestionsWaitingPanel /></MemoryRouter>);
+    render(withAdmin(<MemoryRouter><QuestionsWaitingPanel /></MemoryRouter>));
     expect(await screen.findByText(/Every question asked has been answered/)).toBeInTheDocument();
   });
 });

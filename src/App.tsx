@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { RequireCapability } from './components/auth/RequireCapability';
@@ -281,7 +281,7 @@ function App() {
 
           {/* Company Brain: one real page now (the metric layer). The mock
               knowledge-graph pages that lived under here were removed. */}
-          <Route path="brain">
+          <Route path="brain" element={<RequireCapability capability="view_all_accounts"><Outlet /></RequireCapability>}>
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<BrainDashboard />} />
             <Route path="initiatives" element={<InitiativesPage />} />

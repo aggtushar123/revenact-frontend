@@ -2,6 +2,33 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { KnowledgeByFunctionPanel } from './KnowledgeByFunctionPanel';
 
+import { Provider } from 'react-redux';
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from '../../features/auth/authSlice';
+import { capabilitiesForRole } from '../../test/capabilities';
+
+function withAdmin(children: React.ReactNode) {
+  const store = configureStore({
+    reducer: { auth: authReducer },
+    preloadedState: {
+      auth: {
+        user: {
+          id: 1, email: 'alice@acme.io', name: 'Alice', avatar: '', role: 'admin', role_id: 1,
+          role_name: 'Admin', permissions: capabilitiesForRole('admin'),
+          function: 'leadership' as const, function_display: 'Leadership', reports_to: null,
+          organisation: {
+            id: 1, name: 'Acme Inc', slug: 'acme-inc', currency: 'USD' as const, currency_display: 'US Dollar ($)',
+            default_lifecycle_stage: '', ai_agent_enabled: true, ai_agent_tone: 'professional' as const, ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token', refreshToken: 'refresh', isAuthenticated: true, isLoading: false, error: null,
+      },
+    },
+  });
+  return <Provider store={store}>{children}</Provider>;
+}
+
 const payload = {
   days: 30, since: '2026-08-14',
   functions: [
@@ -16,7 +43,7 @@ describe('KnowledgeByFunctionPanel', () => {
 
   it('shows each staffed function, flags the silent ones, and hides the empty ones', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => payload })));
-    render(<KnowledgeByFunctionPanel />);
+    render(withAdmin(<KnowledgeByFunctionPanel />));
 
     const analytics = await screen.findByRole('row', { name: 'Analytics' });
     const cells = within(analytics).getAllByRole('cell').map((c) => c.textContent);
