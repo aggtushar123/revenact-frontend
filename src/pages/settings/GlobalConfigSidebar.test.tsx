@@ -19,8 +19,16 @@ const organisation = {
   },
 };
 
+const user = (role: 'admin' | 'csm') => ({
+  id: 1, email: 'alice@acme.io', name: 'Alice', avatar: '', role, role_id: 1,
+  role_name: role === 'admin' ? 'Admin' : 'CSM', permissions: capabilitiesForRole(role),
+  function: 'leadership' as const, function_display: 'Leadership', reports_to: null,
+  organisation, is_active: true,
+});
+
 function renderCard(role: 'admin' | 'csm') {
-  const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((_url, init) => {
+  const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url, init) => {
+    if (String(url).includes('/auth/me/')) return Promise.resolve({ ok: true, status: 200, json: async () => user(role) });
     const body = init?.body ? JSON.parse(String(init.body)) : {};
     return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...organisation, name: body.name ?? organisation.name, global_attributes: { ...organisation.global_attributes, ...(body.global_attributes ?? {}) } }) });
   });
@@ -29,12 +37,7 @@ function renderCard(role: 'admin' | 'csm') {
     reducer: { auth: authReducer },
     preloadedState: {
       auth: {
-        user: {
-          id: 1, email: 'alice@acme.io', name: 'Alice', avatar: '', role, role_id: 1,
-          role_name: role === 'admin' ? 'Admin' : 'CSM', permissions: capabilitiesForRole(role),
-          function: 'leadership' as const, function_display: 'Leadership', reports_to: null,
-          organisation, is_active: true,
-        },
+        user: user(role),
         accessToken: 'token', refreshToken: 'refresh', isAuthenticated: true, isLoading: false, error: null,
       },
     },

@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { HelpCircle, Info } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
-import { updateOrganisation } from '../../features/auth/authSlice';
+import { fetchMe, updateOrganisation } from '../../features/auth/authSlice';
 import type { GlobalAttributeKey } from '../../features/auth/authSlice';
 import { ORGANIZATION_ATTRIBUTES } from './organizationAttributes';
 
@@ -33,6 +33,12 @@ export function GlobalConfigSidebar() {
   const [edits, setEdits] = useState<{ name?: string; mapping: Partial<Record<GlobalAttributeKey, string>> }>({ mapping: {} });
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [error, setError] = useState<string | null>(null);
+
+  // The organisation in the store is a login-time snapshot; the card reads
+  // the mapping and its choices fresh from the server when it opens.
+  useEffect(() => {
+    dispatch(fetchMe());
+  }, [dispatch]);
 
   const serverMapping: Record<GlobalAttributeKey, string> = { arr: '', mrr: '', renewal_date: '', joined_date: '', ...(organisation?.global_attributes ?? {}) };
   const name = edits.name ?? organisation?.name ?? '';

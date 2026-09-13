@@ -14,6 +14,10 @@ import { ALL_CAPABILITIES } from '../../test/capabilities';
 // sub-tab here talks to apiFetch directly with no store at all (see
 // this file's own original comment above), so only that one describe
 // block wraps in a real Provider.
+// The global configuration card refreshes the profile when it opens; mocks
+// answer /auth/me/ with whatever user the store was built with.
+let currentStore: ReturnType<typeof configureStore> | null = null;
+
 function renderSettingsPageAsAdmin() {
   const store = configureStore({
     reducer: { auth: authReducer },
@@ -50,6 +54,7 @@ function renderSettingsPageAsAdmin() {
       },
     },
   });
+  currentStore = store;
   render(
     <Provider store={store}>
       <SettingsPage />
@@ -150,6 +155,7 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
 
   it('walks every page of /customers/ via `next`, not just the first', async () => {
     const fetchMock = vi.fn((url: string) => {
+      if (String(url).includes('/auth/me/')) return Promise.resolve(jsonResponse(200, (currentStore?.getState() as { auth: { user: unknown } }).auth.user));
       if (url.endsWith('/customers/')) {
         return Promise.resolve(
           jsonResponse(200, {
@@ -229,6 +235,7 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
 
   it('switching to Custom Objects shows the real page, not the table', async () => {
     const fetchMock = vi.fn((url: string) => {
+      if (String(url).includes('/auth/me/')) return Promise.resolve(jsonResponse(200, (currentStore?.getState() as { auth: { user: unknown } }).auth.user));
       if (url.includes('/custom-objects/definitions/')) return Promise.resolve(jsonResponse(200, []));
       return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
     });
@@ -308,6 +315,7 @@ describe('SettingsPage — Data tab, Account sub-tab', () => {
 
   it('walks every page of /accounts/ via `next`, not just the first', async () => {
     const fetchMock = vi.fn((url: string) => {
+      if (String(url).includes('/auth/me/')) return Promise.resolve(jsonResponse(200, (currentStore?.getState() as { auth: { user: unknown } }).auth.user));
       if (url.endsWith('/accounts/')) {
         return Promise.resolve(
           jsonResponse(200, {
@@ -440,6 +448,7 @@ describe('SettingsPage — Data tab, Contact sub-tab', () => {
 
   it('walks every page of /contacts/ via `next`, not just the first', async () => {
     const fetchMock = vi.fn((url: string) => {
+      if (String(url).includes('/auth/me/')) return Promise.resolve(jsonResponse(200, (currentStore?.getState() as { auth: { user: unknown } }).auth.user));
       if (url.endsWith('/contacts/')) {
         return Promise.resolve(
           jsonResponse(200, {
@@ -568,6 +577,7 @@ describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
 
   it('defaults to Opportunities and fetches the real, unpaginated endpoint', async () => {
     const fetchMock = vi.fn((url: string) => {
+      if (String(url).includes('/auth/me/')) return Promise.resolve(jsonResponse(200, (currentStore?.getState() as { auth: { user: unknown } }).auth.user));
       if (url.endsWith('/opportunities/')) {
         return Promise.resolve(jsonResponse(200, [filledOpportunity, blankOpportunity]));
       }
@@ -586,6 +596,7 @@ describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
 
   it('switching to the Risks toggle fetches /risks/ and shows its own attributes', async () => {
     const fetchMock = vi.fn((url: string) => {
+      if (String(url).includes('/auth/me/')) return Promise.resolve(jsonResponse(200, (currentStore?.getState() as { auth: { user: unknown } }).auth.user));
       if (url.endsWith('/risks/')) return Promise.resolve(jsonResponse(200, [filledRisk]));
       return Promise.resolve(jsonResponse(200, []));
     });
@@ -606,6 +617,7 @@ describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
 
   it('computes a real Usage% from the fetched opportunities, not a fabricated one', async () => {
     const fetchMock = vi.fn((url: string) => {
+      if (String(url).includes('/auth/me/')) return Promise.resolve(jsonResponse(200, (currentStore?.getState() as { auth: { user: unknown } }).auth.user));
       if (url.endsWith('/opportunities/')) {
         return Promise.resolve(jsonResponse(200, [filledOpportunity, blankOpportunity]));
       }
@@ -639,6 +651,7 @@ describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
 
   it('searching filters the attribute list by display name or field name', async () => {
     const fetchMock = vi.fn((url: string) => {
+      if (String(url).includes('/auth/me/')) return Promise.resolve(jsonResponse(200, (currentStore?.getState() as { auth: { user: unknown } }).auth.user));
       if (url.endsWith('/opportunities/')) return Promise.resolve(jsonResponse(200, [filledOpportunity]));
       return Promise.resolve(jsonResponse(200, []));
     });
