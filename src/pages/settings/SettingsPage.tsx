@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { AttributesTabContent } from './AttributesTabContent';
 import { CustomObjectsPage } from './CustomObjectsPage';
 import { SettingPlaceholder } from './SettingPlaceholder';
+import { GlobalConfigSidebar } from './GlobalConfigSidebar';
 import { ORGANIZATION_ATTRIBUTES } from './organizationAttributes';
 import { ACCOUNT_ATTRIBUTES } from './accountAttributes';
 import { CONTACT_ATTRIBUTES } from './contactAttributes';
@@ -181,6 +182,9 @@ export function SettingsPage() {
             <SettingPlaceholder title={activeSubTab} />
           )}
         </div>
+
+        {/* Right Side: Global Configuration — real, see GlobalConfigSidebar */}
+        <GlobalConfigSidebar />
       </div>
     </div>
   );

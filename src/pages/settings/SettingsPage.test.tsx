@@ -138,7 +138,7 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
 
     expect(await screen.findByText('Custom Attributes')).toBeInTheDocument();
     expect(screen.getByText('System Attributes')).toBeInTheDocument();
@@ -166,7 +166,7 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await screen.findByText('Custom Attributes');
 
     await waitFor(() =>
@@ -185,7 +185,7 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await screen.findByText('Domain');
 
     // Domain: filledOrg has one, blankOrg's is '' -- 1 of 2 = 50%.
@@ -202,7 +202,7 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
   it('shows the backend error message instead of crashing', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, { detail: 'Server error.' }))));
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
 
     expect(await screen.findByText('Server error.')).toBeInTheDocument();
   });
@@ -214,7 +214,7 @@ describe('SettingsPage — Data tab, Organization sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await screen.findByText('Custom Attributes');
     expect(screen.getByText('Lifecycle Stage')).toBeInTheDocument();
 
@@ -295,7 +295,7 @@ describe('SettingsPage — Data tab, Account sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Account' }));
 
     expect(await screen.findByText('Custom Attributes')).toBeInTheDocument();
@@ -325,7 +325,7 @@ describe('SettingsPage — Data tab, Account sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Account' }));
     await screen.findByText('Custom Attributes');
 
@@ -346,7 +346,7 @@ describe('SettingsPage — Data tab, Account sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Account' }));
     await screen.findByText('Domain');
 
@@ -363,7 +363,7 @@ describe('SettingsPage — Data tab, Account sub-tab', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, { detail: 'Server error.' }))));
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Account' }));
 
     expect(await screen.findByText('Server error.')).toBeInTheDocument();
@@ -376,7 +376,7 @@ describe('SettingsPage — Data tab, Account sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Account' }));
     await screen.findByText('Custom Attributes');
     expect(screen.getByText('Lifecycle Stage')).toBeInTheDocument();
@@ -429,7 +429,7 @@ describe('SettingsPage — Data tab, Contact sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Contact' }));
 
     expect(await screen.findByText('Custom Attributes')).toBeInTheDocument();
@@ -457,7 +457,7 @@ describe('SettingsPage — Data tab, Contact sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Contact' }));
     await screen.findByText('Custom Attributes');
 
@@ -478,7 +478,7 @@ describe('SettingsPage — Data tab, Contact sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Contact' }));
     await screen.findByText('Phone');
 
@@ -495,7 +495,7 @@ describe('SettingsPage — Data tab, Contact sub-tab', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, { detail: 'Server error.' }))));
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Contact' }));
 
     expect(await screen.findByText('Server error.')).toBeInTheDocument();
@@ -508,7 +508,7 @@ describe('SettingsPage — Data tab, Contact sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Contact' }));
     await screen.findByText('Custom Attributes');
     expect(screen.getByText('Sentiment')).toBeInTheDocument();
@@ -576,7 +576,7 @@ describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Pipeline' }));
 
     expect(await screen.findByText('Custom Attributes')).toBeInTheDocument();
@@ -592,7 +592,7 @@ describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Pipeline' }));
     await screen.findByText('Custom Attributes');
 
@@ -614,7 +614,7 @@ describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Pipeline' }));
     await screen.findByText('MRR');
 
@@ -631,7 +631,7 @@ describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, { detail: 'Server error.' }))));
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Pipeline' }));
 
     expect(await screen.findByText('Server error.')).toBeInTheDocument();
@@ -645,7 +645,7 @@ describe('SettingsPage — Data tab, Pipeline sub-tab', () => {
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 
-    render(<SettingsPage />);
+    renderSettingsPageAsAdmin();
     await user.click(screen.getByRole('button', { name: 'Pipeline' }));
     await screen.findByText('Custom Attributes');
     expect(screen.getByText('Priority')).toBeInTheDocument();

@@ -25,7 +25,14 @@ export interface Organisation {
   ai_agent_enabled: boolean;
   ai_agent_tone: AgentTone;
   ai_agent_tone_display: string;
+  /** Settings › Data's global configuration: which customer field stands
+   * for each headline concept. Read as the stored mapping over the
+   * backend's defaults; optional here only so older fixtures type-check. */
+  global_attributes?: Record<GlobalAttributeKey, string>;
+  global_attribute_choices?: Record<GlobalAttributeKey, string[]>;
 }
+
+export type GlobalAttributeKey = 'arr' | 'mrr' | 'renewal_date' | 'joined_date';
 
 // The closed set the backend actually enforces — mirrors
 // revenact-backend's services/accounts/capabilities.py. The role
@@ -196,7 +203,7 @@ export const updateProfile = createAsyncThunk<User, { name: string }, { rejectVa
 // actually sent.
 export const updateOrganisation = createAsyncThunk<
   Organisation,
-  Partial<Pick<Organisation, 'currency' | 'default_lifecycle_stage' | 'ai_agent_enabled' | 'ai_agent_tone'>>,
+  Partial<Pick<Organisation, 'name' | 'currency' | 'default_lifecycle_stage' | 'ai_agent_enabled' | 'ai_agent_tone' | 'global_attributes'>>,
   { rejectValue: string }
 >('auth/updateOrganisation', async (data, { rejectWithValue }) => {
   try {
