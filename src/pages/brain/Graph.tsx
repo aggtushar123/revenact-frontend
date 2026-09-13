@@ -16,7 +16,7 @@ import type { CurrencyCode } from '../../features/auth/authSlice';
  * book always draws the same picture, and nothing jiggles.
  */
 const COLUMNS: { kind: NodeKind[]; title: string }[] = [
-  { kind: ['owner'], title: 'Owners' },
+  { kind: ['owner'], title: 'Account owners' },
   { kind: ['customer'], title: 'Customers' },
   { kind: ['product'], title: 'Products' },
   { kind: ['initiative', 'proposal'], title: 'Decisions' },

@@ -425,7 +425,7 @@ function buildOrgAttributes(organization: OrgRow): AttributeDef[] {
     { label: 'AI Pulse-Reason', value: organization.reason, type: 'truncated' },
     { label: 'Lifecycle Stage *', value: organization.stage },
     { label: 'Pulse', value: '', type: 'pulse' },
-    { label: 'Owners', value: organization.owner, type: 'owner', ownerAvatar: organization.avatar },
+    { label: 'Account owner', value: organization.owner, type: 'owner', ownerAvatar: organization.avatar },
     { label: 'Health', value: organization.health.val.toString(), type: 'dot', dotColor: organization.health.clr },
   ];
 }

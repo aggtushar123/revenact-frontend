@@ -46,6 +46,8 @@ interface KnowledgeState {
   /** Keyed by customer id. */
   contributions: Record<number, Contribution[]>;
   responsible: Record<number, Responsible[]>;
+  /** The one accountable person per customer, from any function. */
+  accountOwner: Record<number, { id: number; name: string; function: UserFunction } | null>;
   /** Keyed by customer id. */
   questions: Record<number, Question[]>;
   /** Open questions waiting on the signed-in user, everywhere. */
@@ -55,7 +57,7 @@ interface KnowledgeState {
   saveError: string | null;
 }
 
-const initialState: KnowledgeState = { contributions: {}, responsible: {}, questions: {}, mine: [], isLoading: false, error: null, saveError: null };
+const initialState: KnowledgeState = { contributions: {}, responsible: {}, accountOwner: {}, questions: {}, mine: [], isLoading: false, error: null, saveError: null };
 
 export const fetchQuestions = createAsyncThunk<
   { customerId: number; rows: Question[] },
@@ -141,27 +143,29 @@ export const deleteContribution = createAsyncThunk<
   }
 });
 
+type ResponsiblePayload = { responsible: Responsible[]; account_owner: { id: number; name: string; function: UserFunction } | null };
+
 export const fetchResponsible = createAsyncThunk<
-  { customerId: number; rows: Responsible[] },
+  { customerId: number; rows: Responsible[]; owner: ResponsiblePayload['account_owner'] },
   number,
   { rejectValue: string }
 >('knowledge/fetchResponsible', async (customerId, { rejectWithValue }) => {
   try {
-    const data = await apiFetch<{ responsible: Responsible[] }>(`/customers/${customerId}/responsible/`);
-    return { customerId, rows: data.responsible };
+    const data = await apiFetch<ResponsiblePayload>(`/customers/${customerId}/responsible/`);
+    return { customerId, rows: data.responsible, owner: data.account_owner ?? null };
   } catch (err) {
     return rejectWithValue(message(err, 'Could not load who is responsible.'));
   }
 });
 
 export const setResponsible = createAsyncThunk<
-  { customerId: number; rows: Responsible[] },
-  { customerId: number; function: UserFunction; user_id: number | null },
+  { customerId: number; rows: Responsible[]; owner: ResponsiblePayload['account_owner'] },
+  { customerId: number; function: UserFunction; user_id: number | null; note?: string },
   { rejectValue: string }
 >('knowledge/setResponsible', async ({ customerId, ...body }, { rejectWithValue }) => {
   try {
-    const data = await apiFetch<{ responsible: Responsible[] }>(`/customers/${customerId}/responsible/`, { method: 'PATCH', body });
-    return { customerId, rows: data.responsible };
+    const data = await apiFetch<ResponsiblePayload>(`/customers/${customerId}/responsible/`, { method: 'PATCH', body });
+    return { customerId, rows: data.responsible, owner: data.account_owner ?? null };
   } catch (err) {
     return rejectWithValue(message(err, 'Could not change who is responsible.'));
   }
@@ -238,6 +242,7 @@ const knowledgeSlice = createSlice({
       })
       .addCase(fetchResponsible.fulfilled, (state, action) => {
         state.responsible[action.payload.customerId] = action.payload.rows;
+        state.accountOwner[action.payload.customerId] = action.payload.owner;
       })
       .addCase(fetchResponsible.rejected, (state, action) => {
         state.error = action.payload ?? 'Could not load who is responsible.';
@@ -247,6 +252,7 @@ const knowledgeSlice = createSlice({
       })
       .addCase(setResponsible.fulfilled, (state, action) => {
         state.responsible[action.payload.customerId] = action.payload.rows;
+        state.accountOwner[action.payload.customerId] = action.payload.owner;
       })
       .addCase(setResponsible.rejected, (state, action) => {
         state.saveError = action.payload ?? 'Could not change who is responsible.';
