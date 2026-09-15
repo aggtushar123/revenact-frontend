@@ -1,0 +1,17 @@
+# CODEOWNERS — required reviewers for security-sensitive paths (SOC2:CHG-04).
+# One maintainer today; add a second reviewer here as the team grows.
+
+# Session handling and the API client
+src/features/auth/**      @aggtushar123
+src/lib/apiClient.ts      @aggtushar123
+src/components/auth/**    @aggtushar123
+
+# CI, build, release
+.github/**                @aggtushar123
+Dockerfile                @aggtushar123
+package.json              @aggtushar123
+package-lock.json         @aggtushar123
+
+# Compliance records
+.soc2/**                  @aggtushar123
+SECURITY.md               @aggtushar123

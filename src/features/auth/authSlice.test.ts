@@ -10,6 +10,7 @@ import authReducer, {
   changePassword,
   requestPasswordReset,
   confirmPasswordReset,
+  refreshSession,
 } from './authSlice';
 
 function makeStore() {
@@ -241,6 +242,50 @@ describe('authSlice', () => {
 
       expect(confirmPasswordReset.rejected.match(result)).toBe(true);
       expect(result.payload).toBe('This reset link is invalid or has expired.');
+    });
+  });
+
+  describe('refresh session', () => {
+    async function loggedInStore() {
+      const store = makeStore();
+      mockFetchOnce(200, { user: mockUser, access: 'access.jwt', refresh: 'refresh.jwt' });
+      await store.dispatch(login({ email: 'demo@revenact.io', password: 'demo1234' }));
+      return store;
+    }
+
+    it('stores the rotated refresh token the backend returns', async () => {
+      const store = await loggedInStore();
+      mockFetchOnce(200, { access: 'access2.jwt', refresh: 'refresh2.jwt' });
+
+      await store.dispatch(refreshSession());
+
+      const state = store.getState().auth;
+      expect(state.accessToken).toBe('access2.jwt');
+      expect(state.refreshToken).toBe('refresh2.jwt');
+      expect(localStorage.getItem('revenact_access_token')).toBe('access2.jwt');
+      expect(localStorage.getItem('revenact_refresh_token')).toBe('refresh2.jwt');
+    });
+
+    it('keeps the existing refresh token when the reply has none', async () => {
+      const store = await loggedInStore();
+      mockFetchOnce(200, { access: 'access2.jwt' });
+
+      await store.dispatch(refreshSession());
+
+      expect(store.getState().auth.refreshToken).toBe('refresh.jwt');
+      expect(localStorage.getItem('revenact_refresh_token')).toBe('refresh.jwt');
+    });
+
+    it('logs out when the refresh token is rejected', async () => {
+      const store = await loggedInStore();
+      mockFetchOnce(401, { detail: 'Token is blacklisted', code: 'token_not_valid' });
+
+      await store.dispatch(refreshSession());
+
+      const state = store.getState().auth;
+      expect(state.isAuthenticated).toBe(false);
+      expect(state.refreshToken).toBeNull();
+      expect(localStorage.getItem('revenact_refresh_token')).toBeNull();
     });
   });
 

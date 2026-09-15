@@ -296,7 +296,14 @@ export const logout = createAsyncThunk<void, void, { state: { auth: AuthState } 
   }
 );
 
-export const refreshSession = createAsyncThunk<{ accessToken: string }, void, { rejectValue: string }>(
+// The backend rotates refresh tokens (SIMPLE_JWT.ROTATE_REFRESH_TOKENS): each
+// refresh blacklists the token sent and returns a replacement, so the reply's
+// `refresh` must be stored or the next refresh fails. (SOC2:AUTH-05)
+export const refreshSession = createAsyncThunk<
+  { accessToken: string; refreshToken?: string },
+  void,
+  { rejectValue: string }
+>(
   'auth/refreshSession',
   async (_, { getState, rejectWithValue }) => {
     const state = getState() as { auth: AuthState };
@@ -304,12 +311,12 @@ export const refreshSession = createAsyncThunk<{ accessToken: string }, void, { 
       return rejectWithValue('No refresh token available');
     }
     try {
-      const data = await apiFetch<{ access: string }>('/auth/token/refresh/', {
+      const data = await apiFetch<{ access: string; refresh?: string }>('/auth/token/refresh/', {
         method: 'POST',
         body: { refresh: state.auth.refreshToken },
         skipAuthRetry: true, // this IS the refresh call — retrying it on 401 would recurse forever
       });
-      return { accessToken: data.access };
+      return { accessToken: data.access, refreshToken: data.refresh };
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Session refresh failed.';
       return rejectWithValue(message);
@@ -377,6 +384,10 @@ const authSlice = createSlice({
       .addCase(refreshSession.fulfilled, (state, action) => {
         state.accessToken = action.payload.accessToken;
         localStorage.setItem('revenact_access_token', action.payload.accessToken);
+        if (action.payload.refreshToken) {
+          state.refreshToken = action.payload.refreshToken;
+          localStorage.setItem('revenact_refresh_token', action.payload.refreshToken);
+        }
       })
       .addCase(refreshSession.rejected, (state) => {
         // Refresh failed — force logout
