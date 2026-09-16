@@ -12,25 +12,33 @@ const renewal = {
   id: 1, title: 'EMEA Retail - Renewal readiness', host_name: 'Chamath Gamage', occurred_at: '2026-09-16T11:12:00Z',
   duration_minutes: 45, summary: 'They want the enterprise tier by Q4 and asked about SSO.', sentiment: 'positive' as const,
   ai_area: 'product_growth', ai_category: 'Expansion', recording_url: 'https://tldv.io/r/1', connector_name: 'tl;dv', connector_provider: 'zoom',
-  logged_by: null, transcript: null, links: 0, created_at: '2026-09-16T12:00:00Z',
+  logged_by: null, transcript: null, participants: [{ id: 3, name: 'Sam Pizza', role_display: 'Champion', sentiment: 'positive' }],
+  links: 0, created_at: '2026-09-16T12:00:00Z',
 };
 const checkin = {
   id: 2, title: 'Support escalation', host_name: 'Carl', occurred_at: '2026-09-10T09:00:00Z',
   duration_minutes: null, summary: '', sentiment: 'negative' as const, ai_area: '', ai_category: '', recording_url: '',
   connector_name: null, connector_provider: null, logged_by: { id: 3, name: 'Carl' },
   transcript: { id: 8, name: 'esc.vtt', content_type: 'text/vtt', size: 10, description: '', source: 'transcript' as const, uploaded_by: { id: 3, name: 'Carl' }, download_url: '/api/v1/files/8/download/', created_at: '2026-09-10T09:00:00Z' },
-  links: 0, created_at: '2026-09-10T09:00:00Z',
+  participants: [], links: 0, created_at: '2026-09-10T09:00:00Z',
+};
+const sam = {
+  id: 3, name: 'Sam Pizza', role: 'champion', role_display: 'Champion', email: 'sam@pizzahut.com', phone: '', status: 'active',
+  sentiment: 'positive', sentiment_source: 'computed', sentiment_evidence: { score: 0.6, calls: 1, emails: 0, tickets: 0, positive: 1, neutral: 0, negative: 0, latest_at: null },
+  sentiment_computed_at: '2026-09-16T12:00:00Z', last_contacted_at: null, companies: [{ id: 10, name: 'Pizza Hut' }], account_name: 'Pizza Hut UK',
 };
 
 function mockApi() {
-  const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((_url, init) => {
+  const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url, init) => {
     const ok = (body: unknown, status = 200) => Promise.resolve({ ok: true, status, json: async () => body });
+    if (url.endsWith('/contacts/')) return ok([sam]);
     if (init?.method === 'POST') {
       const isForm = init.body instanceof FormData;
       const fields = isForm ? Object.fromEntries((init.body as FormData).entries()) : JSON.parse(String(init.body));
       return ok({ ...checkin, id: 9, title: fields.title, host_name: fields.host_name ?? 'Alice', occurred_at: fields.occurred_at,
         duration_minutes: fields.duration_minutes ? Number(fields.duration_minutes) : null, summary: fields.summary ?? 'Written from the transcript.',
-        sentiment: 'neutral', transcript: null, logged_by: { id: 1, name: 'Alice' } }, 201);
+        sentiment: 'neutral', transcript: null, logged_by: { id: 1, name: 'Alice' },
+        participants: (fields.participant_ids ? [].concat(fields.participant_ids) : []).map(() => ({ id: 3, name: 'Sam Pizza', role_display: 'Champion', sentiment: 'positive' })) }, 201);
     }
     return ok([renewal, checkin]);
   });
@@ -79,6 +87,7 @@ describe('CallSenseTab', () => {
     expect(screen.getByText(/enterprise tier by Q4/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Recording/ })).toHaveAttribute('href', 'https://tldv.io/r/1');
 
+    expect(within(screen.getByLabelText('Participants')).getByText('Sam Pizza')).toBeInTheDocument();
     expect(screen.getByText('· logged by Carl')).toBeInTheDocument();
     expect(screen.getByText('No summary yet.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Transcript/ })).toBeInTheDocument();
@@ -100,12 +109,15 @@ describe('CallSenseTab', () => {
     await user.type(screen.getByLabelText('When'), '2026-09-17T14:30');
     await user.type(screen.getByLabelText('Duration in minutes'), '30');
     await user.type(screen.getByLabelText('Summary'), 'Agreed the rollout plan.');
+    const picker = screen.getByLabelText('Who was on the call');
+    await user.click(within(picker).getByRole('button', { name: 'Sam Pizza' }));
+    expect(within(picker).getByRole('button', { name: 'Sam Pizza' })).toHaveAttribute('aria-pressed', 'true');
     await user.click(screen.getByRole('button', { name: 'Log call' }));
 
     expect(await screen.findByText('Kick-off')).toBeInTheDocument();
     const post = spy.mock.calls.find(([, init]) => init?.method === 'POST');
     const body = JSON.parse(String(post?.[1]?.body));
-    expect(body).toMatchObject({ title: 'Kick-off', duration_minutes: 30, summary: 'Agreed the rollout plan.' });
+    expect(body).toMatchObject({ title: 'Kick-off', duration_minutes: 30, summary: 'Agreed the rollout plan.', participant_ids: [3] });
     expect(body.occurred_at).toMatch(/^2026-09-17T/);
     expect(body).not.toHaveProperty('transcriptFile');
     expect(screen.queryByLabelText('Call title')).not.toBeInTheDocument(); // form closed

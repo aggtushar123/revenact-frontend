@@ -21,6 +21,23 @@ const sarahChen = {
   last_contacted_at: '2026-08-31T00:00:00Z',
   companies: [{ id: 6, name: 'Apple Inc' }],
   account_name: null,
+  sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null,
+};
+
+const sarahRead = {
+  ...sarahChen,
+  sentiment: 'negative',
+  sentiment_source: 'computed' as const,
+  sentiment_evidence: { score: -0.7, calls: 2, emails: 1, tickets: 0, positive: 0, neutral: 1, negative: 2, latest_at: '2026-09-15T10:00:00Z' },
+  sentiment_computed_at: '2026-09-16T08:00:00Z',
+};
+const sarahInteractions = {
+  sentiment: 'negative', score: -0.7, source: 'computed', evidence: sarahRead.sentiment_evidence,
+  interactions: [
+    { kind: 'call', id: 4, title: 'Escalation call', snippet: 'They are unhappy with the outage.', when: '2026-09-15T10:00:00Z', sentiment: 'negative', ai_category: 'Reliability' },
+    { kind: 'email', id: 9, title: 'Re: outage', snippet: 'Still waiting on the RCA.', when: '2026-09-12T10:00:00Z', sentiment: 'negative', ai_category: '' },
+    { kind: 'call', id: 2, title: 'Kick-off', snippet: '', when: '2026-08-01T10:00:00Z', sentiment: 'neutral', ai_category: '' },
+  ],
 };
 
 function renderPage() {
@@ -60,6 +77,38 @@ describe('Contact Details page (/contacts/:id)', () => {
       expect.stringContaining('/contacts/1/'),
       expect.objectContaining({ method: 'GET' })
     );
+  });
+
+  it('shows what the sentiment was read from, newest first', async () => {
+    vi.stubGlobal('fetch', vi.fn((url: string) =>
+      Promise.resolve(jsonResponse(200, url.includes('/interactions/') ? sarahInteractions : sarahRead))
+    ));
+
+    renderPage();
+
+    expect(await screen.findByText('Negative sentiment')).toBeInTheDocument();
+    expect(screen.getByText('read from 2 calls, 1 email')).toBeInTheDocument();
+    const panel = screen.getByLabelText('How they have sounded');
+    const titles = Array.from(panel.querySelectorAll('li')).map((li) => li.textContent);
+    expect(titles[0]).toContain('Escalation call');
+    expect(titles[0]).toContain('Negative');
+    expect(titles[0]).toContain('Reliability');
+    expect(titles[1]).toContain('Re: outage');
+    expect(titles[2]).toContain('Kick-off');
+    expect(titles[2]).toContain('Neutral');
+    expect(fetch).toHaveBeenCalledWith(expect.stringContaining('/contacts/1/interactions/'), expect.anything());
+  });
+
+  it('says a hand-set sentiment is provisional', async () => {
+    vi.stubGlobal('fetch', vi.fn((url: string) =>
+      Promise.resolve(jsonResponse(200, url.includes('/interactions/') ? { ...sarahInteractions, sentiment: null, interactions: [] } : sarahChen))
+    ));
+
+    renderPage();
+
+    expect(await screen.findByText('Positive sentiment')).toBeInTheDocument();
+    expect(screen.getByText(/set by hand/)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing analysed yet/)).toBeInTheDocument();
   });
 
   it('shows the backend error instead of crashing (e.g. a 404)', async () => {

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Phone, Plus, Clock, Mic, Link2, FileText, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { Phone, Plus, Clock, Mic, Link2, FileText, Sparkles, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { clearCalls, fetchCalls, logCall, type Call, type LogCallInput } from '../../../features/calls/callsSlice';
 import { downloadAttachment, type FileParent } from '../../../features/files/filesSlice';
+import type { Contact } from '../../../features/customers/customersSlice';
+import { apiFetch } from '../../../lib/apiClient';
 import { formatDate, initials } from '../../../features/customers/formatters';
 
 /**
@@ -33,8 +35,20 @@ function durationLabel(minutes: number | null): string {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
-function LogCallForm({ onLog, saving, error }: { onLog: (input: LogCallInput) => Promise<boolean>; saving: boolean; error: string | null }) {
+function LogCallForm({
+  onLog,
+  saving,
+  error,
+  contacts,
+}: {
+  onLog: (input: LogCallInput) => Promise<boolean>;
+  saving: boolean;
+  error: string | null;
+  /** This company's contacts, offered as participants. */
+  contacts: Contact[];
+}) {
   const [open, setOpen] = useState(false);
+  const [participants, setParticipants] = useState<number[]>([]);
   const [title, setTitle] = useState('');
   const [host, setHost] = useState('');
   const [when, setWhen] = useState('');
@@ -57,9 +71,10 @@ function LogCallForm({ onLog, saving, error }: { onLog: (input: LogCallInput) =>
       recording_url: recordingUrl.trim() || undefined,
       transcript_text: transcriptText.trim() || undefined,
       transcriptFile: file,
+      participant_ids: participants.length ? participants : undefined,
     });
     if (ok) {
-      setTitle(''); setHost(''); setWhen(''); setDuration(''); setSummary(''); setTranscriptText(''); setRecordingUrl('');
+      setTitle(''); setHost(''); setWhen(''); setDuration(''); setSummary(''); setTranscriptText(''); setRecordingUrl(''); setParticipants([]);
       if (fileInput.current) fileInput.current.value = '';
       setOpen(false);
     }
@@ -86,6 +101,27 @@ function LogCallForm({ onLog, saving, error }: { onLog: (input: LogCallInput) =>
             <Mic className="w-3.5 h-3.5" /> or upload the transcript file
             <input ref={fileInput} type="file" accept=".txt,.vtt,.srt,.md" aria-label="Transcript file" className="text-[12px]" />
           </label>
+          {contacts.length > 0 && (
+            <fieldset className="md:col-span-4 flex items-center gap-2 flex-wrap text-[12px] text-ink-muted" aria-label="Who was on the call">
+              <legend className="sr-only">Who was on the call</legend>
+              <Users className="w-3.5 h-3.5" /> Who was on it (their sentiment is read from this call):
+              {contacts.map((c) => {
+                const on = participants.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => setParticipants((p) => (on ? p.filter((id) => id !== c.id) : [...p, c.id]))}
+                    className={`px-2 py-0.5 rounded-full border text-[11.5px] font-semibold ${on ? 'bg-accent-dim border-accent/40 text-accent' : 'bg-surface border-line text-ink-muted hover:border-line-strong'}`}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
+              <span className="text-ink-faint">Anyone the transcript names is added too.</span>
+            </fieldset>
+          )}
           <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12.5px] font-bold disabled:opacity-50">
             {saving ? 'Logging…' : 'Log call'}
           </button>
@@ -121,6 +157,16 @@ function CallCard({ call }: { call: Call }) {
           </div>
         </div>
         <h4 className="text-[14.5px] font-extrabold text-ink mb-2 leading-snug">{call.title}</h4>
+        {call.participants.length > 0 && (
+          <div className="flex items-center gap-1.5 flex-wrap mb-2 text-[11.5px]" aria-label="Participants">
+            <Users className="w-3 h-3 text-ink-faint" />
+            {call.participants.map((p) => (
+              <span key={p.id} className="px-1.5 py-px rounded-full bg-subtle border border-line text-ink-muted font-semibold" title={p.role_display}>
+                {p.name}
+              </span>
+            ))}
+          </div>
+        )}
         {call.summary ? (
           <div>
             <p className={`text-[12.5px] text-ink-muted whitespace-pre-line ${expanded ? '' : 'line-clamp-3'}`}>{call.summary}</p>
@@ -162,6 +208,7 @@ export interface CallSenseTabProps {
 export function CallSenseTab({ entityType, entityId, customerId }: CallSenseTabProps) {
   const dispatch = useAppDispatch();
   const { items, isLoading, error, saving, saveError } = useAppSelector((s) => s.calls);
+  const [contacts, setContacts] = useState<Contact[]>([]);
 
   const parent: FileParent | null =
     entityType === 'organization'
@@ -175,6 +222,23 @@ export function CallSenseTab({ entityType, entityId, customerId }: CallSenseTabP
     else dispatch(clearCalls());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dispatch, entityType, entityId, customerId]);
+
+  // The company's contacts, for the participant picker. Fetched here rather
+  // than through the customers slice so this tab never disturbs the
+  // Contacts tab's own list.
+  useEffect(() => {
+    let cancelled = false;
+    if (!parent) return undefined;
+    const path =
+      parent.entityType === 'organization'
+        ? `/customers/${parent.customerId}/contacts/`
+        : `/customers/${parent.customerId}/accounts/${parent.accountId}/contacts/`;
+    apiFetch<Contact[]>(path)
+      .then((rows) => { if (!cancelled) setContacts(Array.isArray(rows) ? rows : []); })
+      .catch(() => { if (!cancelled) setContacts([]); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entityType, entityId, customerId]);
 
   const stats = useMemo(() => {
     const minutes = items.reduce((sum, c) => sum + (c.duration_minutes ?? 0), 0);
@@ -200,7 +264,7 @@ export function CallSenseTab({ entityType, entityId, customerId }: CallSenseTabP
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden bg-surface">
-      {parent && <LogCallForm onLog={onLog} saving={saving} error={saveError} />}
+      {parent && <LogCallForm onLog={onLog} saving={saving} error={saveError} contacts={contacts} />}
       {items.length > 0 && (
         <div className="px-6 py-2.5 border-b border-line-subtle flex items-center gap-5 text-[12px] text-ink-muted shrink-0 flex-wrap" aria-label="Call stats">
           <span><strong className="text-ink">{stats.count}</strong> {stats.count === 1 ? 'call' : 'calls'}</span>

@@ -24,6 +24,8 @@ export interface Call {
   connector_provider: string | null;
   logged_by: { id: number; name: string } | null;
   transcript: Attachment | null;
+  /** Who from the customer's side was on it; the call's sentiment is theirs. */
+  participants: { id: number; name: string; role_display: string; sentiment: string }[];
   links: number;
   created_at: string;
 }
@@ -37,6 +39,7 @@ export interface LogCallInput {
   recording_url?: string;
   transcript_text?: string;
   transcriptFile?: File | null;
+  participant_ids?: number[];
 }
 
 export function callsPath({ entityType, customerId, accountId }: FileParent): string {
@@ -76,7 +79,8 @@ export const logCall = createAsyncThunk<Call, FileParent & { input: LogCallInput
       if (transcriptFile) {
         const formData = new FormData();
         Object.entries(fields).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') formData.append(key, String(value));
+          if (Array.isArray(value)) value.forEach((v) => formData.append(key, String(v)));
+          else if (value !== undefined && value !== null && value !== '') formData.append(key, String(value));
         });
         formData.append('transcript', transcriptFile, transcriptFile.name);
         return await apiFetch<Call>(callsPath(parent), { method: 'POST', formData });

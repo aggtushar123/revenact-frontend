@@ -266,7 +266,7 @@ export function ContactFormModal({
           </div>
 
           <SelectField
-            label="Sentiment"
+            label={contact?.sentiment_source === 'computed' ? 'Sentiment (read from their calls, emails and tickets — a hand-set value is replaced once new evidence arrives)' : 'Sentiment (used until their calls, emails and tickets are analysed)'}
             value={sentiment}
             onChange={(v) => setSentiment(v as Contact['sentiment'])}
           >
