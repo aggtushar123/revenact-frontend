@@ -902,6 +902,7 @@ describe('Organization Details page (/organizations/:id)', () => {
                 stage_display: 'Qualification',
                 priority: 'high',
                 priority_display: 'High',
+                department: '' as const, department_display: '',
                 companies: [{ id: 10, name: 'Globex Corp' }],
                 account_name: null,
               },
@@ -921,6 +922,7 @@ describe('Organization Details page (/organizations/:id)', () => {
                 stage_display: 'Open',
                 priority: 'high',
                 priority_display: 'High',
+                department: '' as const, department_display: '',
                 companies: [{ id: 10, name: 'Globex Corp' }],
                 account_name: null,
               },
@@ -1006,6 +1008,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       stage_display: 'Qualification',
       priority: 'high',
       priority_display: 'High',
+      department: '' as const, department_display: '',
       companies: [{ id: 10, name: 'Globex Corp' }],
       account_name: null,
     };
@@ -1023,6 +1026,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       stage_display: 'Open',
       priority: 'high',
       priority_display: 'High',
+      department: '' as const, department_display: '',
       companies: [{ id: 10, name: 'Globex Corp' }],
       account_name: null,
     };

@@ -783,6 +783,7 @@ describe('AccountDetails page (/accounts/:id)', () => {
       stage_display: 'Discovery',
       priority: 'medium',
       priority_display: 'Medium',
+      department: '' as const, department_display: '',
       companies: [{ id: 9, name: 'Kraft Heinz' }],
       account_name: 'APAC Division',
     };
@@ -794,6 +795,7 @@ describe('AccountDetails page (/accounts/:id)', () => {
       stage_display: 'Open',
       priority: 'medium',
       priority_display: 'Medium',
+      department: '' as const, department_display: '',
       companies: [{ id: 9, name: 'Kraft Heinz' }],
       account_name: 'APAC Division',
     };

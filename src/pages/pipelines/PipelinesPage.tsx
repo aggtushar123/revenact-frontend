@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Search, Plus, SlidersHorizontal, Pencil } from 'lucide-react';
+import { Search, Plus, SlidersHorizontal } from 'lucide-react';
 import { EntityAvatar } from '../../components/shared';
 import { OpportunityFormModal } from '../../components/pipelines/OpportunityFormModal';
 import { RiskFormModal } from '../../components/pipelines/RiskFormModal';
@@ -15,7 +15,8 @@ import {
   deleteRisk,
 } from '../../features/customers/customersSlice';
 import { formatMoney, companyLabel } from '../../features/customers/formatters';
-import { useOrgCurrency } from '../../hooks';
+import { useOrgCurrency, useCapability, useAppSelector } from '../../hooks';
+import { FUNCTION_LABELS, type UserFunction } from '../../features/auth/authSlice';
 import { KanbanBoard, PipelineCardContent } from '../../components/pipelines/KanbanBoard';
 import {
   OPPORTUNITY_STAGE_COLUMNS,
@@ -25,6 +26,113 @@ import {
 } from '../../components/pipelines/kanbanConfig';
 import type { Opportunity, Risk } from '../../features/customers/customersSlice';
 import type { AppDispatch, RootState } from '../../store';
+
+const DEPARTMENTS = Object.entries(FUNCTION_LABELS) as [UserFunction, string][];
+const departmentLabel = (d: UserFunction | '') => (d ? FUNCTION_LABELS[d] : 'Whole company');
+
+interface PipelineFilters {
+  departments: (UserFunction | '')[];
+  priorities: ('high' | 'medium' | 'low')[];
+  stages: string[];
+}
+const NO_FILTERS: PipelineFilters = { departments: [], priorities: [], stages: [] };
+
+function toggle<T>(list: T[], value: T): T[] {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+/**
+ * Department, priority and stage filters. The backend already limits what
+ * comes back to the departments the viewer may read — their own plus
+ * undeparted items, or everything for a role that may view all accounts
+ * and for Leadership — so this narrows within that. A viewer limited to
+ * one department is told so instead of being offered the others.
+ */
+function FilterPopover({
+  filters,
+  onChange,
+  stageOptions,
+  seesAllDepartments,
+  myDepartment,
+}: {
+  filters: PipelineFilters;
+  onChange: (next: PipelineFilters) => void;
+  stageOptions: { value: string; label: string }[];
+  seesAllDepartments: boolean;
+  myDepartment: UserFunction | '';
+}) {
+  const [open, setOpen] = useState(false);
+  const active = filters.departments.length + filters.priorities.length + filters.stages.length;
+  const chip = (on: boolean) =>
+    `px-2 py-0.5 rounded-full border text-[11.5px] font-semibold ${on ? 'bg-accent-dim border-accent/40 text-accent' : 'bg-surface border-line text-ink-muted hover:border-line-strong'}`;
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label="Filters"
+        className="flex items-center gap-1.5 px-3 py-2.5 border border-line rounded-lg text-[12.5px] font-bold text-ink-muted hover:bg-subtle transition-colors bg-surface"
+      >
+        <SlidersHorizontal className="w-3.5 h-3.5" />
+        {active > 0 && <span className="text-accent font-bold">{active}</span>}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-2 z-20 w-[340px] bg-surface border border-line rounded-xl shadow-lg p-4 flex flex-col gap-3" role="dialog" aria-label="Pipeline filters">
+          <div>
+            <div className="text-[11px] font-bold text-ink-faint uppercase tracking-widest mb-1.5">Department</div>
+            {seesAllDepartments ? (
+              <div className="flex flex-wrap gap-1.5" aria-label="Department filter">
+                {[...DEPARTMENTS, ['', 'Whole company'] as ['', string]].map(([value, label]) => (
+                  <button key={value || 'all'} type="button" aria-pressed={filters.departments.includes(value)} onClick={() => onChange({ ...filters, departments: toggle(filters.departments, value) })} className={chip(filters.departments.includes(value))}>
+                    {label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[12px] text-ink-muted">
+                You see <strong className="text-ink">{departmentLabel(myDepartment)}</strong> items and those for the whole company. Roles that view all accounts, and Leadership, see every department.
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="text-[11px] font-bold text-ink-faint uppercase tracking-widest mb-1.5">Priority</div>
+            <div className="flex flex-wrap gap-1.5" aria-label="Priority filter">
+              {(['high', 'medium', 'low'] as const).map((value) => (
+                <button key={value} type="button" aria-pressed={filters.priorities.includes(value)} onClick={() => onChange({ ...filters, priorities: toggle(filters.priorities, value) })} className={`${chip(filters.priorities.includes(value))} capitalize`}>
+                  {value}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-bold text-ink-faint uppercase tracking-widest mb-1.5">Stage</div>
+            <div className="flex flex-wrap gap-1.5" aria-label="Stage filter">
+              {stageOptions.map((opt) => (
+                <button key={opt.value} type="button" aria-pressed={filters.stages.includes(opt.value)} onClick={() => onChange({ ...filters, stages: toggle(filters.stages, opt.value) })} className={chip(filters.stages.includes(opt.value))}>
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center justify-between pt-1 border-t border-line-subtle">
+            <button type="button" onClick={() => onChange(NO_FILTERS)} className="text-[12px] font-semibold text-ink-muted hover:text-ink">Clear</button>
+            <button type="button" onClick={() => setOpen(false)} className="text-[12px] font-bold text-accent">Done</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function applyFilters<T extends { priority: 'high' | 'medium' | 'low'; stage: string; department: UserFunction | '' }>(rows: T[], f: PipelineFilters): T[] {
+  return rows.filter(
+    (r) =>
+      (f.departments.length === 0 || f.departments.includes(r.department)) &&
+      (f.priorities.length === 0 || f.priorities.includes(r.priority)) &&
+      (f.stages.length === 0 || f.stages.includes(r.stage))
+  );
+}
 
 // Same toggle-pill look/behavior as the Organizations page's own
 // MetricsPanel (COUNT/MRR/ARR) — a private local copy rather than an
@@ -80,7 +188,10 @@ function OpportunityListView({
               onClick={() => onRowClick(o)}
               className={`border-b border-line-subtle hover:bg-accent-dim/30 transition-colors cursor-pointer ${i % 2 === 0 ? '' : 'bg-subtle/30'}`}
             >
-              <td className="px-5 py-3.5 font-semibold text-ink">{o.title}</td>
+              <td className="px-5 py-3.5 font-semibold text-ink">
+                {o.title}
+                {o.department && <span className="ml-2 px-1.5 py-px rounded-full bg-subtle border border-line text-[10.5px] font-bold text-ink-muted">{o.department_display}</span>}
+              </td>
               <td className="px-4 py-3.5">
                 <span className="px-2.5 py-1 rounded-full bg-accent-dim text-accent text-[11.5px] font-bold">{o.stage_display}</span>
               </td>
@@ -136,7 +247,10 @@ function RiskListView({
               onClick={() => onRowClick(r)}
               className={`border-b border-line-subtle hover:bg-accent-dim/30 transition-colors cursor-pointer ${i % 2 === 0 ? '' : 'bg-subtle/30'}`}
             >
-              <td className="px-5 py-3.5 font-semibold text-ink">{r.title}</td>
+              <td className="px-5 py-3.5 font-semibold text-ink">
+                {r.title}
+                {r.department && <span className="ml-2 px-1.5 py-px rounded-full bg-subtle border border-line text-[10.5px] font-bold text-ink-muted">{r.department_display}</span>}
+              </td>
               <td className="px-4 py-3.5">
                 <span className="px-2.5 py-1 rounded-full bg-accent-dim text-accent text-[11.5px] font-bold">{r.stage_display}</span>
               </td>
@@ -174,6 +288,10 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
   const currency = useOrgCurrency();
   const [activeSubTab, setActiveSubTab] = useState<'opportunities' | 'risks'>('opportunities');
   const [searchQuery, setSearchQuery] = useState('');
+  const [filters, setFilters] = useState<PipelineFilters>(NO_FILTERS);
+  const seesAllAccounts = useCapability('view_all_accounts');
+  const myDepartment = useAppSelector((s) => s.auth.user?.function ?? '');
+  const seesAllDepartments = seesAllAccounts || myDepartment === 'leadership';
   // Overview banner's own COUNT/MRR toggle — previously two static
   // labels that did nothing; MRR never actually rendered.
   const [overviewTab, setOverviewTab] = useState<'count' | 'mrr'>('count');
@@ -213,15 +331,17 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
 
   const filteredOpportunities = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return opportunities;
-    return opportunities.filter((o) => o.title.toLowerCase().includes(q));
-  }, [opportunities, searchQuery]);
+    const rows = applyFilters(opportunities, filters);
+    if (!q) return rows;
+    return rows.filter((o) => o.title.toLowerCase().includes(q));
+  }, [opportunities, searchQuery, filters]);
 
   const filteredRisks = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    if (!q) return risks;
-    return risks.filter((r) => r.title.toLowerCase().includes(q));
-  }, [risks, searchQuery]);
+    const rows = applyFilters(risks, filters);
+    if (!q) return rows;
+    return rows.filter((r) => r.title.toLowerCase().includes(q));
+  }, [risks, searchQuery, filters]);
 
   const handleAddClick = (stage: Opportunity['stage'] = 'discovery') => {
     setAddDefaultStage(stage);
@@ -283,9 +403,6 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
             </div>
           </div>
         </div>
-        <button className="p-1.5 text-ink-faint hover:text-ink-muted hover:bg-subtle rounded-md transition-colors">
-          <Pencil className="w-4 h-4" />
-        </button>
       </div>
 
       {/* Search + Action buttons inline */}
@@ -316,10 +433,13 @@ export function PipelinesPage({ view }: { view: 'list' | 'board' }) {
             Add Risk
           </button>
         )}
-        <button className="flex items-center gap-1.5 px-3 py-2.5 border border-line rounded-lg text-[12.5px] font-bold text-ink-muted hover:bg-subtle transition-colors bg-surface">
-          <SlidersHorizontal className="w-3.5 h-3.5" />
-          <span className="text-accent font-bold">1</span>
-        </button>
+        <FilterPopover
+          filters={filters}
+          onChange={setFilters}
+          stageOptions={(activeSubTab === 'opportunities' ? OPPORTUNITY_STAGE_COLUMNS : RISK_STAGE_COLUMNS).map((c) => ({ value: c.stage, label: c.title }))}
+          seesAllDepartments={seesAllDepartments}
+          myDepartment={myDepartment}
+        />
       </div>
 
       {/* Board / List */}

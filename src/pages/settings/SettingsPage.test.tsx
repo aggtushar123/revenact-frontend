@@ -547,6 +547,7 @@ const filledOpportunity = {
   stage_display: 'Qualification',
   priority: 'high',
   priority_display: 'High',
+  department: '' as const, department_display: '',
   companies: [{ id: 6, name: 'Apple Inc' }],
   account_name: null,
 };
@@ -567,6 +568,7 @@ const filledRisk = {
   stage_display: 'Open',
   priority: 'high',
   priority_display: 'High',
+  department: '' as const, department_display: '',
   companies: [{ id: 6, name: 'Apple Inc' }],
   account_name: null,
 };

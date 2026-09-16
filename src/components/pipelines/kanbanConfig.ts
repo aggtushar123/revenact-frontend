@@ -39,6 +39,9 @@ export interface PipelineCardEntity {
   title: string;
   mrr: string;
   priority: 'high' | 'medium' | 'low';
+  /** Opportunity/Risk only: whose pipeline it is on. */
+  department?: string;
+  department_display?: string;
   companies: { id: number; name: string }[];
   account_name: string | null;
 }
