@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Sparkles, ArrowUp, ChevronRight } from 'lucide-react';
+import { MentionTextarea } from '../../components/shared/MentionTextarea';
 
 // The one skill prompt template that was ever fully written out (the
 // rest of the grid's own cards only ever had a one-line description, no
@@ -109,16 +110,14 @@ export function HomeView({
           <div className="w-full max-w-[700px] relative">
             <div className="absolute -inset-[3px] rounded-xl bg-gradient-to-r from-accent/20 to-accent-hover/20 blur-sm"></div>
             <div className="relative bg-surface border-2 border-accent/30 rounded-xl flex items-end min-h-[104px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] focus-within:ring-4 focus-within:ring-accent/10 transition-shadow">
-              <textarea
+              <MentionTextarea
                 className="w-full h-full min-h-[96px] bg-transparent resize-none outline-none border-none p-4 text-[15px] placeholder:text-ink-faint placeholder:italic text-ink-muted font-medium"
-                placeholder="Type '/' to add variables, like {Account} and {Organization}"
+                placeholder="Ask anything — @mention a colleague or a function to route a question to them"
+                aria-label="Message Copilot"
                 value={inputText}
-                onChange={e => setInputText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    if (inputText.trim()) onSendPrompt(inputText);
-                  }
+                onChange={setInputText}
+                onSubmit={() => {
+                  if (inputText.trim()) onSendPrompt(inputText);
                 }}
               />
               <button
