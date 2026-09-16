@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { Node, Edge } from '@xyflow/react';
+import type { UserFunction } from '../auth/authSlice';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import type { User, CurrencyCode } from '../auth/authSlice';
 
@@ -504,6 +505,11 @@ export interface Opportunity {
   stage_display: string;
   priority: 'high' | 'medium' | 'low';
   priority_display: string;
+  /** Whose pipeline it is on ('' = whole company). Read department-wise:
+   * a person sees their own department's plus undeparted ones; a role
+   * that may view all accounts, and Leadership, see every department. */
+  department: UserFunction | '';
+  department_display: string;
   companies: CompanyRef[];
   account_name: string | null;
 }
@@ -514,6 +520,7 @@ export interface OpportunityWritePayload {
   mrr?: string;
   stage?: Opportunity['stage'];
   priority?: Opportunity['priority'];
+  department?: UserFunction | '';
 }
 
 // Mirrors revenact-backend's RiskSerializer field-for-field — see
@@ -528,6 +535,11 @@ export interface Risk {
   stage_display: string;
   priority: 'high' | 'medium' | 'low';
   priority_display: string;
+  /** Whose pipeline it is on ('' = whole company). Read department-wise:
+   * a person sees their own department's plus undeparted ones; a role
+   * that may view all accounts, and Leadership, see every department. */
+  department: UserFunction | '';
+  department_display: string;
   companies: CompanyRef[];
   account_name: string | null;
 }
@@ -538,6 +550,7 @@ export interface RiskWritePayload {
   mrr?: string;
   stage?: Risk['stage'];
   priority?: Risk['priority'];
+  department?: UserFunction | '';
 }
 
 // Mirrors revenact-backend's SurveySerializer field-for-field — see

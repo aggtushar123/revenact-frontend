@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { fireEvent } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -21,6 +21,7 @@ const discoveryOpp = {
   stage_display: 'Discovery',
   priority: 'low',
   priority_display: 'Low',
+  department: '' as const, department_display: '',
   companies: [{ id: 6, name: 'Shopify' }],
   account_name: null,
 };
@@ -44,6 +45,7 @@ const openRisk = {
   stage_display: 'Open',
   priority: 'high',
   priority_display: 'High',
+  department: '' as const, department_display: '',
   companies: [{ id: 8, name: 'WeWork' }],
   account_name: null,
 };
@@ -59,7 +61,10 @@ const mitigatedRisk = {
 
 const EMPTY_CUSTOMERS_PAGE = { count: 0, next: null, previous: null, results: [] };
 
-function renderPage(view: 'board' | 'list' = 'board') {
+function renderPage(
+  view: 'board' | 'list' = 'board',
+  who: { permissions?: string[]; function?: 'cs' | 'engineering' | 'sales' | 'analytics' | 'leadership' | 'other' } = {}
+) {
   const store = configureStore({
     reducer: { customers: customersReducer, auth: authReducer },
     preloadedState: {
@@ -72,8 +77,8 @@ function renderPage(view: 'board' | 'list' = 'board') {
           role: 'admin' as const,
           role_id: 1,
           role_name: 'Admin',
-          permissions: ALL_CAPABILITIES,
-          function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
+          permissions: (who.permissions ?? ALL_CAPABILITIES) as typeof ALL_CAPABILITIES,
+          function: (who.function ?? 'cs') as 'cs', function_display: 'Customer Success', reports_to: null,
           organisation: {
             id: 1,
             name: 'Acme Inc',
@@ -221,6 +226,49 @@ describe('Pipelines board — Opportunities tab', () => {
 
     expect(screen.queryByText('Digital First Account Expansion')).not.toBeInTheDocument();
     expect(screen.getByText('Payments API Upsell')).toBeInTheDocument();
+  });
+
+  it('filters by department, priority and stage from the filter button', async () => {
+    const salesOpp = { ...discoveryOpp, id: 3, title: 'Sales-only deal', department: 'sales' as const, department_display: 'Sales', priority: 'high' as const };
+    const fetchMock = makeFetchMock({ opportunities: [discoveryOpp, negotiationOpp, salesOpp] });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage('list');
+    await screen.findByText('Sales-only deal');
+    // The department shows on the row.
+    expect(screen.getByText('Sales')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    const departments = screen.getByLabelText('Department filter');
+    await user.click(within(departments).getByRole('button', { name: 'Sales' }));
+    expect(screen.queryByText('Digital First Account Expansion')).not.toBeInTheDocument();
+    expect(screen.getByText('Sales-only deal')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Filters' })).toHaveTextContent('1');
+
+    await user.click(within(departments).getByRole('button', { name: 'Whole company' }));
+    expect(screen.getByText('Digital First Account Expansion')).toBeInTheDocument();
+
+    await user.click(within(screen.getByLabelText('Priority filter')).getByRole('button', { name: 'high' }));
+    expect(screen.queryByText('Digital First Account Expansion')).not.toBeInTheDocument();
+    expect(screen.getByText('Sales-only deal')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear' }));
+    await user.click(within(screen.getByLabelText('Stage filter')).getByRole('button', { name: 'Negotiation' }));
+    expect(screen.getByText('Payments API Upsell')).toBeInTheDocument();
+    expect(screen.queryByText('Sales-only deal')).not.toBeInTheDocument();
+  });
+
+  it('tells a viewer without view_all_accounts which department they see instead of offering the others', async () => {
+    const fetchMock = makeFetchMock({ opportunities: [discoveryOpp] });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage('list', { permissions: [], function: 'engineering' });
+    await screen.findByText('Digital First Account Expansion');
+    await user.click(screen.getByRole('button', { name: 'Filters' }));
+    expect(screen.queryByLabelText('Department filter')).not.toBeInTheDocument();
+    expect(screen.getByText(/You see/)).toHaveTextContent('Engineering');
   });
 
   it('the list view renders the same real data in a table', async () => {
