@@ -1,6 +1,7 @@
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from 'react';
 import { X, AlertCircle } from 'lucide-react';
-import { useAppDispatch } from '../../hooks';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { FUNCTION_LABELS, type UserFunction } from '../../features/auth/authSlice';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import {
   createOpportunity,
@@ -66,6 +67,11 @@ interface OpportunityFormModalProps {
   onSaved?: () => void;
 }
 
+const DEPARTMENT_OPTIONS: { value: UserFunction | ''; label: string }[] = [
+  ...(Object.entries(FUNCTION_LABELS) as [UserFunction, string][]).map(([value, label]) => ({ value, label })),
+  { value: '', label: 'Whole company' },
+];
+
 export function OpportunityFormModal({
   opportunity,
   defaultStage,
@@ -85,6 +91,8 @@ export function OpportunityFormModal({
     opportunity?.stage ?? defaultStage ?? 'discovery'
   );
   const [priority, setPriority] = useState<Opportunity['priority']>(opportunity?.priority ?? 'medium');
+  const myFunction = useAppSelector((s) => s.auth.user?.function ?? '');
+  const [department, setDepartment] = useState<UserFunction | ''>(opportunity?.department ?? myFunction);
   const [selectedCompanyId, setSelectedCompanyId] = useState(customerId ? String(customerId) : '');
 
   // Same self-fetching Account picker as ContactFormModal — every
@@ -131,7 +139,7 @@ export function OpportunityFormModal({
     }
 
     setIsSaving(true);
-    const data = { title: title.trim(), mrr: mrr.trim() || '0', stage, priority };
+    const data = { title: title.trim(), mrr: mrr.trim() || '0', stage, priority, department };
     try {
       if (isEdit) {
         // No onSaved() — updateOpportunity's own extraReducers already
@@ -235,6 +243,14 @@ export function OpportunityFormModal({
               <option value="low">Low</option>
             </SelectField>
           </div>
+
+          <SelectField label="Department" value={department} onChange={(v) => setDepartment(v as UserFunction | '')}>
+            {DEPARTMENT_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </SelectField>
 
           <SelectField label="Stage" value={stage} onChange={(v) => setStage(v as Opportunity['stage'])}>
             {STAGE_OPTIONS.map((opt) => (

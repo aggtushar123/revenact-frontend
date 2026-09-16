@@ -27,7 +27,14 @@ import type { CurrencyCode } from '../../features/auth/authSlice';
 export function PipelineCardContent(entity: PipelineCardEntity, currency: CurrencyCode) {
   return (
     <>
-      <h4 className="text-[12.5px] font-bold text-ink leading-snug mb-2.5">{entity.title}</h4>
+      <h4 className="text-[12.5px] font-bold text-ink leading-snug mb-2.5">
+        {entity.title}
+        {entity.department && (
+          <span className="ml-1.5 px-1.5 py-px rounded-full bg-subtle border border-line text-[10px] font-bold text-ink-muted align-middle" title="Department">
+            {entity.department_display}
+          </span>
+        )}
+      </h4>
       <div className="text-[12px] font-bold text-accent mb-3">MRR: {formatMoney(entity.mrr, currency)}</div>
       <div className="flex items-center justify-between min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
