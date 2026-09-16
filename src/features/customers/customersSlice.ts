@@ -122,6 +122,8 @@ export interface Customer {
    *  rubric decide it. */
   health_score_is_overridden: boolean;
   ai_pulse_reason: string;
+  /** How the relationship feels right now — pulse.py over the organisation's own signals plus its accounts'. Optional: older fixtures omit it. */
+  account_pulse?: AccountPulse;
   nps_score: number | null;
   csat_score: string | null;
   joined_date: string | null;
