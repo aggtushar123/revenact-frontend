@@ -44,6 +44,7 @@ function account(overrides: Partial<Account> = {}): Account {
     csat_score: '100.00',
     renewal_date: '2026-03-02',
     arr: '33600.00',
+    account_pulse: { value: '4.0', label: 'Healthy', category: 1, breakdown: [] },
     ...overrides,
   };
 }

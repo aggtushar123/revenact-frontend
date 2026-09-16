@@ -59,6 +59,7 @@ export function mapAccountToAccountRow(
     owner: a.owner?.name ?? 'Unassigned',
     ownerId: a.owner?.id ?? null,
     ownerFunction: a.owner?.function ?? null,
+    accountPulse: a.account_pulse ?? null,
     avatar: a.owner ? initials(a.owner.name) : '—',
     health: { val: Number(a.health_score), clr: HEALTH_COLORS[a.health_category] },
     healthCategory: a.health_category,

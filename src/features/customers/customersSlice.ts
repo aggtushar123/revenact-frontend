@@ -212,6 +212,8 @@ export interface Account {
   pulse: number[];
   ai_pulse_score: 'very_satisfied' | 'satisfied' | 'moderate' | 'high_risk' | '';
   ai_pulse_reason: string;
+  /** How the relationship feels right now — the backend's pulse.py blend of five signals. */
+  account_pulse: AccountPulse;
   nps_score: number | null;
   csat_score: string | null;
   renewal_date: string | null;
@@ -548,6 +550,24 @@ export interface CanvasWritePayload {
 // docstring) — it exists here only for the standalone Account page's
 // own Organizations tab, which fully replaces the linked set when it
 // sends this field at all (see AccountSerializer's own docstring).
+export interface AccountPulseReading {
+  key: 'ai_pulse' | 'csm_pulse' | 'sentiment' | 'touch' | 'support';
+  label: string;
+  weight: string;
+  /** 1-5 to a tenth, or null when the signal had nothing to measure. */
+  reading: string | null;
+  note: string;
+}
+
+export interface AccountPulse {
+  /** 1-5 to a tenth, or null when no signal could be measured. */
+  value: string | null;
+  label: 'Thriving' | 'Healthy' | 'Watch' | 'At risk' | 'Critical' | 'No signal';
+  /** Pulse-history dot code: 1 good, 3 warning, 2 bad, 0 no signal. */
+  category: 0 | 1 | 2 | 3;
+  breakdown: AccountPulseReading[];
+}
+
 export interface AccountWritePayload {
   name?: string;
   domain?: string;
