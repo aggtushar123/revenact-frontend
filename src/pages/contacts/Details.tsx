@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mail, Phone, Building2, Clock, Pencil, Trash2 } from 'lucide-react';
+import { Mail, Phone, Building2, Clock, Pencil, Trash2, PhoneCall, Ticket as TicketIcon, Sparkles } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchContactById, deleteContact } from '../../features/customers/customersSlice';
-import { initials, capitalize, formatRelativeTime, companyLabel } from '../../features/customers/formatters';
+import { fetchContactById, fetchContactInteractions, deleteContact } from '../../features/customers/customersSlice';
+import type { Contact, ContactInteraction } from '../../features/customers/customersSlice';
+import { initials, capitalize, formatRelativeTime, companyLabel, formatDate } from '../../features/customers/formatters';
 import { ContactFormModal } from '../../components/contacts/ContactFormModal';
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 
@@ -18,15 +19,21 @@ export function ContactDetails() {
   const contactId = Number(id);
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
-  const { selectedContact: contact, selectedContactLoading, selectedContactError } = useAppSelector(
-    (state) => state.customers
-  );
+  const {
+    selectedContact: contact,
+    selectedContactLoading,
+    selectedContactError,
+    selectedContactInteractions: interactions,
+  } = useAppSelector((state) => state.customers);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    if (Number.isFinite(contactId)) dispatch(fetchContactById(contactId));
+    if (Number.isFinite(contactId)) {
+      dispatch(fetchContactById(contactId));
+      dispatch(fetchContactInteractions(contactId));
+    }
   }, [dispatch, contactId]);
 
   if (selectedContactLoading || !contact) {
@@ -87,7 +94,10 @@ export function ContactDetails() {
           <span className={`px-2.5 py-1 rounded-full text-[11.5px] font-bold border ${sentimentColor}`}>
             {capitalize(contact.sentiment)} sentiment
           </span>
+          <span className="text-[11.5px] text-ink-faint">{sentimentBasis(contact)}</span>
         </div>
+
+        <SentimentPanel contact={contact} rows={Array.isArray(interactions?.interactions) ? interactions.interactions : []} />
 
         {/* Info grid */}
         <div className="grid grid-cols-2 gap-4">
@@ -134,6 +144,75 @@ export function ContactDetails() {
         />
       )}
     </div>
+  );
+}
+
+// "from 3 calls, 1 email" — what the pill rests on, or that it was set by hand.
+function sentimentBasis(contact: Contact): string {
+  if (contact.sentiment_source !== 'computed') return 'set by hand — read from their calls, emails and tickets once analysed';
+  const e = contact.sentiment_evidence as { calls?: number; emails?: number; tickets?: number };
+  const parts = [
+    e.calls ? `${e.calls} ${e.calls === 1 ? 'call' : 'calls'}` : '',
+    e.emails ? `${e.emails} ${e.emails === 1 ? 'email' : 'emails'}` : '',
+    e.tickets ? `${e.tickets} ${e.tickets === 1 ? 'ticket' : 'tickets'}` : '',
+  ].filter(Boolean);
+  return `read from ${parts.join(', ') || 'their interactions'}`;
+}
+
+const SENTIMENT_CHIP: Record<string, string> = {
+  positive: 'bg-success-dim text-success border-success/40',
+  negative: 'bg-danger-dim text-danger border-danger/40',
+  neutral: 'bg-subtle text-ink-muted border-line',
+};
+
+const KIND_ICON = {
+  call: <PhoneCall className="w-3.5 h-3.5" />,
+  email: <Mail className="w-3.5 h-3.5" />,
+  ticket: <TicketIcon className="w-3.5 h-3.5" />,
+};
+
+/**
+ * How this person has sounded: every classified call they were on, email
+ * from them and ticket they raised, newest first, each with its own
+ * sentiment — the evidence behind the pill above.
+ */
+function SentimentPanel({ contact, rows }: { contact: Contact; rows: ContactInteraction[] }) {
+  return (
+    <section aria-label="How they have sounded" className="bg-surface border border-line-subtle rounded-2xl shadow-sm p-5 flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-accent" />
+          <h2 className="text-[14px] font-bold text-ink">How they have sounded</h2>
+        </div>
+        {contact.sentiment_computed_at && (
+          <span className="text-[11.5px] text-ink-faint">Last read {formatRelativeTime(contact.sentiment_computed_at)}</span>
+        )}
+      </div>
+      {rows.length === 0 ? (
+        <p className="text-[12.5px] text-ink-faint">
+          Nothing analysed yet. Log a call with them as a participant, or sync the mailbox and ticket sources they write to, and their sentiment is read from it.
+        </p>
+      ) : (
+        <ul className="flex flex-col divide-y divide-line-subtle" aria-label="Interactions">
+          {rows.map((row) => (
+            <li key={`${row.kind}-${row.id}`} className="py-2.5 flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-subtle border border-line-subtle flex items-center justify-center text-ink-muted shrink-0">{KIND_ICON[row.kind]}</div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[13px] font-bold text-ink truncate">{row.title}</span>
+                  <span className={`px-2 py-px rounded-full border text-[10.5px] font-bold ${SENTIMENT_CHIP[row.sentiment] ?? SENTIMENT_CHIP.neutral}`}>
+                    {row.sentiment ? capitalize(row.sentiment) : 'Unread'}
+                  </span>
+                  {row.ai_category && <span className="text-[11px] text-ink-faint">{row.ai_category}</span>}
+                </div>
+                {row.snippet && <p className="text-[12px] text-ink-muted line-clamp-2">{row.snippet}</p>}
+                <div className="text-[11px] text-ink-faint">{capitalize(row.kind)} · {formatDate(row.when.slice(0, 10))}</div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

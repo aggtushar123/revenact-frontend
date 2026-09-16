@@ -419,9 +419,45 @@ export interface Contact {
   phone: string;
   status: 'active' | 'inactive';
   sentiment: 'positive' | 'neutral' | 'negative';
+  /** Where the sentiment comes from: set by hand, or computed from the
+   * person's own classified calls, emails and tickets (the backend's
+   * contact_sentiment.py). Computed wins whenever there is evidence. */
+  sentiment_source: 'manual' | 'computed';
+  sentiment_evidence: ContactSentimentEvidence | Record<string, never>;
+  sentiment_computed_at: string | null;
   last_contacted_at: string | null;
   companies: CompanyRef[];
   account_name: string | null;
+}
+
+export interface ContactSentimentEvidence {
+  score: number;
+  calls: number;
+  emails: number;
+  tickets: number;
+  positive: number;
+  neutral: number;
+  negative: number;
+  latest_at: string | null;
+}
+
+// GET /api/v1/contacts/<id>/interactions/ — what the sentiment rests on.
+export interface ContactInteraction {
+  kind: 'call' | 'email' | 'ticket';
+  id: number;
+  title: string;
+  snippet: string;
+  when: string;
+  sentiment: 'positive' | 'neutral' | 'negative' | '';
+  ai_category: string;
+}
+
+export interface ContactInteractions {
+  sentiment: 'positive' | 'neutral' | 'negative' | null;
+  score: number;
+  source: 'manual' | 'computed';
+  evidence: ContactSentimentEvidence | Record<string, never>;
+  interactions: ContactInteraction[];
 }
 
 // Mirrors revenact-backend's ContactStatsView response exactly — see
@@ -807,6 +843,8 @@ interface CustomersState {
   selectedContact: Contact | null;
   selectedContactLoading: boolean;
   selectedContactError: string | null;
+  selectedContactInteractions: ContactInteractions | null;
+  selectedContactInteractionsLoading: boolean;
   /** Every Opportunity the caller's organisation owns — the standalone
    * Pipelines board's own "Opportunities" tab, unpaginated (a Kanban
    * board needs every card in every column at once, see
@@ -938,6 +976,8 @@ const initialState: CustomersState = {
   selectedContact: null,
   selectedContactLoading: false,
   selectedContactError: null,
+  selectedContactInteractions: null,
+  selectedContactInteractionsLoading: false,
   opportunities: [],
   opportunitiesLoading: false,
   opportunitiesError: null,
@@ -1463,6 +1503,18 @@ export const fetchContactStats = createAsyncThunk<ContactStats, void, { rejectVa
 );
 
 // Powers the new /contacts/:id page.
+export const fetchContactInteractions = createAsyncThunk<ContactInteractions, number, { rejectValue: string }>(
+  'customers/fetchContactInteractions',
+  async (id, { rejectWithValue }) => {
+    try {
+      return await apiFetch<ContactInteractions>(`/contacts/${id}/interactions/`);
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not load this contact\'s interactions.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
 export const fetchContactById = createAsyncThunk<Contact, number, { rejectValue: string }>(
   'customers/fetchContactById',
   async (id, { rejectWithValue }) => {
@@ -2602,6 +2654,17 @@ const customersSlice = createSlice({
       .addCase(fetchContactStats.rejected, (state, action) => {
         state.contactStatsLoading = false;
         state.contactStatsError = action.payload ?? 'Something went wrong.';
+      })
+      .addCase(fetchContactInteractions.pending, (state) => {
+        state.selectedContactInteractionsLoading = true;
+      })
+      .addCase(fetchContactInteractions.fulfilled, (state, action) => {
+        state.selectedContactInteractionsLoading = false;
+        state.selectedContactInteractions = action.payload;
+      })
+      .addCase(fetchContactInteractions.rejected, (state) => {
+        state.selectedContactInteractionsLoading = false;
+        state.selectedContactInteractions = null;
       })
       .addCase(fetchContactById.pending, (state) => {
         state.selectedContactLoading = true;
