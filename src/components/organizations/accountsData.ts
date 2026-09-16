@@ -1,3 +1,5 @@
+import type { UserFunction } from '../../features/auth/authSlice';
+
 export type AccountHealthCategory = 'good' | 'average' | 'poor';
 
 export interface AccountRow {
@@ -11,6 +13,9 @@ export interface AccountRow {
   aiPulseScore: string;
   aiPulseReason: string;
   owner: string;
+  /** The owner's id and function when the row came from the API (mapToAccountRow); the mock rows have neither. */
+  ownerId?: number | null;
+  ownerFunction?: UserFunction | null;
   avatar: string;
   health: { val: number; clr: string };
   healthCategory: AccountHealthCategory;

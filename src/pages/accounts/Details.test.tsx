@@ -10,6 +10,7 @@ import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
 import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
+import { resetMembersCache } from '../../features/knowledge/useMembers';
 
 // Real-shaped AccountRow, the kind organizations/Details.tsx's AccountsTab
 // passes through navigate()'s state when a row is clicked — see that
@@ -966,5 +967,40 @@ describe('AccountDetails page (/accounts/:id)', () => {
       );
       expect(await screen.findByText('New Risk')).toBeInTheDocument();
     });
+  });
+});
+
+describe('AccountDetails owner tile', () => {
+  it('assigns an owner with a handover note, like an organisation', async () => {
+    resetMembersCache();
+    const calls: { url: string; init?: RequestInit }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        calls.push({ url: String(url), init });
+        const ok = (body: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => body });
+        if (String(url).includes('/auth/members/')) {
+          return ok([{ id: 2, name: 'Carl CSM', function: 'cs' }, { id: 5, name: 'Priya Nair', function: 'engineering' }]);
+        }
+        if (init?.method === 'PATCH') {
+          return ok({ id: 17, name: 'APAC Division', owner: { id: 5, name: 'Priya Nair', function: 'engineering' }, customers: [{ id: 9, name: 'Kraft Heinz' }] });
+        }
+        return ok([]);
+      }),
+    );
+    const user = userEvent.setup();
+    renderAccountDetails({ account: apacDivision });
+
+    expect(screen.getByText('Nobody yet')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Assign' }));
+    await user.selectOptions(await screen.findByLabelText('New account owner'), '5');
+    await user.type(screen.getByLabelText('Handover note'), 'Priya runs APAC now.');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() => expect(screen.getByText('Priya Nair · Engineering')).toBeInTheDocument());
+    const patch = calls.find((c) => c.init?.method === 'PATCH');
+    expect(patch?.url).toContain('/customers/9/accounts/17/');
+    expect(JSON.parse(String(patch?.init?.body))).toEqual({ owner_id: 5, handover_note: 'Priya runs APAC now.' });
+    expect(screen.queryByLabelText('New account owner')).not.toBeInTheDocument();
   });
 });

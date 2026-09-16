@@ -553,6 +553,8 @@ export interface AccountWritePayload {
   domain?: string;
   industry?: string;
   owner_id?: number | null;
+  /** Why the owner is changing — written down as knowledge on every linked organisation. */
+  handover_note?: string;
   lifecycle_stage?: Account['lifecycle_stage'];
   renewal_date?: string | null;
   customer_ids?: number[];
