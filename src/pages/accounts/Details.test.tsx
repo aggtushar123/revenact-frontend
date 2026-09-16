@@ -28,6 +28,18 @@ const apacDivision: AccountRow = {
   aiPulseReason: '-',
   owner: 'Unassigned',
   avatar: '—',
+  accountPulse: {
+    value: '3.2',
+    label: 'Watch',
+    category: 3,
+    breakdown: [
+      { key: 'ai_pulse', label: 'AI pulse', weight: '3.0', reading: '3.0', note: 'what the model reads' },
+      { key: 'csm_pulse', label: 'CSM pulse', weight: '2.5', reading: null, note: 'not set' },
+      { key: 'sentiment', label: 'Recent sentiment', weight: '2.0', reading: '4.0', note: '2 positive, 0 negative of 4 in the last 30 days' },
+      { key: 'touch', label: 'Last contact', weight: '1.5', reading: '2.0', note: '68 days ago' },
+      { key: 'support', label: 'Open tickets', weight: '1.0', reading: '4.6', note: '1 open' },
+    ],
+  },
   health: { val: 6.2, clr: 'bg-[var(--warning)]' },
   healthCategory: 'average',
   nps: '-20',
@@ -109,7 +121,12 @@ describe('AccountDetails page (/accounts/:id)', () => {
     expect(screen.getByText('APAC Division')).toBeInTheDocument();
     expect(screen.getByText('6.2')).toBeInTheDocument();
     expect(screen.getByText('Onboarding')).toBeInTheDocument();
-    expect(screen.getByText('Neutral')).toBeInTheDocument(); // CSM Pulse: health 4-6.9
+    // Account Pulse comes from the API's computed blend, not from the health score.
+    expect(screen.getByText('Account Pulse')).toBeInTheDocument();
+    expect(screen.getByText('Watch')).toBeInTheDocument();
+    expect(screen.getByText('3.2 / 5')).toBeInTheDocument();
+    expect(screen.getByLabelText('Account pulse')).toHaveAttribute('title', expect.stringContaining('Last contact: 2.0 (68 days ago, weight 1.5)'));
+    expect(screen.queryByText('CSM Pulse')).not.toBeInTheDocument();
     expect(screen.getByText('-20')).toBeInTheDocument(); // NPS, no leading '+'
     expect(screen.getByText('45%')).toBeInTheDocument();
     expect(screen.getByText('$34.0K')).toBeInTheDocument();
