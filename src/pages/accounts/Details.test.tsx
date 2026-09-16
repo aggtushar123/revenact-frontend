@@ -9,6 +9,7 @@ import type { AccountRow } from '../../components/organizations/accountsData';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
 import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
+import knowledgeReducer from '../../features/knowledge/knowledgeSlice';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 import { resetMembersCache } from '../../features/knowledge/useMembers';
 
@@ -46,7 +47,7 @@ const apacDivision: AccountRow = {
 // what each test is actually asserting on.
 function renderAccountDetails(state?: { account: AccountRow }) {
   const store = configureStore({
-    reducer: { customers: customersReducer, auth: authReducer, copilotSessions: copilotSessionsReducer },
+    reducer: { customers: customersReducer, auth: authReducer, copilotSessions: copilotSessionsReducer, knowledge: knowledgeReducer },
     preloadedState: {
       auth: {
         user: {
@@ -1002,5 +1003,47 @@ describe('AccountDetails owner tile', () => {
     expect(patch?.url).toContain('/customers/9/accounts/17/');
     expect(JSON.parse(String(patch?.init?.body))).toEqual({ owner_id: 5, handover_note: 'Priya runs APAC now.' });
     expect(screen.queryByLabelText('New account owner')).not.toBeInTheDocument();
+  });
+});
+
+describe('AccountDetails Company View', () => {
+  it("shows the account owner and the parent organisation's department owners and knowledge", { timeout: 15000 }, async () => {
+    resetMembersCache();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        const ok = (body: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => body });
+        const u = String(url);
+        if (u.includes('/auth/members/')) return ok([{ id: 2, name: 'Carl CSM', function: 'cs' }, { id: 5, name: 'Priya Nair', function: 'engineering' }]);
+        if (u.includes('/customers/9/responsible/')) {
+          return ok({
+            customer_id: 9,
+            account_owner: { id: 2, name: 'Carl CSM', function: 'cs' },
+            responsible: [
+              { function: 'cs', function_display: 'Customer Success', user: { id: 2, name: 'Carl CSM' } },
+              { function: 'engineering', function_display: 'Engineering', user: { id: 5, name: 'Priya Nair' } },
+              { function: 'sales', function_display: 'Sales', user: null },
+            ],
+          });
+        }
+        if (u.includes('/customers/9/contributions/')) {
+          return ok([{ id: 1, customer_id: 9, customer_name: 'Kraft Heinz', author: { id: 5, name: 'Priya Nair' }, function: 'engineering', function_display: 'Engineering', body: 'SSO drops sessions on token refresh.', created_at: '2026-09-13T08:00:00Z', updated_at: '2026-09-13T08:00:00Z' }]);
+        }
+        return ok([]);
+      }),
+    );
+    const user = userEvent.setup();
+    renderAccountDetails({ account: { ...apacDivision, owner: 'Mei Tanaka', ownerId: 7, ownerFunction: 'analytics' } });
+
+    await user.click(await screen.findByRole('button', { name: /^Company View/ }));
+    expect(await screen.findByText(/Who answers for APAC Division/)).toBeInTheDocument();
+    expect(screen.getByText('knowledge of Kraft Heinz', { exact: false })).toBeInTheDocument();
+    // The account's own owner, then the organisation's.
+    expect(screen.getByText('Mei Tanaka · Analytics')).toBeInTheDocument();
+    expect(screen.getByText('Organisation owner')).toBeInTheDocument();
+    expect((await screen.findAllByText('Carl CSM · Customer Success')).length).toBeGreaterThan(0);
+    // Department owners and knowledge come from the organisation.
+    expect(await screen.findByLabelText('Engineering owner')).toHaveValue('5');
+    expect(await screen.findByText('SSO drops sessions on token refresh.')).toBeInTheDocument();
   });
 });
