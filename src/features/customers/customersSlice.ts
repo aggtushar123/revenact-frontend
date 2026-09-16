@@ -355,10 +355,21 @@ export interface Ticket {
   ticket_number: string;
   title: string;
   assignee_name: string;
-  status: 'open' | 'in-progress' | 'resolved' | 'closed';
+  status: 'open' | 'in-progress' | 'on-hold' | 'resolved' | 'closed';
   priority: 'critical' | 'high' | 'medium' | 'low';
   opened_at: string;
   links: number;
+  /** Where it came from: the connector's name, or null when raised here. */
+  connector_name: string | null;
+  connector_provider: string | null;
+  /** The department that may read it ('' = everyone). */
+  department: string;
+  department_display: string;
+  description: string;
+  requester_name: string;
+  requester_email: string;
+  external_url: string;
+  synced_at: string | null;
 }
 
 // Mirrors revenact-backend's CalendarEventSerializer field-for-field —

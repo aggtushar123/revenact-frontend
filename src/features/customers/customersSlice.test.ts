@@ -1151,6 +1151,7 @@ describe('customersSlice', () => {
       priority: 'high',
       opened_at: '2026-03-03',
       links: 2,
+      connector_name: null, connector_provider: null, department: '', department_display: '', description: '', requester_name: '', requester_email: '', external_url: '', synced_at: null,
     };
     const accountTicket = {
       id: 2,
@@ -1161,6 +1162,7 @@ describe('customersSlice', () => {
       priority: 'critical',
       opened_at: '2026-03-29',
       links: 0,
+      connector_name: null, connector_provider: null, department: '', department_display: '', description: '', requester_name: '', requester_email: '', external_url: '', synced_at: null,
     };
 
     it('fetchTicketsForCustomer GETs /customers/<id>/tickets/ and stores the result', async () => {

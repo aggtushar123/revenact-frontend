@@ -66,6 +66,7 @@ const ticket = {
   priority: 'critical' as const,
   opened_at: '2026-03-10',
   links: 0,
+  connector_name: null, connector_provider: null, department: '', department_display: '', description: '', requester_name: '', requester_email: '', external_url: '', synced_at: null,
 };
 
 const event = {
