@@ -16,6 +16,7 @@ import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector, useOrgCurrency, useCapability } from '../../hooks';
 import { useMembers } from '../../features/knowledge/useMembers';
 import { OwnerTile, type OwnerSummary } from '../../components/shared/OwnerTile';
+import { CompanyViewTab } from '../../components/organizations/CompanyViewTab';
 import { formatCompactMoney } from '../../features/customers/formatters';
 import {
   fetchContactsForAccount,
@@ -60,6 +61,8 @@ export function AccountDetails() {
   const members = useMembers();
   // What the row said, until a save on this page says otherwise.
   const [saved, setSaved] = useState<{ accountId: number; owner: OwnerSummary | null } | null>(null);
+  // Which linked organisation's knowledge the Company View shows (an account can belong to several).
+  const [companyOrgId, setCompanyOrgId] = useState<number | null>(null);
 
   // Clicking through from a real org's Accounts tab (see
   // organizations/Details.tsx) carries the real, already-fetched
@@ -117,6 +120,7 @@ export function AccountDetails() {
 
   const tabs = [
     { name: 'General', count: null },
+    { name: 'Company View', count: null },
     { name: 'Organizations', count: account.orgs?.length ?? 1 },
     { name: 'Contacts', count: contacts.length },
     { name: 'Pipelines', count: pipelineOpportunities.length + pipelineRisks.length },
@@ -252,6 +256,35 @@ export function AccountDetails() {
               </div>
             </div>
           </div>
+        ) : activeTab === 'Company View' ? (
+          isRealAccount ? (
+            <div className="flex flex-col gap-3 w-full px-6 pt-5 pb-4 overflow-y-auto">
+              {(account.orgs?.length ?? 0) > 1 && (
+                <label className="flex items-center gap-2 text-[12.5px] text-ink-muted max-w-5xl mx-auto w-full">
+                  Knowledge of
+                  <select
+                    aria-label="Organisation for Company View"
+                    value={companyOrgId ?? account.orgId}
+                    onChange={(e) => setCompanyOrgId(Number(e.target.value))}
+                    className="px-2 py-1 bg-surface border border-line rounded-lg text-[12.5px] text-ink focus:outline-none focus:border-accent"
+                  >
+                    {account.orgs!.map((o) => (
+                      <option key={o.id} value={o.id}>{o.name}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <CompanyViewTab
+                key={companyOrgId ?? account.orgId}
+                customerId={companyOrgId ?? account.orgId}
+                customerName={account.orgs?.find((o) => o.id === (companyOrgId ?? account.orgId))?.name ?? account.orgName}
+                accountName={account.name}
+                accountOwnerTile={<OwnerTile owner={owner} members={members} mayChange={mayChangeOwner} onSave={saveOwner} />}
+              />
+            </div>
+          ) : (
+            <div className="px-6 pt-5 text-[13px] text-ink-muted">Open a real account to see who answers for it.</div>
+          )
         ) : activeTab === 'Organizations' ? (
           <OrganizationTab account={account} isRealAccount={!!accountNavState?.account} />
         ) : activeTab === 'Contacts' ? (

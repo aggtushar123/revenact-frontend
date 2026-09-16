@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Users } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import {
@@ -33,7 +33,19 @@ const FUNCTION_TONE: Record<UserFunction, string> = {
  * profile. The Copilot reads the same rows, so what is written here is
  * what it answers from.
  */
-export function CompanyViewTab({ customerId, customerName }: { customerId: number; customerName: string }) {
+export function CompanyViewTab({
+  customerId,
+  customerName,
+  accountName,
+  accountOwnerTile,
+}: {
+  customerId: number;
+  customerName: string;
+  /** On an account page: the account this view is framed for. Knowledge and
+   *  department owners are the organisation's; the account has its own owner. */
+  accountName?: string;
+  accountOwnerTile?: ReactNode;
+}) {
   const dispatch = useAppDispatch();
   const me = useAppSelector((s) => s.auth.user);
   const canAssign = useCapability('view_all_accounts');
@@ -74,9 +86,15 @@ export function CompanyViewTab({ customerId, customerName }: { customerId: numbe
       <section className="bg-surface rounded-xl border border-line-subtle shadow-sm px-5 py-4">
         <div className="flex items-center gap-2 mb-2">
           <Users className="w-4 h-4 text-accent" />
-          <h2 className="text-[14px] font-bold text-ink">Who answers for {customerName}</h2>
+          <h2 className="text-[14px] font-bold text-ink">
+            Who answers for {accountName ?? customerName}
+            {accountName && <span className="font-medium text-ink-muted"> · knowledge of {customerName}</span>}
+          </h2>
         </div>
-        <AccountOwnerTile customerId={customerId} members={members} canAssign={canAssign} />
+        {accountOwnerTile}
+        <div className={accountOwnerTile ? 'mt-2' : ''}>
+          <AccountOwnerTile customerId={customerId} members={members} canAssign={canAssign} title={accountName ? 'Organisation owner' : 'Account owner'} />
+        </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 mt-2">
           {(responsible ?? []).filter((r) => r.function !== 'cs').map((r) => (
             <div key={r.function} className="border border-line-subtle rounded-lg px-3 py-2">
@@ -165,13 +183,14 @@ export function CompanyViewTab({ customerId, customerName }: { customerId: numbe
 }
 
 /** The organisation's one accountable person — the shared OwnerTile over the knowledge slice. */
-function AccountOwnerTile({ customerId, members, canAssign }: { customerId: number; members: User[]; canAssign: boolean }) {
+function AccountOwnerTile({ customerId, members, canAssign, title }: { customerId: number; members: User[]; canAssign: boolean; title?: string }) {
   const dispatch = useAppDispatch();
   const me = useAppSelector((s) => s.auth.user);
   const owner = useAppSelector((s) => s.knowledge.accountOwner[customerId] ?? null);
   const mayChange = canAssign || (!!me && (!owner || owner.id === me.id));
   return (
     <OwnerTile
+      title={title}
       owner={owner}
       members={members}
       mayChange={mayChange}
