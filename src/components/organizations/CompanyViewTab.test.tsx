@@ -24,7 +24,7 @@ const responsible = [
 function mockApi() {
   const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url, init) => {
     const ok = (body: unknown, status = 200) => Promise.resolve({ ok: true, status, json: async () => body });
-    if (url.includes('/auth/members/')) return ok([{ id: 2, name: 'Carl CSM' }, { id: 5, name: 'Priya Nair' }, { id: 6, name: 'Raj Mehta' }]);
+    if (url.includes('/auth/members/')) return ok([{ id: 2, name: 'Carl CSM', function: 'cs' }, { id: 5, name: 'Priya Nair', function: 'engineering' }, { id: 6, name: 'Raj Mehta', function: 'sales' }]);
     if (url.includes('/responsible/') && init?.method === 'PATCH') {
       const body = JSON.parse(String(init.body));
       return ok({ responsible: responsible.map((r) => (r.function === body.function ? { ...r, user: { id: body.user_id, name: 'Raj Mehta' } } : r)) });
@@ -98,6 +98,11 @@ describe('CompanyViewTab', () => {
     const post = spy.mock.calls.find(([, init]) => init?.method === 'POST');
     expect(JSON.parse(String(post?.[1]?.body))).toEqual({ body: 'Board wants this account kept.' });
 
+    // Only people in Sales are offered for the Sales row.
+    const salesOptions = Array.from((screen.getByLabelText('Sales owner') as HTMLSelectElement).options).map((o) => o.textContent);
+    expect(salesOptions).toContain('Raj Mehta');
+    expect(salesOptions).not.toContain('Priya Nair');
+    expect(salesOptions).not.toContain('Carl CSM');
     await user.selectOptions(screen.getByLabelText('Sales owner'), '6');
     const patch = spy.mock.calls.find(([, init]) => init?.method === 'PATCH');
     expect(JSON.parse(String(patch?.[1]?.body))).toEqual({ function: 'sales', user_id: 6 });

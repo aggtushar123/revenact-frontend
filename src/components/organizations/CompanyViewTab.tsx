@@ -90,7 +90,8 @@ export function CompanyViewTab({ customerId, customerName }: { customerId: numbe
                   className="mt-0.5 w-full bg-transparent text-[13px] font-semibold text-ink focus:outline-none"
                 >
                   <option value="">Nobody yet</option>
-                  {members.map((m) => (
+                  {/* Only people in the function: the engineering owner is an engineer. */}
+                  {members.filter((m) => m.function === r.function || m.id === r.user?.id).map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
                     </option>
