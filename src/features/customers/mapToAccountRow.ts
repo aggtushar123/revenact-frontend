@@ -57,6 +57,8 @@ export function mapAccountToAccountRow(
     aiPulseScore: AI_PULSE_LABELS[a.ai_pulse_score] ?? '—',
     aiPulseReason: a.ai_pulse_reason || '-',
     owner: a.owner?.name ?? 'Unassigned',
+    ownerId: a.owner?.id ?? null,
+    ownerFunction: a.owner?.function ?? null,
     avatar: a.owner ? initials(a.owner.name) : '—',
     health: { val: Number(a.health_score), clr: HEALTH_COLORS[a.health_category] },
     healthCategory: a.health_category,

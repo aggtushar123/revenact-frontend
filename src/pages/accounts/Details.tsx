@@ -13,7 +13,9 @@ import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
 import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab, CustomObjectsTab } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
-import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
+import { useAppDispatch, useAppSelector, useOrgCurrency, useCapability } from '../../hooks';
+import { useMembers } from '../../features/knowledge/useMembers';
+import { OwnerTile, type OwnerSummary } from '../../components/shared/OwnerTile';
 import { formatCompactMoney } from '../../features/customers/formatters';
 import {
   fetchContactsForAccount,
@@ -23,6 +25,7 @@ import {
   clearPipelineData,
   fetchCanvasesForAccount,
   clearCanvases,
+  updateAccount,
 } from '../../features/customers/customersSlice';
 
 export function AccountDetails() {
@@ -51,6 +54,12 @@ export function AccountDetails() {
   // replaces the old hardcoded `0` (see this tab's own render block
   // below for why CustomObjectsTab, not this page, owns that fetch).
   const [customObjectsCount, setCustomObjectsCount] = useState(0);
+  // The account's one accountable person (the same tile as an organisation's).
+  const canAssign = useCapability('view_all_accounts');
+  const me = useAppSelector((s) => s.auth.user);
+  const members = useMembers();
+  // What the row said, until a save on this page says otherwise.
+  const [saved, setSaved] = useState<{ accountId: number; owner: OwnerSummary | null } | null>(null);
 
   // Clicking through from a real org's Accounts tab (see
   // organizations/Details.tsx) carries the real, already-fetched
@@ -88,6 +97,24 @@ export function AccountDetails() {
     }
   }, [dispatch, accountNavState, account]);
 
+  const owner: OwnerSummary | null =
+    saved && saved.accountId === account.revenactId
+      ? saved.owner
+      : account.ownerId
+        ? { id: account.ownerId, name: account.owner, function: account.ownerFunction ?? null }
+        : null;
+  const isRealAccount = !!accountNavState?.account;
+  const mayChangeOwner = isRealAccount && (canAssign || (!!me && (!owner || owner.id === me.id)));
+  async function saveOwner(userId: number | null, note: string) {
+    const result = await dispatch(
+      updateAccount({ customerId: account.orgId, id: account.revenactId, owner_id: userId, handover_note: note }),
+    );
+    if (!updateAccount.fulfilled.match(result)) return false;
+    const next = result.payload.owner;
+    setSaved({ accountId: account.revenactId, owner: next ? { id: next.id, name: next.name, function: next.function ?? null } : null });
+    return true;
+  }
+
   const tabs = [
     { name: 'General', count: null },
     { name: 'Organizations', count: account.orgs?.length ?? 1 },
@@ -105,7 +132,7 @@ export function AccountDetails() {
     { label: 'AI Pulse-Score', value: account.aiPulseScore, type: 'truncated' },
     { label: 'AI Pulse-Reason', value: account.aiPulseReason, type: 'truncated' },
     { label: 'Pulse', value: '', type: 'pulse' },
-    { label: 'Account Owner', value: account.owner, type: 'owner', ownerAvatar: account.avatar },
+    { label: 'Account Owner', value: owner?.name ?? 'Unassigned', type: 'owner', ownerAvatar: account.avatar },
   ];
 
   return (
@@ -171,6 +198,7 @@ export function AccountDetails() {
       <main className="flex-1 overflow-y-auto custom-scrollbar bg-subtle/50">
         {activeTab === 'General' ? (
           <div className="flex flex-col gap-4 w-full px-6 pt-5 pb-4 h-full">
+            <OwnerTile owner={owner} members={members} mayChange={mayChangeOwner} onSave={saveOwner} />
             {/* Metrics Banner */}
             <AccountMetricsBanner account={account} />
 
