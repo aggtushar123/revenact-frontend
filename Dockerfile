@@ -13,5 +13,7 @@ RUN npm run build
 
 FROM alpine:3.20
 COPY --from=build /app/dist /dist
-# Copy into the mounted volume and exit; Caddy serves what lands there.
+# Copy into the mounted volume and exit; Caddy serves what lands there. Root
+# because the volume is root-owned; no ports, no secrets, runs for seconds.
+# nosemgrep: dockerfile.security.missing-user.missing-user
 CMD ["sh", "-c", "rm -rf /out/* && cp -r /dist/. /out/ && echo 'frontend published'"]
