@@ -1,818 +1,240 @@
-import { useState } from 'react';
-import { Search, Filter, Info, X, Archive, Phone, Sparkles, MoreHorizontal, Maximize2, Minimize2, Star, ChevronDown, Calendar, Info as InfoIcon, PlayCircle, MoreVertical, ChevronRight, Link2, Globe, Copy, Mail } from 'lucide-react';
-import { useDispatch } from 'react-redux';
-import { addTask } from '../../../features/tasks/tasksSlice';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { Phone, Plus, Clock, Mic, Link2, FileText, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '../../../hooks';
+import { clearCalls, fetchCalls, logCall, type Call, type LogCallInput } from '../../../features/calls/callsSlice';
+import { downloadAttachment, type FileParent } from '../../../features/files/filesSlice';
+import { formatDate, initials } from '../../../features/customers/formatters';
 
-export interface CallSenseItem {
-  id: number;
-  orgId: number;
-  title: string;
-  source: string;
-  author: string;
-  authorAvatar: string;
-  date: string;
-  group: string;
-  aiItems: string;
-  links: number;
+/**
+ * CallSense: the calls that happened with this organisation or account,
+ * on the real Call records. A call is logged here with a summary, or with
+ * a transcript (pasted, or a .txt/.vtt/.srt file from the recorder) that
+ * the model summarises; either way it is classified for sentiment and
+ * counts toward the Account Pulse. Calls that arrive through a recorder
+ * connector show up in the same list.
+ */
+
+const SENTIMENT: Record<string, { label: string; cls: string }> = {
+  positive: { label: 'Positive', cls: 'bg-success-dim text-success border-success/30' },
+  neutral: { label: 'Neutral', cls: 'bg-subtle text-ink-muted border-line' },
+  negative: { label: 'Negative', cls: 'bg-danger-dim text-danger border-danger/30' },
+};
+
+function timeOf(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-const CALLSENSE_DATA: CallSenseItem[] = [
-  {
-    id: 1,
-    orgId: 1,
-    title: 'EMEA Retail - Renewal Readiness Check-in',
-    source: 'tl;dv',
-    author: 'Chamath Gamage',
-    authorAvatar: 'https://i.pravatar.cc/150?u=chamath',
-    date: 'Jan 21st 5:12 PM',
-    group: '21 Jan 2026',
-    aiItems: 'Open AI Items',
-    links: 2,
-  },
-  {
-    id: 2,
-    orgId: 1,
-    title: 'Renewal & Expansion Review - Apple EMEA Retail Operations',
-    source: 'tl;dv',
-    author: 'Chamath Gamage',
-    authorAvatar: 'https://i.pravatar.cc/150?u=chamath',
-    date: 'Dec 5th 5:12 PM',
-    group: '05 Dec 2025',
-    aiItems: 'Open AI Items',
-    links: 1,
+function durationLabel(minutes: number | null): string {
+  if (minutes === null) return '';
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h} h ${m} min` : `${h} h`;
+}
+
+function LogCallForm({ onLog, saving, error }: { onLog: (input: LogCallInput) => Promise<boolean>; saving: boolean; error: string | null }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [host, setHost] = useState('');
+  const [when, setWhen] = useState('');
+  const [duration, setDuration] = useState('');
+  const [summary, setSummary] = useState('');
+  const [transcriptText, setTranscriptText] = useState('');
+  const [recordingUrl, setRecordingUrl] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !when) return;
+    const file = fileInput.current?.files?.[0] ?? null;
+    const ok = await onLog({
+      title: title.trim(),
+      host_name: host.trim() || undefined,
+      occurred_at: new Date(when).toISOString(),
+      duration_minutes: duration ? Number(duration) : null,
+      summary: summary.trim() || undefined,
+      recording_url: recordingUrl.trim() || undefined,
+      transcript_text: transcriptText.trim() || undefined,
+      transcriptFile: file,
+    });
+    if (ok) {
+      setTitle(''); setHost(''); setWhen(''); setDuration(''); setSummary(''); setTranscriptText(''); setRecordingUrl('');
+      if (fileInput.current) fileInput.current.value = '';
+      setOpen(false);
+    }
   }
-];
-
-const AI_ACTIONS = [
-  {
-    id: 1,
-    title: 'Advanced workflow optimization',
-    description: 'Explore and potentially implement fine-tuning of advanced workflows to help the EMEA Retail team get even more value out of the platform, building on their current strong adoption and usage patterns.',
-    owner: 'Sarah Lee (revenact.io)',
-    timeframe: 'Not specified',
-    timestamp: '1:33:21',
-    note: "This was offered as the platform has become part of their standard operating rhythm and they're looking for ways to extract additional value. Current utilization is over 80% with 290 out of 360 users active regularly."
-  },
-  {
-    id: 2,
-    title: 'Renewal timeline and optimization ideas',
-    description: 'Follow up with a detailed renewal timeline to support the smooth renewal process for the EMEA Retail team and ensure continued platform satisfaction.',
-    owner: 'Sarah Lee (revenact.io)',
-    timeframe: 'Not specified',
-    timestamp: '1:45:00',
-    note: ''
-  }
-];
-
-export function CallSenseTab({ entityId }: { entityId: number | string }) {
-  const [selectedCall, setSelectedCall] = useState<CallSenseItem | null>(null);
-  const [isPanelExpanded, setIsPanelExpanded] = useState(false);
-  const items = CALLSENSE_DATA.filter(t => t.orgId == entityId);
-
-  const grouped = items.reduce<Record<string, CallSenseItem[]>>((acc, item) => {
-    if (!acc[item.group]) acc[item.group] = [];
-    acc[item.group].push(item);
-    return acc;
-  }, {});
-
-  const sortedGroups = Object.entries(grouped).sort(
-    (a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime()
-  );
 
   return (
-    <div className="flex-1 flex overflow-hidden">
-      <div className="flex-1 flex flex-col bg-surface overflow-hidden font-sans relative z-0">
-        {/* Search Header */}
-      <div className="px-5 py-3 border-b border-line-subtle flex items-center justify-between shrink-0 bg-surface z-10">
-        <div className="relative flex-1 max-w-3xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-          <input 
-            type="text" 
-            placeholder="Search Table"
-            className="w-full pl-9 pr-4 py-2 text-[13px] border border-line rounded-lg placeholder:text-ink-faint focus:outline-none focus:ring-1 focus:ring-accent/20 transition-shadow" 
-          />
-        </div>
-        <button className="flex items-center gap-1.5 px-3 py-1.5 text-ink-muted hover:text-ink-muted hover:bg-subtle rounded-lg transition-colors ml-4 border border-transparent hover:border-line">
-          <Filter className="w-4 h-4" />
-          <span className="text-[12px] font-bold text-ink-muted">(0)</span>
+    <div className="px-6 py-3 border-b border-line-subtle flex flex-col gap-2 bg-surface shrink-0">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11.5px] text-ink-faint">Log a call with its summary, or hand over the transcript and the summary is written for you. Every call is read for sentiment and counts toward the pulse.</span>
+        <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold shrink-0">
+          <Plus className="w-3.5 h-3.5" /> {open ? 'Cancel' : 'Log a call'}
         </button>
       </div>
-
-      {/* Main Content Scroll Area */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar px-6 md:px-8 py-5">
-        
-        {/* Banner Alert */}
-        <div className="flex items-center justify-between bg-subtle border border-accent/30 rounded-xl px-4 py-3 mb-8 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-[18px] h-[18px] rounded-full bg-accent text-white flex items-center justify-center shrink-0 shadow-sm">
-              <Info className="w-3 h-3" strokeWidth={3} />
-            </div>
-            <p className="text-[12.5px] font-semibold text-accent/90">
-              To receive updates, turn on AI Notifications in Settings within the Notifications section
-            </p>
-          </div>
-          <button className="p-1 hover:bg-surface rounded-md text-accent/70 hover:text-accent transition-colors shadow-sm border border-transparent hover:border-accent/30">
-             <X className="w-3.5 h-3.5" />
+      {open && (
+        <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-4 gap-2" aria-label="Log a call">
+          <input aria-label="Call title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title, e.g. Renewal readiness check-in" className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+          <input aria-label="Host" value={host} onChange={(e) => setHost(e.target.value)} placeholder="Host (you, by default)" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+          <input aria-label="When" required type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+          <input aria-label="Duration in minutes" type="number" min={1} value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Minutes" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+          <input aria-label="Recording link" value={recordingUrl} onChange={(e) => setRecordingUrl(e.target.value)} placeholder="Recording link (optional)" className="md:col-span-3 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+          <textarea aria-label="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Summary — leave blank to have it written from the transcript" rows={3} className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
+          <textarea aria-label="Transcript" value={transcriptText} onChange={(e) => setTranscriptText(e.target.value)} placeholder="Paste the transcript…" rows={3} className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
+          <label className="md:col-span-3 flex items-center gap-2 text-[12px] text-ink-muted">
+            <Mic className="w-3.5 h-3.5" /> or upload the transcript file
+            <input ref={fileInput} type="file" accept=".txt,.vtt,.srt,.md" aria-label="Transcript file" className="text-[12px]" />
+          </label>
+          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12.5px] font-bold disabled:opacity-50">
+            {saving ? 'Logging…' : 'Log call'}
           </button>
-        </div>
-
-        {/* Timeline Area */}
-        <div className="relative">
-          {/* Global Timeline Vertical Line */}
-          {items.length > 0 && <div className="absolute left-[12px] top-6 bottom-0 w-px bg-accent-dim z-0"></div>}
-
-          {items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 opacity-40">
-              <Archive className="w-10 h-10 text-ink-faint mb-2" />
-              <span className="text-sm font-semibold text-ink-faint">No calls found</span>
-            </div>
-          ) : (
-            sortedGroups.map(([group, groupItems]) => (
-              <div key={group} className="relative z-10 mb-8 pl-0">
-                {/* Group Date Pill */}
-                <div className="mb-6 inline-block bg-subtle rounded-full px-4 py-1.5 text-[11.5px] font-bold text-ink-muted border border-line/50 shadow-[0_1px_2px_rgba(0,0,0,0.02)] relative z-10 transition-colors ml-[4px]">
-                  {group}
-                </div>
-                
-                <div className="flex flex-col gap-6">
-                  {groupItems.map((item) => (
-                    <CallSenseCard 
-                      key={item.id} 
-                      item={item} 
-                      isSelected={selectedCall?.id === item.id && !isPanelExpanded}
-                      onClick={() => { setSelectedCall(item); setIsPanelExpanded(false); }} 
-                    />
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-      </div>
+          {error && <div className="md:col-span-4 text-[12px] text-danger font-semibold" role="alert">{error}</div>}
+        </form>
+      )}
     </div>
-    
-    {/* Slide-in Panel Area */}
-    {selectedCall && !isPanelExpanded && (
-      <div 
-        className="w-[420px] shrink-0 bg-surface h-full shadow-[-4px_0_24px_rgba(0,0,0,0.06)] z-20 border-l border-line-subtle flex flex-col relative"
-        style={{ animation: 'slideInRight 0.3s cubic-bezier(0.4,0,0.2,1)' }}
-      >
-        <CallSensePanel 
-          item={selectedCall} 
-          onClose={() => setSelectedCall(null)} 
-          isExpanded={false}
-          onToggleExpand={() => setIsPanelExpanded(true)}
-        />
-      </div>
-    )}
-
-    {/* Expanded Modal Overlay */}
-    {selectedCall && isPanelExpanded && (
-      <div 
-        className="fixed inset-0 z-[100] bg-gray-900/60 flex items-center justify-center p-6 sm:p-12 backdrop-blur-sm transition-all"
-        onClick={() => setIsPanelExpanded(false)}
-        style={{ animation: 'fadeIn 0.2s ease-out' }}
-      >
-        <div 
-          className="bg-surface rounded-xl shadow-2xl w-full max-w-[900px] h-[85vh] max-h-[800px] flex flex-col overflow-hidden" 
-          onClick={e => e.stopPropagation()}
-          style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}
-        >
-          <CallSensePanel 
-            item={selectedCall} 
-            onClose={() => { setSelectedCall(null); setIsPanelExpanded(false); }} 
-            isExpanded={true}
-            onToggleExpand={() => setIsPanelExpanded(false)}
-          />
-        </div>
-      </div>
-    )}
-    
-    <style>{`
-      @keyframes slideInRight {
-        from { transform: translateX(100%); opacity: 0; }
-        to   { transform: translateX(0);   opacity: 1; }
-      }
-      @keyframes fadeIn {
-        from { opacity: 0; }
-        to   { opacity: 1; }
-      }
-      @keyframes slideUp {
-        from { transform: translateY(20px) scale(0.98); opacity: 0; }
-        to   { transform: translateY(0) scale(1); opacity: 1; }
-      }
-    `}</style>
-  </div>
   );
 }
 
-function CallSenseCard({ item, isSelected, onClick }: { item: CallSenseItem; isSelected: boolean; onClick: () => void }) {
+function CallCard({ call }: { call: Call }) {
+  const [expanded, setExpanded] = useState(false);
+  const sentiment = call.sentiment ? SENTIMENT[call.sentiment] : null;
+  const source = call.connector_name ? `via ${call.connector_name}` : call.logged_by ? `logged by ${call.logged_by.name}` : '';
   return (
-    <div className="relative flex items-start gap-5 z-10 group cursor-pointer" onClick={onClick}>
-      {/* Timeline Squircle Icon */}
-      <div className="w-[24px] h-[24px] rounded-[7px] bg-subtle border border-accent/30 text-accent flex items-center justify-center shrink-0 mt-5 relative z-10 shadow-sm">
-        <Archive className="w-3.5 h-3.5" />
+    <article className="relative flex items-start gap-5 z-10">
+      <div className="w-[24px] h-[24px] rounded-md bg-subtle border border-accent/30 text-accent flex items-center justify-center shrink-0 mt-5 relative z-10 shadow-sm">
+        <Phone className="w-3.5 h-3.5" />
       </div>
-
-      {/* Main card content */}
-      <div className={`flex-1 border rounded-xl p-5 shadow-sm transition-all duration-200 ${isSelected ? 'border-accent bg-accent-dim/10 ring-2 ring-accent/10' : 'bg-surface border-line/80 hover:shadow-md hover:border-accent/40'}`}>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2.5">
-            <Phone className="w-4 h-4 text-ink-faint" />
-            <h4 className="text-[14.5px] font-extrabold text-ink leading-snug group-hover:text-accent transition-colors">
-              {item.title}
-            </h4>
-            <span className="text-accent font-bold text-[13px] ml-1 opacity-90">{item.source}</span>
+      <div className="flex-1 bg-surface border border-line/80 rounded-xl p-5 shadow-sm hover:shadow-md transition-all">
+        <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-[22px] h-[22px] rounded-full bg-info text-white flex items-center justify-center text-[10px] font-bold shrink-0">{initials(call.host_name)}</div>
+            <span className="text-[12.5px] font-bold text-ink-muted truncate">{call.host_name}</span>
+            {source && <span className="text-[11.5px] text-ink-faint truncate">· {source}</span>}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span className="text-[12px] font-bold text-ink-muted">{item.date}</span>
-            <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-ink-faint hover:text-ink-muted ml-1">
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 mb-4">
-          <span className="text-[12px] font-medium text-ink-faint">Logged By:</span>
-          <img src={item.authorAvatar} alt={item.author} className="w-5 h-5 rounded-full object-cover border border-line-subtle shadow-sm" />
-          <span className="text-[12px] font-bold text-ink-muted">{item.author}</span>
-        </div>
-
-        <div className="flex items-center justify-between mt-2">
-          <div className="flex items-center gap-1.5 text-accent font-bold text-[12.5px] hover:text-accent cursor-pointer transition-colors px-2 py-1 -ml-2 rounded-lg hover:bg-accent-dim/50">
-             <Sparkles className="w-4 h-4" />
-             {item.aiItems}
-          </div>
-
-          <div className="flex justify-end">
-             <span className="text-[11.5px] font-bold text-accent cursor-pointer hover:underline">
-               {item.links} Links
-             </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CallSensePanel({ 
-  item, 
-  onClose,
-  isExpanded,
-  onToggleExpand
-}: { 
-  item: CallSenseItem; 
-  onClose: () => void;
-  isExpanded?: boolean;
-  onToggleExpand?: () => void;
-}) {
-  const [activeTab, setActiveTab] = useState<'details' | 'ai'>('details');
-  const [openAccordions, setOpenAccordions] = useState<Record<string, boolean>>({
-    summary: true,
-    actions: false,
-    followup: false,
-    signals: false,
-    topics: false
-  });
-  
-  const [selectedActions, setSelectedActions] = useState<number[]>([]);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-
-  const toggleAcc = (key: string) => {
-    setOpenAccordions(prev => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const toggleAction = (id: number) => {
-    setSelectedActions(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-
-  const toggleAllActions = () => {
-    if (selectedActions.length === AI_ACTIONS.length) {
-      setSelectedActions([]);
-    } else {
-      setSelectedActions(AI_ACTIONS.map(a => a.id));
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-full bg-surface font-sans overflow-hidden">
-      {/* Header Tabs Navigation */}
-      <div className="px-5 pt-3 border-b border-line-subtle flex items-center justify-between shrink-0 bg-surface z-10">
-        <div className="flex gap-6">
-          <button
-            onClick={() => setActiveTab('details')}
-            className={`flex items-center gap-2 pb-2.5 text-[13px] font-semibold transition-all relative ${
-              activeTab === 'details' ? 'text-accent' : 'text-ink-faint hover:text-ink-muted'
-            }`}
-          >
-            Activity Details
-            {activeTab === 'details' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />
+            {sentiment && <span className={`px-2 py-px rounded-full border text-[10.5px] font-bold ${sentiment.cls}`}>{sentiment.label}</span>}
+            {call.duration_minutes !== null && (
+              <span className="flex items-center gap-1 text-[11.5px] font-semibold text-ink-muted"><Clock className="w-3 h-3" /> {durationLabel(call.duration_minutes)}</span>
             )}
-          </button>
-          <button
-            onClick={() => setActiveTab('ai')}
-            className={`flex items-center gap-1.5 pb-2.5 text-[13px] font-semibold transition-all relative ${
-              activeTab === 'ai' ? 'text-accent' : 'text-ink-faint hover:text-ink-muted'
-            }`}
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            AI items
-            {activeTab === 'ai' && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-accent rounded-full" />
+            <span className="text-[12px] font-bold text-ink-muted">{timeOf(call.occurred_at)}</span>
+          </div>
+        </div>
+        <h4 className="text-[14.5px] font-extrabold text-ink mb-2 leading-snug">{call.title}</h4>
+        {call.summary ? (
+          <div>
+            <p className={`text-[12.5px] text-ink-muted whitespace-pre-line ${expanded ? '' : 'line-clamp-3'}`}>{call.summary}</p>
+            {call.summary.length > 220 && (
+              <button type="button" onClick={() => setExpanded((v) => !v)} className="mt-1 flex items-center gap-1 text-[11.5px] font-bold text-accent">
+                {expanded ? <><ChevronUp className="w-3 h-3" /> Less</> : <><ChevronDown className="w-3 h-3" /> More</>}
+              </button>
             )}
-          </button>
-        </div>
-        <div className="flex items-center gap-1 pb-1 text-ink-faint">
-           {onToggleExpand && (
-             <button onClick={onToggleExpand} className="p-1.5 hover:bg-subtle rounded-lg transition-colors">
-               {isExpanded ? <Minimize2 className="w-[15px] h-[15px]" /> : <Maximize2 className="w-[15px] h-[15px]" />}
-             </button>
-           )}
-           <button className="p-1.5 hover:bg-subtle rounded-lg transition-colors"><Star className="w-[15px] h-[15px]" /></button>
-           <button onClick={onClose} className="p-1.5 hover:bg-danger-dim hover:text-danger rounded-lg transition-colors"><X className="w-4 h-4" /></button>
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {activeTab === 'details' ? (
-          <div className="p-5 flex flex-col gap-6">
-            
-            {/* Title & Actions */}
-            <div className="flex items-start justify-between gap-4">
-              <h3 className="text-[14px] font-extrabold text-ink leading-snug">
-                {item.title}
-              </h3>
-              <div className="flex items-center gap-1.5 shrink-0 text-ink-faint">
-                <button className="p-1 hover:bg-subtle rounded text-ink-muted transition-colors"><MoreVertical className="w-4 h-4" /></button>
-                <div className="flex -space-x-[1px]">
-                  <button className="p-1 border border-line rounded-l hover:bg-subtle bg-surface transition-colors"><Phone className="w-[13px] h-[13px] text-ink-muted" /></button>
-                  <button className="p-1 border border-line rounded-r hover:bg-subtle bg-surface transition-colors"><InfoIcon className="w-[13px] h-[13px] text-ink-muted" /></button>
-                </div>
-              </div>
-            </div>
-
-            {/* Grid Form Fields */}
-            <div className="grid grid-cols-2 gap-x-6 gap-y-5 mt-2">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-bold text-ink-muted flex items-center">
-                  Activity Type <span className="text-danger ml-0.5">*</span>
-                </label>
-                <div className="flex items-center justify-between border border-white hover:border-line rounded p-1 group cursor-pointer transition-colors -ml-1">
-                  <div className="flex items-center gap-2">
-                    <Phone className="w-3.5 h-3.5 text-ink-faint" />
-                    <span className="text-[13px] font-semibold text-ink">Call</span>
-                  </div>
-                  <ChevronDown className="w-3.5 h-3.5 text-ink-faint opacity-0 group-hover:opacity-100" />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-bold text-ink-muted flex items-center">
-                  Date & Time <span className="text-danger ml-0.5">*</span>
-                </label>
-                <div className="flex items-center justify-between p-1 -ml-1 group">
-                  <span className="text-[13px] font-semibold text-ink tracking-tight">2026-01-21 05:12 PM</span>
-                  <Calendar className="w-3.5 h-3.5 text-ink-faint group-hover:text-ink-faint transition-colors cursor-pointer" />
-                </div>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12px] font-bold text-ink-muted flex items-center">
-                  Links <span className="text-danger ml-0.5">*</span>
-                </label>
-                <div className="flex items-center justify-between border border-transparent hover:border-accent/30 rounded px-1.5 py-1 group cursor-pointer transition-colors -ml-1.5">
-                  <span className="text-[13px] font-bold text-accent">{item.links} Links</span>
-                  <ChevronDown className="w-3.5 h-3.5 text-accent opacity-0 group-hover:opacity-100" />
-                </div>
-              </div>
-            </div>
-
-            <div className="h-px bg-subtle my-1 w-full -mx-5 px-5" style={{ width: 'calc(100% + 40px)' }}></div>
-
-            {/* Full Width Fields */}
-            <div className="flex flex-col gap-6 mt-1">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-bold text-ink-muted">Description</label>
-                <span className="text-[13px] font-medium text-ink pl-0.5">-</span>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="text-[12.5px] font-bold text-ink-muted flex items-center gap-1.5">
-                  URL
-                  <PlayCircle className="w-3 h-3 text-accent" />
-                </label>
-                <a href="#" className="text-[13px] font-semibold text-accent hover:text-accent-hover underline underline-offset-2 break-all pl-0.5 leading-relaxed">
-                  https://tl;dv.io/app/meetings/68d3c3525891510013500079
-                </a>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-[12.5px] font-bold text-ink-muted">Brief</label>
-                <div className="pl-0.5 flex flex-col gap-3 text-[13px] text-ink-muted leading-[1.7]">
-
-                  <div>
-                    <p className="font-bold text-ink mb-1">Onboarding Email Strategy</p>
-                    <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-ink-muted font-medium">
-                      <li>Discuss sending onboarding emails for customers at their one-year anniversary, focusing on contracts with account creation.</li>
-                      <li>Confirm onboarding emails will only be sent for new account contracts, not existing long-term customers.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <p className="font-bold text-ink mb-1">Bridge Integration Technical Details</p>
-                    <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-ink-muted font-medium">
-                      <li>Recommended using ChatGPT and developer documentation for Bridge integration questions.</li>
-                      <li>Web hooks can be triggered based on specific object updates and selected attributes.</li>
-                      <li>In Revenact bridge, flows must be tested before publication.</li>
-                      <li>Contract creation in Revenact triggered when sales moves deal to recorded stage in HubSpot.</li>
-                      <li>Update API requests require authorization headers and JSON body with object properties.</li>
-                      <li>Single option attributes can be updated using picklist value name or ID.</li>
-                      <li>Aswin recommends adding validations when building flows, such as checking if an object is not archived before updating.</li>
-                      <li>Simple steps in Bridge can be done without using code, but complex logic may require JavaScript.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <p className="font-bold text-ink mb-1">Action Items and Assignments</p>
-                    <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-ink-muted font-medium">
-                      <li>Aswin to check and potentially share Bridge API documentation link.</li>
-                      <li>Aswin to investigate creating a technical account with administrator rights for API activities.</li>
-                      <li>Create separate folder for Doctena and Revenact workflows to prevent accidental modifications.</li>
-                      <li>Create separate web hook for each flow, providing descriptive name and optional description.</li>
-                      <li>Philippe suggests Maria review team feedback to identify fields that could benefit from default values.</li>
-                      <li>Aswin offers ongoing support via Slack for any questions during workflow development.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <p className="font-bold text-ink mb-1">Contract and Lifecycle Management</p>
-                    <ul className="list-disc pl-5 space-y-1 text-[12.5px] text-ink-muted font-medium">
-                      <li>Contracts in Revenact linked to Accounts and Organizations, mapping to Deals in HubSpot.</li>
-                      <li>Revenact team to explore possible HubSpot contract sync enhancements based on team feedback.</li>
-                    </ul>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-              {/* View Comments */}
-              <div className="border border-line-subtle rounded-lg overflow-hidden">
-                <button
-                  onClick={() => toggleAcc('comments')}
-                  className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-subtle transition-colors"
-                >
-                  {openAccordions.comments
-                    ? <ChevronDown className="w-3.5 h-3.5 text-ink-muted" strokeWidth={2.5} />
-                    : <ChevronRight className="w-3.5 h-3.5 text-ink-muted" strokeWidth={2.5} />}
-                  <span className="text-[12.5px] font-bold text-ink-muted">View Comments</span>
-                </button>
-                {openAccordions.comments && (
-                  <div className="px-4 py-3 text-[12.5px] text-ink-muted font-medium border-t border-line-subtle">
-                    No comments yet.
-                  </div>
-                )}
-              </div>
-
           </div>
         ) : (
-          <div className="p-4 flex flex-col gap-3">
-            {/* Summary Accordion */}
-            <div className="border border-line rounded-lg overflow-hidden bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all">
-              <div onClick={() => toggleAcc('summary')} className={`px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-subtle/50 transition-colors ${openAccordions.summary ? 'bg-subtle/50 border-b border-line' : ''}`}>
-                {openAccordions.summary ? <ChevronDown className="w-3.5 h-3.5 text-accent" strokeWidth={3} /> : <ChevronRight className="w-3.5 h-3.5 text-accent" strokeWidth={3} />}
-                <span className="text-[13px] font-bold text-accent select-none">Summary</span>
-              </div>
-              {openAccordions.summary && (
-                <div className="p-4 bg-surface flex flex-col gap-3">
-                  <a href="#" className="flex items-center gap-1.5 text-[12.5px] font-bold text-accent hover:underline w-fit">
-                    <Link2 className="w-3.5 h-3.5" />
-                    Meeting URL
-                  </a>
-                  <p className="text-[12.5px] leading-[1.6] text-ink-muted font-medium pr-2">
-                    EMEA Retail renewal readiness check-in shows strong 
-                    account health with 80% utilization (290/360 licenses), 
-                    consistent weekly logins above 55%, and platform integration 
-                    into standard operations. Customer expressed confidence in 
-                    renewal with no major concerns raised. Follow-up planned 
-                    with renewal timeline and optimization opportunities.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* Actions Accordion */}
-            <div className="border border-line rounded-lg overflow-hidden bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all">
-              <div onClick={() => toggleAcc('actions')} className={`px-4 py-3 flex items-center justify-between cursor-pointer hover:bg-subtle/50 transition-colors ${openAccordions.actions ? 'bg-subtle/50 border-b border-line' : ''}`}>
-                <div className="flex items-center gap-2">
-                  {openAccordions.actions ? <ChevronDown className="w-3.5 h-3.5 text-accent" strokeWidth={3} /> : <ChevronRight className="w-3.5 h-3.5 text-accent" strokeWidth={3} />}
-                  <span className="text-[13px] font-bold text-accent select-none">Actions</span>
-                </div>
-                <div className="flex items-center gap-4">
-                  {openAccordions.actions && (
-                    <label className="flex items-center gap-2 cursor-pointer" onClick={(e) => { e.stopPropagation(); toggleAllActions(); }}>
-                      <input 
-                        type="checkbox" 
-                        checked={selectedActions.length === AI_ACTIONS.length && AI_ACTIONS.length > 0}
-                        readOnly
-                        className="w-3 h-3 rounded text-accent focus:ring-accent cursor-pointer" 
-                      />
-                      <span className="text-[11.5px] font-bold text-ink-muted">Select All</span>
-                    </label>
-                  )}
-                  <button 
-                    onClick={(e) => { 
-                      e.stopPropagation(); 
-                      if (selectedActions.length > 0) {
-                        setShowCreateModal(true);
-                      }
-                    }}
-                    className={`px-3 py-1.5 rounded-md text-[11px] font-extrabold tracking-wide uppercase transition-all border ${
-                      selectedActions.length > 0 
-                        ? 'bg-accent text-white border-accent shadow-sm hover:brightness-110' 
-                        : 'bg-subtle text-ink-faint border-line-subtle cursor-not-allowed'
-                    }`}
-                  >
-                    Create Tasks ({selectedActions.length})
-                  </button>
-                </div>
-              </div>
-              {openAccordions.actions && (
-                <div className="p-4 bg-surface flex flex-col gap-3">
-                  {AI_ACTIONS.map(action => {
-                    const isSelected = selectedActions.includes(action.id);
-                    return (
-                      <div key={action.id} className="border border-line-subtle rounded-lg p-4 flex gap-3 hover:border-accent/30 transition-colors shadow-sm bg">
-                        <input 
-                          type="checkbox" 
-                          checked={isSelected}
-                          onChange={() => toggleAction(action.id)}
-                          className="w-[15px] h-[15px] rounded border-line-strong text-accent focus:ring-accent mt-0.5 cursor-pointer flex-shrink-0"
-                        />
-                        <div className="flex flex-col gap-3 pt-0.5">
-                           <h5 className={`text-[13px] font-extrabold cursor-pointer ${isSelected ? 'text-accent' : 'text-ink'}`} onClick={() => toggleAction(action.id)}>
-                             {action.title}
-                           </h5>
-                           <p className="text-[12.5px] leading-[1.6] text-ink-muted font-medium">
-                             {action.description}
-                           </p>
-                           <div className="flex flex-col gap-1.5 text-[12.5px]">
-                             <div className="flex gap-1.5 font-medium text-ink-muted">
-                               <span className="font-extrabold text-ink-muted">Owner:</span> {action.owner}
-                             </div>
-                             <div className="flex gap-1.5 font-medium text-ink-muted">
-                               <span className="font-extrabold text-ink-muted">Timeframe:</span> {action.timeframe}
-                             </div>
-                             <div className="flex gap-1.5 font-medium text-ink-muted">
-                               <span className="font-extrabold text-ink-muted">Timestamp:</span> {action.timestamp}
-                             </div>
-                           </div>
-                           {action.note && (
-                             <p className="text-[12.5px] italic text-ink-muted mt-2">
-                               {action.note}
-                             </p>
-                           )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Follow Up Message Accordion */}
-            <div className="border border-line rounded-lg overflow-hidden bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all">
-              <div onClick={() => toggleAcc('followup')} className={`px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-subtle/50 transition-colors ${openAccordions.followup ? 'bg-subtle/50 border-b border-line' : ''}`}>
-                {openAccordions.followup ? <ChevronDown className="w-3.5 h-3.5 text-accent" strokeWidth={3} /> : <ChevronRight className="w-3.5 h-3.5 text-accent" strokeWidth={3} />}
-                <span className="text-[13px] font-bold text-accent select-none">Follow Up Message</span>
-              </div>
-              {openAccordions.followup && (
-                <div className="p-6 bg-surface flex flex-col gap-6">
-                  <div className="flex flex-col gap-5 text-[12.5px] leading-[1.65] text-ink-muted font-medium">
-                    <p>Hi there,</p>
-                    <p>Thank you for taking the time to meet with me today for our EMEA Retail account renewal check-in. It was great to hear about the positive momentum your team has built with the platform.</p>
-                    
-                    <div className="flex flex-col gap-3">
-                       <p className="font-extrabold text-ink tracking-tight text-[13px]">Key Highlights from Our Discussion:</p>
-                       <div className="flex flex-col gap-1.5">
-                          <p><span className="font-bold text-ink">Strong User Adoption:</span> Your team has achieved impressive adoption metrics with 290 out of 360 licenses actively used regularly - that's over 80% utilization, which represents significant improvement from previous periods.</p>
-                          <p><span className="font-bold text-ink">Platform Integration:</span> It's encouraging to see that your teams have become comfortable with the platform workflows, particularly for weekly performance tracking and regional reporting. The platform has truly become part of your standard operating rhythm.</p>
-                          <p><span className="font-bold text-ink">Improved Engagement:</span> Your weekly logins consistently above 55% and the shift to managers reviewing dashboards directly within the platform (rather than exporting data) shows deeper platform engagement.</p>
-                          <p><span className="font-bold text-ink">Account Health:</span> Your account health score has improved significantly, and I appreciate that your feedback is now focused on extracting more value rather than addressing issues - this is a great indicator of platform maturity.</p>
-                          <p><span className="font-bold text-ink">Support Performance:</span> The minimal support tickets and reasonable response times demonstrate the stability you've achieved with the platform.</p>
-                       </div>
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                       <p className="font-extrabold text-ink tracking-tight text-[13px]">Next Steps & Actions:</p>
-                       <div className="flex flex-col gap-1.5">
-                          <p><span className="font-bold text-ink">Advanced Workflow Optimization:</span> I'll explore opportunities to fine-tune your advanced workflows to help extract even more value from the platform, building on your current strong adoption patterns.</p>
-                          <p><span className="font-bold text-ink">Renewal Planning:</span> I'll follow up with a detailed renewal timeline and optional optimization ideas to ensure a smooth renewal process.</p>
-                          <p><span className="font-bold text-ink">Ongoing Benchmarks:</span> I'll continue sharing performance benchmarks so you can track your progress and maintain this positive trajectory.</p>
-                       </div>
-                    </div>
-                    
-                    <p>Based on our conversation, I'm confident that your renewal should proceed smoothly given the strong performance and positive sentiment. I'll be in touch soon with the renewal timeline and optimization recommendations we discussed.</p>
-                    
-                    <p>Please don't hesitate to reach out if you have any questions or need anything in the meantime.</p>
-                    
-                    <div className="flex flex-col pt-1 line-clamp-2 gap-[1px]">
-                      <p>Best regards,</p>
-                      <p>Sarah Lee</p>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="flex items-center gap-3 mt-2 border-t border-line-subtle pt-6">
-                    <button className="flex items-center justify-center gap-2 bg-accent hover:bg-accent text-white px-5 py-2.5 rounded-lg text-[13px] font-bold shadow-sm transition-colors">
-                      <Copy className="w-4 h-4 mb-[1px]" />
-                      Copy to Clipboard
-                    </button>
-                    <button className="flex items-center justify-center gap-2 bg-surface hover:bg-subtle border border-line text-ink-muted px-5 py-2.5 rounded-lg text-[13px] font-bold shadow-sm transition-colors">
-                      <Mail className="w-4 h-4 text-ink-faint mb-[1px]" />
-                      Send Email
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Signals Accordion */}
-            <div className="border border-line rounded-lg overflow-hidden bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all">
-              <div onClick={() => toggleAcc('signals')} className={`px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-subtle/50 transition-colors ${openAccordions.signals ? 'bg-subtle/50 border-b border-line' : ''}`}>
-                {openAccordions.signals ? <ChevronDown className="w-3.5 h-3.5 text-accent" strokeWidth={3} /> : <ChevronRight className="w-3.5 h-3.5 text-accent" strokeWidth={3} />}
-                <span className="text-[13px] font-bold text-accent select-none">Signals</span>
-              </div>
-              {openAccordions.signals && (
-                <div className="bg-surface divide-y divide-line-subtle">
-                  <div className="px-5 py-4 flex flex-col gap-2">
-                    <p className="text-[13px] font-bold text-ink">High User Adoption and Platform Integration</p>
-                    <span className="self-start px-2.5 py-0.5 rounded border border-success/40 text-success text-[11.5px] font-semibold bg-success-dim">Opportunity</span>
-                    <p className="text-[12.5px] leading-[1.75] text-ink-muted font-medium">EMEA Retail account shows strong adoption metrics with 290 out of 360 licenses actively used (80%+ utilization). The platform has become part of their standard operating rhythm rather than an extra tool, with weekly logins consistently above 55% and managers directly reviewing dashboards instead of exporting data. This indicates deep integration into their workflows and high user engagement.</p>
-                  </div>
-                  <div className="px-5 py-4 flex flex-col gap-2">
-                    <p className="text-[13px] font-bold text-ink">Positive Sentiment Shift and Reduced Complaints</p>
-                    <span className="self-start px-2.5 py-0.5 rounded border border-success/40 text-success text-[11.5px] font-semibold bg-success-dim">Opportunity</span>
-                    <p className="text-[12.5px] leading-[1.75] text-ink-muted font-medium">Customer reports a clear positive shift in sentiment with fewer complaints and more feedback focused on extracting additional value from the platform. Teams are comfortable with workflows, particularly for weekly performance tracking and regional reporting. This represents strong customer satisfaction and potential for advocacy.</p>
-                  </div>
-                  <div className="px-5 py-4 flex flex-col gap-2">
-                    <p className="text-[13px] font-bold text-ink">Renewal Risk – Upcoming Contract Expiry</p>
-                    <span className="self-start px-2.5 py-0.5 rounded border border-danger/40 text-danger text-[11.5px] font-semibold bg-danger-dim">Risk</span>
-                    <p className="text-[12.5px] leading-[1.75] text-ink-muted font-medium">The current contract is approaching its renewal window. While account health is strong, no formal renewal discussions have been initiated. Delay in outreach could allow competing vendors to engage the customer first. Proactive renewal timeline communication is recommended.</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Topics Accordion */}
-            <div className="border border-line rounded-lg overflow-hidden bg-surface shadow-[0_1px_2px_rgba(0,0,0,0.02)] transition-all">
-              <div onClick={() => toggleAcc('topics')} className={`px-4 py-3 flex items-center gap-2 cursor-pointer hover:bg-subtle/50 transition-colors ${openAccordions.topics ? 'bg-subtle/50 border-b border-line' : ''}`}>
-                {openAccordions.topics ? <ChevronDown className="w-3.5 h-3.5 text-accent" strokeWidth={3} /> : <ChevronRight className="w-3.5 h-3.5 text-accent" strokeWidth={3} />}
-                <span className="text-[13px] font-bold text-accent select-none">Topics</span>
-              </div>
-              {openAccordions.topics && (
-                <div className="p-5 bg-surface flex flex-col gap-4">
-                  
-                  <div className="border border-line-subtle rounded-lg p-5 flex flex-col gap-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                    <h4 className="text-[13.5px] font-extrabold text-ink tracking-tight">Introductions and Participant Roles</h4>
-                    <span className="w-fit px-2.5 py-1 text-[11.5px] font-semibold text-info bg-info-dim border border-info/30 rounded shadow-sm">
-                      Introductions
-                    </span>
-                    <p className="text-[12.5px] leading-[1.65] text-ink-muted font-medium">
-                      Each participant shared their name, company, and areas of focus. Sarah (Cloudfinity) leads CSM efforts in enterprise, Leo (Axora) supports mid-market SaaS, and Priya (Orbio) recently launched a CSM pod model to learn best practices.
-                    </p>
-                  </div>
-
-                  <div className="border border-line-subtle rounded-lg p-5 flex flex-col gap-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                    <h4 className="text-[13.5px] font-extrabold text-ink tracking-tight">Customer Onboarding Feedback and Retention Challenges</h4>
-                    <span className="w-fit px-2.5 py-1 text-[11.5px] font-semibold text-info bg-info-dim border border-info/30 rounded shadow-sm">
-                      Customer Challenges
-                    </span>
-                    <p className="text-[12.5px] leading-[1.65] text-ink-muted font-medium">
-                      Participants discussed key customer retention issues identified via surveys and feedback. Churn risk was highlighted, especially relating to onboarding gaps. Solutions in place included piloting 'warm handoff' processes from Sales to CSMs, introducing kickoff checklists, and implementing 30-day QBRs, which collectively contributed to increased NPS scores.
-                    </p>
-                  </div>
-
-                  <div className="border border-line-subtle rounded-lg p-5 flex flex-col gap-3 shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                    <h4 className="text-[13.5px] font-extrabold text-ink tracking-tight">Onboarding and Success Metrics Alignment</h4>
-                    <span className="w-fit px-2.5 py-1 text-[11.5px] font-semibold text-info bg-info-dim border border-info/30 rounded shadow-sm">
-                      Metrics Discussion / KPI Alignment
-                    </span>
-                    <p className="text-[12.5px] leading-[1.65] text-ink-muted font-medium">
-                      The teams shared specific metrics used to define onboarding success, such as aiming for full activation by day 21 and achieving task completion in the first month of customer engagement. Recent improvements in NPS were attributed to these standardized metrics.
-                    </p>
-                  </div>
-
-                </div>
-              )}
-            </div>
+          <p className="text-[12.5px] text-ink-faint italic">No summary yet.</p>
+        )}
+        {(call.ai_area || call.transcript || call.recording_url) && (
+          <div className="flex items-center gap-3 mt-3 flex-wrap text-[11.5px] font-semibold">
+            {call.ai_area && <span className="flex items-center gap-1 text-ink-faint"><Sparkles className="w-3 h-3" /> {call.ai_category || call.ai_area}</span>}
+            {call.transcript && (
+              <button type="button" onClick={() => void downloadAttachment(call.transcript!)} className="flex items-center gap-1 text-accent hover:underline">
+                <FileText className="w-3 h-3" /> Transcript
+              </button>
+            )}
+            {call.recording_url && (
+              <a href={call.recording_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-accent hover:underline">
+                <Link2 className="w-3 h-3" /> Recording
+              </a>
+            )}
           </div>
         )}
       </div>
-
-      {/* Footer Accordion */}
-      <div className="p-3 border-t border-line-subtle bg-subtle/50 mt-auto shrink-0 cursor-pointer hover:bg-subtle/50 transition-colors flex items-center gap-2">
-         <ChevronRight className="w-4 h-4 text-ink-muted" />
-         <span className="text-[13px] font-bold text-ink-muted">View Comments</span>
-      </div>
-
-      <CreateTasksModal 
-        isOpen={showCreateModal} 
-        onClose={() => setShowCreateModal(false)}
-        actions={AI_ACTIONS.filter(a => selectedActions.includes(a.id))}
-        onSuccess={() => {
-          setShowCreateModal(false);
-          setSelectedActions([]);
-          setOpenAccordions(prev => ({ ...prev, actions: false }));
-        }}
-      />
-    </div>
+    </article>
   );
 }
 
-function CreateTasksModal({ 
-  isOpen, 
-  onClose, 
-  actions,
-  onSuccess
-}: { 
-  isOpen: boolean; 
-  onClose: () => void;
-  actions: typeof AI_ACTIONS;
-  onSuccess: () => void;
-}) {
-  const dispatch = useDispatch();
-  if (!isOpen) return null;
+export interface CallSenseTabProps {
+  entityType: 'organization' | 'account';
+  entityId: number | string;
+  customerId?: number;
+}
 
-  const handleCreate = () => {
-    actions.forEach(action => {
-      dispatch(addTask({
-        title: action.title,
-        org: 'Apple EMEA', // Mocked matching the current context visually
-        type: 'account',
-        priority: 'Normal',
-        status: 'Open',
-        date: '7 Mar 2026'
-      }));
+export function CallSenseTab({ entityType, entityId, customerId }: CallSenseTabProps) {
+  const dispatch = useAppDispatch();
+  const { items, isLoading, error, saving, saveError } = useAppSelector((s) => s.calls);
+
+  const parent: FileParent | null =
+    entityType === 'organization'
+      ? { entityType, customerId: Number(entityId) }
+      : customerId !== undefined
+        ? { entityType, customerId, accountId: Number(entityId) }
+        : null;
+
+  useEffect(() => {
+    if (parent) dispatch(fetchCalls(parent));
+    else dispatch(clearCalls());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dispatch, entityType, entityId, customerId]);
+
+  const stats = useMemo(() => {
+    const minutes = items.reduce((sum, c) => sum + (c.duration_minutes ?? 0), 0);
+    const by = { positive: 0, neutral: 0, negative: 0 };
+    items.forEach((c) => { if (c.sentiment && c.sentiment in by) by[c.sentiment as keyof typeof by] += 1; });
+    return { count: items.length, minutes, ...by };
+  }, [items]);
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, Call[]>();
+    items.forEach((c) => {
+      const day = c.occurred_at.slice(0, 10);
+      map.set(day, [...(map.get(day) ?? []), c]);
     });
-    onSuccess();
-  };
+    return [...map.entries()].sort((a, b) => b[0].localeCompare(a[0]));
+  }, [items]);
+
+  async function onLog(input: LogCallInput) {
+    if (!parent) return false;
+    const result = await dispatch(logCall({ ...parent, input }));
+    return logCall.fulfilled.match(result);
+  }
 
   return (
-    <div className="fixed inset-0 z-[200] bg-gray-900/40 flex items-center justify-center p-4 backdrop-blur-sm shadow-2xl transition-all" style={{ animation: 'fadeIn 0.2s ease-out' }}>
-      <div className="bg-surface rounded-xl shadow-2xl w-full max-w-[900px] flex flex-col overflow-hidden" style={{ animation: 'slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)' }}>
-        <div className="px-6 py-4 border-b border-line-subtle flex items-center justify-between">
-          <h3 className="text-[15px] font-bold text-ink tracking-tight">Create Tasks from Actions</h3>
-          <button onClick={onClose} className="p-1 hover:bg-subtle rounded-md transition-colors"><X className="w-4 h-4 text-ink-muted" /></button>
+    <div className="flex-1 flex flex-col overflow-hidden bg-surface">
+      {parent && <LogCallForm onLog={onLog} saving={saving} error={saveError} />}
+      {items.length > 0 && (
+        <div className="px-6 py-2.5 border-b border-line-subtle flex items-center gap-5 text-[12px] text-ink-muted shrink-0 flex-wrap" aria-label="Call stats">
+          <span><strong className="text-ink">{stats.count}</strong> {stats.count === 1 ? 'call' : 'calls'}</span>
+          {stats.minutes > 0 && <span><strong className="text-ink">{durationLabel(stats.minutes)}</strong> on calls</span>}
+          <span className="text-success"><strong>{stats.positive}</strong> positive</span>
+          <span><strong className="text-ink">{stats.neutral}</strong> neutral</span>
+          <span className="text-danger"><strong>{stats.negative}</strong> negative</span>
         </div>
-        
-        <div className="p-6 bg-subtle/50 flex flex-col gap-4">
-          <div className="flex w-full text-[12.5px] font-bold text-ink-muted mb-1 px-1 tracking-tight">
-             <div className="flex-[2.5]">Task Name</div>
-             <div className="flex-[1.5]">Assignee</div>
-             <div className="flex-[1.2]">Due Date</div>
-             <div className="flex-[1.2]">Activity Type</div>
+      )}
+      <div className="flex-1 overflow-y-auto custom-scrollbar relative px-8 py-6 bg-subtle/40">
+        {isLoading ? (
+          <div className="py-16 text-center text-sm font-semibold text-ink-faint opacity-60">Loading calls…</div>
+        ) : error ? (
+          <div className="py-16 text-center text-sm font-semibold text-danger">{error}</div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-16 opacity-40">
+            <Phone className="w-10 h-10 text-ink-faint mb-2" />
+            <span className="text-sm font-semibold text-ink-faint">No calls yet</span>
           </div>
-          
-          {actions.map(action => (
-            <div key={action.id} className="flex w-full gap-3 h-[42px]">
-               <div className="flex-[2.5] bg-surface border border-line rounded-md text-[13px] px-3 flex items-center shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                 <span className="truncate text-ink-muted font-medium">{action.title}</span>
-               </div>
-               
-               <div className="flex-[1.5] bg-surface border border-line rounded-md text-[13px] px-3 flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer hover:border-accent/50 transition-colors">
-                 <div className="flex items-center gap-2">
-                   <div className="w-5 h-5 rounded-full bg-info-dim text-info flex items-center justify-center text-[10px] font-bold overflow-hidden">
-                     <span className="font-bold -ml-[0.5px]">DT</span>
-                   </div>
-                   <span className="text-ink-muted font-medium tracking-tight mt-0.5">Daniel Trial Test</span>
-                 </div>
-                 <ChevronDown className="w-3.5 h-3.5 text-ink-faint" />
-               </div>
-
-               <div className="flex-[1.2] bg-surface border border-line rounded-md text-[13px] px-3 flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)] cursor-pointer hover:border-accent/50 transition-colors">
-                 <span className="text-ink-muted font-medium">7 Mar 2026</span>
-                 <Calendar className="w-4 h-4 text-ink-faint" />
-               </div>
-
-               <div className="flex-[1.2] bg-surface border border-line rounded-md text-[13px] px-3 flex items-center shadow-[0_1px_2px_rgba(0,0,0,0.02)] gap-2 cursor-pointer hover:border-accent/50 transition-colors">
-                 <Globe className="w-4 h-4 text-ink-faint stroke-[2px]" />
-                 <span className="text-ink-muted font-medium mt-[1px]">General</span>
-               </div>
-            </div>
-          ))}
-        </div>
-        
-        <div className="px-6 py-4 border-t border-line-subtle flex items-center justify-end gap-3 bg-surface">
-          <button onClick={onClose} className="px-5 py-2 border border-line rounded-md text-[13px] font-bold text-ink-muted hover:bg-subtle transition-colors">
-            Cancel
-          </button>
-          <button onClick={handleCreate} className="px-5 py-2 bg-accent rounded-md text-[13px] font-bold text-[#0D0F0E] hover:bg-accent-hover transition-colors shadow-[0px_2px_4px_rgba(45,212,168,0.25)]">
-            Create
-          </button>
-        </div>
+        ) : (
+          <>
+            <div className="absolute left-[44px] top-6 bottom-0 w-px bg-accent-dim z-0" />
+            {grouped.map(([day, calls]) => (
+              <div key={day} className="relative z-10 mb-8">
+                <div className="mb-6 inline-block bg-subtle rounded-full px-4 py-1.5 text-[11.5px] font-bold text-ink-muted border border-line/50 shadow-sm relative z-10">
+                  {formatDate(day)}
+                </div>
+                <div className="flex flex-col gap-6">
+                  {calls.map((call) => <CallCard key={call.id} call={call} />)}
+                </div>
+              </div>
+            ))}
+          </>
+        )}
       </div>
     </div>
   );

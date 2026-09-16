@@ -7,6 +7,7 @@ export { CalendarEventsTab } from './CalendarEventsTab';
 export { ActivitiesTab } from './ActivitiesTab';
 export { AllActivityTab } from './AllActivityTab';
 export { CallSenseTab } from './CallSenseTab';
+export { FilesTab } from './FilesTab';
 export { HeadlinesTab } from './HeadlinesTab';
 export { SlackTab } from './SlackTab';
 export { SessionsTab } from './SessionsTab';

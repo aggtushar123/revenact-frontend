@@ -39,6 +39,9 @@ export function setAuthHooks(hooks: AuthHooks) {
 interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
+  /** A multipart body (file uploads). Sent as-is; the browser sets the
+   * boundary, so no Content-Type header is added. */
+  formData?: FormData;
   accessToken?: string | null;
   /** Skip the auto-refresh-on-401 retry. Used by the auth endpoints
    * themselves (login/refresh/logout) — a 401 from them means "bad
@@ -66,7 +69,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 }
 
 function rawFetch(path: string, options: RequestOptions, token: string | null) {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = options.formData ? {} : { 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
   // DRF's pagination `next`/`previous` links are full absolute URLs (they
@@ -77,8 +80,25 @@ function rawFetch(path: string, options: RequestOptions, token: string | null) {
   return fetch(url, {
     method: options.method ?? 'GET',
     headers,
-    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    body: options.formData ?? (options.body !== undefined ? JSON.stringify(options.body) : undefined),
   });
+}
+
+/** Fetch a file the API serves as an attachment (Files tab downloads):
+ * the same auth handling as apiFetch, but the body comes back as a Blob. */
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  const token = authHooks?.getAccessToken() ?? null;
+  let response = await rawFetch(path, {}, token);
+  if (response.status === 401 && authHooks) {
+    const newToken = await authHooks.refreshAccessToken();
+    if (newToken) response = await rawFetch(path, {}, newToken);
+    if (response.status === 401) authHooks.onAuthFailure();
+  }
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new ApiError(response.status, data, extractErrorMessage(data) ?? `Request failed (${response.status})`);
+  }
+  return response.blob();
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
