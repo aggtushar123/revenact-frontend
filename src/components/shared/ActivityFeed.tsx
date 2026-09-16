@@ -31,6 +31,7 @@ import {
   fetchNotesForCustomer,
   fetchNotesForAccount,
   createNote,
+  createTask,
   clearNotes,
   fetchHeadlinesForCustomer,
   fetchHeadlinesForAccount,
@@ -453,7 +454,25 @@ export function ActivityFeed({
                 />
               )}
               {filter === 'Tasks' && (
-                <TasksTab tasks={tasks} isLoading={tasksLoading} error={tasksError} />
+                <TasksTab
+                  tasks={tasks}
+                  isLoading={tasksLoading}
+                  error={tasksError}
+                  onCreate={
+                    canEmail
+                      ? async (task) => {
+                          const result = await dispatch(
+                            createTask({
+                              customerId: entityType === 'account' ? (customerId as number) : Number(entityId),
+                              accountId: entityType === 'account' ? Number(entityId) : undefined,
+                              ...task,
+                            }),
+                          );
+                          return createTask.fulfilled.match(result);
+                        }
+                      : undefined
+                  }
+                />
               )}
               {filter === 'Notes' && (
                 <NotesTab

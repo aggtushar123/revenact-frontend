@@ -1,5 +1,7 @@
+import { useState, type FormEvent } from 'react';
 import { CheckCircle, Clock, AlertCircle, MoreHorizontal, Flag } from 'lucide-react';
 import type { Task } from '../../../features/customers/customersSlice';
+import { useMembers } from '../../../features/knowledge/useMembers';
 
 const priorityConfig: Record<Task['priority'], { color: string; bg: string; border: string; label: string }> = {
   high: { color: 'text-danger', bg: 'bg-danger-dim', border: 'border-danger/30', label: 'High' },
@@ -63,9 +65,68 @@ export interface TasksTabProps {
   tasks: Task[];
   isLoading: boolean;
   error: string | null;
+  /** Saves a new task on this record; absent when the record cannot take one (mock data). */
+  onCreate?: (task: { title: string; due_date: string; priority: Task['priority']; assignee_id?: number | null }) => Promise<boolean>;
 }
 
-export function TasksTab({ tasks, isLoading, error }: TasksTabProps) {
+export type NewTask = { title: string; due_date: string; priority: Task['priority']; assignee_id?: number | null };
+
+function NewTaskForm({ onCreate }: { onCreate: (task: NewTask) => Promise<boolean> }) {
+  const members = useMembers();
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [priority, setPriority] = useState<Task['priority']>('medium');
+  const [assignee, setAssignee] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !dueDate) return;
+    setSaving(true);
+    const ok = await onCreate({ title: title.trim(), due_date: dueDate, priority, assignee_id: assignee ? Number(assignee) : null });
+    setSaving(false);
+    if (ok) {
+      setTitle('');
+      setDueDate('');
+      setAssignee('');
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className="px-6 py-2 border-b border-line-subtle flex flex-col gap-2 bg-surface">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11.5px] text-ink-faint">A task is seen by its creator, its assignee and their management chains.</span>
+        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold">
+          {open ? 'Cancel' : 'New task'}
+        </button>
+      </div>
+      {open && (
+        <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-4 gap-2">
+          <input aria-label="Task title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+          <input aria-label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+          <select aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value as Task['priority'])} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent">
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <select aria-label="Assignee" value={assignee} onChange={(e) => setAssignee(e.target.value)} className="md:col-span-3 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent">
+            <option value="">Assign to me</option>
+            {members.map((m) => (
+              <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+            {saving ? 'Saving…' : 'Save task'}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
+
+export function TasksTab({ tasks, isLoading, error, onCreate }: TasksTabProps) {
   const grouped = tasks.reduce<Record<WeekBucket, Task[]>>(
     (acc, task) => {
       acc[bucketFor(task.due_date)].push(task);
@@ -96,15 +157,19 @@ export function TasksTab({ tasks, isLoading, error }: TasksTabProps) {
 
   if (tasks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
-        <CheckCircle className="w-10 h-10 text-ink-faint mb-2" />
-        <span className="text-sm font-semibold text-ink-faint">No tasks found</span>
+      <div className="flex flex-col flex-1">
+        {onCreate && <NewTaskForm onCreate={onCreate} />}
+        <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
+          <CheckCircle className="w-10 h-10 text-ink-faint mb-2" />
+          <span className="text-sm font-semibold text-ink-faint">No tasks found</span>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar">
+      {onCreate && <NewTaskForm onCreate={onCreate} />}
       {sortedGroups.map(([group, items]) => (
         <div key={group}>
           <div className="px-6 py-2 bg-subtle/80 border-b border-line-subtle sticky top-0 z-10">

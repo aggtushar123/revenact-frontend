@@ -274,6 +274,9 @@ export interface Task {
   id: number;
   title: string;
   assignee_name: string;
+  /** Who it is for and who made it, when created in the app; readable by them and their management chains. */
+  assignee?: { id: number; name: string } | null;
+  created_by?: { id: number; name: string } | null;
   due_date: string;
   priority: 'high' | 'medium' | 'low';
   status: 'pending' | 'in-progress' | 'completed';
@@ -1176,6 +1179,20 @@ export const fetchTasksForCustomer = createAsyncThunk<
 
 // Powers ActivityFeed's "Tasks" filter on the standalone Account
 // page — every account-level Task for one Account.
+export const createTask = createAsyncThunk<
+  Task,
+  { customerId: number; accountId?: number; title: string; due_date: string; priority: Task['priority']; assignee_id?: number | null },
+  { rejectValue: string }
+>('customers/createTask', async ({ customerId, accountId, ...body }, { rejectWithValue }) => {
+  const path = accountId ? `/customers/${customerId}/accounts/${accountId}/tasks/` : `/customers/${customerId}/tasks/`;
+  try {
+    return await apiFetch<Task>(path, { method: 'POST', body });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not save the task.';
+    return rejectWithValue(message);
+  }
+});
+
 export const fetchTasksForAccount = createAsyncThunk<
   Task[],
   { customerId: number; accountId: number },
@@ -2354,6 +2371,9 @@ const customersSlice = createSlice({
       // fetchTasksForCustomer and fetchTasksForAccount share the same
       // tasks/tasksLoading/tasksError slots, same reasoning as the
       // activities/emails slots above.
+      .addCase(createTask.fulfilled, (state, action) => {
+        state.tasks = [action.payload, ...state.tasks];
+      })
       .addCase(fetchTasksForCustomer.pending, (state) => {
         state.tasksLoading = true;
         state.tasksError = null;
