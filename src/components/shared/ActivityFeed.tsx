@@ -11,6 +11,7 @@ import {
   ActivitiesTab,
   AllActivityTab,
   CallSenseTab,
+  FilesTab,
   HeadlinesTab,
   SlackTab,
   SurveysTab,
@@ -116,9 +117,9 @@ const FILTER_ITEMS = [
 const IMPLEMENTED_FILTERS = ['All', 'Activities', 'Emails', 'Tasks', 'Notes', 'Tickets', 'Calendar Events', 'Surveys', 'Sessions', 'Slack'];
 
 // ── Account id resolution ────────────────────────────────────────────────────
-// CallSense/Slack are still fully mock (SlackTab keeps its own
-// SLACK_DATA locally; CallSense is decorative) — they take a
-// resolved numeric id the same way the mock-swapped filters used to.
+// Slack is still fully mock (SlackTab keeps its own SLACK_DATA
+// locally) — it takes a resolved numeric id the same way the
+// mock-swapped filters used to. CallSense and Files read real data.
 // ACCOUNT_ID_MAP only knows the mock's own string ids (e.g.
 // 'acc-1'), so a real account id falls back to the stub 101, same
 // fallback those tabs' own mock content already keys off.
@@ -190,8 +191,8 @@ export function ActivityFeed({
     entityType === 'organization' ? s.customer_id === numericEntityId : s.account_id === numericEntityId
   );
 
-  // Resolve numeric ID for the still-mock tabs (CallSense/
-  // Slack) — see resolveAccountId's own comment.
+  // Resolve numeric ID for the still-mock Slack tab — see
+  // resolveAccountId's own comment.
   let resolvedId: number;
   if (entityType === 'account') {
     resolvedId = resolveAccountId(String(entityId));
@@ -566,7 +567,9 @@ export function ActivityFeed({
             regenerateError={headlinesGenerateError}
           />
         ) : activeSubTab === 'CallSense' ? (
-          <CallSenseTab entityId={resolvedId} />
+          <CallSenseTab entityType={entityType} entityId={entityId} customerId={customerId} />
+        ) : activeSubTab === 'Files' ? (
+          <FilesTab entityType={entityType} entityId={entityId} customerId={customerId} />
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 py-10 opacity-30">
             <Layout className="w-12 h-12 text-ink-faint mb-2" />
