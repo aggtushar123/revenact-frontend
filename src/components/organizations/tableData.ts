@@ -1,3 +1,4 @@
+import type { AccountPulse } from '../../features/customers/customersSlice';
 import type { CsatBreakdown, HealthComponent } from '../../features/customers/customersSlice';
 import type { CurrencyCode } from '../../features/auth/authSlice';
 
@@ -41,6 +42,8 @@ export interface OrgRow {
   csatBreakdown?: CsatBreakdown;
   lifecycleCategory: LifecycleCategory;
   pulse: number[];
+  /** The computed pulse from the API; absent on mock rows. */
+  accountPulse?: AccountPulse | null;
   aiScore: string;
   reason: string;
   fullReason: string;

@@ -28,6 +28,18 @@ const globex = {
   pulse: [],
   ai_pulse_score: '' as const,
   ai_pulse_reason: '',
+  account_pulse: {
+    value: '2.3',
+    label: 'At risk' as const,
+    category: 2 as const,
+    breakdown: [
+      { key: 'ai_pulse' as const, label: 'AI pulse', weight: '3.0', reading: '2.0', note: 'what the model reads' },
+      { key: 'csm_pulse' as const, label: 'CSM pulse', weight: '2.5', reading: null, note: 'not set' },
+      { key: 'sentiment' as const, label: 'Recent sentiment', weight: '2.0', reading: '3.0', note: '1 positive, 1 negative of 2 in the last 30 days' },
+      { key: 'touch' as const, label: 'Last contact', weight: '1.5', reading: '4.8', note: '4 days ago' },
+      { key: 'support' as const, label: 'Open tickets', weight: '1.0', reading: '1.0', note: '12 open' },
+    ],
+  },
   nps_score: null,
   csat_score: null,
   joined_date: null,
@@ -133,6 +145,24 @@ describe('Organization Details page (/organizations/:id)', () => {
       expect.stringContaining('/customers/10/accounts/'),
       expect.objectContaining({ method: 'GET' })
     );
+  });
+
+  it('shows the computed Account Pulse in the banner, not a label derived from health', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        const body = url.includes('/customers/10/') && !url.includes('/customers/10/', url.indexOf('/customers/10/') + 1) && url.endsWith('/customers/10/') ? globex : [];
+        return Promise.resolve({ ok: true, status: 200, json: async () => body });
+      })
+    );
+
+    renderDetails('10');
+
+    expect(await screen.findByText('Account Pulse')).toBeInTheDocument();
+    expect(screen.getByText('At risk')).toBeInTheDocument();
+    expect(screen.getByText('2.3 / 5')).toBeInTheDocument();
+    expect(screen.getByLabelText('Account pulse')).toHaveAttribute('title', expect.stringContaining('Open tickets: 1.0 (12 open, weight 1.0)'));
+    expect(screen.queryByText('CSM Pulse')).not.toBeInTheDocument();
   });
 
   it('fetches and renders this organization\'s own real activities on the General tab', async () => {

@@ -38,6 +38,7 @@ export function mapCustomerToOrgRow(c: Customer): OrgRow {
     logo: c.domain ? `https://logo.clearbit.com/${c.domain}` : '',
     id: c.id,
     owner: c.owner?.name ?? 'Unassigned',
+    accountPulse: c.account_pulse ?? null,
     avatar: c.owner ? initials(c.owner.name) : '—',
     bg: c.owner ? 'bg-info' : 'bg-line-strong',
     img: c.owner?.avatar,

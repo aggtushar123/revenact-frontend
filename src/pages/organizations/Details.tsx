@@ -322,8 +322,18 @@ function MetricsBanner({ organization }: { organization: OrgRow }) {
   const healthColor = healthVal >= 7 ? 'var(--success)' : healthVal >= 4 ? 'var(--warning)' : 'var(--danger)';
   const healthPct = (healthVal / 10) * 100;
 
-  const csmPulseText = healthVal >= 7 ? 'Very Satisfied' : healthVal >= 4 ? 'Neutral' : 'High Risk';
-  const csmPulseColor = healthVal >= 7 ? 'text-success' : healthVal >= 4 ? 'text-warning' : 'text-danger';
+  // Account pulse: the backend's blend of AI pulse, CSM pulse, recent
+  // sentiment, last contact and open tickets over the organisation and its
+  // accounts (services/customers/pulse.py).
+  const pulse = organization.accountPulse ?? null;
+  const pulseLabel = pulse?.label ?? 'No signal';
+  const pulseColor =
+    pulse?.category === 1 ? 'text-success' : pulse?.category === 3 ? 'text-warning' : pulse?.category === 2 ? 'text-danger' : 'text-ink-faint';
+  const pulseTooltip = pulse
+    ? pulse.breakdown
+        .map((r) => `${r.label}: ${r.reading ?? '—'} (${r.note}${r.reading ? `, weight ${r.weight}` : ''})`)
+        .join('\n')
+    : 'No pulse signal for this organisation yet.';
 
   const promoters = organization.npsValue > 0 ? 1 : 0;
   const passives = organization.npsValue === 0 ? 1 : 0;
@@ -357,10 +367,13 @@ function MetricsBanner({ organization }: { organization: OrgRow }) {
 
       <div className="w-px bg-line my-3" />
 
-      {/* CSM Pulse */}
-      <div className="flex flex-col justify-center flex-1 px-5 py-4 min-w-0">
-        <span className="text-[13px] font-semibold text-ink tracking-wide mb-2">CSM Pulse</span>
-        <span className={`text-xl font-bold leading-none truncate ${csmPulseColor}`}>{csmPulseText}</span>
+      {/* Account Pulse */}
+      <div className="flex flex-col justify-center flex-1 px-5 py-4 min-w-0" title={pulseTooltip} aria-label="Account pulse">
+        <span className="text-[13px] font-semibold text-ink tracking-wide mb-2">Account Pulse</span>
+        <div className="flex items-baseline gap-2 min-w-0">
+          <span className={`text-xl font-bold leading-none truncate ${pulseColor}`}>{pulseLabel}</span>
+          {pulse?.value && <span className="text-[12px] font-medium text-ink-muted">{pulse.value} / 5</span>}
+        </div>
       </div>
 
       <div className="w-px bg-line my-3" />
