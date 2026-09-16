@@ -17,6 +17,7 @@ import {
   SessionsTab,
 } from '../organizations/activity';
 import { useAppDispatch, useAppSelector } from '../../hooks';
+import { ComposeEmailModal } from './ComposeEmailModal';
 import {
   fetchActivitiesForCustomer,
   fetchActivitiesForAccount,
@@ -143,7 +144,10 @@ export function ActivityFeed({
   const [activeSubTab, setActiveSubTab] = useState('Activity Feed');
   const [filter, setFilter] = useState(initialFilter ?? 'All');
   const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
+  const [composing, setComposing] = useState(false);
   const dispatch = useAppDispatch();
+  // A real record we can email: an organisation by id, or an account with its parent id in hand.
+  const canEmail = entityType === 'organization' ? Number.isFinite(Number(entityId)) : customerId !== undefined;
   const {
     activities,
     activitiesLoading,
@@ -429,6 +433,22 @@ export function ActivityFeed({
                   error={emailsError}
                   selectedEmail={selectedEmail}
                   onSelectEmail={setSelectedEmail}
+                  onCompose={canEmail ? () => setComposing(true) : undefined}
+                />
+              )}
+              {composing && canEmail && (
+                <ComposeEmailModal
+                  customerId={entityType === 'account' ? (customerId as number) : Number(entityId)}
+                  accountId={entityType === 'account' ? Number(entityId) : undefined}
+                  recordName={entityType === 'account' ? 'this account' : 'this organisation'}
+                  onClose={() => setComposing(false)}
+                  onSent={() => {
+                    if (entityType === 'account') {
+                      dispatch(fetchEmailsForAccount({ customerId: customerId as number, accountId: Number(entityId) }));
+                    } else {
+                      dispatch(fetchEmailsForCustomer(Number(entityId)));
+                    }
+                  }}
                 />
               )}
               {filter === 'Tasks' && (

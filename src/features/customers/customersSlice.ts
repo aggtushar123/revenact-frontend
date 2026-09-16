@@ -250,6 +250,13 @@ export interface Email {
   links: number;
   watchers: number;
   is_starred: boolean;
+  /** Set on rows synced through someone's mailbox (services/mail); '' on logged/seeded rows. */
+  direction?: 'sent' | 'received' | '';
+  from_address?: string;
+  to_addresses?: string[];
+  thread_id?: string;
+  /** Whose mailbox it came through — readable by them and their management chain. */
+  mailbox_owner?: { id: number; name: string } | null;
 }
 
 // Mirrors revenact-backend's TaskSerializer field-for-field — see

@@ -3,6 +3,7 @@ import { Search, CheckCircle2, SlidersHorizontal, GitBranch, PenTool, Users, Mes
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { createConnector, fetchConnectors, updateConnector } from '../../features/connectors/connectorsSlice';
 import type { Connector, Provider } from '../../features/connectors/connectorsSlice';
+import { MailboxSection } from '../../components/integrations/MailboxSection';
 import { formatDate } from '../../features/customers/formatters';
 
 const GMAIL_SVG = (
@@ -236,7 +237,8 @@ export function Integrations() {
 
   return (
     <div className="flex flex-col h-full w-full bg-base text-ink overflow-y-auto">
-      <div className="px-8 pt-10 pb-6 w-full max-w-7xl mx-auto shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <MailboxSection />
+      <div className="px-8 pt-6 pb-6 w-full max-w-7xl mx-auto shrink-0 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 custom-scrollbar fade-edges">
           {CATEGORIES.map((cat) => (
             <button
