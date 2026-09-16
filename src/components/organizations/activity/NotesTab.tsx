@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react';
 import { FileText, MoreHorizontal, Sparkles } from 'lucide-react';
 import type { Note } from '../../../features/customers/customersSlice';
 
@@ -16,9 +17,53 @@ export interface NotesTabProps {
   notes: Note[];
   isLoading: boolean;
   error: string | null;
+  /** Saves a new note on this record; absent when the record cannot take one (mock data). */
+  onCreate?: (note: { title: string; body: string }) => Promise<boolean>;
 }
 
-export function NotesTab({ notes, isLoading, error }: NotesTabProps) {
+function NewNoteForm({ onCreate }: { onCreate: (note: { title: string; body: string }) => Promise<boolean> }) {
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState('');
+  const [body, setBody] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!title.trim() || !body.trim()) return;
+    setSaving(true);
+    const ok = await onCreate({ title: title.trim(), body: body.trim() });
+    setSaving(false);
+    if (ok) {
+      setTitle('');
+      setBody('');
+      setOpen(false);
+    }
+  }
+
+  return (
+    <div className="px-6 py-2 border-b border-line-subtle flex flex-col gap-2 bg-surface">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11.5px] text-ink-faint">Notes you write here are seen by you and your management chain only.</span>
+        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold">
+          {open ? 'Cancel' : 'New note'}
+        </button>
+      </div>
+      {open && (
+        <form onSubmit={submit} className="flex flex-col gap-2">
+          <input aria-label="Note title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+          <textarea aria-label="Note body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="What do you want the team above you to know?" rows={4} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
+          <div className="flex justify-end">
+            <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+              {saving ? 'Saving…' : 'Save note'}
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
+export function NotesTab({ notes, isLoading, error, onCreate }: NotesTabProps) {
   const grouped = notes.reduce<Record<string, Note[]>>((acc, note) => {
     if (!acc[note.logged_at]) acc[note.logged_at] = [];
     acc[note.logged_at].push(note);
@@ -47,14 +92,19 @@ export function NotesTab({ notes, isLoading, error }: NotesTabProps) {
 
   if (notes.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
-        <FileText className="w-10 h-10 text-ink-faint mb-2" />
-        <span className="text-sm font-semibold text-ink-faint">No notes found</span>
+      <div className="flex flex-col flex-1">
+        {onCreate && <NewNoteForm onCreate={onCreate} />}
+        <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
+          <FileText className="w-10 h-10 text-ink-faint mb-2" />
+          <span className="text-sm font-semibold text-ink-faint">No notes found</span>
+        </div>
       </div>
     );
   }
 
   return (
+    <div className="flex flex-col flex-1 min-h-0">
+      {onCreate && <NewNoteForm onCreate={onCreate} />}
     <div className="flex-1 overflow-y-auto custom-scrollbar relative px-8 py-6 bg-subtle/40 font-sans">
       {/* Global Timeline Vertical Line */}
       <div className="absolute left-[44px] top-6 bottom-0 w-px bg-warning-dim z-0"></div>
@@ -73,6 +123,7 @@ export function NotesTab({ notes, isLoading, error }: NotesTabProps) {
           </div>
         </div>
       ))}
+    </div>
     </div>
   );
 }
