@@ -30,6 +30,7 @@ import {
   clearTasks,
   fetchNotesForCustomer,
   fetchNotesForAccount,
+  createNote,
   clearNotes,
   fetchHeadlinesForCustomer,
   fetchHeadlinesForAccount,
@@ -455,7 +456,25 @@ export function ActivityFeed({
                 <TasksTab tasks={tasks} isLoading={tasksLoading} error={tasksError} />
               )}
               {filter === 'Notes' && (
-                <NotesTab notes={notes} isLoading={notesLoading} error={notesError} />
+                <NotesTab
+                  notes={notes}
+                  isLoading={notesLoading}
+                  error={notesError}
+                  onCreate={
+                    canEmail
+                      ? async (note) => {
+                          const result = await dispatch(
+                            createNote({
+                              customerId: entityType === 'account' ? (customerId as number) : Number(entityId),
+                              accountId: entityType === 'account' ? Number(entityId) : undefined,
+                              ...note,
+                            }),
+                          );
+                          return createNote.fulfilled.match(result);
+                        }
+                      : undefined
+                  }
+                />
               )}
               {filter === 'Tickets' && (
                 <TicketsTab tickets={tickets} isLoading={ticketsLoading} error={ticketsError} />

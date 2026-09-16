@@ -289,6 +289,8 @@ export interface Note {
   id: number;
   title: string;
   author_name: string;
+  /** Who wrote it in the app; readable by them and their management chain. Null on seeded notes. */
+  author?: { id: number; name: string } | null;
   body: string;
   logged_at: string;
   links: number;
@@ -1205,6 +1207,20 @@ export const fetchNotesForCustomer = createAsyncThunk<
 
 // Powers ActivityFeed's "Notes" filter on the standalone Account
 // page — every account-level Note for one Account.
+export const createNote = createAsyncThunk<
+  Note,
+  { customerId: number; accountId?: number; title: string; body: string },
+  { rejectValue: string }
+>('customers/createNote', async ({ customerId, accountId, ...body }, { rejectWithValue }) => {
+  const path = accountId ? `/customers/${customerId}/accounts/${accountId}/notes/` : `/customers/${customerId}/notes/`;
+  try {
+    return await apiFetch<Note>(path, { method: 'POST', body });
+  } catch (err) {
+    const message = err instanceof ApiError ? err.message : 'Could not save the note.';
+    return rejectWithValue(message);
+  }
+});
+
 export const fetchNotesForAccount = createAsyncThunk<
   Note[],
   { customerId: number; accountId: number },
@@ -2367,6 +2383,9 @@ const customersSlice = createSlice({
       // fetchNotesForCustomer and fetchNotesForAccount share the same
       // notes/notesLoading/notesError slots, same reasoning as the
       // activities/emails/tasks slots above.
+      .addCase(createNote.fulfilled, (state, action) => {
+        state.notes = [action.payload, ...state.notes];
+      })
       .addCase(fetchNotesForCustomer.pending, (state) => {
         state.notesLoading = true;
         state.notesError = null;
