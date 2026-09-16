@@ -1,9 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Search, CheckCircle2, SlidersHorizontal, GitBranch, PenTool, Users, MessageCircle, Video } from 'lucide-react';
+import { Search, CheckCircle2, SlidersHorizontal, GitBranch, PenTool, Users, MessageCircle, Video, LifeBuoy, Webhook, RefreshCw, Unplug } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
-import { createConnector, fetchConnectors, updateConnector } from '../../features/connectors/connectorsSlice';
+import {
+  createConnector,
+  disconnectConnector,
+  fetchConnectors,
+  syncConnector,
+  updateConnector,
+} from '../../features/connectors/connectorsSlice';
 import type { Connector, Provider } from '../../features/connectors/connectorsSlice';
+import { FUNCTION_LABELS, type UserFunction } from '../../features/auth/authSlice';
 import { MailboxSection } from '../../components/integrations/MailboxSection';
+import { ConnectSourceForm } from '../../components/integrations/ConnectSourceForm';
 import { formatDate } from '../../features/customers/formatters';
 
 const GMAIL_SVG = (
@@ -55,22 +63,37 @@ const HUBSPOT_SVG = (
  * always carried. The mock advertised nine more (Stripe, Notion, …) that
  * nothing in the product could ever read from; they are gone rather than
  * shown as "Not Setup" forever.
+ *
+ * `tickets` marks a live ticket source: it takes credentials, is synced
+ * every ten minutes, and its tickets belong to one department.
  */
-const PROVIDERS: { id: Provider; name: string; category: string; desc: string; icon: React.ReactNode }[] = [
+const PROVIDERS: { id: Provider; name: string; category: string; desc: string; icon: React.ReactNode; tickets?: boolean }[] = [
   { id: 'salesforce', name: 'Salesforce', category: 'CRM', desc: 'The CRM your accounts and opportunities live in.', icon: SALESFORCE_SVG },
   { id: 'hubspot', name: 'HubSpot', category: 'CRM', desc: 'Marketing leads and the sales pipeline.', icon: HUBSPOT_SVG },
-  { id: 'zendesk', name: 'Zendesk', category: 'Support', desc: 'Support tickets, attributed to the accounts they came from.', icon: ZENDESK_SVG },
+  { id: 'zendesk', name: 'Zendesk', category: 'Support', desc: 'Support tickets, synced every ten minutes and filed on the accounts they came from.', icon: ZENDESK_SVG, tickets: true },
+  { id: 'freshdesk', name: 'Freshdesk', category: 'Support', desc: 'Helpdesk tickets, synced and filed on the accounts they came from.', icon: <LifeBuoy className="w-10 h-10 text-success" />, tickets: true },
   { id: 'intercom', name: 'Intercom', category: 'Support', desc: 'Customer chats and support conversations.', icon: <MessageCircle className="w-10 h-10 text-info" /> },
-  { id: 'jira', name: 'Jira Software', category: 'Productivity', desc: 'Issues and epics linked to customer feedback.', icon: JIRA_SVG },
+  { id: 'webhook', name: 'Any other system', category: 'Support', desc: 'A URL and a secret: whatever your tickets live in can post them here.', icon: <Webhook className="w-10 h-10 text-accent" />, tickets: true },
+  { id: 'jira', name: 'Jira Software', category: 'Productivity', desc: 'Issues from a project, synced as tickets for the engineering team.', icon: JIRA_SVG, tickets: true },
   { id: 'github', name: 'GitHub', category: 'Productivity', desc: 'Commits, pull requests and issues on customer work.', icon: <GitBranch className="w-10 h-10 text-ink" /> },
   { id: 'figma', name: 'Figma', category: 'Productivity', desc: 'Designs referenced from customer records.', icon: <PenTool className="w-10 h-10 text-accent" /> },
   { id: 'gmail', name: 'Gmail', category: 'Communication', desc: 'Emails logged as activity on the account.', icon: GMAIL_SVG },
-  { id: 'slack', name: 'Slack', category: 'Communication', desc: 'Alerts and health changes, where the team already is.', icon: SLACK_SVG },
+  { id: 'slack', name: 'Slack', category: 'Communication', desc: 'Every message in a support channel becomes a ticket; a ✅ reaction resolves it.', icon: SLACK_SVG, tickets: true },
   { id: 'ms_teams', name: 'Microsoft Teams', category: 'Communication', desc: 'Notifications and alerts in channels.', icon: <Users className="w-10 h-10 text-accent" /> },
   { id: 'zoom', name: 'Zoom', category: 'Communication', desc: 'Recorded calls, attributed to the account they were with.', icon: <Video className="w-10 h-10 text-info" /> },
 ];
 
 const CATEGORIES = ['All', 'CRM', 'Communication', 'Productivity', 'Support'];
+
+const DEPARTMENTS: (UserFunction | '')[] = ['cs', 'engineering', 'sales', 'analytics', 'leadership', 'other', ''];
+const departmentLabel = (d: UserFunction | '') => (d ? FUNCTION_LABELS[d] : 'Whole company');
+
+function statusLabel(c: Connector): { text: string; tone: string } {
+  if (c.status === 'error') return { text: `Needs attention: ${c.error}`, tone: 'text-danger' };
+  if (!c.has_credentials) return { text: 'Not connected yet', tone: 'text-warning' };
+  if (!c.last_synced_at) return { text: 'Connected · not synced yet', tone: 'text-ink-muted' };
+  return { text: `Synced ${formatDate(c.last_synced_at.slice(0, 10))}${c.last_sync_note ? ` · ${c.last_sync_note}` : ''}`, tone: 'text-ink-muted' };
+}
 
 function scopeLabel(c: Connector): string {
   if (c.is_organisation_wide) return 'whole organisation';
@@ -90,24 +113,65 @@ function ingestedLabel(c: Connector): string {
   return `${parts.join(', ')}${c.last_record_at ? ` · last ${formatDate(c.last_record_at)}` : ''}`;
 }
 
-function ConnectorRow({ connector, canManage }: { connector: Connector; canManage: boolean }) {
+function ConnectorRow({
+  connector,
+  canManage,
+  open,
+  onToggle,
+}: {
+  connector: Connector;
+  canManage: boolean;
+  /** Whether the credentials form is showing — the card owns this so a
+   *  freshly created source opens its form straight away. */
+  open: boolean;
+  onToggle: (open: boolean) => void;
+}) {
   const dispatch = useAppDispatch();
+  const saving = useAppSelector((s) => s.connectors.saving);
+  const isSource = connector.setup !== null && connector.setup !== undefined;
+  const status = statusLabel(connector);
   return (
-    <li className="flex items-center justify-between gap-2 text-[12px]">
-      <div className="min-w-0">
-        <span className={`font-semibold ${connector.is_enabled ? 'text-ink' : 'text-ink-faint line-through'}`}>{connector.name}</span>
-        <span className="text-ink-faint"> · {scopeLabel(connector)}</span>
-        <div className="text-[11px] text-ink-faint tabular-nums">{ingestedLabel(connector)}</div>
+    <li className="flex flex-col gap-1 text-[12px]">
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <span className={`font-semibold ${connector.is_enabled ? 'text-ink' : 'text-ink-faint line-through'}`}>{connector.name}</span>
+          <span className="text-ink-faint"> · {scopeLabel(connector)}</span>
+          {isSource && (
+            <span className="ml-1.5 inline-block px-1.5 py-px rounded-full bg-accent-dim text-accent text-[10.5px] font-bold" title="Only this department (and Leadership) can read its tickets">
+              {departmentLabel(connector.department)}
+            </span>
+          )}
+          <div className="text-[11px] text-ink-faint tabular-nums">{ingestedLabel(connector)}</div>
+          {isSource && <div className={`text-[11px] ${status.tone}`}>{status.text}</div>}
+        </div>
+        {canManage && (
+          <div className="flex items-center gap-2 shrink-0">
+            {isSource && connector.has_credentials && (
+              <button type="button" onClick={() => dispatch(syncConnector(connector.id))} disabled={saving} className="text-[11px] font-bold text-ink-muted hover:text-accent disabled:opacity-50 flex items-center gap-1" aria-label={`Sync ${connector.name} now`}>
+                <RefreshCw className="w-3 h-3" /> Sync
+              </button>
+            )}
+            {isSource && !open && (
+              <button type="button" onClick={() => onToggle(true)} className="text-[11px] font-bold text-accent hover:underline">
+                {connector.has_credentials ? 'Reconnect' : 'Set up'}
+              </button>
+            )}
+            {isSource && connector.has_credentials && (
+              <button type="button" onClick={() => dispatch(disconnectConnector(connector.id))} className="text-[11px] font-bold text-danger hover:underline flex items-center gap-1" aria-label={`Disconnect ${connector.name}`}>
+                <Unplug className="w-3 h-3" /> Disconnect
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => dispatch(updateConnector({ id: connector.id, is_enabled: !connector.is_enabled }))}
+              className="text-[11px] font-bold text-ink-muted hover:text-accent"
+            >
+              {connector.is_enabled ? 'Disable' : 'Enable'}
+            </button>
+          </div>
+        )}
       </div>
-      {canManage && (
-        <button
-          type="button"
-          onClick={() => dispatch(updateConnector({ id: connector.id, is_enabled: !connector.is_enabled }))}
-          className="text-[11px] font-bold text-ink-muted hover:text-accent shrink-0"
-        >
-          {connector.is_enabled ? 'Disable' : 'Enable'}
-        </button>
-      )}
+      {canManage && isSource && open && <ConnectSourceForm connector={connector} onDone={() => onToggle(false)} />}
     </li>
   );
 }
@@ -123,15 +187,25 @@ function ProviderCard({
 }) {
   const dispatch = useAppDispatch();
   const saving = useAppSelector((s) => s.connectors.saving);
+  const myFunction = useAppSelector((s) => s.auth.user?.function ?? '');
   const [connecting, setConnecting] = useState(false);
   const [name, setName] = useState(provider.name);
-  const connected = connectors.some((c) => c.is_enabled);
+  const [department, setDepartment] = useState<UserFunction | ''>(myFunction);
+  // Which connector's credentials form is showing; a source just created
+  // opens its own straight away.
+  const [formFor, setFormFor] = useState<number | null>(null);
+  const connected = connectors.some((c) => c.is_enabled && (!provider.tickets || c.has_credentials));
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    const result = await dispatch(createConnector({ provider: provider.id, name: name.trim() }));
-    if (createConnector.fulfilled.match(result)) setConnecting(false);
+    const result = await dispatch(
+      createConnector({ provider: provider.id, name: name.trim(), ...(provider.tickets ? { department } : {}) })
+    );
+    if (createConnector.fulfilled.match(result)) {
+      setConnecting(false);
+      if (provider.tickets) setFormFor(result.payload.id);
+    }
   }
 
   return (
@@ -158,7 +232,13 @@ function ProviderCard({
       {connectors.length > 0 && (
         <ul className="flex flex-col gap-2 mb-4">
           {connectors.map((c) => (
-            <ConnectorRow key={c.id} connector={c} canManage={canManage} />
+            <ConnectorRow
+              key={c.id}
+              connector={c}
+              canManage={canManage}
+              open={formFor === c.id}
+              onToggle={(open) => setFormFor(open ? c.id : null)}
+            />
           ))}
         </ul>
       )}
@@ -178,7 +258,7 @@ function ProviderCard({
         )}
       </div>
       {canManage && connecting && (
-        <form onSubmit={submit} className="flex items-center gap-2 mt-3">
+        <form onSubmit={submit} className="flex items-center gap-2 mt-3 flex-wrap">
           <label htmlFor={`name-${provider.id}`} className="sr-only">
             Name for {provider.name}
           </label>
@@ -190,6 +270,26 @@ function ProviderCard({
             className="flex-1 min-w-0 px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
             autoFocus
           />
+          {provider.tickets && (
+            <>
+              <label htmlFor={`department-${provider.id}`} className="sr-only">
+                Department for {provider.name}
+              </label>
+              <select
+                id={`department-${provider.id}`}
+                value={department}
+                onChange={(e) => setDepartment(e.target.value as UserFunction | '')}
+                className="px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[12.5px] text-ink focus:outline-none focus:border-accent"
+                title="Whose tickets these are: only this department and Leadership can read them"
+              >
+                {DEPARTMENTS.map((d) => (
+                  <option key={d} value={d}>
+                    {departmentLabel(d)}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
           <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
             Save
           </button>
@@ -210,9 +310,10 @@ function ProviderCard({
  * they came from; each card shows its connectors, their scope and what
  * they have brought in. Anyone may read; connecting, enabling and
  * disabling need manage_integrations, the same capability as webhooks.
- * There is no OAuth or sync behind "Connect" — the backend's own docstring
- * is explicit that a real sync needs credentials and a queue this codebase
- * does not have — so the button says what it does and nothing more.
+ * Ticket sources (Zendesk, Jira, Slack, Freshdesk, any other system by
+ * webhook) go one step further: each belongs to a department, takes the
+ * organisation's credentials, and is synced every ten minutes; its tickets
+ * are readable by that department and Leadership only.
  */
 export function Integrations() {
   const dispatch = useAppDispatch();
@@ -224,6 +325,11 @@ export function Integrations() {
   useEffect(() => {
     dispatch(fetchConnectors());
   }, [dispatch]);
+
+  // A Slack sign-in lands back on /integrations?connector=connected|error&detail=…
+  const query = new URLSearchParams(window.location.search);
+  const outcome = query.get('connector');
+  const outcomeDetail = query.get('detail');
 
   const byProvider = new Map<Provider, Connector[]>();
   items.forEach((c) => byProvider.set(c.provider, [...(byProvider.get(c.provider) ?? []), c]));
@@ -269,6 +375,12 @@ export function Integrations() {
       </div>
 
       <div className="px-8 pb-12 w-full max-w-7xl mx-auto">
+        {outcome === 'connected' && <p className="text-[12.5px] font-semibold text-success mb-4">Source connected.</p>}
+        {outcome === 'error' && (
+          <p className="text-[12.5px] font-semibold text-danger mb-4" role="alert">
+            Could not connect: {outcomeDetail || 'the provider refused.'}
+          </p>
+        )}
         {(error || saveError) && (
           <p className="text-[12.5px] font-semibold text-danger mb-4" role="alert">
             {error ?? saveError}

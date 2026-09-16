@@ -405,6 +405,7 @@ describe('AccountDetails page (/accounts/:id)', () => {
                       priority: 'high',
                       opened_at: '2026-07-15',
                       links: 1,
+                      connector_name: null, connector_provider: null, department: '', department_display: '', description: '', requester_name: '', requester_email: '', external_url: '', synced_at: null,
                     },
                   ]
                 : [],

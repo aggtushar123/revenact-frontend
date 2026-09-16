@@ -336,6 +336,7 @@ describe('Organization Details page (/organizations/:id)', () => {
                 priority: 'high',
                 opened_at: '2026-03-03',
                 links: 2,
+                connector_name: null, connector_provider: null, department: '', department_display: '', description: '', requester_name: '', requester_email: '', external_url: '', synced_at: null,
               },
             ],
           });

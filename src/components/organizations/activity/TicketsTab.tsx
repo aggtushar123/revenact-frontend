@@ -1,4 +1,4 @@
-import { AlertTriangle, MoreHorizontal, Ticket as TicketIcon, Circle, Flag, Settings, CornerUpLeft } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Ticket as TicketIcon, Circle, Flag, Building2 } from 'lucide-react';
 import type { Ticket } from '../../../features/customers/customersSlice';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -22,6 +22,14 @@ const PRIORITY_COLOR: Record<Ticket['priority'], string> = {
 
 function getInitials(name: string) {
   return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+}
+
+// Where a ticket came from: its connector's name, or this product itself.
+// Abbreviated to a letter for the little source square, the way the old
+// mock hard-coded a "Z" for Zendesk on every ticket.
+function sourceOf(ticket: Ticket): { name: string; letter: string } {
+  const name = ticket.connector_name || 'Revenact';
+  return { name, letter: name.charAt(0).toUpperCase() };
 }
 
 export interface TicketsTabProps {
@@ -99,6 +107,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
   const statusBg = isResolved ? 'bg-line-strong' : 'bg-info';
 
   const priorityClasses = PRIORITY_COLOR[ticket.priority];
+  const source = sourceOf(ticket);
 
   return (
     <div className="relative flex items-start gap-5 z-10 group">
@@ -115,21 +124,52 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
               {initial}
             </div>
             <span className="text-[12.5px] font-bold text-ink-muted">{ticket.assignee_name}</span>
-            <div className="w-[18px] h-[18px] bg-black text-white rounded-[4px] flex items-center justify-center font-bold text-[10px] ml-1 opacity-80">
-              Z
+            <div
+              className="w-[18px] h-[18px] bg-black text-white rounded-[4px] flex items-center justify-center font-bold text-[10px] ml-1 opacity-80"
+              title={`From ${source.name}`}
+              aria-label={`From ${source.name}`}
+            >
+              {source.letter}
             </div>
+            {ticket.department && (
+              <span
+                className="ml-1 inline-flex items-center gap-1 px-1.5 py-px rounded-full bg-accent-dim text-accent text-[10.5px] font-bold"
+                title="Only this department (and Leadership) can read this ticket"
+              >
+                <Building2 className="w-3 h-3" /> {ticket.department_display}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-[12px] font-bold text-ink-muted">{formatDate(ticket.opened_at)}</span>
-            <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-ink-faint hover:text-ink-muted ml-1">
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
+            {ticket.external_url && (
+              <a
+                href={ticket.external_url}
+                target="_blank"
+                rel="noreferrer"
+                className="p-0.5 rounded text-ink-faint hover:text-accent ml-1"
+                aria-label={`Open ${ticket.ticket_number} in ${source.name}`}
+                title={`Open in ${source.name}`}
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
           </div>
         </div>
 
-        <h4 className="text-[14.5px] font-extrabold text-ink mb-4 leading-snug group-hover:text-accent transition-colors">
+        <h4 className="text-[14.5px] font-extrabold text-ink mb-1.5 leading-snug group-hover:text-accent transition-colors">
           {ticket.title} <span className="text-accent font-bold text-[13px] ml-1">#{ticket.ticket_number.replace('TKT-', '')}</span>
         </h4>
+        {(ticket.requester_name || ticket.requester_email) && (
+          <div className="text-[12px] text-ink-muted mb-1.5">
+            Raised by <span className="font-semibold text-ink">{ticket.requester_name || ticket.requester_email}</span>
+            {ticket.requester_name && ticket.requester_email && <span className="text-ink-faint"> · {ticket.requester_email}</span>}
+          </div>
+        )}
+        {ticket.description && (
+          <p className="text-[12.5px] text-ink-muted mb-4 line-clamp-2 whitespace-pre-line">{ticket.description}</p>
+        )}
+        {!ticket.description && <div className="mb-2.5" />}
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
@@ -139,13 +179,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
             <div className={`w-[26px] h-[26px] rounded-[6px] border flex items-center justify-center ${priorityClasses}`} title={`Priority: ${ticket.priority}`}>
               <Flag className="w-3.5 h-3.5" />
             </div>
-            <div className="w-[26px] h-[26px] rounded-[6px] border border-line-subtle bg-subtle text-ink-faint flex items-center justify-center">
-              <Settings className="w-3.5 h-3.5" />
-            </div>
-            <div className="h-[26px] px-2 rounded-[6px] border border-line-subtle bg-subtle text-ink-muted flex items-center gap-1">
-              <CornerUpLeft className="w-3 h-3" />
-              <span className="text-[11px] font-semibold">0</span>
-            </div>
+            <span className="text-[11px] font-semibold text-ink-muted capitalize ml-1">{ticket.status.replace('-', ' ')}</span>
           </div>
 
           {ticket.links > 0 && (
