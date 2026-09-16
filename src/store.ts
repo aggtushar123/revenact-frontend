@@ -24,6 +24,8 @@ import connectorsReducer from './features/connectors/connectorsSlice';
 import graphReducer from './features/graph/graphSlice';
 import knowledgeReducer from './features/knowledge/knowledgeSlice';
 import mailReducer from './features/mail/mailSlice';
+import filesReducer from './features/files/filesSlice';
+import callsReducer from './features/calls/callsSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
@@ -53,6 +55,8 @@ export const store = configureStore({
     graph: graphReducer,
     knowledge: knowledgeReducer,
     mail: mailReducer,
+    files: filesReducer,
+    calls: callsReducer,
   },
 });
 
