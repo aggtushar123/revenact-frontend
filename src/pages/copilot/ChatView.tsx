@@ -396,7 +396,7 @@ export function ChatView({
           <div className="relative bg-surface border-2 border-accent/30 rounded-xl flex items-end min-h-[72px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] focus-within:ring-4 focus-within:ring-accent/10 transition-shadow">
             <MentionTextarea
               className="w-full h-full min-h-[64px] bg-transparent resize-none outline-none border-none p-4 text-[15px] placeholder:text-ink-faint placeholder:italic text-ink-muted font-medium leading-relaxed"
-              placeholder="Ask anything — @mention a colleague to route a question to them"
+              placeholder="Ask anything — @mention a colleague or a function to route a question to them"
               aria-label="Message Copilot"
               value={inputText}
               onChange={setInputText}

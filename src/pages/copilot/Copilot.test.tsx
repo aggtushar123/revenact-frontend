@@ -23,7 +23,7 @@ function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
-const PLACEHOLDER = "Type '/' to add variables, like {Account} and {Organization}";
+const PLACEHOLDER = "Ask anything — @mention a colleague or a function to route a question to them";
 
 const existingConversation: ConversationSummary = {
   id: 1,

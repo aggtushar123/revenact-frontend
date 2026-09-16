@@ -25,7 +25,7 @@ function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
-const PLACEHOLDER = "Ask anything — @mention a colleague to route a question to them";
+const PLACEHOLDER = "Ask anything — @mention a colleague or a function to route a question to them";
 const alice = { id: 1, name: 'Alice' };
 
 function conversationWith(userMessages: string[]): Conversation {
