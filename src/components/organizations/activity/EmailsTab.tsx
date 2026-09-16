@@ -60,6 +60,19 @@ interface ThreadMessage {
 }
 
 function buildThread(email: Email): ThreadMessage[] {
+  // A synced email (services/mail) is shown as itself: one real message.
+  if (email.direction) {
+    return [
+      {
+        id: 2,
+        sender: email.sender_name,
+        senderAvatar: avatarFor(email.sender_name),
+        recipient: email.recipient_name,
+        date: formatCardDate(email.sent_at),
+        body: email.body,
+      },
+    ];
+  }
   // Build a realistic back-and-forth thread from a single Email — the
   // first message is a synthetic kickoff note from the recipient, the
   // second is the real logged email.
@@ -270,9 +283,11 @@ export interface EmailsTabProps {
   error: string | null;
   selectedEmail?: Email | null;
   onSelectEmail?: (email: Email | null) => void;
+  /** Opens the compose form; absent when this record cannot be emailed (mock data). */
+  onCompose?: () => void;
 }
 
-export function EmailsTab({ emails, isLoading, error, selectedEmail, onSelectEmail }: EmailsTabProps) {
+export function EmailsTab({ emails, isLoading, error, selectedEmail, onSelectEmail, onCompose }: EmailsTabProps) {
   const [localSelected, setLocalSelected] = useState<Email | null>(null);
   const currentSelectedEmail = selectedEmail !== undefined ? selectedEmail : localSelected;
   const handleSelectEmail = onSelectEmail || setLocalSelected;
@@ -288,6 +303,14 @@ export function EmailsTab({ emails, isLoading, error, selectedEmail, onSelectEma
 
   const sortedGroups = Object.entries(grouped).sort((a, b) => b[0].localeCompare(a[0]));
 
+  const composeBar = onCompose ? (
+    <div className="px-6 py-2 border-b border-line-subtle flex items-center justify-between gap-3 bg-surface">
+      <span className="text-[11.5px] text-ink-faint">You see your own and your team's emails on this record.</span>
+      <button type="button" onClick={onCompose} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold">
+        Compose
+      </button>
+    </div>
+  ) : null;
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
@@ -306,15 +329,19 @@ export function EmailsTab({ emails, isLoading, error, selectedEmail, onSelectEma
 
   if (emails.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
-        <MessageCircle className="w-10 h-10 text-ink-faint mb-2" />
-        <span className="text-sm font-semibold text-ink-faint">No emails found</span>
+      <div className="flex flex-col flex-1">
+        {composeBar}
+        <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
+          <MessageCircle className="w-10 h-10 text-ink-faint mb-2" />
+          <span className="text-sm font-semibold text-ink-faint">No emails found</span>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+      {composeBar}
       {sortedGroups.map(([day, items]) => (
         <div key={day} className="flex flex-col">
           <div className="px-6 py-2 bg-subtle/80 border-b border-line-subtle sticky top-0 z-10">
@@ -377,6 +404,15 @@ function EmailCard({
       <div className="flex items-center gap-2 mb-2">
         <img src={avatarFor(email.sender_name)} alt={email.sender_name} className="w-6 h-6 rounded-full border border-line-subtle object-cover" />
         <div className="flex items-center gap-1.5">
+          {email.direction && (
+            <span
+              className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                email.direction === 'sent' ? 'bg-accent-dim text-accent' : 'bg-info-dim text-info'
+              }`}
+            >
+              {email.direction}
+            </span>
+          )}
           <span className="text-[12.5px] font-semibold text-ink-muted">{email.sender_name}</span>
           <span className="text-[11px] text-ink-faint">▸</span>
           <span className="text-[12px] text-ink-faint italic">{email.recipient_name}</span>

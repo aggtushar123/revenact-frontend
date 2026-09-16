@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import connectorsReducer from '../../features/connectors/connectorsSlice';
+import mailReducer from '../../features/mail/mailSlice';
 import { Integrations } from './Integrations';
 import { capabilitiesForRole } from '../../test/capabilities';
 
@@ -35,7 +36,7 @@ function mockApi() {
 
 function renderPage(role: 'admin' | 'csm' = 'admin') {
   const store = configureStore({
-    reducer: { auth: authReducer, connectors: connectorsReducer },
+    reducer: { auth: authReducer, connectors: connectorsReducer, mail: mailReducer },
     preloadedState: {
       auth: {
         user: {
