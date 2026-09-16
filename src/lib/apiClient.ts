@@ -2,7 +2,10 @@
 // revenact-backend/docs/API_CONTRACTS.md for the response/error shapes
 // this follows.
 
-const BASE_URL = `${import.meta.env.VITE_API_URL}/api/v1`;
+// Same origin unless VITE_API_URL says otherwise: production serves the SPA
+// and the API from one host (Caddy), and CI runs the tests without a .env.
+export const API_ORIGIN = import.meta.env.VITE_API_URL || window.location.origin;
+const BASE_URL = `${API_ORIGIN}/api/v1`;
 
 export class ApiError extends Error {
   status: number;

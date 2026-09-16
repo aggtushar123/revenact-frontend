@@ -19,7 +19,7 @@ export interface SocketHandle {
 // ws(s):// instead of http(s):// and no /api/v1 prefix — every real WS
 // route is mounted directly on the ASGI app (config/asgi.py), not
 // through Django's normal URLconf.
-export const WS_BASE_URL = `${import.meta.env.VITE_API_URL}`.replace(/^http/, 'ws');
+export const WS_BASE_URL = (import.meta.env.VITE_API_URL || window.location.origin).replace(/^http/, 'ws');
 
 export function connectSocket(path: string, onMessage: (data: unknown) => void): SocketHandle {
   let socket: WebSocket | null = null;
