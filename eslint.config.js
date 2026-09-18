@@ -6,7 +6,10 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  // .claude/skills vendors third-party agent skills (impeccable, motion-framer,
+  // ...) that ship their own .js/.jsx/.py helpers; they are not app code.
+  // .impeccable is that skill's working directory (screenshots, session state).
+  globalIgnores(['dist', '.claude', '.impeccable']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
