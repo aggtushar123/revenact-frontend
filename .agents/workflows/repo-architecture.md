@@ -25,7 +25,8 @@ description: Full repository architecture, module map, and data flow reference f
 ```
 react-ts-app/
 ├── .agents/workflows/          ← Workflow knowledge files
-├── .claude/skills/             ← Agent skills: testing, soc2-dev, and the design set
+├── .claude/skills/             ← Agent skills: testing, soc2-dev, playwright-cli (browser
+│                                  automation via `npm run pw -- <cmd>`), and the design set
 │                                  (start at revenact-design/SKILL.md; it routes to
 │                                  impeccable, ui-ux-pro-max, emil-design-eng, ...)
 ├── src/
