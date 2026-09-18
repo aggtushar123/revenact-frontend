@@ -31,3 +31,9 @@ every change must pass.
   bug. Fix it in the same pull request.
 - `.agents/workflows/repo-architecture.md` is the agent-facing map of this
   repository and is currently stale; see task A2 in the Implementation Plan.
+
+## Design specifications
+
+Surface designs, written before the code. Each carries its own visual.
+
+- [Communications](design/communications.md) — the queue of what is waiting on you. Specification approved 2026-09-18, not yet built.
