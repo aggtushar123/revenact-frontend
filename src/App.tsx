@@ -14,6 +14,7 @@ import { AccountDetails } from './pages/accounts/Details';
 import { List as AccountsList } from './pages/accounts/List';
 import { Board as AccountsBoard } from './pages/accounts/Board';
 import { CopilotIndex } from './pages/copilot/Index';
+import CommunicationsPage from './pages/communications/CommunicationsPage';
 import { LifecyclePage } from './pages/lifecycle/LifecyclePage';
 import { HealthPage } from './pages/health/HealthPage';
 import { CreateScenario } from './pages/scenarios/CreateScenario';
@@ -220,6 +221,8 @@ function App() {
             <Route path="board" element={<AccountsBoard />} />
             <Route path=":id" element={<AccountDetails />} />
           </Route>
+
+          <Route path="communications" element={<CommunicationsPage />} />
 
           <Route path="copilot" element={<CopilotIndex />} />
 
