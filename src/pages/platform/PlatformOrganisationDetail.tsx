@@ -1,13 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Archive, Check, Crown, Pencil, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Archive, Check, Crown, Pencil, X, CreditCard } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
   archiveOrganisation,
+  billingAction,
+  fetchOrganisationBilling,
   fetchOrganisation,
   renameOrganisation,
   setOrganisationStatus,
   transferOwnership,
+  type PlatformBilling,
 } from '../../features/platform/platformSlice';
 import { StatusPill } from './PlatformOrganisations';
 
@@ -18,7 +21,7 @@ function when(iso: string | null) {
 export function PlatformOrganisationDetail() {
   const { id } = useParams();
   const dispatch = useAppDispatch();
-  const { organisation, error } = useAppSelector((state) => state.platform);
+  const { organisation, billing, error } = useAppSelector((state) => state.platform);
   const [reason, setReason] = useState('');
   const [newOwner, setNewOwner] = useState<number | ''>('');
   const [actionError, setActionError] = useState<string | null>(null);
@@ -31,7 +34,10 @@ export function PlatformOrganisationDetail() {
   const created = (useLocation().state as { ownerMailed?: boolean; ownerEmail?: string } | null) ?? null;
 
   useEffect(() => {
-    if (id) dispatch(fetchOrganisation(Number(id)));
+    if (id) {
+      dispatch(fetchOrganisation(Number(id)));
+      dispatch(fetchOrganisationBilling(Number(id)));
+    }
   }, [dispatch, id]);
 
   if (!organisation) {
@@ -282,6 +288,8 @@ export function PlatformOrganisationDetail() {
         </section>
       </div>
 
+      {billing && <BillingCard organisationId={organisation.id} billing={billing} onError={setActionError} />}
+
       {/* Members */}
       <section className="rv-card overflow-hidden" aria-labelledby="members-heading">
         <h2 id="members-heading" className="text-[13px] font-bold text-ink px-4 pt-4 pb-2">
@@ -365,3 +373,131 @@ export function PlatformOrganisationDetail() {
 }
 
 export default PlatformOrganisationDetail;
+
+/**
+ * Plan, seats and credits, with the three things staff may change. Each needs
+ * a reason: these are the movements no system event explains, and every one
+ * lands on the tenant's own audit trail.
+ */
+function BillingCard({
+  organisationId,
+  billing,
+  onError,
+}: {
+  organisationId: number;
+  billing: PlatformBilling;
+  onError: (message: string | null) => void;
+}) {
+  const dispatch = useAppDispatch();
+  const [creditAmount, setCreditAmount] = useState('');
+  const [creditReason, setCreditReason] = useState('');
+  const [seatLimit, setSeatLimit] = useState('');
+  const [seatReason, setSeatReason] = useState('');
+  const [planCode, setPlanCode] = useState('');
+  const [planReason, setPlanReason] = useState('');
+  const [busy, setBusy] = useState<string | null>(null);
+
+  async function run(action: 'credits' | 'seats' | 'plan', body: Record<string, unknown>, reset: () => void) {
+    onError(null);
+    setBusy(action);
+    try {
+      await dispatch(billingAction({ id: organisationId, action, body })).unwrap();
+      reset();
+    } catch (err) {
+      onError(typeof err === 'string' ? err : 'Could not update billing.');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <section className="rv-card p-4 space-y-4" aria-labelledby="billing-heading">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 id="billing-heading" className="text-[13px] font-bold text-ink flex items-center gap-2">
+          <CreditCard className="w-4 h-4 text-ink-faint" aria-hidden="true" />
+          Billing
+        </h2>
+        <p className="text-[12px] text-ink-muted">
+          <span className="font-semibold text-ink">{billing.plan.name}</span> · {billing.status.replace('_', ' ')}
+          {billing.trial_ends_at ? ` · trial ends ${when(billing.trial_ends_at)}` : ''}
+          {billing.stripe_customer_id ? ` · Stripe ${billing.stripe_customer_id}` : ''}
+        </p>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-3 text-[12.5px]">
+        <div className="rounded-lg border border-line-subtle p-3">
+          <div className="text-[11px] uppercase tracking-[0.08em] text-ink-faint font-semibold">Seats</div>
+          <div className="text-[20px] font-semibold text-ink tabular-nums">
+            {billing.seats.used} <span className="text-[12px] text-ink-muted font-medium">of {billing.seats.limit}</span>
+          </div>
+        </div>
+        <div className="rounded-lg border border-line-subtle p-3">
+          <div className="text-[11px] uppercase tracking-[0.08em] text-ink-faint font-semibold">AI credits</div>
+          <div className="text-[20px] font-semibold text-ink tabular-nums">{billing.credits.balance}</div>
+        </div>
+      </div>
+
+      <div className="grid md:grid-cols-3 gap-3">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            run('credits', { amount: Number(creditAmount), reason: creditReason.trim() }, () => { setCreditAmount(''); setCreditReason(''); });
+          }}
+          className="space-y-2"
+          aria-label="Adjust credits"
+        >
+          <label htmlFor="credit-amount" className="block text-[11.5px] text-ink-muted">Adjust credits (signed)</label>
+          <input id="credit-amount" type="number" value={creditAmount} onChange={(e) => setCreditAmount(e.target.value)} className="rv-input text-[12.5px]" placeholder="+100 or -50" />
+          <input aria-label="Credit reason" type="text" value={creditReason} onChange={(e) => setCreditReason(e.target.value)} className="rv-input text-[12.5px]" placeholder="Reason" />
+          <button type="submit" disabled={busy !== null || !creditAmount || !creditReason.trim()} className="rv-pill-secondary disabled:opacity-40">Apply credits</button>
+        </form>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            run('seats', { seats_limit: Number(seatLimit), reason: seatReason.trim() }, () => { setSeatLimit(''); setSeatReason(''); });
+          }}
+          className="space-y-2"
+          aria-label="Set seat limit"
+        >
+          <label htmlFor="seat-limit" className="block text-[11.5px] text-ink-muted">Seat allowance</label>
+          <input id="seat-limit" type="number" min={0} value={seatLimit} onChange={(e) => setSeatLimit(e.target.value)} className="rv-input text-[12.5px]" placeholder={String(billing.seats.limit)} />
+          <input aria-label="Seat reason" type="text" value={seatReason} onChange={(e) => setSeatReason(e.target.value)} className="rv-input text-[12.5px]" placeholder="Reason" />
+          <button type="submit" disabled={busy !== null || seatLimit === '' || !seatReason.trim()} className="rv-pill-secondary disabled:opacity-40">Set seats</button>
+        </form>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            run('plan', { plan_code: planCode, reason: planReason.trim() }, () => { setPlanCode(''); setPlanReason(''); });
+          }}
+          className="space-y-2"
+          aria-label="Change plan"
+        >
+          <label htmlFor="plan-code" className="block text-[11.5px] text-ink-muted">Plan</label>
+          <select id="plan-code" value={planCode} onChange={(e) => setPlanCode(e.target.value)} className="rv-input text-[12.5px]">
+            <option value="">Choose a plan</option>
+            {(billing.plans ?? []).map((p) => (
+              <option key={p.code} value={p.code}>{p.name} · {p.seats_included} seats · {p.monthly_credits} credits</option>
+            ))}
+          </select>
+          <input aria-label="Plan reason" type="text" value={planReason} onChange={(e) => setPlanReason(e.target.value)} className="rv-input text-[12.5px]" placeholder="Reason" />
+          <button type="submit" disabled={busy !== null || !planCode || !planReason.trim()} className="rv-pill-primary disabled:opacity-40">Change plan</button>
+        </form>
+      </div>
+
+      {(billing.ledger ?? []).length > 0 && (
+        <ul className="text-[12px] divide-y divide-line-subtle" aria-label="Recent credit movements">
+          {(billing.ledger ?? []).slice(0, 8).map((row) => (
+            <li key={row.id} className="py-1.5 flex items-baseline justify-between gap-3">
+              <span className="text-ink-muted truncate">{row.kind}{row.reason ? ` · ${row.reason}` : ''}{row.actor ? ` · ${row.actor}` : ''}</span>
+              <span className={`tabular-nums shrink-0 ${row.amount < 0 ? 'text-ink-muted' : 'text-success'}`}>{row.amount > 0 ? `+${row.amount}` : row.amount}</span>
+              <span className="tabular-nums shrink-0 text-ink">{row.balance_after}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+

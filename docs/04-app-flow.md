@@ -308,9 +308,12 @@ invited person signs in and is let straight in; cancel), and email domains
 Domains need `manage_org_settings`; the rest needs `manage_users`.
 
 `/account-settings/*` is the personal side, in the newer shell (own left nav,
-assistant rail): profile name, password or sign-in method, appearance (light,
-dark, system), timezone, cached-data reset, plan and billing, integrations,
-personalization rules, skills and tasks, about.
+assistant rail): profile name, password or sign-in method, two-factor,
+appearance (light, dark, system), timezone, cached-data reset, plan and
+billing (`features/billing/billingSlice.ts` against `/api/v1/billing/`: the
+plan, seats used of limit, AI credit balance, published plans, and, with
+`manage_org_settings`, the credit ledger), integrations, personalization
+rules, skills and tasks, about.
 
 ### 4.10a The internal portal
 
@@ -323,7 +326,9 @@ with a provider on that address or from the reset email); an organisation's
 name (rename in place), owner (transfer to another active member when the
 owner cannot), suspend or reactivate with a required reason, archive (closes
 sign-in, hides it from the list, purges nothing), members (owner first),
-domains and the last twenty audit events; staff with their second-factor
+domains, the last twenty audit events, and a billing card (plan, seats,
+credits, recent ledger; adjust credits, set the seat allowance or change the
+plan, each with a mandatory reason); staff with their second-factor
 state. Metadata only: nothing here shows a tenant's customers,
 emails or notes, and the backend pins that. The Sidebar shows a Platform link
 to superusers.
