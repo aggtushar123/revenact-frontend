@@ -34,7 +34,7 @@ export function CategoriesBlock({ blocks, active, onPick }: { blocks: MailCatego
               onClick={() => onPick(block.category)}
               aria-pressed={active === block.category}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                active === block.category ? 'bg-subtle border-line-strong' : 'bg-surface border-line hover:border-line-strong'
+                active === block.category ? 'bg-subtle border-line-strong' : 'rv-glass-inner border-line hover:border-line-strong'
               }`}
             >
               <span className={`w-2 h-2 rounded-full shrink-0 ${CATEGORY_DOT[block.category]}`} aria-hidden="true" />
@@ -98,7 +98,7 @@ export function MailList({
                   <button
                     type="button"
                     onClick={() => onSelect(row.id)}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border bg-surface border-line hover:border-line-strong text-left transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border rv-glass-inner border-line hover:border-line-strong text-left transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
                     <span className="w-8 h-8 shrink-0 rounded-full bg-subtle text-ink text-[11.5px] font-semibold flex items-center justify-center" aria-hidden="true">
                       {initialsOf(name)}

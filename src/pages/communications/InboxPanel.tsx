@@ -56,7 +56,7 @@ export function InboxPanel({
 }) {
   return (
     <aside aria-label="Inbox folders and filters" className="w-[232px] shrink-0 flex flex-col gap-2.5 pr-3">
-      <nav aria-label="Folders" className="bg-surface border border-line rounded-xl p-1.5 flex flex-col gap-0.5">
+      <nav aria-label="Folders" className="rv-glass-inner border border-line rounded-xl p-1.5 flex flex-col gap-0.5">
         {FOLDERS.map(({ kind: folderKind, label, icon: Icon }) => {
           const active = folderKind === kind;
           const count = folderKind === null ? stats?.total : stats?.counts[folderKind];
@@ -81,7 +81,7 @@ export function InboxPanel({
         })}
       </nav>
 
-      <section aria-label="Filters" className="bg-surface border border-line rounded-xl p-1.5">
+      <section aria-label="Filters" className="rv-glass-inner border border-line rounded-xl p-1.5">
         <div className="flex items-center gap-2 px-3 py-2 text-[13px] text-ink">
           <SlidersHorizontal className="w-4 h-4 text-ink-muted" aria-hidden="true" />
           Filters

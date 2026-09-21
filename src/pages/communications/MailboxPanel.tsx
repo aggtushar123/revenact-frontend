@@ -37,7 +37,7 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <section aria-label={title} className="bg-surface border border-line rounded-xl p-1.5">
+    <section aria-label={title} className="rv-glass-inner border border-line rounded-xl p-1.5">
       <button
         type="button"
         onClick={onToggle}
@@ -79,7 +79,7 @@ export function MailboxPanel({
 
   return (
     <aside aria-label="Mailbox folders and filters" className="w-[232px] shrink-0 flex flex-col gap-2.5 pr-3 overflow-y-auto custom-scrollbar">
-      <nav aria-label="Folders" className="bg-surface border border-line rounded-xl p-1.5 flex flex-col gap-0.5">
+      <nav aria-label="Folders" className="rv-glass-inner border border-line rounded-xl p-1.5 flex flex-col gap-0.5">
         {FOLDERS.map(({ folder: f, label }) => {
           const active = f === folder;
           const count = summary?.folders[f as keyof MailSummary['folders']];

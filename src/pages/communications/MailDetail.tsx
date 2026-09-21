@@ -35,7 +35,7 @@ export function MailDetail({
 
   if (!message) {
     return (
-      <section aria-label="Message" aria-busy={loading} className="grow min-w-0 bg-surface border border-line rounded-xl flex items-center justify-center">
+      <section aria-label="Message" aria-busy={loading} className="grow min-w-0 rv-glass-inner border border-line rounded-xl flex items-center justify-center">
         <p className="text-[12.5px] text-ink-muted">{loading ? 'Opening…' : 'Choose a message to read it.'}</p>
       </section>
     );
@@ -45,7 +45,7 @@ export function MailDetail({
   const canReply = message.direction === 'received' ? Boolean(message.from_address) : message.to.length > 0;
 
   return (
-    <section aria-label="Message" aria-live="polite" className="grow min-w-0 bg-surface border border-line rounded-xl flex flex-col overflow-hidden">
+    <section aria-label="Message" aria-live="polite" className="grow min-w-0 rv-glass-inner border border-line rounded-xl flex flex-col overflow-hidden">
       <div className="shrink-0 px-4.5 pt-4 pb-3.5 border-b border-line-subtle">
         <div className="flex items-start gap-3">
           <div className="grow min-w-0">

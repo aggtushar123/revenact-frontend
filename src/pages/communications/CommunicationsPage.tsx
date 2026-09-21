@@ -210,7 +210,7 @@ export default function CommunicationsPage() {
         ) : (
           <section
             aria-label="Inbox"
-            className="flex-1 min-w-0 rv-card flex flex-col overflow-hidden"
+            className="flex-1 min-w-0 rv-card-glass flex flex-col overflow-hidden"
           >
             <div className="h-14 shrink-0 flex items-center gap-2 px-3">
               <button

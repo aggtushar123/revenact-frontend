@@ -83,7 +83,7 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
   const rows = page?.results ?? [];
 
   return (
-    <section aria-label="Mailbox" className="flex-1 min-w-0 rv-card flex flex-col overflow-hidden">
+    <section aria-label="Mailbox" className="flex-1 min-w-0 rv-card-glass flex flex-col overflow-hidden">
       <div className="h-14 shrink-0 flex items-center gap-2 px-3">
         <button type="button" onClick={onTogglePanel} aria-label={panelOpen ? 'Hide folders' : 'Show folders'} aria-expanded={panelOpen} className="w-9 h-9 rounded-lg border border-line flex items-center justify-center text-ink-muted hover:text-ink hover:bg-subtle">
           <ChevronUp className={`w-4 h-4 transition-transform duration-[var(--dur-fast)] ${panelOpen ? '' : 'rotate-180'}`} aria-hidden="true" />
