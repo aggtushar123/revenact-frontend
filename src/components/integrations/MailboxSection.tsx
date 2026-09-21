@@ -107,7 +107,7 @@ export function MailboxSection() {
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 flex-wrap">
               {oauthProviders.map((p) => (
-                <button key={p.key} type="button" onClick={() => connect(p.key)} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12.5px] font-bold">
+                <button key={p.key} type="button" onClick={() => connect(p.key)} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12.5px] font-bold">
                   Connect {p.label}
                 </button>
               ))}
@@ -130,7 +130,7 @@ export function MailboxSection() {
                 <div />
                 <input aria-label="SMTP host" required value={form.smtp_host} onChange={(e) => setForm({ ...form, smtp_host: e.target.value })} placeholder="smtp.company.com" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[12.5px]" />
                 <input aria-label="SMTP port" value={form.smtp_port} onChange={(e) => setForm({ ...form, smtp_port: e.target.value })} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[12.5px]" />
-                <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12.5px] font-bold disabled:opacity-50">
+                <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12.5px] font-bold disabled:opacity-50">
                   {saving ? 'Checking login…' : 'Connect'}
                 </button>
               </form>

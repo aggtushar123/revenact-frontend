@@ -58,7 +58,7 @@ export function OwnerTile({ title = 'Account owner', owner, members, mayChange, 
           </select>
           <input aria-label="Handover note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why is it moving? (written down for the record)" className="px-2 py-1 bg-surface border border-line rounded-lg text-[12.5px] text-ink focus:outline-none focus:border-accent" />
           <div className="flex gap-2">
-            <button type="button" onClick={save} className="px-3 py-1 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold">Save</button>
+            <button type="button" onClick={save} className="px-3 py-1 bg-accent text-on-accent rounded-lg text-[12px] font-bold">Save</button>
             <button type="button" onClick={() => setPending(null)} className="text-[12px] font-semibold text-ink-muted">Cancel</button>
           </div>
         </div>

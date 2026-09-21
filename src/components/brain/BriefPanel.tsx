@@ -33,7 +33,7 @@ export function BriefPanel() {
       onClick={() => dispatch(generateBrief())}
       disabled={briefGenerating}
       title="Writes a new brief from today's figures. This makes a paid model call."
-      className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+      className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <Sparkles className="w-3.5 h-3.5" />
       {briefGenerating ? 'Writing…' : brief ? 'Write a new brief' : 'Write the first brief'}

@@ -62,7 +62,7 @@ export function ConnectSourceForm({ connector, onDone }: { connector: Connector;
           Send one ticket object or {'{'}"tickets": [...]{'}'} with external_id, title and optionally description, status, priority,
           requester_email, requester_name, assignee_name, url, opened_at, resolved_at.
         </div>
-        <button type="button" onClick={onDone} className="self-start px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold">
+        <button type="button" onClick={onDone} className="self-start px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold">
           Done
         </button>
       </div>
@@ -88,7 +88,7 @@ export function ConnectSourceForm({ connector, onDone }: { connector: Connector;
       ))}
       {setup.help && <p className="text-[11px] text-ink-faint">{setup.help}</p>}
       <div className="flex items-center gap-2 flex-wrap">
-        <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+        <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
           {saving ? 'Checking…' : setup.fields.length ? 'Connect' : 'Generate secret'}
         </button>
         {setup.uses_oauth && (

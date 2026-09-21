@@ -65,7 +65,7 @@ export function ConfirmDialog({ title, message, confirmLabel, danger, onConfirm,
             onClick={handleConfirm}
             disabled={isSaving}
             className={`px-3.5 py-2 rounded-lg text-[12px] font-bold transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed ${
-              danger ? 'bg-danger text-white hover:opacity-90' : 'bg-accent text-[#0D0F0E] hover:bg-accent-hover'
+              danger ? 'bg-danger text-white hover:opacity-90' : 'bg-accent text-on-accent hover:bg-accent-hover'
             }`}
           >
             {isSaving ? 'Working…' : confirmLabel}

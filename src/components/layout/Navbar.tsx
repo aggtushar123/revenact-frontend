@@ -17,6 +17,7 @@ import {
   User as UserIcon,
   LogOut,
   Check,
+  Sliders,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { logout } from '../../features/auth/authSlice';
@@ -117,6 +118,7 @@ export function Navbar() {
   const isAccountsList = location.pathname.startsWith('/accounts');
   const isCopilot = location.pathname === '/copilot';
   const isSettings = location.pathname.startsWith('/settings');
+  const isAccountSettings = location.pathname.startsWith('/account-settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
   const isDashboard = location.pathname.startsWith('/dashboard');
 
@@ -144,6 +146,86 @@ export function Navbar() {
   let greeting = 'Good Evening';
   if (hour < 12) greeting = 'Good Morning';
   else if (hour < 18) greeting = 'Good Afternoon';
+
+  if (isAccountSettings) {
+    return (
+      <header className="h-[52px] border-b border-[var(--rv-header-border)] bg-[var(--rv-header-bg)] flex items-center justify-between px-4 md:px-6 shrink-0 z-20 transition-all select-none">
+        {/* Search box matching user screenshot */}
+        <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-lg bg-[var(--rv-search-bg)] border border-[var(--rv-search-border)] text-[var(--rv-search-text)] text-[12px] w-[320px] sm:w-[420px] md:w-[460px] hover:border-[var(--rv-card-border-hover)] transition-all">
+          <Search className="w-3.5 h-3.5 text-[var(--rv-text-muted)] shrink-0" />
+          <input
+            type="text"
+            placeholder="Search all conversations"
+            className="bg-transparent text-[12px] text-[var(--rv-search-text)] placeholder:text-[var(--rv-search-placeholder)] outline-none w-full font-sans"
+          />
+          <kbd className="text-[10px] bg-[var(--rv-search-kbd-bg)] text-[var(--rv-search-kbd-text)] px-1.5 py-0.5 rounded border border-[var(--rv-search-kbd-border)] shrink-0 font-mono">
+            ⌘ + F
+          </kbd>
+        </div>
+
+        {/* Right icons: Feedback/MessageSquare icon + Status ring avatar indicator */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="p-1.5 text-[var(--rv-text-muted)] hover:text-[var(--rv-text)] rounded-lg hover:bg-black/5 dark:hover:bg-white/[0.06] transition-colors relative cursor-pointer"
+            title="Messages and activity"
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-teal-400" />
+          </button>
+
+          <div
+            onClick={() => setIsAccountMenuOpen((open) => !open)}
+            className="relative cursor-pointer"
+            ref={accountMenuRef}
+          >
+            <div className="w-7 h-7 rounded-full p-[2px] bg-gradient-to-tr from-teal-500 via-amber-500 to-rose-500 flex items-center justify-center hover:scale-105 transition-transform shadow-xs">
+              <div className="w-full h-full rounded-full bg-[var(--rv-header-bg)] flex items-center justify-center">
+                <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-amber-400 to-rose-400" />
+              </div>
+            </div>
+
+            {isAccountMenuOpen && (
+              <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-[var(--rv-card-bg)] border border-[var(--rv-card-border)] rounded-xl shadow-2xl overflow-hidden z-50 text-[var(--rv-text)]">
+                <div className="flex items-center gap-3 p-3 border-b border-[var(--rv-card-border)]">
+                  <div className="w-9 h-9 rounded-full bg-accent text-white flex items-center justify-center font-bold text-sm shrink-0">
+                    {(user?.name?.charAt(0) || 'T').toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[13px] font-bold text-[var(--rv-text)] truncate">{user?.name || 'Your account'}</div>
+                    <div className="text-[11px] text-[var(--rv-text-muted)] truncate">{user?.email ?? ''}</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAccountMenuOpen(false);
+                    navigate('/account-settings');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[12.5px] font-medium text-[var(--rv-text-muted)] hover:text-[var(--rv-text)] hover:bg-black/5 dark:hover:bg-white/[0.06] transition-all cursor-pointer"
+                >
+                  <Sliders className="w-[15px] h-[15px]" />
+                  Settings
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAccountMenuOpen(false);
+                    dispatch(logout());
+                    navigate('/login');
+                  }}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[12.5px] font-medium text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-all border-t border-[var(--rv-card-border)] cursor-pointer"
+                >
+                  <LogOut className="w-[15px] h-[15px]" />
+                  Sign out
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="h-[64px] border-b border-line-subtle bg-surface flex items-center justify-between px-6 shrink-0 z-20 transition-all duration-300 shadow-sm">
@@ -344,7 +426,7 @@ export function Navbar() {
         {/* Right side actions */}
         <button
           onClick={() => navigate('/copilot')}
-          className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent text-[#0D0F0E] text-[12px] font-bold shadow-md hover:scale-105 transition-all transform active:scale-95 border border-accent-hover/40"
+          className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent text-on-accent text-[12px] font-bold shadow-md hover:scale-105 transition-all transform active:scale-95 border border-accent-hover/40"
         >
           <Sparkles className="w-3.5 h-3.5" />
           <span className="mt-[1px]">AI Copilot</span>
@@ -365,7 +447,7 @@ export function Navbar() {
               <Bell className="w-4 h-4" />
             </button>
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-0.5 min-w-[15px] h-[15px] bg-accent text-[#0D0F0E] flex items-center justify-center text-[9px] font-bold rounded-full px-0.5 border-2 border-surface shadow-sm">
+              <span className="absolute -top-1 -right-0.5 min-w-[15px] h-[15px] bg-accent text-on-accent flex items-center justify-center text-[9px] font-bold rounded-full px-0.5 border-2 border-surface shadow-sm">
                 {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
@@ -444,6 +526,16 @@ export function Navbar() {
                   <div className="text-[11px] text-ink-muted truncate">{user?.email || 'My Workspace'}</div>
                 </div>
               </div>
+              <button
+                onClick={() => {
+                  setIsAccountMenuOpen(false);
+                  navigate('/account-settings');
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[12.5px] font-medium text-ink-muted hover:text-ink hover:bg-subtle transition-all cursor-pointer"
+              >
+                <Sliders className="w-[15px] h-[15px]" />
+                Settings
+              </button>
               <button
                 onClick={() => {
                   setIsAccountMenuOpen(false);

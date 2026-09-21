@@ -3,6 +3,7 @@ import counterReducer from './features/counter/counterSlice';
 import authReducer, { loggedOut, refreshSession } from './features/auth/authSlice';
 import tasksReducer from './features/tasks/tasksSlice';
 import userManagementReducer from './features/userManagement/userManagementSlice';
+import accessReducer from './features/access/accessSlice';
 import customersReducer from './features/customers/customersSlice';
 import copilotSessionsReducer from './features/copilotSessions/copilotSessionsSlice';
 import notificationsReducer from './features/notifications/notificationsSlice';
@@ -27,15 +28,18 @@ import mailReducer from './features/mail/mailSlice';
 import filesReducer from './features/files/filesSlice';
 import callsReducer from './features/calls/callsSlice';
 import communicationsReducer from './features/communications/communicationsSlice';
+import settingsReducer from './features/settings/settingsSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
   reducer: {
     counter: counterReducer,
     communications: communicationsReducer,
+    settings: settingsReducer,
     auth: authReducer,
     tasks: tasksReducer,
     userManagement: userManagementReducer,
+    access: accessReducer,
     customers: customersReducer,
     copilotSessions: copilotSessionsReducer,
     notifications: notificationsReducer,

@@ -306,7 +306,7 @@ export function EmailsTab({ emails, isLoading, error, selectedEmail, onSelectEma
   const composeBar = onCompose ? (
     <div className="px-6 py-2 border-b border-line-subtle flex items-center justify-between gap-3 bg-surface">
       <span className="text-[11.5px] text-ink-faint">You see your own and your team's emails on this record.</span>
-      <button type="button" onClick={onCompose} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold">
+      <button type="button" onClick={onCompose} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold">
         Compose
       </button>
     </div>

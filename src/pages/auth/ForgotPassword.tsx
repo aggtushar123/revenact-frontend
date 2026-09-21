@@ -4,7 +4,7 @@ import { z } from 'zod/v4';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAppDispatch } from '../../hooks';
 import { requestPasswordReset } from '../../features/auth/authSlice';
-import { AuthLeftPanel } from './AuthLeftPanel';
+import { RevenactMark } from '../../components/shared/RevenactMark';
 import './Login.css';
 
 const emailSchema = z.email('Please enter a valid email address');
@@ -48,10 +48,9 @@ export function ForgotPassword() {
   }
 
   return (
-    <div className="login-container">
-      <AuthLeftPanel />
-
-      <div className="login-right">
+    <div className="auth-page">
+      <main className="auth-card">
+        <RevenactMark size="lg" className="mb-5" />
         <div className="login-form-wrapper">
           {submitted ? (
             <>
@@ -115,7 +114,7 @@ export function ForgotPassword() {
             </>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

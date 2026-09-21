@@ -73,7 +73,7 @@ export function InitiativesPage() {
           <button
             type="button"
             onClick={() => setShowForm((v) => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold shrink-0"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold shrink-0"
           >
             <Plus className="w-3.5 h-3.5" />
             New initiative
@@ -296,7 +296,7 @@ function InitiativeCard({ initiative }: { initiative: Initiative }) {
             autoFocus
           />
           <div className="flex gap-2">
-            <button type="submit" className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold">
+            <button type="submit" className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold">
               {closing === 'done' ? 'Close as done' : 'Close as abandoned'}
             </button>
             <button type="button" onClick={() => setClosing(null)} className="px-2 py-1.5 text-[12px] font-semibold text-ink-muted">
@@ -462,7 +462,7 @@ function NewInitiativeForm({
         <button
           type="submit"
           disabled={isSaving}
-          className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50"
+          className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50"
         >
           {isSaving ? 'Saving…' : 'Save initiative'}
         </button>

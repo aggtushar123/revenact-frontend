@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { DashboardLayout } from './layouts/DashboardLayout';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -20,6 +21,13 @@ import { HealthPage } from './pages/health/HealthPage';
 import { CreateScenario } from './pages/scenarios/CreateScenario';
 import { ScenariosList } from './pages/scenarios/ScenariosList';
 import { SettingsPage } from './pages/settings/SettingsPage';
+import { SettingsLayout } from './layouts/SettingsLayout';
+import { AccountSettingsPage } from './pages/settings/AccountSettingsPage';
+import { BillingSettingsPage } from './pages/settings/BillingSettingsPage';
+import { IntegrationsSettingsPage } from './pages/settings/IntegrationsSettingsPage';
+import { PersonalizationPage } from './pages/settings/PersonalizationPage';
+import { SkillsTasksPage } from './pages/settings/SkillsTasksPage';
+import { AboutSettingsPage } from './pages/settings/AboutSettingsPage';
 import { SettingPlaceholder } from './pages/settings/SettingPlaceholder';
 import { CurrencyPage } from './pages/settings/CurrencyPage';
 import { ProductsPage } from './pages/settings/ProductsPage';
@@ -67,20 +75,74 @@ import { FeedbackLogPage } from './pages/brain/Feedback';
 import { AgentsPage } from './pages/brain/Agents';
 import { SkillsPage } from './pages/brain/Skills';
 import { GraphPage } from './pages/brain/Graph';
+import { OnboardingCarousel } from './pages/onboarding/OnboardingCarousel';
+import { AuthCallback } from './pages/auth/AuthCallback';
+
+function ThemeSynchronizer() {
+  const theme = useAppSelector((state) => state.settings.theme);
+
+  useEffect(() => {
+    const updateTheme = () => {
+      const isDark =
+        theme === 'dark' ||
+        (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.setAttribute('data-theme', 'dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    };
+
+    updateTheme();
+
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const listener = () => updateTheme();
+      mediaQuery.addEventListener('change', listener);
+      return () => mediaQuery.removeEventListener('change', listener);
+    }
+  }, [theme]);
+
+  return null;
+}
 
 function RootRedirect() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
-  return <Navigate to={isAuthenticated ? '/dashboard' : '/login'} replace />;
+  const user = useAppSelector((state) => state.auth.user);
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  // `tour_completed_at` is stamped by the server when the tour is finished
+  // or skipped. A user cached from before the field existed has it
+  // undefined; they have been here a while, so they are not shown the tour.
+  const owesTour = user !== null && user.tour_completed_at === null;
+  if (owesTour) return <Navigate to="/onboarding" replace />;
+  return <Navigate to="/dashboard" replace />;
 }
 
 function App() {
   return (
     <BrowserRouter>
+      <ThemeSynchronizer />
       <Routes>
-        {/* Public routes */}
+        {/* Public routes — nobody is signed in yet on any of these. */}
         <Route path="/login" element={<Login />} />
+        {/* Where revenact-backend's OAuth callback redirects the browser. */}
+        <Route path="/auth/callback" element={<AuthCallback />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+
+        {/* The product tour shows real surfaces, so it is behind the session
+            like everything else rather than public. */}
+        <Route
+          path="/onboarding"
+          element={
+            <ProtectedRoute>
+              <OnboardingCarousel />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Protected routes */}
         <Route path="/" element={
@@ -261,6 +323,16 @@ function App() {
             <Route path="global-presets" element={<GlobalPresetsPage />} />
             <Route path="connect-widget" element={<SettingPlaceholder title="Connect Widget" />} />
             <Route path="ai-agent" element={<AIAgentPage />} />
+          </Route>
+
+          <Route path="account-settings" element={<SettingsLayout />}>
+            <Route index element={<Navigate to="account" replace />} />
+            <Route path="account" element={<AccountSettingsPage />} />
+            <Route path="billing" element={<BillingSettingsPage />} />
+            <Route path="integrations" element={<IntegrationsSettingsPage />} />
+            <Route path="personalization" element={<PersonalizationPage />} />
+            <Route path="skills" element={<SkillsTasksPage />} />
+            <Route path="about" element={<AboutSettingsPage />} />
           </Route>
           
           <Route path="integrations" element={<Integrations />} />

@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { useAppDispatch } from '../../hooks';
 import { confirmPasswordReset } from '../../features/auth/authSlice';
-import { AuthLeftPanel } from './AuthLeftPanel';
+import { RevenactMark } from '../../components/shared/RevenactMark';
 import './Login.css';
 
 // Step 2 of the forgot-password flow. Reached from the link emailed by
@@ -53,10 +53,9 @@ export function ResetPassword() {
   }
 
   return (
-    <div className="login-container">
-      <AuthLeftPanel />
-
-      <div className="login-right">
+    <div className="auth-page">
+      <main className="auth-card">
+        <RevenactMark size="lg" className="mb-5" />
         <div className="login-form-wrapper">
           {linkIsMissingParams ? (
             <>
@@ -148,7 +147,7 @@ export function ResetPassword() {
             </>
           )}
         </div>
-      </div>
+      </main>
     </div>
   );
 }

@@ -66,7 +66,7 @@ export function ComposeEmailModal({ customerId, accountId, recordName, onClose, 
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-3 border-t border-line-subtle">
           <button type="button" onClick={onClose} className="text-[12.5px] font-semibold text-ink-muted px-3 py-1.5">Cancel</button>
-          <button type="submit" disabled={sending || !connection} className="px-4 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12.5px] font-bold disabled:opacity-40 disabled:cursor-not-allowed">
+          <button type="submit" disabled={sending || !connection} className="px-4 py-1.5 bg-accent text-on-accent rounded-lg text-[12.5px] font-bold disabled:opacity-40 disabled:cursor-not-allowed">
             {sending ? 'Sending…' : 'Send'}
           </button>
         </div>

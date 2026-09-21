@@ -100,7 +100,7 @@ export function HomeView({
               </button>
               <button
                 onClick={() => onSendPrompt(buildSkillPrompt(selectedSkill))}
-                className="px-4 py-1.5 text-[13px] font-bold text-[#0D0F0E] bg-accent hover:bg-accent-hover rounded-md transition-colors shadow-sm"
+                className="px-4 py-1.5 text-[13px] font-bold text-on-accent bg-accent hover:bg-accent-hover rounded-md transition-colors shadow-sm"
               >
                 Run
               </button>
@@ -122,9 +122,9 @@ export function HomeView({
               />
               <button
                 onClick={() => { if (inputText.trim()) onSendPrompt(inputText); }}
-                className="absolute right-3.5 bottom-3.5 w-[26px] h-[26px] bg-subtle hover:bg-accent hover:text-[#0D0F0E] rounded-full flex items-center justify-center text-white shadow-sm transition-all cursor-pointer group"
+                className="absolute right-3.5 bottom-3.5 w-[26px] h-[26px] bg-subtle hover:bg-accent hover:text-on-accent rounded-full flex items-center justify-center text-white shadow-sm transition-all cursor-pointer group"
               >
-                <ArrowUp className="w-[14px] h-[14px] stroke-[3.5px] text-ink-faint group-hover:text-[#0D0F0E]" />
+                <ArrowUp className="w-[14px] h-[14px] stroke-[3.5px] text-ink-faint group-hover:text-on-accent" />
               </button>
             </div>
           </div>

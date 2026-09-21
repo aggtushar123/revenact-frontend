@@ -98,7 +98,7 @@ function NewTaskForm({ onCreate }: { onCreate: (task: NewTask) => Promise<boolea
     <div className="px-6 py-2 border-b border-line-subtle flex flex-col gap-2 bg-surface">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11.5px] text-ink-faint">A task is seen by its creator, its assignee and their management chains.</span>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold">
+        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold">
           {open ? 'Cancel' : 'New task'}
         </button>
       </div>
@@ -117,7 +117,7 @@ function NewTaskForm({ onCreate }: { onCreate: (task: NewTask) => Promise<boolea
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
-          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
             {saving ? 'Saving…' : 'Save task'}
           </button>
         </form>

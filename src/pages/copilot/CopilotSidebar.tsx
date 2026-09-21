@@ -248,7 +248,7 @@ function QuestionsForYou() {
               >
                 <textarea aria-label={`Answer ${q.asked_by.name}`} value={body} onChange={(e) => setBody(e.target.value)} rows={3} autoFocus className="w-full px-2 py-1.5 bg-surface border border-line rounded-md text-[12px] text-ink focus:outline-none focus:border-accent" />
                 <div className="flex gap-1.5">
-                  <button type="submit" className="text-[11px] font-bold text-[#0D0F0E] bg-accent rounded-full px-2.5 py-0.5">Send answer</button>
+                  <button type="submit" className="text-[11px] font-bold text-on-accent bg-accent rounded-full px-2.5 py-0.5">Send answer</button>
                   <button type="button" onClick={() => setOpenId(null)} className="text-[11px] font-bold text-ink-faint">Cancel</button>
                 </div>
               </form>

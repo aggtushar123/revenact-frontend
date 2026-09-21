@@ -61,7 +61,7 @@ export function ReviewQueuePage() {
             onClick={() => dispatch(generateProposals())}
             disabled={isGenerating}
             title="Asks the agent for new proposals from today's figures. This makes a paid model call."
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Sparkles className="w-3.5 h-3.5" />
             {isGenerating ? 'Asking…' : 'Ask the agent'}
@@ -206,7 +206,7 @@ function ProposalCard({ proposal }: { proposal: Proposal }) {
             type="button"
             disabled={busy}
             onClick={() => dispatch(decideProposal({ id: proposal.id, decision: 'approve' }))}
-            className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50"
+            className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50"
           >
             {busy ? 'Working…' : 'Approve'}
           </button>

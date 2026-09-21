@@ -65,7 +65,7 @@ export function CanvasListTab({ canvases, isLoading, error, customerId, accountI
         <div className="flex items-center justify-end">
           <button
             onClick={handleNewCanvas}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             New Canvas

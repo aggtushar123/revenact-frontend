@@ -208,7 +208,7 @@ export function ChatView({
                 <button
                   type="button"
                   onClick={() => { setIsClosingOpen(false); onCloseSession(true); }}
-                  className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold"
+                  className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold"
                 >
                   Close and capture decisions
                 </button>
@@ -405,9 +405,9 @@ export function ChatView({
             <button
               onClick={submit}
               disabled={isSending}
-              className="absolute right-3.5 bottom-3.5 w-[26px] h-[26px] bg-subtle hover:bg-accent hover:text-[#0D0F0E] rounded-full flex items-center justify-center text-white shadow-sm transition-all cursor-pointer group disabled:opacity-40 disabled:cursor-not-allowed"
+              className="absolute right-3.5 bottom-3.5 w-[26px] h-[26px] bg-subtle hover:bg-accent hover:text-on-accent rounded-full flex items-center justify-center text-white shadow-sm transition-all cursor-pointer group disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <ArrowUp className="w-[14px] h-[14px] stroke-[3.5px] text-ink-faint group-hover:text-[#0D0F0E]" />
+              <ArrowUp className="w-[14px] h-[14px] stroke-[3.5px] text-ink-faint group-hover:text-on-accent" />
             </button>
           </div>
         </div>

@@ -62,7 +62,7 @@ export function ActionBar({
         )}
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-4 py-[8px] bg-accent hover:bg-accent-hover text-[#0D0F0E] text-[13px] font-semibold rounded-lg shadow-sm transition-colors tracking-wide"
+          className="flex items-center gap-1.5 px-4 py-[8px] bg-accent hover:bg-accent-hover text-on-accent text-[13px] font-semibold rounded-lg shadow-sm transition-colors tracking-wide"
         >
           <span className="text-lg leading-none mb-[2px]">+</span> Add Organization
         </button>
@@ -90,7 +90,7 @@ export function ActionBar({
         >
           <Settings className="w-4 h-4 stroke-[2px]" />
           {selectedCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-accent text-[#0D0F0E] text-[10px] font-bold flex items-center justify-center leading-none">
+            <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] px-1 rounded-full bg-accent text-on-accent text-[10px] font-bold flex items-center justify-center leading-none">
               {selectedCount}
             </span>
           )}

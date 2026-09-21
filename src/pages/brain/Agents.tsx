@@ -72,7 +72,7 @@ function PurposeCard({ row, canManage }: { row: PurposeUsage; canManage: boolean
             Tokens / month
           </label>
           <input id={`budget-${row.purpose}`} type="number" min={0} step={1000} value={draft} onChange={(e) => setDraft(e.target.value)} className="w-32 px-2 py-1 bg-surface border border-line rounded text-[12px] text-ink focus:outline-none focus:border-accent" autoFocus />
-          <button type="submit" className="px-2.5 py-1 bg-accent text-[#0D0F0E] rounded text-[12px] font-bold">Save</button>
+          <button type="submit" className="px-2.5 py-1 bg-accent text-on-accent rounded text-[12px] font-bold">Save</button>
           <button type="button" onClick={() => setEditing(false)} className="text-[12px] font-semibold text-ink-muted">Cancel</button>
         </form>
       )}

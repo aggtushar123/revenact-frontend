@@ -152,7 +152,7 @@ export function CompanyViewTab({
           />
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] text-ink-faint">Visible to everyone in the company, and read by the Copilot.</span>
-            <button type="submit" disabled={!body.trim()} className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+            <button type="submit" disabled={!body.trim()} className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
               Add
             </button>
           </div>

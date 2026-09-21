@@ -130,12 +130,12 @@ export function ScenarioHeader({
         <div className="flex items-center group relative">
           <button
             onClick={onSave}
-            className="bg-accent hover:bg-accent-hover text-[#0D0F0E] flex items-center gap-2 px-4 py-1.5 rounded-l-[6px] text-[13px] font-bold transition-all shadow-sm"
+            className="bg-accent hover:bg-accent-hover text-on-accent flex items-center gap-2 px-4 py-1.5 rounded-l-[6px] text-[13px] font-bold transition-all shadow-sm"
           >
             Save
           </button>
           <details className="relative">
-            <summary className="list-none bg-accent hover:bg-accent-hover text-[#0D0F0E] px-1.5 py-1.5 rounded-r-[6px] border-l border-white/20 transition-all shadow-sm cursor-pointer h-full flex items-center">
+            <summary className="list-none bg-accent hover:bg-accent-hover text-on-accent px-1.5 py-1.5 rounded-r-[6px] border-l border-white/20 transition-all shadow-sm cursor-pointer h-full flex items-center">
               <ChevronDown className="w-4 h-4 stroke-[2.5px]" />
             </summary>
             <div className="absolute right-0 top-full mt-1 bg-surface border border-line-subtle rounded-lg shadow-lg py-1 min-w-[160px] z-30">

@@ -105,7 +105,7 @@ export function FilesTab({ entityType, entityId, customerId }: FilesTabProps) {
                 className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[12.5px] text-ink focus:outline-none focus:border-accent w-56"
               />
               <input ref={input} type="file" multiple accept={ACCEPT} className="sr-only" aria-label="Choose files" onChange={(e) => e.target.files && void send(e.target.files)} />
-              <button type="button" onClick={() => input.current?.click()} disabled={uploading} className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+              <button type="button" onClick={() => input.current?.click()} disabled={uploading} className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
                 <UploadCloud className="w-3.5 h-3.5" /> {uploading ? 'Uploading…' : 'Upload file'}
               </button>
             </div>

@@ -22,7 +22,8 @@ main.tsx
  └── <Provider store>
       └── <App>
            └── <BrowserRouter>
-                ├── /login, /forgot-password, /reset-password   (public, no shell)
+                ├── /login, /auth/callback, /forgot-password, /reset-password   (public, no shell)
+                ├── /onboarding                                   (auth, no shell: the first-run tour)
                 └── <ProtectedRoute>
                      └── <DashboardLayout>
                           ├── <Sidebar/>     hover-expands, 68px to 240px
@@ -48,7 +49,10 @@ closing it on unmount or token change.
 | Path | Component | Guard |
 |---|---|---|
 | `/login`, `/forgot-password`, `/reset-password` | `Login`, `ForgotPassword`, `ResetPassword` | public |
-| `/` | `RootRedirect` | auth |
+| `/auth/callback` | `AuthCallback` (hand-off exchange, workspace form, or an explained refusal) | public |
+| `/` | `RootRedirect`: `/login`, then `/onboarding` until `user.tour_completed_at` is set, then `/dashboard` | auth |
+| `/onboarding` | `OnboardingCarousel`, the eight-step first-run tour | auth |
+| `/account-settings/{account,billing,integrations,personalization,skills,about}` | `SettingsLayout` with its own left nav and the assistant rail | auth |
 | `/dashboard` → `/dashboard/advance` → `/dashboard/advance/health` | `AdvanceDashboard` | auth |
 | `/dashboard/advance/health/{triage,divergence,movement,renewal-date,controls}` | `HealthOverviewContainer` and its five views | auth |
 | `/dashboard/advance/{ai-trending,customer,activity,revenue,usage,product,ticket}/controls` | one container each | auth |
@@ -116,13 +120,45 @@ Profile and Sign out.
 
 ### 4.1 Sign in, refresh, sign out
 
-1. `/login`. `Login.tsx` validates with `loginSchema` (Zod: email required,
-   password at least 8 characters).
+Two doors, one session shape.
+
+**Continue with Google / Microsoft** (`features/auth/oauth.ts`)
+
+1. `/login` asks `GET /auth/oauth/providers/` on mount and shows a button per
+   provider the backend has configured; none configured, and only the password
+   form appears. The list is the server's answer, never a constant.
+2. A button calls `POST /auth/oauth/<key>/start/` and sends the whole window to
+   the returned `authorize_url`. Never an iframe or popup.
+3. The provider returns to the backend, which redirects to `/auth/callback` with
+   exactly one of:
+   - `?handoff=<code>`: `AuthCallback` scrubs the code from the address bar,
+     dispatches `loginWithHandoff` (`POST /auth/oauth/exchange/`) once (guarded
+     against StrictMode's double effect) and lands on `/`.
+   - `?setup=<code>`: nobody has claimed this person's email domain.
+     `WorkspaceSetup` previews who is signing up (`POST workspace/preview/`),
+     asks for a company name, and `createWorkspace` (`POST workspace/`) creates
+     the organisation with them as its first administrator and signs them in.
+     A `409 WORKSPACE_CLAIMED` means a colleague got there first: they are told
+     to sign in again, where they will be routed to that workspace.
+   - `?error=<CODE>`: `ACCESS_REQUEST_PENDING` gets its own "waiting for
+     approval" screen; every other code is explained in words by
+     `authErrorMessage`, never shown as an identifier.
+
+**Email and password**
+
+1. `Login.tsx` validates with `loginSchema` (Zod: email required, password at
+   least 8 characters).
 2. `dispatch(login)` → `POST /auth/login/` with `skipAuthRetry`, so a bad
-   password does not trigger a refresh attempt.
+   password does not trigger a refresh attempt. The error stays visible until
+   the person edits a field.
+
+**Either way**
+
 3. Tokens and user are written to `localStorage` under `revenact_access_token`,
    `revenact_refresh_token` and `revenact_user`, then the app navigates to
-   `state.from` or `/dashboard`.
+   `state.from` or `/`, where `RootRedirect` sends a first-timer to
+   `/onboarding` (until `user.tour_completed_at` is set; finishing or skipping
+   the tour writes it through `PATCH /auth/me/ {tour_completed: true}`).
 4. On reload, `authSlice` hydrates from `localStorage` so `ProtectedRoute` passes
    without a round trip.
 5. Any 401 from `apiFetch` → `POST /auth/token/refresh/` (the rotated refresh
@@ -133,7 +169,10 @@ Profile and Sign out.
    refresh token.
 
 Forgot and reset password are separate public pages; the reset page reads `uid`
-and `token` from the query string.
+and `token` from the query string. Changing a password while signed in lives in
+Account settings, and only for people who have one: `user.has_password` is false
+for someone who only ever signed in with a provider, and they see how they sign
+in instead.
 
 ### 4.2 Organisations: list to detail
 
@@ -251,7 +290,17 @@ global attribute mapping), Currency and exchange rates, Products, Entity Uploads
 placeholders.
 
 `/users` manages members with inline role, function, manager and active controls,
-and a Roles tab that edits capability checkboxes live.
+a Roles tab that edits capability checkboxes live, and an Access tab
+(`AccessTab.tsx`, `features/access/accessSlice.ts`): people waiting to join
+(approve with a role, or reject), invitations (send by address and role; the
+invited person signs in and is let straight in; cancel), and email domains
+(add, copy the TXT record, check DNS; verified domains route sign-ins here).
+Domains need `manage_org_settings`; the rest needs `manage_users`.
+
+`/account-settings/*` is the personal side, in the newer shell (own left nav,
+assistant rail): profile name, password or sign-in method, appearance (light,
+dark, system), timezone, cached-data reset, plan and billing, integrations,
+personalization rules, skills and tasks, about.
 
 ### 4.11 Brain
 
@@ -314,6 +363,6 @@ as a query parameter because a WebSocket handshake cannot carry a header.
 | Activity feed: search box, "Add Action", filter icon | No handler |
 | Navbar: Search, Plus, Help, Message | No handler |
 | Navbar list-page title chevrons | No menu |
-| Login: "Log In with SSO" | A three second toast saying it is coming |
-| Login: Terms and Privacy | `href="#"` |
+| Settings sidebar: "Revenact for desktop" | No handler yet |
+| Settings rail: "Next event" | Says nothing is scheduled; no personal calendar feed exists |
 | `/accounts/:id` on refresh | Silently shows mock data |
