@@ -77,11 +77,18 @@ function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown>;
   return spy;
 }
 
-function renderPage() {
-  const store = configureStore({ reducer: { communications: communicationsReducer, mail: mailReducer, connectors: connectorsReducer } });
+function renderPage(path = '/communications') {
+  const store = configureStore({
+    reducer: { communications: communicationsReducer, mail: mailReducer, connectors: connectorsReducer },
+    // The sidebar's group normally fetches these; the page only reads them.
+    preloadedState: {
+      mail: { connection: { id: 1, provider: 'google', provider_display: 'Google', address: 'alice@acme.io', status: 'connected' }, providers: [], loaded: true, saving: false, error: null, sending: false, sendError: null } as unknown as ReturnType<typeof mailReducer>,
+      connectors: { items: [{ id: 5, provider: 'zendesk', provider_display: 'Zendesk', name: 'Support desk', status: 'connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 3, call_count: 0, last_record_at: null, has_credentials: true, config: {} }], isLoading: false, error: null, saving: false, saveError: null } as unknown as ReturnType<typeof connectorsReducer>,
+    },
+  });
   render(
     <Provider store={store}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <CommunicationsPage />
       </MemoryRouter>
     </Provider>
@@ -137,16 +144,12 @@ describe('CommunicationsPage', () => {
     expect(await screen.findByRole('region', { name: /queue/i })).toBeInTheDocument();
   });
 
-  it('the sources rail shows only what is connected, and picking one narrows and becomes the Copilot context', async () => {
+  it('arriving from a source in the sidebar narrows the inbox and becomes the Copilot context', async () => {
     const spy = mockApi();
-    renderPage();
-    const rail = await screen.findByRole('navigation', { name: /connected sources/i });
-    expect(await within(rail).findByRole('button', { name: 'Gmail' })).toBeInTheDocument();
-    expect(within(rail).getByRole('button', { name: 'Support desk' })).toBeInTheDocument();
-    await userEvent.click(within(rail).getByRole('button', { name: 'Support desk' }));
+    renderPage('/communications?source=connector%3A5');
     await waitFor(() => expect(spy).toHaveBeenCalledWith(expect.stringContaining('kind=ticket'), expect.anything()));
-    const copilot = screen.getByRole('complementary', { name: /copilot/i });
-    expect(within(copilot).getByText('Support desk')).toBeInTheDocument();
+    const copilot = await screen.findByRole('complementary', { name: /copilot/i });
+    expect(await within(copilot).findByText('Support desk')).toBeInTheDocument();
   });
 
   it('the Copilot rail sends a real message and can be hidden from the top bar', async () => {

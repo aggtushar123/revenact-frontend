@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutGrid, MessageSquare, Network, Layers, Users,
+  LayoutGrid, Network, Layers, Users,
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
   Brain, Flag, CheckSquare, MessageSquareWarning, Bot, Wand2,
@@ -13,6 +13,7 @@ import { fetchProposals } from '../../features/proposals/proposalsSlice';
 import { fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
 import type { CustomObjectDefinition } from '../../features/customObjects/types';
 import { logout } from '../../features/auth/authSlice';
+import { SourcesGroup } from './SourcesGroup';
 
 export function Sidebar() {
   const navigate = useNavigate();
@@ -97,7 +98,7 @@ export function Sidebar() {
         {/* Top Links */}
         <NavItem to="/copilot" icon={<Sparkles className="w-[18px] h-[18px]" />} label="Copilot" isExpanded={isExpanded} />
         <NavItem to="/dashboard" icon={<LayoutGrid className="w-[18px] h-[18px]" />} label="Dashboard" isExpanded={isExpanded} />
-        <NavItem to="/communications" icon={<MessageSquare className="w-[18px] h-[18px]" />} label="Communications" isExpanded={isExpanded} />
+        <SourcesGroup isExpanded={isExpanded} />
 
         {/* ENTITIES Section */}
         {isExpanded ? (
