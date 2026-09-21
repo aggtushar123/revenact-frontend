@@ -25,8 +25,9 @@ function renderGroup(path = '/dashboard') {
       if (url.includes('/connectors/')) {
         return Promise.resolve(
           jsonResponse(200, [
-            { id: 5, provider: 'slack', provider_display: 'Slack', name: 'Slack', status: 'connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 0, call_count: 0, last_record_at: null, has_credentials: true, config: {} },
-            { id: 6, provider: 'zendesk', provider_display: 'Zendesk', name: 'Zendesk', status: 'not_connected', is_enabled: false, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 0, call_count: 0, last_record_at: null, has_credentials: false, config: {} },
+            { id: 5, provider: 'slack', provider_display: 'Slack', name: 'Slack', status: 'not_connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 0, call_count: 0, last_record_at: null, has_credentials: true, config: {} },
+            { id: 6, provider: 'zendesk', provider_display: 'Zendesk', name: 'Zendesk', status: 'not_connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 0, call_count: 0, last_record_at: null, has_credentials: false, config: {} },
+            { id: 7, provider: 'salesforce', provider_display: 'Salesforce', name: 'Salesforce', status: 'not_connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 0, call_count: 0, last_record_at: null, has_credentials: false, config: {} },
           ])
         );
       }
@@ -60,6 +61,9 @@ describe('Sidebar Communications group', () => {
     await userEvent.click(within(group).getByRole('button', { name: 'Show all sources' }));
     expect(within(group).getByRole('button', { name: 'Slack' })).toBeInTheDocument();
     expect(within(group).getByRole('button', { name: 'Calls' })).toBeInTheDocument();
+    // Salesforce is set up and enabled: connected, the way Integrations says it is.
+    expect(within(group).getByRole('button', { name: 'Salesforce' })).toBeInTheDocument();
+    // Zendesk pulls tickets and has no credentials yet: not connected.
     expect(within(group).queryByRole('button', { name: 'Zendesk' })).not.toBeInTheDocument();
     expect(localStorage.getItem('revenact_sidebar_sources_open')).toBe('true');
 
