@@ -18,20 +18,21 @@ import {
   type Role,
 } from '../../features/userManagement/userManagementSlice';
 import type { Capability } from '../../features/auth/authSlice';
+import { AccessTab } from './AccessTab';
 
 // Settings > Users. Reachable only with the `manage_users` capability
 // (see RequireCapability in App.tsx and the Sidebar's own gate), which
 // the backend enforces independently on every endpoint here.
 //
-// Two tabs, because roles are real now: **Members** is every person in
-// the organisation — admins included, which the old CSM-only list
-// couldn't show — with their role editable inline; **Roles** is where
-// an admin actually creates and maintains those roles and the
-// capabilities each one grants.
+// Three tabs: **Members** is every person in the organisation — admins
+// included — with their role editable inline; **Roles** is where an admin
+// creates and maintains those roles and the capabilities each one grants;
+// **Access** is who is asking to join, who has been invited, and which
+// email domains route people here (see AccessTab.tsx).
 export function UserManagement() {
   const dispatch = useAppDispatch();
   const { members, roles, isLoading, error } = useAppSelector((state) => state.userManagement);
-  const [tab, setTab] = useState<'members' | 'roles'>('members');
+  const [tab, setTab] = useState<'members' | 'roles' | 'access'>('members');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingMember, setEditingMember] = useState<Member | null>(null);
@@ -63,7 +64,7 @@ export function UserManagement() {
       </div>
 
       <div className="flex bg-subtle/50 p-0.5 rounded-lg border border-line-subtle w-fit">
-        {(['members', 'roles'] as const).map((name) => (
+        {(['members', 'roles', 'access'] as const).map((name) => (
           <button
             key={name}
             onClick={() => {
@@ -88,16 +89,16 @@ export function UserManagement() {
         </div>
       )}
 
-      {tab === 'members' ? (
+      {tab === 'members' && (
         <MembersTab
           members={members}
           roles={roles}
           isLoading={isLoading}
           onEdit={setEditingMember}
         />
-      ) : (
-        <RolesTab />
       )}
+      {tab === 'roles' && <RolesTab />}
+      {tab === 'access' && <AccessTab roles={roles} />}
 
       {showAddModal && <AddMemberModal roles={roles} onClose={() => setShowAddModal(false)} />}
       {editingMember && (

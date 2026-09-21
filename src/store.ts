@@ -3,6 +3,7 @@ import counterReducer from './features/counter/counterSlice';
 import authReducer, { loggedOut, refreshSession } from './features/auth/authSlice';
 import tasksReducer from './features/tasks/tasksSlice';
 import userManagementReducer from './features/userManagement/userManagementSlice';
+import accessReducer from './features/access/accessSlice';
 import customersReducer from './features/customers/customersSlice';
 import copilotSessionsReducer from './features/copilotSessions/copilotSessionsSlice';
 import notificationsReducer from './features/notifications/notificationsSlice';
@@ -38,6 +39,7 @@ export const store = configureStore({
     auth: authReducer,
     tasks: tasksReducer,
     userManagement: userManagementReducer,
+    access: accessReducer,
     customers: customersReducer,
     copilotSessions: copilotSessionsReducer,
     notifications: notificationsReducer,

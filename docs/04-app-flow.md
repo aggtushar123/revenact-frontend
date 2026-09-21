@@ -290,7 +290,12 @@ global attribute mapping), Currency and exchange rates, Products, Entity Uploads
 placeholders.
 
 `/users` manages members with inline role, function, manager and active controls,
-and a Roles tab that edits capability checkboxes live.
+a Roles tab that edits capability checkboxes live, and an Access tab
+(`AccessTab.tsx`, `features/access/accessSlice.ts`): people waiting to join
+(approve with a role, or reject), invitations (send by address and role; the
+invited person signs in and is let straight in; cancel), and email domains
+(add, copy the TXT record, check DNS; verified domains route sign-ins here).
+Domains need `manage_org_settings`; the rest needs `manage_users`.
 
 `/account-settings/*` is the personal side, in the newer shell (own left nav,
 assistant rail): profile name, password or sign-in method, appearance (light,
