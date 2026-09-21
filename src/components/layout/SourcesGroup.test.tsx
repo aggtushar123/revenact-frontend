@@ -17,14 +17,15 @@ function WhereAmI() {
   return <div data-testid="where">{location.pathname + location.search}</div>;
 }
 
-function renderGroup(path = '/dashboard') {
+function renderGroup(path = '/dashboard', mailbox: unknown = { id: 1, provider: 'google', provider_display: 'Google', address: 'a@acme.io', status: 'connected' }) {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string) => {
-      if (url.includes('/mail/connection/')) return Promise.resolve(jsonResponse(200, { connection: { id: 1, provider: 'google', provider_display: 'Google', address: 'a@acme.io', status: 'connected' }, providers: [] }));
+      if (url.includes('/mail/connection/')) return Promise.resolve(jsonResponse(200, { connection: mailbox, providers: [] }));
       if (url.includes('/connectors/')) {
         return Promise.resolve(
           jsonResponse(200, [
+            { id: 4, provider: 'intercom', provider_display: 'Intercom', name: 'Intercom', status: 'connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 0, call_count: 0, last_record_at: null, has_credentials: true, config: {} },
             { id: 5, provider: 'slack', provider_display: 'Slack', name: 'Slack', status: 'not_connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 0, call_count: 0, last_record_at: null, has_credentials: true, config: {} },
             { id: 6, provider: 'zendesk', provider_display: 'Zendesk', name: 'Zendesk', status: 'not_connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 0, call_count: 0, last_record_at: null, has_credentials: false, config: {} },
             { id: 7, provider: 'salesforce', provider_display: 'Salesforce', name: 'Salesforce', status: 'not_connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 0, call_count: 0, last_record_at: null, has_credentials: false, config: {} },
@@ -71,6 +72,16 @@ describe('Sidebar Communications group', () => {
 
     await userEvent.click(within(group).getByRole('button', { name: 'Show fewer sources' }));
     expect(within(group).queryByRole('button', { name: 'Slack' })).not.toBeInTheDocument();
+  });
+
+  it('keeps Gmail second even when no mailbox is connected and another channel is', async () => {
+    renderGroup('/dashboard', null);
+    const group = screen.getByRole('group', { name: 'Communications' });
+    // Intercom is connected, but mail leads: Gmail sits by the inbox, dimmed, and connects from Integrations.
+    expect(await within(group).findByRole('button', { name: 'Connect Gmail' })).toBeInTheDocument();
+    expect(within(group).queryByRole('button', { name: 'Intercom' })).not.toBeInTheDocument();
+    await userEvent.click(within(group).getByRole('button', { name: 'Connect Gmail' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/integrations');
   });
 
   it('the inbox goes to Communications and a source narrows it by the URL', async () => {

@@ -1,7 +1,7 @@
 // The Communications group in the sidebar: the inbox, then every source
 // connected to the platform, in a pill that opens and closes.
 //
-// Collapsed it shows the inbox, the first connected channel and a chevron;
+// Collapsed it shows the inbox, Gmail and a chevron;
 // open, every channel the platform offers, the unconnected ones dimmed and
 // leading to Integrations. The inbox goes to /communications; a source goes to
 // /communications?source=<id>, which the page reads to narrow the inbox and
@@ -48,10 +48,10 @@ export function SourcesGroup({ isExpanded }: { isExpanded: boolean }) {
   const sources = useMemo(() => sourcesFrom(mailbox, connectors), [mailbox, connectors]);
   const onPage = location.pathname.startsWith('/communications');
   const activeId = onPage ? (params.get('source') ?? 'all') : null;
-  // The inbox is always first; when closed, the first connected channel
-  // keeps it company (or the first channel at all, dimmed).
-  const companion = sources.slice(1).find((s) => s.connected && s.id !== 'calls') ?? sources[1];
-  const shown = open ? sources : [sources[0], companion];
+  // The inbox is always first and mail always second: closed, the group is
+  // the inbox and Gmail, whatever else is connected. Unconnected, Gmail is
+  // dimmed and leads to Integrations, which is where a mailbox connects.
+  const shown = open ? sources : sources.slice(0, 2);
   const hasMore = sources.length > 2;
 
   return (
