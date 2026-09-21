@@ -1,11 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer, { type User } from '../../features/auth/authSlice';
 import settingsReducer from '../../features/settings/settingsSlice';
 import { AccountSettingsPage } from './AccountSettingsPage';
+
+// jsdom has no canvas; the QR is a picture of the server's URI and is not
+// what these tests are about.
+vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,stub' } }));
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 const baseUser = {
@@ -98,6 +102,55 @@ describe('Account settings', () => {
     expect(screen.getByText('How you sign in')).toBeInTheDocument();
     expect(screen.getByText('Google')).toBeInTheDocument();
     expect(screen.queryByLabelText('Current password')).not.toBeInTheDocument();
+  });
+
+  it('enrols an authenticator app and shows the recovery codes once', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes('/mfa/setup/')) {
+        return jsonResponse(200, { secret: 'JBSWY3DPEHPK3PXP', otpauth_uri: 'otpauth://totp/Revenact:alice%40acme.io?secret=JBSWY3DPEHPK3PXP&issuer=Revenact' });
+      }
+      if (String(url).includes('/mfa/confirm/')) {
+        return jsonResponse(200, { recovery_codes: ['abcde-fghjk', 'mnpqr-stuvw'] });
+      }
+      throw new Error(`unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    const store = renderPage({ has_password: true, mfa_enrolled: false });
+
+    await user.click(screen.getByRole('button', { name: 'Set up an authenticator app' }));
+    expect(await screen.findByText('JBSWY3DPEHPK3PXP')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText(/enter the six-digit code/i), '123456');
+    await user.click(screen.getByRole('button', { name: 'Turn on' }));
+
+    expect(await screen.findByText('abcde-fghjk')).toBeInTheDocument();
+    expect(screen.getByText(/will not be shown again/)).toBeInTheDocument();
+    expect(store.getState().auth.user?.mfa_enrolled).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/me/mfa/confirm/'),
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ code: '123456' }) })
+    );
+  });
+
+  it('turning two-factor off needs a current code', async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (String(url).includes('/mfa/disable/')) return jsonResponse(200, { enrolled: false });
+      throw new Error(`unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    const store = renderPage({ has_password: true, mfa_enrolled: true });
+
+    await user.click(screen.getByRole('button', { name: 'Turn off' }));
+    await user.type(screen.getByLabelText(/a current code/i), '654321');
+    await user.click(screen.getByRole('button', { name: 'Turn off two-factor' }));
+
+    await waitFor(() => expect(store.getState().auth.user?.mfa_enrolled).toBe(false));
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/me/mfa/disable/'),
+      expect.objectContaining({ body: JSON.stringify({ code: '654321' }) })
+    );
   });
 
   it('assumes a password for a user cached before the field existed', () => {

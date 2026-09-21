@@ -23,3 +23,17 @@ export const useOrgCurrency = (): CurrencyCode =>
 // what it grants is the real question.
 export const useCapability = (capability: Capability): boolean =>
   useAppSelector((state) => state.auth.user?.permissions?.includes(capability) ?? false);
+
+// Platform access is two things at once: being Revenact staff (a superuser,
+// belonging to no tenant) and having signed in with a second factor in
+// *this* session. The backend's IsPlatformStaff enforces both; this only
+// decides what to show, and which of the two is missing when it is not.
+// Three primitive selectors rather than one returning an object, so
+// react-redux's reference check sees stable values and never re-renders
+// for nothing.
+export const usePlatformAccess = () => {
+  const isStaff = useAppSelector((state) => state.auth.user?.is_superuser === true);
+  const mfaVerified = useAppSelector((state) => state.auth.mfaVerified === true);
+  const mfaEnrolled = useAppSelector((state) => state.auth.user?.mfa_enrolled === true);
+  return { isStaff, mfaVerified, mfaEnrolled };
+};

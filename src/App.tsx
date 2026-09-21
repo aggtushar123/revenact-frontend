@@ -77,6 +77,12 @@ import { SkillsPage } from './pages/brain/Skills';
 import { GraphPage } from './pages/brain/Graph';
 import { OnboardingCarousel } from './pages/onboarding/OnboardingCarousel';
 import { AuthCallback } from './pages/auth/AuthCallback';
+import { RequirePlatform } from './components/auth/RequirePlatform';
+import { PlatformLayout } from './layouts/PlatformLayout';
+import { PlatformOverview } from './pages/platform/PlatformOverview';
+import { PlatformOrganisations } from './pages/platform/PlatformOrganisations';
+import { PlatformOrganisationDetail } from './pages/platform/PlatformOrganisationDetail';
+import { PlatformStaff } from './pages/platform/PlatformStaff';
 
 function ThemeSynchronizer() {
   const theme = useAppSelector((state) => state.settings.theme);
@@ -143,6 +149,24 @@ function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* The internal portal: Revenact staff, second factor required. Its
+            own shell, never the tenant one. */}
+        <Route
+          path="/platform"
+          element={
+            <ProtectedRoute>
+              <RequirePlatform>
+                <PlatformLayout />
+              </RequirePlatform>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<PlatformOverview />} />
+          <Route path="organisations" element={<PlatformOrganisations />} />
+          <Route path="organisations/:id" element={<PlatformOrganisationDetail />} />
+          <Route path="staff" element={<PlatformStaff />} />
+        </Route>
 
         {/* Protected routes */}
         <Route path="/" element={

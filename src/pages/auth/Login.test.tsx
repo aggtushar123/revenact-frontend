@@ -118,6 +118,61 @@ describe('Login page', () => {
     );
   });
 
+  it('asks for a second factor when the password alone is not enough', async () => {
+    // A JWT whose payload carries mfa:true, as the backend mints after the code.
+    const payload = btoa(JSON.stringify({ mfa: true, user_id: 1 })).replace(/=+$/, '');
+    const mfaAccess = `h.${payload}.s`;
+    const fetchMock = stubFetch({
+      ...NO_PROVIDERS,
+      '/auth/login/mfa/': { body: { user: mockUser, access: mfaAccess, refresh: 'refresh.jwt' } },
+      '/auth/login/': { body: { mfa_required: true, mfa_token: 'challenge-token' } },
+    });
+    const user = userEvent.setup();
+
+    const store = renderLogin();
+    await fillCredentials(user, 'alice@acme.io', 'supersecret1');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+
+    expect(await screen.findByText('Enter your code')).toBeInTheDocument();
+    expect(store.getState().auth.isAuthenticated).toBe(false);
+    expect(localStorage.getItem('revenact_access_token')).toBeNull();
+
+    await user.type(screen.getByLabelText('Code'), '123456');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    await waitFor(() => expect(screen.getByText('Dashboard Home')).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/api/v1/auth/login/mfa/'),
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ mfa_token: 'challenge-token', code: '123456' }),
+      })
+    );
+    expect(store.getState().auth.mfaVerified).toBe(true);
+  });
+
+  it('shows the backend’s reason for a wrong code and stays on the code form', async () => {
+    stubFetch({
+      ...NO_PROVIDERS,
+      '/auth/login/mfa/': {
+        ok: false,
+        status: 401,
+        body: { success: false, error: { code: 'MFA_CODE_INVALID', message: 'That code is not right.' } },
+      },
+      '/auth/login/': { body: { mfa_required: true, mfa_token: 'challenge-token' } },
+    });
+    const user = userEvent.setup();
+
+    renderLogin();
+    await fillCredentials(user, 'alice@acme.io', 'supersecret1');
+    await user.click(screen.getByRole('button', { name: 'Sign in' }));
+    await user.type(await screen.findByLabelText('Code'), '000000');
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(await screen.findByText('That code is not right.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Code')).toBeInTheDocument();
+  });
+
   it('links "Forgot password?" to the forgot-password page', async () => {
     stubFetch(NO_PROVIDERS);
     const user = userEvent.setup();

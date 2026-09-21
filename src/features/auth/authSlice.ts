@@ -93,6 +93,12 @@ export interface User {
   tour_completed_at?: string | null;
   /** Only `/auth/me/` carries this; login and list rows do not. */
   sign_in_providers?: string[];
+  /** Revenact's own staff: belongs to no tenant, administers all of them. */
+  is_superuser?: boolean;
+  /** `/auth/me/` only: whether an authenticator app is enrolled. */
+  mfa_enrolled?: boolean;
+  /** `/auth/me/` only: whether this person owns their organisation. */
+  is_owner?: boolean;
 }
 
 interface AuthState {
@@ -102,6 +108,28 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  /** A password was accepted and a second factor is owed: the challenge
+   * token the code is sent back with. Null outside that moment. Optional
+   * in the type only so the many tests that preload an auth state need
+   * not know about it; the slice always sets it. */
+  mfaChallenge?: string | null;
+  /** Whether this session passed a second factor. Read from the access
+   * token's `mfa` claim, which only the second-factor login mints and
+   * refresh preserves; never set from anything the client decides. */
+  mfaVerified?: boolean;
+}
+
+/** The claims of a JWT, without verifying it: the server verifies, this
+ * only reads what the server put there for display and routing. */
+export function tokenClaims(token: string | null): Record<string, unknown> {
+  if (!token) return {};
+  try {
+    const payload = token.split('.')[1] ?? '';
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return {};
+  }
 }
 
 interface LoginPayload {
@@ -158,18 +186,25 @@ const initialState: AuthState = {
   isAuthenticated: persisted.isAuthenticated ?? false,
   isLoading: false,
   error: null,
+  mfaChallenge: null,
+  mfaVerified: tokenClaims(persisted.accessToken ?? null).mfa === true,
 };
 
 // --- Async thunks ---
-export const login = createAsyncThunk<LoginPayload, { email: string; password: string }, { rejectValue: string }>(
+/** What a password login resolves to: a session, or a second-factor
+ * challenge when the person has an authenticator enrolled. */
+export type LoginResult = LoginPayload | { mfaRequired: true; mfaToken: string };
+
+export const login = createAsyncThunk<LoginResult, { email: string; password: string }, { rejectValue: string }>(
   'auth/login',
   async ({ email, password }, { rejectWithValue }) => {
     try {
-      const data = await apiFetch<AuthResponse>('/auth/login/', {
+      const data = await apiFetch<AuthResponse | { mfa_required: true; mfa_token: string }>('/auth/login/', {
         method: 'POST',
         body: { email, password },
         skipAuthRetry: true, // a 401 here means bad credentials, not an expired token
       });
+      if ('mfa_required' in data) return { mfaRequired: true, mfaToken: data.mfa_token };
       return { user: data.user, accessToken: data.access, refreshToken: data.refresh };
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not reach the server. Please try again.';
@@ -177,6 +212,73 @@ export const login = createAsyncThunk<LoginPayload, { email: string; password: s
     }
   }
 );
+
+// The second half of a password login for someone with an authenticator
+// app: the challenge from `login` plus a six-digit code (or a recovery
+// code). Tokens minted here carry the `mfa` claim the platform requires.
+export const loginWithMfa = createAsyncThunk<
+  LoginPayload,
+  { mfaToken: string; code: string },
+  { rejectValue: string }
+>('auth/loginWithMfa', async ({ mfaToken, code }, { rejectWithValue }) => {
+  try {
+    const data = await apiFetch<AuthResponse>('/auth/login/mfa/', {
+      method: 'POST',
+      body: { mfa_token: mfaToken, code },
+      accessToken: null,
+      skipAuthRetry: true,
+    });
+    return { user: data.user, accessToken: data.access, refreshToken: data.refresh };
+  } catch (err) {
+    const body = err instanceof ApiError ? (err.body as { error?: { message?: string } } | undefined) : undefined;
+    return rejectWithValue(body?.error?.message ?? 'That code did not work. Try again.');
+  }
+});
+
+// Enrolling an authenticator app, from Account settings. `setup` starts
+// (or restarts) an enrolment; nothing is on until `confirm` proves the app
+// works, which also hands back the recovery codes, once.
+export const setupMfa = createAsyncThunk<{ secret: string; otpauth_uri: string }, void, { rejectValue: string }>(
+  'auth/setupMfa',
+  async (_, { rejectWithValue }) => {
+    try {
+      return await apiFetch<{ secret: string; otpauth_uri: string }>('/auth/me/mfa/setup/', { method: 'POST' });
+    } catch (err) {
+      return rejectWithValue(mfaErrorMessage(err, 'Could not start two-factor setup.'));
+    }
+  }
+);
+
+export const confirmMfa = createAsyncThunk<{ recovery_codes: string[] }, string, { rejectValue: string }>(
+  'auth/confirmMfa',
+  async (code, { rejectWithValue }) => {
+    try {
+      return await apiFetch<{ recovery_codes: string[] }>('/auth/me/mfa/confirm/', {
+        method: 'POST',
+        body: { code },
+      });
+    } catch (err) {
+      return rejectWithValue(mfaErrorMessage(err, 'That code is not right. Check the app and try again.'));
+    }
+  }
+);
+
+export const disableMfa = createAsyncThunk<void, string, { rejectValue: string }>(
+  'auth/disableMfa',
+  async (code, { rejectWithValue }) => {
+    try {
+      await apiFetch('/auth/me/mfa/disable/', { method: 'POST', body: { code } });
+    } catch (err) {
+      return rejectWithValue(mfaErrorMessage(err, 'Could not turn two-factor authentication off.'));
+    }
+  }
+);
+
+function mfaErrorMessage(err: unknown, fallback: string): string {
+  if (!(err instanceof ApiError)) return fallback;
+  const body = err.body as { error?: { message?: string } } | undefined;
+  return body?.error?.message ?? fallback;
+}
 
 // Second half of "Continue with Google / Microsoft". The provider talks to
 // the backend, which redirects to /auth/callback with a one-time hand-off
@@ -413,6 +515,8 @@ const authSlice = createSlice({
       state.refreshToken = null;
       state.isAuthenticated = false;
       state.error = null;
+      state.mfaChallenge = null;
+      state.mfaVerified = false;
       clearPersistedAuth();
     },
     clearError(state) {
@@ -426,13 +530,50 @@ const authSlice = createSlice({
         state.isLoading = true;
         state.error = null;
       })
-      .addCase(login.fulfilled, (state, action: PayloadAction<LoginPayload>) => {
+      .addCase(login.fulfilled, (state, action: PayloadAction<LoginResult>) => {
+        state.isLoading = false;
+        if ('mfaRequired' in action.payload) {
+          // Not signed in. The password was right; a code is owed.
+          state.mfaChallenge = action.payload.mfaToken;
+          return;
+        }
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
+        state.mfaChallenge = null;
+        state.mfaVerified = tokenClaims(action.payload.accessToken).mfa === true;
+        persistAuth(action.payload);
+      })
+      .addCase(loginWithMfa.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loginWithMfa.fulfilled, (state, action: PayloadAction<LoginPayload>) => {
         state.isLoading = false;
         state.user = action.payload.user;
         state.accessToken = action.payload.accessToken;
         state.refreshToken = action.payload.refreshToken;
         state.isAuthenticated = true;
+        state.mfaChallenge = null;
+        state.mfaVerified = tokenClaims(action.payload.accessToken).mfa === true;
         persistAuth(action.payload);
+      })
+      .addCase(loginWithMfa.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload ?? 'That code did not work.';
+      })
+      .addCase(confirmMfa.fulfilled, (state) => {
+        if (state.user) {
+          state.user.mfa_enrolled = true;
+          localStorage.setItem('revenact_user', JSON.stringify(state.user));
+        }
+      })
+      .addCase(disableMfa.fulfilled, (state) => {
+        if (state.user) {
+          state.user.mfa_enrolled = false;
+          localStorage.setItem('revenact_user', JSON.stringify(state.user));
+        }
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;
@@ -494,6 +635,7 @@ const authSlice = createSlice({
       // Refresh session
       .addCase(refreshSession.fulfilled, (state, action) => {
         state.accessToken = action.payload.accessToken;
+        state.mfaVerified = tokenClaims(action.payload.accessToken).mfa === true;
         localStorage.setItem('revenact_access_token', action.payload.accessToken);
         if (action.payload.refreshToken) {
           state.refreshToken = action.payload.refreshToken;

@@ -1,0 +1,267 @@
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { AlertCircle, ArrowLeft, Crown } from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import {
+  fetchOrganisation,
+  setOrganisationStatus,
+  transferOwnership,
+} from '../../features/platform/platformSlice';
+import { StatusPill } from './PlatformOrganisations';
+
+function when(iso: string | null) {
+  return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '—';
+}
+
+export function PlatformOrganisationDetail() {
+  const { id } = useParams();
+  const dispatch = useAppDispatch();
+  const { organisation, error } = useAppSelector((state) => state.platform);
+  const [reason, setReason] = useState('');
+  const [newOwner, setNewOwner] = useState<number | ''>('');
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (id) dispatch(fetchOrganisation(Number(id)));
+  }, [dispatch, id]);
+
+  if (!organisation) {
+    return (
+      <div className="space-y-4">
+        <Link to="/platform/organisations" className="inline-flex items-center gap-1 text-[12px] text-ink-muted hover:text-ink">
+          <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+          Organisations
+        </Link>
+        {error ? (
+          <div role="alert" className="flex items-center gap-2 text-[12px] text-danger p-3 bg-danger-dim rounded-lg">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            {error}
+          </div>
+        ) : (
+          <p className="text-[13px] text-ink-muted">Loading.</p>
+        )}
+      </div>
+    );
+  }
+
+  const suspended = organisation.status === 'suspended';
+
+  async function changeStatus(e: FormEvent) {
+    e.preventDefault();
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch(
+        setOrganisationStatus({ id: organisation!.id, status: suspended ? 'active' : 'suspended', reason: reason.trim() })
+      ).unwrap();
+      setReason('');
+    } catch (err) {
+      setActionError(typeof err === 'string' ? err : 'Could not change the status.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handOver(e: FormEvent) {
+    e.preventDefault();
+    if (newOwner === '') return;
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch(transferOwnership({ id: organisation!.id, userId: newOwner })).unwrap();
+      setNewOwner('');
+    } catch (err) {
+      setActionError(typeof err === 'string' ? err : 'Could not transfer ownership.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const candidates = organisation.memberships.filter((m) => m.status === 'active' && m.is_active && !m.is_owner);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <Link to="/platform/organisations" className="inline-flex items-center gap-1 text-[12px] text-ink-muted hover:text-ink">
+          <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+          Organisations
+        </Link>
+        <div className="flex flex-wrap items-center gap-3 mt-2">
+          <h1 className="text-[22px] font-semibold tracking-tight text-ink">{organisation.name}</h1>
+          <StatusPill status={organisation.status} />
+        </div>
+        <p className="text-[12.5px] text-ink-muted mt-1">
+          {organisation.slug} · created {when(organisation.created_at)} · {organisation.members_active} active members ·{' '}
+          {organisation.pending_requests} waiting · {organisation.open_invitations} invited
+        </p>
+      </div>
+
+      {(error || actionError) && (
+        <div role="alert" className="flex items-center gap-2 text-[12px] text-danger p-3 bg-danger-dim rounded-lg">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          {actionError ?? error}
+        </div>
+      )}
+
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Owner */}
+        <section className="rv-card p-4 space-y-3" aria-labelledby="owner-heading">
+          <h2 id="owner-heading" className="text-[13px] font-bold text-ink flex items-center gap-2">
+            <Crown className="w-4 h-4 text-ink-faint" aria-hidden="true" />
+            Owner
+          </h2>
+          {organisation.owner ? (
+            <div className="text-[13px]">
+              <div className="font-semibold text-ink">{organisation.owner.name}</div>
+              <div className="text-ink-muted">{organisation.owner.email}</div>
+            </div>
+          ) : (
+            <p className="text-[12.5px] text-warning">This organisation has no owner.</p>
+          )}
+          <form onSubmit={handOver} className="flex flex-wrap items-end gap-2 pt-1">
+            <div className="flex-1 min-w-[200px]">
+              <label htmlFor="new-owner" className="block text-[11.5px] text-ink-muted mb-1">
+                Hand over to
+              </label>
+              <select
+                id="new-owner"
+                value={newOwner}
+                onChange={(e) => setNewOwner(e.target.value === '' ? '' : Number(e.target.value))}
+                className="rv-input text-[12.5px]"
+              >
+                <option value="">Choose an active member</option>
+                {candidates.map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.name} · {m.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button type="submit" disabled={busy || newOwner === ''} className="rv-pill-primary disabled:opacity-40">
+              Transfer ownership
+            </button>
+          </form>
+          <p className="text-[11px] text-ink-faint">Only when the owner cannot do it themselves. The new owner becomes an Admin. Audited on the tenant's own trail.</p>
+        </section>
+
+        {/* Status */}
+        <section className="rv-card p-4 space-y-3" aria-labelledby="status-heading">
+          <h2 id="status-heading" className="text-[13px] font-bold text-ink">
+            {suspended ? 'Reactivate' : 'Suspend'}
+          </h2>
+          <p className="text-[12.5px] text-ink-muted">
+            {suspended
+              ? 'Sign-in is refused and every member holds nothing while suspended. Reactivating restores everything; nothing was deleted.'
+              : 'Refuses sign-in by every door and voids every member’s capabilities. Nothing is deleted. The reason goes on the record.'}
+          </p>
+          <form onSubmit={changeStatus} className="flex flex-wrap items-end gap-2">
+            <div className="flex-1 min-w-[200px]">
+              <label htmlFor="status-reason" className="block text-[11.5px] text-ink-muted mb-1">
+                Reason
+              </label>
+              <input
+                id="status-reason"
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                className="rv-input text-[12.5px]"
+                placeholder={suspended ? 'e.g. Invoice settled' : 'e.g. Non-payment, 60 days'}
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={busy || !reason.trim()}
+              className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold disabled:opacity-40 ${
+                suspended ? 'bg-accent text-on-accent' : 'bg-danger text-white'
+              }`}
+            >
+              {suspended ? 'Reactivate' : 'Suspend organisation'}
+            </button>
+          </form>
+        </section>
+      </div>
+
+      {/* Members */}
+      <section className="rv-card overflow-hidden" aria-labelledby="members-heading">
+        <h2 id="members-heading" className="text-[13px] font-bold text-ink px-4 pt-4 pb-2">
+          Members
+        </h2>
+        <table className="w-full text-[12.5px]">
+          <thead className="text-[11px] uppercase tracking-[0.08em] text-ink-faint text-left">
+            <tr className="border-y border-line-subtle">
+              <th className="px-4 py-2 font-semibold">Person</th>
+              <th className="px-4 py-2 font-semibold">Role</th>
+              <th className="px-4 py-2 font-semibold">Department</th>
+              <th className="px-4 py-2 font-semibold">Standing</th>
+              <th className="px-4 py-2 font-semibold">Last sign-in</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line-subtle">
+            {organisation.memberships.map((m) => (
+              <tr key={m.id}>
+                <td className="px-4 py-2">
+                  <div className="font-semibold text-ink flex items-center gap-1.5">
+                    {m.name}
+                    {m.is_owner && <Crown className="w-3.5 h-3.5 text-warning" aria-label="Owner" />}
+                  </div>
+                  <div className="text-[11px] text-ink-muted">{m.email}</div>
+                </td>
+                <td className="px-4 py-2 text-ink-muted">{m.role ?? '—'}</td>
+                <td className="px-4 py-2 text-ink-muted">{m.department ?? '—'}</td>
+                <td className="px-4 py-2">
+                  <StatusPill status={m.is_active ? m.status : 'archived'} />
+                </td>
+                <td className="px-4 py-2 text-ink-muted">{when(m.last_login)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <div className="grid md:grid-cols-2 gap-4">
+        <section className="rv-card p-4" aria-labelledby="domains-heading">
+          <h2 id="domains-heading" className="text-[13px] font-bold text-ink mb-2">
+            Domains
+          </h2>
+          {organisation.domains.length === 0 ? (
+            <p className="text-[12.5px] text-ink-faint">None claimed.</p>
+          ) : (
+            <ul className="space-y-1.5 text-[12.5px]">
+              {organisation.domains.map((d) => (
+                <li key={d.id} className="flex items-center justify-between gap-2">
+                  <span className="text-ink">
+                    {d.domain}
+                    {d.is_primary && <span className="text-ink-faint text-[11px]"> · primary</span>}
+                  </span>
+                  <StatusPill status={d.verification_status === 'verified' ? 'active' : d.verification_status === 'revoked' ? 'suspended' : 'pending'} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        <section className="rv-card p-4" aria-labelledby="events-heading">
+          <h2 id="events-heading" className="text-[13px] font-bold text-ink mb-2">
+            Recent events
+          </h2>
+          {organisation.recent_events.length === 0 ? (
+            <p className="text-[12.5px] text-ink-faint">Nothing yet.</p>
+          ) : (
+            <ul className="space-y-1.5 text-[12px]">
+              {organisation.recent_events.map((e, index) => (
+                <li key={`${e.at}-${index}`} className="flex items-baseline justify-between gap-3">
+                  <span className="text-ink font-mono-brand text-[11.5px]">{e.action}</span>
+                  <span className="text-ink-muted truncate">{e.actor || 'system'}</span>
+                  <span className={`shrink-0 ${e.outcome === 'failure' ? 'text-danger' : 'text-ink-faint'}`}>{when(e.at)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export default PlatformOrganisationDetail;
