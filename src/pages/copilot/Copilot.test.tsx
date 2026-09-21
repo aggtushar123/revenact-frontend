@@ -199,8 +199,8 @@ describe('Copilot (/copilot)', () => {
     const user = userEvent.setup();
     renderCopilot();
 
-    await user.click(await screen.findByRole('heading', { name: 'Internal Business Review', level: 4 }));
-    await user.click(await screen.findByRole('button', { name: 'Run' }));
+    await user.click(await screen.findByRole('button', { name: /Internal Business Review/ }));
+    await user.click(await screen.findByRole('button', { name: 'Run skill' }));
 
     const postCall = await vi.waitFor(() => {
       const call = fetchMock.mock.calls.find(([, o]) => o?.method === 'POST');

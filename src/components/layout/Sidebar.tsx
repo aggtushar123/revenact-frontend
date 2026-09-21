@@ -6,6 +6,7 @@ import {
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
   Brain, Flag, CheckSquare, MessageSquareWarning, Bot, Wand2,
   Sliders, LogOut,
+  Sparkles,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchProposals } from '../../features/proposals/proposalsSlice';
@@ -94,6 +95,7 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar py-2 flex flex-col gap-0.5 px-3">
         
         {/* Top Links */}
+        <NavItem to="/copilot" icon={<Sparkles className="w-[18px] h-[18px]" />} label="Copilot" isExpanded={isExpanded} />
         <NavItem to="/dashboard" icon={<LayoutGrid className="w-[18px] h-[18px]" />} label="Dashboard" isExpanded={isExpanded} />
         <NavItem to="/communications" icon={<MessageSquare className="w-[18px] h-[18px]" />} label="Communications" isExpanded={isExpanded} />
 

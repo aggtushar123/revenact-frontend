@@ -166,14 +166,19 @@ html.dark :where(.bg-accent, .bg-accent-hover) :where(.text-white) {
 }
 
 /* ─────────────────────────────────────────────────────────────
-   Typography utilities (Fallback to Tailwind sans)
+   Typography utilities. index.html preloads DM Serif Display, DM Mono and
+   Lato; these two utilities are where the first two are actually applied
+   (the body keeps the system stack for now). A serif display face at 400
+   is the house voice for greetings and headings; the mono face carries
+   numbers, ids and eyebrow labels with tabular figures.
 ───────────────────────────────────────────────────────────── */
 .font-display {
-  font-family: inherit;
-  font-weight: 600;
+  font-family: "DM Serif Display", Georgia, "Times New Roman", serif;
+  font-weight: 400;
 }
 .font-mono-brand {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: "DM Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
 }
 .font-body-brand {
   font-family: inherit;

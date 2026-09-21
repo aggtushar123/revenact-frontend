@@ -18,6 +18,8 @@ export function DashboardLayout() {
   // full-canvas, no-Navbar treatment — /scenarios itself is a plain
   // list page like any other, with the shared Navbar above it.
   const isScenarios = location.pathname.startsWith('/scenarios/');
+  // The Copilot is the home page: nothing above it, nothing framing it.
+  const isCopilot = location.pathname === '/copilot';
   const isSettings = location.pathname.startsWith('/settings');
   const isAccountSettings = location.pathname.startsWith('/account-settings');
 
@@ -50,8 +52,8 @@ export function DashboardLayout() {
     <div className="flex bg-surface h-screen w-screen overflow-hidden text-ink font-sans">
       <Sidebar />
       <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden rv-canvas">
-        {!isScenarios && <Navbar />}
-        <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
+        {!isScenarios && !isCopilot && <Navbar />}
+        <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
           <Outlet />
         </main>
       </div>
