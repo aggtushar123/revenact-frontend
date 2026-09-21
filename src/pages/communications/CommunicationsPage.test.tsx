@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
 import communicationsReducer from '../../features/communications/communicationsSlice';
+import mailReducer from '../../features/mail/mailSlice';
+import connectorsReducer from '../../features/connectors/connectorsSlice';
 import CommunicationsPage from './CommunicationsPage';
 
 const emailRow = {
@@ -55,31 +57,28 @@ const stats = {
   ticket_scope_note: 'Tickets are read by department.',
 };
 
-function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown> } = {}) {
-  const spy = vi.fn<(url: string) => Promise<unknown>>((url) => {
-    const ok = (body: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => body });
-    if (url.includes('/communications/stats/')) {
-      return ok({ ...stats, ...(overrides.stats ?? {}) });
+function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown>; mailbox?: unknown; connectors?: unknown[] } = {}) {
+  const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url, init) => {
+    const ok = (body: unknown, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => body });
+    if (url.includes('/communications/stats/')) return ok({ ...stats, ...(overrides.stats ?? {}) });
+    if (url.includes('/mail/connection/')) return ok({ connection: overrides.mailbox ?? { id: 1, provider: 'google', provider_display: 'Google', address: 'alice@acme.io', status: 'connected' }, providers: [] });
+    if (url.includes('/connectors/')) return ok(overrides.connectors ?? [{ id: 5, provider: 'zendesk', provider_display: 'Zendesk', name: 'Support desk', status: 'connected', is_enabled: true, department: '', department_display: '', customers: [], accounts: [], is_organisation_wide: true, ticket_count: 3, call_count: 0, last_record_at: null, has_credentials: true, config: {} }]);
+    if (url.includes('/copilot/messages/') && init?.method === 'POST') {
+      const content = JSON.parse(String(init.body)).content as string;
+      return ok({ id: 1, title: 'Chat', created_at: '', updated_at: '', messages: [{ id: 1, role: 'user', content, sources: [], questions: [] }, { id: 2, role: 'assistant', content: 'Two tickets and one reply.', sources: [], questions: [] }] });
     }
+    if (url.includes('/copilot/conversations/')) return ok([]);
     const results = overrides.rows ?? [emailRow, ticketRow];
     const kind = new URL(url, 'http://localhost').searchParams.get('kind');
     const filtered = kind ? results.filter((r) => (r as { kind: string }).kind === kind) : results;
-    return ok({
-      count: filtered.length,
-      next: null,
-      previous: null,
-      results: filtered,
-      truncated: false,
-      mode: 'needs',
-      scope: 'mine',
-    });
+    return ok({ count: filtered.length, next: null, previous: null, results: filtered, truncated: false, mode: 'needs', scope: 'mine' });
   });
   vi.stubGlobal('fetch', spy);
   return spy;
 }
 
 function renderPage() {
-  const store = configureStore({ reducer: { communications: communicationsReducer } });
+  const store = configureStore({ reducer: { communications: communicationsReducer, mail: mailReducer, connectors: connectorsReducer } });
   render(
     <Provider store={store}>
       <MemoryRouter>
@@ -93,165 +92,94 @@ function renderPage() {
 describe('CommunicationsPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    localStorage.clear();
   });
 
-  it('says how much is waiting and how long the worst has waited', async () => {
-    mockApi();
-    renderPage();
-    expect(await screen.findByText(/2 things are waiting on you/i)).toBeInTheDocument();
-    expect(screen.getByText(/oldest has waited 9 days/i)).toBeInTheDocument();
-  });
-
-  it('lists the queue with its waiting time, longest first', async () => {
+  it('lists the inbox with its waiting time, grouped by month', async () => {
     mockApi();
     renderPage();
     const queue = await screen.findByRole('region', { name: /queue/i });
-    const rows = within(queue).getAllByRole('button');
-    expect(rows[0]).toHaveTextContent('Dana Whitfield');
-    expect(rows[0]).toHaveTextContent('9d');
-    expect(rows[1]).toHaveTextContent('Zendesk #4182');
+    expect(await within(queue).findByText('Dana Whitfield')).toBeInTheDocument();
+    expect(within(queue).getByText('9d waiting')).toBeInTheDocument();
+    expect(within(queue).getByText('Zendesk #4182')).toBeInTheDocument();
+    expect(within(queue).getByRole('heading', { level: 3, name: /September/ })).toBeInTheDocument();
   });
 
-  it('shows the account context above the composer, which is the point of the page', async () => {
+  it('shows the folders with their counts and a dash for replies when no mailbox has been read', async () => {
+    mockApi({ stats: { has_mailbox: false, counts: { email: 0, question: 0, ticket: 1, call: 0 }, total: 1 } });
+    renderPage();
+    const folders = await screen.findByRole('navigation', { name: /folders/i });
+    expect(within(folders).getByRole('button', { name: /Replies owed/ })).toHaveTextContent('–');
+    expect(within(folders).getByRole('button', { name: /Open tickets/ })).toHaveTextContent('1');
+    expect(await screen.findByRole('button', { name: /connect mailbox/i })).toBeInTheDocument();
+  });
+
+  it('a folder narrows the inbox to one kind', async () => {
+    const spy = mockApi();
+    renderPage();
+    await screen.findByText('Dana Whitfield');
+    await userEvent.click(screen.getByRole('button', { name: /Open tickets/ }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith(expect.stringContaining('kind=ticket'), expect.anything()));
+    const queue = await screen.findByRole('region', { name: /queue/i });
+    await waitFor(() => expect(within(queue).queryByText('Dana Whitfield')).not.toBeInTheDocument());
+    expect(within(queue).getByText('Zendesk #4182')).toBeInTheDocument();
+  });
+
+  it('opens an item in place, with the account context above the composer, and goes back', async () => {
     mockApi();
     renderPage();
+    await userEvent.click(await screen.findByText('Dana Whitfield'));
     const detail = await screen.findByRole('region', { name: /selected item/i });
     expect(within(detail).getByText('34d')).toBeInTheDocument();
     expect(within(detail).getByText('$128.4K')).toBeInTheDocument();
-    expect(within(detail).getByText('5.2')).toBeInTheDocument();
-    expect(within(detail).getByText('Carl')).toBeInTheDocument();
-  });
-
-  it('selects the first row without being asked, so the pane is never empty beside a full list', async () => {
-    mockApi();
-    renderPage();
-    const detail = await screen.findByRole('region', { name: /selected item/i });
-    expect(within(detail).getByRole('heading', { level: 2 })).toHaveTextContent(
-      'Re: revised renewal terms'
-    );
-  });
-
-  it('changes the pane when another row is chosen', async () => {
-    mockApi();
-    renderPage();
-    const queue = await screen.findByRole('region', { name: /queue/i });
-    await userEvent.click(within(queue).getAllByRole('button')[1]);
-
-    const detail = screen.getByRole('region', { name: /selected item/i });
-    expect(within(detail).getByRole('heading', { level: 2 })).toHaveTextContent(
-      'Login fails for SSO users'
-    );
-  });
-
-  it('offers the right composer per channel, and a link out for a ticket', async () => {
-    mockApi();
-    renderPage();
-    const detail = await screen.findByRole('region', { name: /selected item/i });
-    expect(within(detail).getByRole('button', { name: /send reply/i })).toBeInTheDocument();
-
-    const queue = screen.getByRole('region', { name: /queue/i });
-    await userEvent.click(within(queue).getAllByRole('button')[1]);
-    expect(
-      within(screen.getByRole('region', { name: /selected item/i })).getByRole('link', {
-        name: /open in the source system/i,
-      })
-    ).toHaveAttribute('href', ticketRow.external_url);
-  });
-
-  it('cannot send an empty reply', async () => {
-    mockApi();
-    renderPage();
-    const detail = await screen.findByRole('region', { name: /selected item/i });
     expect(within(detail).getByRole('button', { name: /send reply/i })).toBeDisabled();
-
-    await userEvent.type(within(detail).getByLabelText(/reply/i), 'On its way.');
-    expect(within(detail).getByRole('button', { name: /send reply/i })).toBeEnabled();
+    await userEvent.click(screen.getByRole('button', { name: /^Inbox$/ }));
+    expect(await screen.findByRole('region', { name: /queue/i })).toBeInTheDocument();
   });
 
-  it('a tile filters the queue, and clicking it again clears the filter', async () => {
+  it('the sources rail shows only what is connected, and picking one narrows and becomes the Copilot context', async () => {
     const spy = mockApi();
     renderPage();
-    await screen.findByRole('region', { name: /queue/i });
-
-    const tile = screen.getByRole('button', { name: /open tickets/i });
-    await userEvent.click(tile);
-    expect(tile).toHaveAttribute('aria-pressed', 'true');
-    expect(spy.mock.calls.some(([url]) => String(url).includes('kind=ticket'))).toBe(true);
-
-    const queue = screen.getByRole('region', { name: /queue/i });
-    expect(within(queue).getAllByRole('button')).toHaveLength(1);
-
-    await userEvent.click(tile);
-    expect(tile).toHaveAttribute('aria-pressed', 'false');
+    const rail = await screen.findByRole('navigation', { name: /connected sources/i });
+    expect(await within(rail).findByRole('button', { name: 'Gmail' })).toBeInTheDocument();
+    expect(within(rail).getByRole('button', { name: 'Support desk' })).toBeInTheDocument();
+    await userEvent.click(within(rail).getByRole('button', { name: 'Support desk' }));
+    await waitFor(() => expect(spy).toHaveBeenCalledWith(expect.stringContaining('kind=ticket'), expect.anything()));
+    const copilot = screen.getByRole('complementary', { name: /copilot/i });
+    expect(within(copilot).getByText('Support desk')).toBeInTheDocument();
   });
 
-  it('shows a dash rather than a zero when no mailbox has ever been read', async () => {
-    mockApi({ stats: { has_mailbox: false, counts: { email: 0, question: 1, ticket: 0, call: 0 } } });
+  it('the Copilot rail sends a real message and can be hidden from the top bar', async () => {
+    mockApi();
     renderPage();
-    const tile = await screen.findByRole('button', { name: /replies owed/i });
-    expect(tile).toHaveTextContent('—');
-    expect(tile).toHaveTextContent(/no mailbox connected/i);
-    expect(screen.getByRole('link', { name: /connect mailbox/i })).toBeInTheDocument();
+    const copilot = await screen.findByRole('complementary', { name: /copilot/i });
+    await userEvent.type(within(copilot).getByPlaceholderText('Ask Revenact'), 'What is waiting?{enter}');
+    expect(await within(copilot).findByText('Two tickets and one reply.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: /hide copilot/i }));
+    expect(screen.queryByRole('complementary', { name: /copilot/i })).not.toBeInTheDocument();
+    expect(localStorage.getItem('revenact_comms_copilot')).toBe('off');
   });
 
-  it('treats an empty queue as an achievement, not a blank', async () => {
+  it('treats an empty inbox as inbox zero', async () => {
     mockApi({ rows: [], stats: { total: 0, oldest_waiting_days: null, counts: { email: 0, question: 0, ticket: 0, call: 0 } } });
     renderPage();
-    expect(await screen.findByText(/you are clear/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /see everything/i })).toBeInTheDocument();
+    expect(await screen.findByText('Inbox zero')).toBeInTheDocument();
+    expect(screen.getByText(/nothing between you and the rest of the day/i)).toBeInTheDocument();
   });
 
   it('explains a failure rather than showing half a picture', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async (url: string) => {
-        if (String(url).includes('/stats/')) {
-          return { ok: true, status: 200, json: async () => stats };
-        }
-        return { ok: false, status: 500, json: async () => ({ detail: 'Server error.' }) };
+      vi.fn((url: string) => {
+        if (url.includes('/communications/stats/')) return Promise.resolve({ ok: true, status: 200, json: async () => stats });
+        if (url.includes('/communications/')) return Promise.resolve({ ok: false, status: 500, json: async () => ({ detail: 'Server error.' }) });
+        if (url.includes('/connectors/')) return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ connection: null, providers: [] }) });
       })
     );
     renderPage();
     const alert = await screen.findByRole('alert');
-    expect(alert).toHaveTextContent(/could not load your queue/i);
-    expect(alert).toHaveTextContent(/rather than part of it/i);
+    expect(alert).toHaveTextContent(/could not load your inbox/i);
     expect(within(alert).getByRole('button', { name: /try again/i })).toBeInTheDocument();
-  });
-
-  it('switching scope refetches for the team', async () => {
-    const spy = mockApi();
-    renderPage();
-    await screen.findByRole('region', { name: /queue/i });
-
-    await userEvent.selectOptions(screen.getByLabelText(/showing/i), 'team');
-    expect(spy.mock.calls.some(([url]) => String(url).includes('scope=team'))).toBe(true);
-  });
-});
-
-describe('when one channel is over the cap', () => {
-  it('does not let the queue header argue with the tile', async () => {
-    // The server capped the merge at 203 rows while 283 are really waiting.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (url: string) => {
-        const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
-        if (String(url).includes('/stats/')) {
-          return ok({ ...stats, total: 283, counts: { email: 2, question: 1, ticket: 280, call: 0 } });
-        }
-        return ok({
-          count: 203,
-          next: null,
-          previous: null,
-          results: [emailRow],
-          truncated: true,
-          mode: 'needs',
-          scope: 'mine',
-        });
-      })
-    );
-    renderPage();
-    const queue = await screen.findByRole('region', { name: /queue/i });
-    expect(within(queue).getByText(/1 shown of 283 waiting/i)).toBeInTheDocument();
-    expect(screen.getByText(/more than we show is outstanding/i)).toBeInTheDocument();
   });
 });
