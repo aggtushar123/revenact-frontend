@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ClipboardList, Flag, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { ChevronDown, Flag, Clock, AlertCircle, Circle, CheckCircle2, Building2, Layers } from 'lucide-react';
 import { useAppSelector } from '../../hooks';
 import { formatCompactMoney, formatDate } from '../../features/customers/formatters';
 import { ApiError } from '../../lib/apiClient';
-import { fetchCockpitSummary, fetchMyTasks } from './cockpitApi';
+import { fetchCockpitSummary, fetchMyTasks, updateTaskStatus } from './cockpitApi';
 import { RENEWAL_WINDOW_OPTIONS } from './cockpitTypes';
 import type { CockpitHealthBreakdown, CockpitSummary, CockpitTask, RenewalWindowDays } from './cockpitTypes';
 
@@ -45,13 +45,36 @@ function isOverdue(dueIso: string): boolean {
 
 function HealthRing({ health }: { health: CockpitHealthBreakdown }) {
   const total = health.good + health.average + health.poor;
+  const label = total === 0 ? 'No health data' : `${health.good} good, ${health.average} average, ${health.poor} poor`;
   if (total === 0) {
-    return <div className="w-7 h-7 rounded-full border-[4px] border-line-subtle mt-2" />;
+    return <div className="w-8 h-8 rounded-full border-[5px] border-line-subtle" role="img" aria-label={label} />;
   }
   const goodDeg = (health.good / total) * 360;
   const averageDeg = (health.average / total) * 360;
   const gradient = `conic-gradient(var(--success) 0deg ${goodDeg}deg, var(--warning) ${goodDeg}deg ${goodDeg + averageDeg}deg, var(--danger) ${goodDeg + averageDeg}deg 360deg)`;
-  return <div className="w-7 h-7 rounded-full mt-2" style={{ background: gradient }} />;
+  return (
+    <div className="w-8 h-8 rounded-full" style={{ background: gradient }} role="img" aria-label={label}>
+      <div className="w-full h-full rounded-full border-[5px] border-transparent" style={{ background: 'var(--bg-surface)', backgroundClip: 'padding-box' }} />
+    </div>
+  );
+}
+
+/** One number with its eyebrow. Numbers in DM Mono with tabular figures. */
+function Stat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div>
+      <div className="font-mono-brand text-[10.5px] uppercase tracking-[0.12em] text-ink-faint">{label}</div>
+      <div className="font-mono-brand text-[22px] text-ink leading-none mt-1.5">{value}</div>
+    </div>
+  );
+}
+
+function ParentIcon({ type, className = 'w-3.5 h-3.5' }: { type: 'customer' | 'account'; className?: string }) {
+  return type === 'customer' ? (
+    <Building2 className={`${className} text-ink-muted`} aria-label="Organisation" />
+  ) : (
+    <Layers className={`${className} text-ink-muted`} aria-label="Account" />
+  );
 }
 
 export function CockpitView() {
@@ -63,6 +86,8 @@ export function CockpitView() {
   const [tasks, setTasks] = useState<CockpitTask[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [completing, setCompleting] = useState<number | null>(null);
+  const [taskError, setTaskError] = useState<string | null>(null);
 
   const [renewalWindow, setRenewalWindow] = useState<RenewalWindowDays>(30);
   const [isWindowMenuOpen, setIsWindowMenuOpen] = useState(false);
@@ -121,6 +146,24 @@ export function CockpitView() {
   const upcomingTasks = activeTasks.filter((t) => !isOverdue(t.due_date));
   const displayedTasks = taskTab === 'upcoming' ? upcomingTasks : overdueTasks;
 
+  // Ticking a task off: optimistic removal from the list, put back if the
+  // server says no. The row's status is the server's word; nothing here
+  // decides it.
+  async function completeTask(task: CockpitTask) {
+    setTaskError(null);
+    setCompleting(task.id);
+    const before = tasks;
+    setTasks((current) => current.map((t) => (t.id === task.id ? { ...t, status: 'completed' } : t)));
+    try {
+      await updateTaskStatus(task.id, 'completed');
+    } catch (err) {
+      setTasks(before);
+      setTaskError(err instanceof ApiError ? err.message : 'Could not complete that task.');
+    } finally {
+      setCompleting(null);
+    }
+  }
+
   function goToRenewalItem(item: { id: number; type: 'customer' | 'account' }) {
     setIsRenewalsListOpen(false);
     navigate(item.type === 'customer' ? `/organizations/${item.id}` : `/accounts/${item.id}`);
@@ -128,316 +171,233 @@ export function CockpitView() {
 
   if (isLoading && !summary) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-[13px] text-ink-faint">
-        Loading…
+      <div className="w-full max-w-[1100px] mx-auto px-6 pt-6 space-y-4" aria-busy="true" aria-label="Loading your Cockpit">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2 h-[132px] rounded-xl bg-surface/60 border border-line-subtle" />
+          <div className="h-[132px] rounded-xl bg-surface/60 border border-line-subtle" />
+        </div>
+        <div className="h-[280px] rounded-xl bg-surface/60 border border-line-subtle" />
       </div>
     );
   }
 
   if (error || !summary) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-[13px] text-danger">
+      <div className="w-full h-full flex items-center justify-center text-[13px] text-danger" role="alert">
         {error ?? 'Could not load your Cockpit.'}
       </div>
     );
   }
 
   return (
-    <div className="w-full flex flex-col gap-5 h-full">
-      {/* Top Split Sections */}
-      <div className="grid grid-cols-3 gap-5 shrink-0 items-start">
-        {/* Left: My Portfolio Summary */}
-        <div className="col-span-2 bg-surface rounded-xl shadow-[0px_4px_16px_rgba(0,0,0,0.02)] p-6">
-          <h2 className="text-[14.5px] font-bold text-accent tracking-tight mb-7">My Portfolio Summary</h2>
-
-          <div className="flex gap-16">
-            {/* Organizations */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-[13px] font-bold text-ink-muted tracking-tight">
-                <div className="text-danger flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-[11px] h-[11px]"><path d="M12 2L2 22h20L12 2z"/></svg>
-                </div>
-                Organizations
-              </div>
-              <div className="flex gap-8 items-end">
-                <div>
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Count</div>
-                  <div className="text-[22px] font-bold text-ink leading-none">{summary.customers.count}</div>
-                </div>
-                <div>
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Portfolio Value</div>
-                  <div className="text-[22px] font-bold text-ink leading-none">
-                    {formatCompactMoney(summary.customers.value, currency)}
+    <div className="w-full h-full overflow-y-auto custom-scrollbar">
+      <div className="w-full max-w-[1100px] mx-auto px-6 pt-4 pb-16 flex flex-col gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* My book */}
+          <section className="lg:col-span-2 bg-surface border border-line rounded-xl p-5" aria-labelledby="book-heading">
+            <h2 id="book-heading" className="text-[13px] font-semibold text-ink">My book</h2>
+            <div className="mt-5 grid grid-cols-2 gap-8">
+              {(
+                [
+                  ['customer', 'Organizations', summary.customers],
+                  ['account', 'Accounts', summary.accounts],
+                ] as const
+              ).map(([type, label, book]) => (
+                <div key={type}>
+                  <div className="flex items-center gap-2 text-[12.5px] font-medium text-ink-muted">
+                    <ParentIcon type={type} />
+                    {label}
+                  </div>
+                  <div className="mt-3 flex items-end gap-8">
+                    <Stat label="Count" value={book.count} />
+                    <Stat label="Portfolio value" value={formatCompactMoney(book.value, currency)} />
+                    <div>
+                      <div className="font-mono-brand text-[10.5px] uppercase tracking-[0.12em] text-ink-faint">Health</div>
+                      <div className="mt-1.5"><HealthRing health={book.health} /></div>
+                    </div>
                   </div>
                 </div>
-                <div className="ml-2">
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Health Distribution</div>
-                  <HealthRing health={summary.customers.health} />
-                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Renewals */}
+          <section className="bg-surface border border-line rounded-xl p-5 relative" aria-labelledby="renewals-heading">
+            <div className="flex items-start justify-between gap-2">
+              <h2 id="renewals-heading" className="text-[13px] font-semibold text-ink">Renewals</h2>
+              <div ref={windowMenuRef} className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsWindowMenuOpen((open) => !open)}
+                  aria-haspopup="listbox"
+                  aria-expanded={isWindowMenuOpen}
+                  className="inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] text-ink-muted hover:text-ink hover:border-line-strong transition-colors duration-[var(--dur-fast)]"
+                >
+                  Next {renewalWindow} Days <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                </button>
+                {isWindowMenuOpen && (
+                  <div role="listbox" className="absolute right-0 top-[calc(100%+4px)] w-36 bg-elevated border border-line rounded-lg shadow-md overflow-hidden z-10">
+                    {RENEWAL_WINDOW_OPTIONS.map((days) => (
+                      <button
+                        key={days}
+                        type="button"
+                        role="option"
+                        aria-selected={days === renewalWindow}
+                        onClick={() => {
+                          setRenewalWindow(days);
+                          setIsWindowMenuOpen(false);
+                          loadSummary(days);
+                        }}
+                        className={`w-full text-left px-3 py-2 text-[12px] transition-colors duration-[var(--dur-fast)] ${days === renewalWindow ? 'bg-accent-dim text-ink' : 'text-ink-muted hover:bg-subtle hover:text-ink'}`}
+                      >
+                        Next {days} Days
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Accounts */}
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-[13px] font-bold text-ink-muted tracking-tight">
-                <div className="text-info flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-[11px] h-[11px]"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                </div>
-                Accounts
-              </div>
-              <div className="flex gap-8 items-end">
-                <div>
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Count</div>
-                  <div className="text-[22px] font-bold text-ink leading-none">{summary.accounts.count}</div>
-                </div>
-                <div>
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Portfolio Value</div>
-                  <div className="text-[22px] font-bold text-ink leading-none">
-                    {formatCompactMoney(summary.accounts.value, currency)}
+            <div className="mt-5 grid grid-cols-2 gap-6">
+              {(
+                [
+                  ['customer', 'Organizations', summary.renewals.customers],
+                  ['account', 'Accounts', summary.renewals.accounts],
+                ] as const
+              ).map(([type, label, book]) => (
+                <div key={type}>
+                  <div className="flex items-center gap-2 text-[12.5px] font-medium text-ink-muted">
+                    <ParentIcon type={type} />
+                    {label}
+                  </div>
+                  <div className="mt-3 flex items-end gap-6">
+                    <Stat label="Count" value={book.count} />
+                    <Stat label="Value" value={formatCompactMoney(book.value, currency)} />
                   </div>
                 </div>
-                <div className="ml-2">
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Health Distribution</div>
-                  <HealthRing health={summary.accounts.health} />
-                </div>
-              </div>
+              ))}
             </div>
-          </div>
-        </div>
 
-        {/* Right: Renewals */}
-        <div className="col-span-1 bg-surface rounded-xl shadow-[0px_4px_16px_rgba(0,0,0,0.02)] p-6 relative">
-          <h2 className="text-[14.5px] font-bold text-accent tracking-tight mb-7">Renewals</h2>
-
-          <div className="absolute top-5 right-5" ref={windowMenuRef}>
-            <button
-              onClick={() => setIsWindowMenuOpen((open) => !open)}
-              className="border border-line rounded-md px-2 py-1 text-[11px] text-ink-muted font-bold flex items-center gap-1 hover:bg-subtle transition-colors cursor-pointer"
-            >
-              Next {renewalWindow} Days <ChevronDown className="w-3.5 h-3.5 stroke-[2.5px]" />
-            </button>
-            {isWindowMenuOpen && (
-              <div className="absolute right-0 top-[calc(100%+4px)] w-32 bg-elevated border border-line rounded-lg shadow-xl overflow-hidden z-10">
-                {RENEWAL_WINDOW_OPTIONS.map((days) => (
-                  <button
-                    key={days}
-                    onClick={() => {
-                      setRenewalWindow(days);
-                      setIsWindowMenuOpen(false);
-                      loadSummary(days);
-                    }}
-                    className={`w-full text-left px-3 py-2 text-[11.5px] font-semibold transition-colors ${days === renewalWindow ? 'text-accent bg-accent-dim' : 'text-ink-muted hover:bg-subtle hover:text-ink'}`}
-                  >
-                    Next {days} Days
-                  </button>
-                ))}
+            {summary.renewals.items.length > 0 && (
+              <div className="mt-4" ref={renewalsListRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsRenewalsListOpen((open) => !open)}
+                  aria-expanded={isRenewalsListOpen}
+                  className="inline-flex items-center gap-1 text-[12px] text-ink-muted hover:text-ink transition-colors duration-[var(--dur-fast)]"
+                >
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-[var(--dur-fast)] ${isRenewalsListOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
+                  View {summary.renewals.items.length} renewing {summary.renewals.items.length === 1 ? 'item' : 'items'}
+                </button>
+                {isRenewalsListOpen && (
+                  <ul className="absolute left-5 right-5 top-full mt-2 bg-elevated border border-line rounded-lg shadow-md z-20 max-h-[260px] overflow-y-auto custom-scrollbar p-1.5 divide-y divide-line-subtle">
+                    {summary.renewals.items.map((item) => (
+                      <li key={`${item.type}-${item.id}`}>
+                        <button
+                          type="button"
+                          onClick={() => goToRenewalItem(item)}
+                          className="w-full flex items-center gap-2.5 py-2 px-2 rounded-md hover:bg-subtle transition-colors duration-[var(--dur-fast)] text-left"
+                        >
+                          <ParentIcon type={item.type} className="w-3.5 h-3.5 shrink-0" />
+                          <span className="text-[12.5px] font-medium text-ink truncate flex-1">{item.name}</span>
+                          <span className="font-mono-brand text-[11.5px] text-ink-muted shrink-0">{formatCompactMoney(item.value, currency)}</span>
+                          <span className="font-mono-brand text-[11px] text-ink-faint shrink-0 w-[68px] text-right">{formatDate(item.renewal_date)}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
-          </div>
+          </section>
+        </div>
 
-          <div className="flex gap-10">
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-[13px] font-bold text-ink-muted tracking-tight">
-                <div className="text-danger flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-[11px] h-[11px]"><path d="M12 2L2 22h20L12 2z"/></svg>
-                </div>
-                Organizations
-              </div>
-              <div className="flex gap-6 items-end">
-                <div>
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Count</div>
-                  <div className="text-[22px] font-bold text-ink leading-none">
-                    {summary.renewals.customers.count}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Value</div>
-                  <div className="text-[22px] font-bold text-ink leading-none">
-                    {formatCompactMoney(summary.renewals.customers.value, currency)}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2 text-[13px] font-bold text-ink-muted tracking-tight">
-                <div className="text-info flex items-center justify-center">
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-[11px] h-[11px]"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                </div>
-                Accounts
-              </div>
-              <div className="flex gap-6 items-end">
-                <div>
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Count</div>
-                  <div className="text-[22px] font-bold text-ink leading-none">
-                    {summary.renewals.accounts.count}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11.5px] font-bold text-ink-faint mb-1.5">Value</div>
-                  <div className="text-[22px] font-bold text-ink leading-none">
-                    {formatCompactMoney(summary.renewals.accounts.value, currency)}
-                  </div>
-                </div>
-              </div>
+        {/* My tasks */}
+        <section className="bg-surface border border-line rounded-xl" aria-labelledby="tasks-heading">
+          <div className="px-5 pt-5 flex flex-wrap items-center justify-between gap-3">
+            <h2 id="tasks-heading" className="text-[13px] font-semibold text-ink">My tasks</h2>
+            <div role="tablist" aria-label="Task lists" className="inline-flex items-center gap-1 rounded-full border border-line p-0.5">
+              {(
+                [
+                  ['upcoming', `Upcoming (${upcomingTasks.length})`],
+                  ['overdue', `Overdue (${overdueTasks.length})`],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={taskTab === key}
+                  onClick={() => setTaskTab(key)}
+                  className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors duration-[var(--dur-fast)] ${taskTab === key ? 'bg-accent text-on-accent' : 'text-ink-muted hover:text-ink'}`}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Real drill-down — every renewing Customer/Account, soonest-
-              first. Collapsed behind this toggle rather than shown inline:
-              at any real number of renewals this list made the card taller
-              than My Portfolio Summary next to it, which either stretched
-              that row's height (stealing space from My Tasks below, given
-              the shared h-full column) or stretched Portfolio Summary to
-              match it for no reason of its own. Popped over the page as an
-              absolutely-positioned panel instead, so opening it doesn't
-              change this card's height at all — the full list is still one
-              click away, just not paid for in layout space by default. */}
-          {summary.renewals.items.length > 0 && (
-            <div className="mt-3" ref={renewalsListRef}>
-              <button
-                onClick={() => setIsRenewalsListOpen((open) => !open)}
-                className="flex items-center gap-1 text-[11.5px] font-bold text-ink-faint hover:text-accent transition-colors"
-              >
-                <ChevronDown
-                  className={`w-3.5 h-3.5 stroke-[2.5px] transition-transform ${isRenewalsListOpen ? 'rotate-180' : ''}`}
-                />
-                View {summary.renewals.items.length} renewing{' '}
-                {summary.renewals.items.length === 1 ? 'item' : 'items'}
-              </button>
-
-              {isRenewalsListOpen && (
-                <div className="absolute left-6 right-6 top-full mt-2 bg-elevated border border-line rounded-lg shadow-xl z-20 flex flex-col gap-1 max-h-[260px] overflow-y-auto custom-scrollbar p-2">
-                  {summary.renewals.items.map((item) => (
-                    <button
-                      key={`${item.type}-${item.id}`}
-                      onClick={() => goToRenewalItem(item)}
-                      className="w-full flex items-center gap-2 py-1.5 px-1 rounded-md hover:bg-subtle transition-colors text-left cursor-pointer"
-                    >
-                      <div className={item.type === 'customer' ? 'text-danger' : 'text-info'}>
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-[9px] h-[9px]">
-                          {item.type === 'customer' ? <path d="M12 2L2 22h20L12 2z" /> : <rect x="3" y="3" width="18" height="18" rx="2" />}
-                        </svg>
-                      </div>
-                      <span className="text-[12px] font-bold text-ink truncate flex-1">{item.name}</span>
-                      <span className="text-[11px] font-semibold text-ink-muted shrink-0">
-                        {formatCompactMoney(item.value, currency)}
-                      </span>
-                      <span className="text-[11px] text-ink-faint shrink-0 w-[64px] text-right">
-                        {formatDate(item.renewal_date)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+          {taskError && (
+            <p role="alert" className="mx-5 mt-3 text-[12px] text-danger bg-danger-dim rounded-lg px-3 py-2">
+              {taskError}
+            </p>
           )}
-        </div>
-      </div>
 
-      {/* Bottom section: My Tasks */}
-      <div className="bg-surface rounded-xl shadow-[0px_4px_16px_rgba(0,0,0,0.02)] pt-5 pb-2 relative flex-1 min-h-0 flex flex-col">
-        <div className="px-6 flex items-center gap-2 mb-6 shrink-0">
-          <div className="bg-accent p-[2px] rounded-md text-on-accent">
-            <ClipboardList className="w-[14px] h-[14px]" strokeWidth={2.5} />
-          </div>
-          <h2 className="text-[14.5px] font-bold text-accent tracking-tight">My Tasks</h2>
-        </div>
+          {displayedTasks.length === 0 ? (
+            <div className="px-5 py-14 text-center">
+              <p className="text-[13px] text-ink-muted">
+                {taskTab === 'overdue' ? 'Nothing overdue.' : 'Nothing coming up.'}
+              </p>
+              <p className="text-[12px] text-ink-faint mt-1">Tasks on the organisations and accounts you own appear here.</p>
+            </div>
+          ) : (
+            <ul className="mt-3 divide-y divide-line-subtle">
+              {displayedTasks.map((task) => {
+                const priority = PRIORITY_STYLES[task.priority];
+                const statusStyle = STATUS_STYLES[task.status as 'pending' | 'in-progress'] ?? STATUS_STYLES.pending;
+                const StatusIcon = statusStyle.icon;
+                const busy = completing === task.id;
+                return (
+                  <li key={task.id} className="flex items-center gap-3 px-5 py-3 hover:bg-subtle/60 transition-colors duration-[var(--dur-fast)]">
+                    <button
+                      type="button"
+                      onClick={() => completeTask(task)}
+                      disabled={busy}
+                      aria-label={`Mark "${task.title}" complete`}
+                      className="shrink-0 w-8 h-8 -ml-1.5 rounded-full flex items-center justify-center text-ink-faint hover:text-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50 group"
+                    >
+                      <Circle className="w-[18px] h-[18px] group-hover:hidden" strokeWidth={2} aria-hidden="true" />
+                      <CheckCircle2 className="w-[18px] h-[18px] hidden group-hover:block" strokeWidth={2} aria-hidden="true" />
+                    </button>
 
-        {/* Tabs */}
-        <div className="px-6 flex items-center gap-6 border-b border-line-subtle mb-1 shrink-0">
-          <div
-            onClick={() => setTaskTab('upcoming')}
-            className={`pb-3.5 text-[12.5px] tracking-tight font-bold cursor-pointer border-b-2 transition-colors relative top-[1px] ${taskTab === 'upcoming' ? 'text-accent border-accent' : 'text-ink-faint border-transparent hover:text-ink-muted'}`}
-          >
-            Upcoming ({upcomingTasks.length})
-          </div>
-          <div
-            onClick={() => setTaskTab('overdue')}
-            className={`pb-3.5 text-[12.5px] tracking-tight font-bold cursor-pointer border-b-2 transition-colors relative top-[1px] ${taskTab === 'overdue' ? 'text-accent border-accent' : 'text-ink-faint border-transparent hover:text-ink-muted'}`}
-          >
-            Overdue ({overdueTasks.length})
-          </div>
-        </div>
-
-        {/* Tab Content */}
-        {displayedTasks.length === 0 ? (
-          <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col items-center justify-center p-16 pb-20 pt-20">
-            <svg width="240" height="160" viewBox="0 0 240 160" fill="none" xmlns="http://www.w3.org/2000/svg">
-               <path d="M50 160 C 50 110, 80 50, 80 90" stroke="var(--accent)" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.7"/>
-               <path d="M50 160 C 50 120, 40 100, 30 110" stroke="var(--accent)" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.7"/>
-               <path d="M190 160 C 190 110, 160 50, 160 90" stroke="var(--accent)" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.7"/>
-               <path d="M190 160 C 190 120, 200 100, 210 110" stroke="var(--accent)" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.7"/>
-
-               <path d="M70 100 Q 120 160 170 100" stroke="var(--accent-dim)" strokeWidth="24" fill="none" strokeLinecap="round"/>
-               <path d="M85 110 Q 120 140 160 105" stroke="var(--accent)" strokeWidth="8" fill="none" strokeLinecap="round" opacity="0.5"/>
-
-               <path d="M80 90 Q 60 70 40 80" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" fill="none" opacity="0.6"/>
-               <path d="M80 90 Q 70 50 85 40" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" fill="none" opacity="0.6"/>
-               <path d="M80 90 Q 100 70 110 85" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" fill="none" opacity="0.6"/>
-
-               <path d="M160 90 Q 180 70 200 80" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" fill="none" opacity="0.6"/>
-               <path d="M160 90 Q 170 50 155 40" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" fill="none" opacity="0.6"/>
-               <path d="M160 90 Q 140 70 130 85" stroke="var(--accent)" strokeWidth="8" strokeLinecap="round" fill="none" opacity="0.6"/>
-
-               <circle cx="120" cy="50" r="16" fill="var(--bg-subtle)" opacity="0.8"/>
-            </svg>
-            <p className="text-ink-faint text-[13px] font-bold tracking-tight opacity-70 mt-6">Nothing here right now!</p>
-          </div>
-        ) : (
-          <div className="flex-1 overflow-y-auto custom-scrollbar flex flex-col px-6">
-            {displayedTasks.map((task) => {
-              const priority = PRIORITY_STYLES[task.priority];
-              const statusStyle = STATUS_STYLES[task.status as 'pending' | 'in-progress'];
-              const StatusIcon = statusStyle.icon;
-              return (
-                <div key={task.id} className="flex items-center py-4 border-b border-line-subtle last:border-0 hover:bg-subtle/50 transition-colors -mx-4 px-4 rounded-lg shrink-0">
-                  <div className="w-10 flex-shrink-0 flex justify-center">
-                    <CheckCircle2 className="w-[18px] h-[18px] text-ink-faint/50" strokeWidth={2.5} />
-                  </div>
-
-                  <div className="flex-1 min-w-0 pr-4">
-                    <h4 className="text-[13px] font-bold text-accent truncate mb-[1px]">{task.title}</h4>
-                    <div className="text-[10.5px] text-ink-faint font-bold uppercase tracking-wider">TASK-{task.id}</div>
-                  </div>
-
-                  <div className="w-[180px] flex items-center gap-3">
-                    <ClipboardList className="w-[15px] h-[15px] text-ink-faint" strokeWidth={2.5} />
-                    <span className="text-[12.5px] font-bold text-ink-muted truncate">{task.parent_name}</span>
-                  </div>
-
-                  <div className="w-[48px] flex justify-center border-l border-transparent">
-                    {task.parent_type === 'customer' ? (
-                      <div className="text-danger flex items-center justify-center">
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-[11px] h-[11px]"><path d="M12 2L2 22h20L12 2z"/></svg>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[13px] font-medium text-ink truncate">{task.title}</div>
+                      <div className="flex items-center gap-1.5 text-[11.5px] text-ink-muted mt-0.5 min-w-0">
+                        <ParentIcon type={task.parent_type} className="w-3 h-3" />
+                        <span className="truncate">{task.parent_name}</span>
+                        <span className="font-mono-brand text-[10.5px] text-ink-faint">· TASK-{task.id}</span>
                       </div>
-                    ) : (
-                      <div className="text-info flex items-center justify-center">
-                        <svg viewBox="0 0 24 24" fill="currentColor" className="w-[11px] h-[11px]"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                      </div>
-                    )}
-                  </div>
+                    </div>
 
-                  <div className={`w-[110px] flex items-center gap-1.5 px-2 py-0.5 rounded-full border ${priority.bg} ${priority.border}`}>
-                    <Flag className={`w-3 h-3 ${priority.color}`} />
-                    <span className={`text-[11px] font-bold ${priority.color}`}>
+                    <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[11px] font-medium ${priority.bg} ${priority.border} ${priority.color}`}>
+                      <Flag className="w-3 h-3" aria-hidden="true" />
                       {task.priority_display}
                     </span>
-                  </div>
 
-                  <div className="w-[110px] flex items-center gap-1.5 pl-3">
-                    <StatusIcon className={`w-3.5 h-3.5 ${statusStyle.color}`} />
-                    <span className={`text-[11.5px] font-semibold ${statusStyle.color}`}>{task.status_display}</span>
-                  </div>
+                    <span className={`hidden md:inline-flex items-center gap-1.5 w-[104px] text-[11.5px] ${statusStyle.color}`}>
+                      <StatusIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                      {task.status_display}
+                    </span>
 
-                  <div className="w-[90px] text-right text-[12.5px] text-ink-muted font-bold tracking-tight">
-                    {formatDate(task.due_date)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                    <span className={`font-mono-brand text-[12px] w-[84px] text-right ${isOverdue(task.due_date) ? 'text-danger' : 'text-ink-muted'}`}>
+                      {formatDate(task.due_date)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
       </div>
     </div>
   );

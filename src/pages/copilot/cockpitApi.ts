@@ -16,3 +16,9 @@ export function fetchCockpitSummary(days?: number): Promise<CockpitSummary> {
 export function fetchMyTasks(): Promise<CockpitTask[]> {
   return apiFetch<CockpitTask[]>('/tasks/?mine=true');
 }
+
+// Cockpit's tick-off: the one write on a Task outside its parent's own tab.
+// PATCH /api/v1/tasks/<id>/ accepts `status` only and answers the list shape.
+export function updateTaskStatus(id: number, status: CockpitTask['status']): Promise<CockpitTask> {
+  return apiFetch<CockpitTask>(`/tasks/${id}/`, { method: 'PATCH', body: { status } });
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -265,5 +265,62 @@ describe('CockpitView', () => {
     await user.click(await screen.findByText('Acme Co'));
 
     expect(await screen.findByText('ORG DETAIL PAGE')).toBeInTheDocument();
+  });
+});
+
+describe('CockpitView tick-off', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function stub(patchResponse: ReturnType<typeof jsonResponse>) {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        calls.push({ url, init });
+        if (url.includes('/cockpit/summary/')) {
+          return Promise.resolve(
+            jsonResponse(200, {
+              customers: { count: 1, value: 1000, health: { good: 1, average: 0, poor: 0 } },
+              accounts: { count: 0, value: 0, health: { good: 0, average: 0, poor: 0 } },
+              renewals: { window_days: 30, customers: { count: 0, value: 0 }, accounts: { count: 0, value: 0 }, items: [] },
+            })
+          );
+        }
+        if (/\/tasks\/7\/$/.test(url) && init?.method === 'PATCH') return Promise.resolve(patchResponse);
+        return Promise.resolve(
+          jsonResponse(200, [
+            { id: 7, title: 'Send the renewal deck', assignee_name: 'Carl', due_date: '2099-01-01', priority: 'high', priority_display: 'High', status: 'pending', status_display: 'Pending', parent_name: 'Globex', parent_type: 'customer' },
+          ])
+        );
+      })
+    );
+    return calls;
+  }
+
+  it('completes a task through the backend and drops it from the list', async () => {
+    const calls = stub(jsonResponse(200, { id: 7, status: 'completed' }));
+    const user = userEvent.setup();
+    renderCockpit();
+
+    await user.click(await screen.findByRole('button', { name: 'Mark "Send the renewal deck" complete' }));
+
+    await waitFor(() => expect(screen.queryByText('Send the renewal deck')).not.toBeInTheDocument());
+    const patch = calls.find((c) => c.init?.method === 'PATCH');
+    expect(patch?.url).toContain('/api/v1/tasks/7/');
+    expect(patch?.init?.body).toBe(JSON.stringify({ status: 'completed' }));
+    expect(screen.getByText('Upcoming (0)')).toBeInTheDocument();
+  });
+
+  it('puts the task back and says why when the backend refuses', async () => {
+    stub(jsonResponse(404, { detail: 'No such task.' }));
+    const user = userEvent.setup();
+    renderCockpit();
+
+    await user.click(await screen.findByRole('button', { name: 'Mark "Send the renewal deck" complete' }));
+
+    expect(await screen.findByText('No such task.')).toBeInTheDocument();
+    expect(screen.getByText('Send the renewal deck')).toBeInTheDocument();
   });
 });
