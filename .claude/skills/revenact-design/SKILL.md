@@ -18,9 +18,9 @@ the skills below for the task at hand.
 | Product | B2B customer-success intelligence. Almost every surface is **Operate** mode (impeccable's term): dashboards, tables, detail panes, editors. Scanability and consistency outrank expression. | `.agents/workflows/Companybrainfrontendprd.md` |
 | Stack | React 19 + TypeScript, Vite, Tailwind **v4** (`@theme` in `src/index.css`, no `tailwind.config.js` theme), Redux Toolkit, react-router 7, recharts, `@xyflow/react`, `lucide-react`. No Motion/Framer, no GSAP, no shadcn installed today. | `package.json` |
 | Colour tokens | Defined **once** in `@theme` in `src/index.css` (Tier 0), aliased as `--bg-*`, `--text-*`, `--accent*`, `--border-*` (Tier 1) and `--color-surface-*`, `--color-text-*` (Tier 2). Use `bg-surface`, `text-ink`, `text-ink-muted`, `border-line`, `bg-accent`, etc. **Never introduce a raw hex in a component.** | `src/index.css` |
-| Accent | **Revenact Rose** `--color-accent #F43F5E`, hover `#E11D48`, tint `#FFF1F2`. Single accent. Semantic: success emerald, warning amber, danger red, info blue, each with a `-dim` tint. | `src/index.css` |
-| Theme | Light only. Do not add a dark theme as a side effect of a polish task. | `src/index.css` |
-| Fonts | `index.html` preloads **DM Serif Display** (display, italic allowed), **DM Mono** (numbers, code, badges), **Lato** (body). Known gap: `src/index.css` never applies them; `.font-display` is `font-family: inherit`. Wiring them in via `@theme --font-*` is the highest-leverage typography fix and should be its own PR. Do not load any other font. | `index.html`, `src/index.css:114` |
+| Accent | **Monochrome primary** since 2026-09-21: `--color-accent` is ink-black on light and white on dark; text on it is `text-on-accent`. **Revenact Rose** survives only as `--color-brand` on the mark. Semantic: success emerald, warning amber, danger red, info blue, each with a `-dim` tint. | `src/index.css` |
+| Theme | **Both modes.** Every colour is a token with a light value in `@theme` and a dark override under `html.dark` / `[data-theme="dark"]`; `ThemeSynchronizer` in `App.tsx` drives them from the settings slice. A new colour goes in both blocks or it is not done. | `src/index.css` |
+| Fonts | `index.html` preloads **DM Serif Display** (display, italic allowed), **DM Mono** (numbers, code, badges), **Lato** (body). `.font-display` and `.font-mono-brand` in `src/index.css` apply the first two (since 2026-09-21); the body still uses the system stack, and moving it to Lato is its own decision. Do not load any other font. | `index.html`, `src/index.css` |
 | Icons | **Lucide React exclusively.** 16px inline, 20px standalone action, 24px section header. `aria-label` when no adjacent text. No emoji as icons. Overrides every vendored rule that prefers Phosphor/Hugeicons. | `.agents/workflows/DesignCompanybrain.md` §5.3 |
 | Radius | Dominant scale in the codebase: `rounded-lg` (default), `rounded-md` (compact controls), `rounded-xl` (cards/panels), `rounded-full` (pills, avatars). Pick from that scale; do not introduce `rounded-2xl`+ or `rounded-none` without a documented reason. | census of `src/**/*.tsx` |
 | Elevation | `shadow-sm` is the norm; `shadow-md`/`lg` are exceptions for overlays. Prefer `border-line` over shadow for grouping. No card-in-card. | census of `src/**/*.tsx` |
@@ -52,7 +52,7 @@ the skills below for the task at hand.
 - **Icons:** `design-taste-frontend`, `minimalist-ui`, `redesign-existing-projects` discourage Lucide. Overruled; Lucide is the house set.
 - **Fonts:** several skills push Geist/Satoshi/Outfit or ban serif. Overruled; the house fonts are DM Serif Display, DM Mono, Lato. `impeccable`'s "no Inter/Arial/system default" rule *does* apply and is currently violated (see fonts gap above).
 - **Palette:** `ui-ux-pro-max --design-system` and `design-styles` presets emit their own hex palettes. Never applied. Roles map to existing tokens.
-- **Dark mode:** `design-taste-frontend` demands dual-mode. Not in scope for this product until the user asks.
+- **Dark mode:** in scope since 2026-09-21; both modes are first-class (see ground truth).
 - **Springs:** `motion-framer` and `apple-design` show spring transitions freely. House rule: no bounce; if a spring is used it must be critically damped and finish inside 300ms.
 - **Em-dash ban** (`design-taste-frontend` §9.G) applies to **UI copy** you write. It does not require rewriting existing copy or comments as a side effect.
 - **Dials:** for product surfaces use `design-taste-frontend`-style dials of roughly VARIANCE 3-4, MOTION 2-3, DENSITY 6-8. For marketing 5-6 / 3-4 / 3-4.
@@ -63,7 +63,7 @@ the skills below for the task at hand.
 Fail any of these and the work is not done:
 
 1. Zero raw hex, rgb, or named colours in `src/**/*.tsx`; tokens only.
-2. One accent (rose). Semantic colours carry meaning only (status, trend, severity), never decoration.
+2. One primary, and it is monochrome; rose is the mark only. Semantic colours carry meaning only (status, trend, severity), never decoration.
 3. Type hierarchy with at most four sizes per surface; numbers and IDs in DM Mono with `tabular-nums`; body line length capped around 65-75ch in reading surfaces.
 4. No card inside a card. Group with `border-line`, `divide-y`, or whitespace. No gradient buttons, no purple, no glow, no glassmorphism on product surfaces.
 5. Every interactive element has default, hover, focus-visible, active, disabled, loading states, and a 44px touch target or `min-h-9` on desktop-only dense controls.

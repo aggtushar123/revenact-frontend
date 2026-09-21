@@ -392,36 +392,36 @@ export function CopilotIndex() {
   }
 
   return (
-    <div className="w-full h-full flex flex-col bg-surface">
-      {/* Top Tabs */}
-      <div className="h-[56px] border-b border-line-subtle flex items-center px-6 shrink-0">
-        <div className="flex items-center rounded-md border border-accent/30 bg-surface h-[34px] overflow-hidden">
+    <div className="w-full h-full flex flex-col">
+      {/* The view switch. Small and out of the way: this is the home page,
+          and the only chrome it needs is where else it can go. */}
+      <div className="h-11 flex items-center justify-end px-5 shrink-0">
+        <div role="tablist" aria-label="Copilot views" className="inline-flex items-center gap-1 rounded-full border border-line bg-surface/70 p-0.5">
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'copilot'}
             onClick={() => {
               setActiveTab('copilot');
               setView('home');
             }}
-            className={`h-full flex items-center gap-1.5 px-3.5 text-[13.5px] font-bold transition-colors ${activeTab === 'copilot' ? 'border border-accent text-accent bg-accent-dim shadow-sm relative z-10 -mr-[1px]' : 'text-accent hover:bg-accent-dim opacity-80 border border-transparent'}`}
+            className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors duration-[var(--dur-fast)] ${activeTab === 'copilot' ? 'bg-accent text-on-accent' : 'text-ink-muted hover:text-ink'}`}
           >
-            <svg viewBox="0 0 24 24" className="w-[15px] h-[15px] fill-current"><path d="M12 2L9 9l-7 3 7 3 3 7 3-7 7-3-7-3z"/></svg>
             Copilot
           </button>
-          <div className="w-[1px] h-[22px] bg-accent/20 my-auto z-0"></div>
           <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'cockpit'}
             onClick={() => setActiveTab('cockpit')}
-            className={`h-full flex items-center gap-1.5 px-3.5 text-[13.5px] font-bold transition-colors ${activeTab === 'cockpit' ? 'border border-line-strong text-ink bg-subtle shadow-sm relative z-10 -ml-[1px]' : 'text-ink-muted hover:text-ink hover:bg-subtle border border-transparent'}`}
+            className={`px-3 py-1 rounded-full text-[12px] font-medium transition-colors duration-[var(--dur-fast)] ${activeTab === 'cockpit' ? 'bg-accent text-on-accent' : 'text-ink-muted hover:text-ink'}`}
           >
-            <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor">
-              <rect x="1" y="2" width="7" height="6" rx="1.5" opacity="0.9" />
-              <rect x="1" y="9" width="7" height="5" rx="1.5" opacity="0.9" />
-              <rect x="9" y="2" width="6" height="12" rx="1.5" />
-            </svg>
             Cockpit
           </button>
         </div>
       </div>
 
-      <div className="flex-1 w-full h-[calc(100%-56px)] flex relative overflow-hidden bg-surface">
+      <div className="flex-1 w-full min-h-0 flex relative overflow-hidden">
         {activeTab === 'copilot' ? (
           <>
             <CopilotSidebar
@@ -437,7 +437,13 @@ export function CopilotIndex() {
               onAcceptInvite={handleAcceptInvite}
               onDeclineInvite={handleDeclineInvite}
             />
-            <div className="flex-1 overflow-hidden relative bg-surface border border-line/80 shadow-[0px_4px_24px_rgba(0,0,0,0.04)] rounded-[20px] m-1 mt-4 mr-4 mb-4 flex">
+            <div
+              className={
+                view === 'home'
+                  ? 'flex-1 overflow-hidden relative flex'
+                  : 'flex-1 overflow-hidden relative bg-surface border border-line rounded-xl shadow-sm m-1 mr-4 mb-4 flex'
+              }
+            >
               {view === 'home' ? (
                 <HomeView onSendPrompt={handleSendPrompt} selectedSkill={selectedSkill} onSelectSkill={handleSelectSkill} />
               ) : (
@@ -465,7 +471,7 @@ export function CopilotIndex() {
             </div>
           </>
         ) : (
-          <div className="flex-1 overflow-hidden bg-base p-6 pt-5">
+          <div className="flex-1 overflow-hidden p-6 pt-2">
             <CockpitView />
           </div>
         )}

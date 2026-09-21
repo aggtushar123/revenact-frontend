@@ -114,11 +114,9 @@ in Tailwind v4 the `@theme` names are the real custom properties, so a bare
 | Lato | Body and UI | 400, 700, 900 |
 
 > **Known gap, highest-leverage fix in the whole design system.** `src/index.css`
-> never applies them. `.font-display` resolves to `font-family: inherit`, no
-> `--font-*` token exists, and no `body { font-family }` rule exists, so the app
-> renders in Tailwind's default sans stack. Wiring the three families in through
-> `@theme --font-*` should be its own pull request. See the
-> [Implementation Plan](../../revenact-backend/docs/product/06-implementation-plan.md), task F1.
+> Since 2026-09-21 `.font-display` applies DM Serif Display at 400 and
+> `.font-mono-brand` applies DM Mono with tabular figures. The body still
+> uses the system stack; moving it to Lato is a separate decision.
 
 ### Scale in use
 
@@ -355,7 +353,7 @@ Ranked by leverage. Each is a task in the
 
 | # | Debt | Evidence |
 |---|---|---|
-| 1 | The three brand fonts are loaded but never applied | `src/index.css` has no `--font-*` token and no `body` rule; `.font-display` inherits |
+| 1 | Body text is still on the system stack (display and mono are wired) | `src/index.css` has no `body` font rule; DM Serif Display and DM Mono apply via `.font-display` / `.font-mono-brand` |
 | 2 | No `focus-visible` styling anywhere | Grep returns zero occurrences |
 | 3 | 108 raw hex values in components | Worst offenders: `Integrations.tsx` (11, vendor logos), `SurveysTab.tsx` (4), the recurring `text-[#0D0F0E]` on accent backgrounds |
 | 4 | No modal focus management, three `role="dialog"` in fifteen modals | |

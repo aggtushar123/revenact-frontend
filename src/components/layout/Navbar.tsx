@@ -13,7 +13,6 @@ import {
   HelpCircle,
   Bell,
   MessageSquare,
-  Sparkles,
   User as UserIcon,
   LogOut,
   Check,
@@ -116,36 +115,11 @@ export function Navbar() {
   // earlier in the render chain below), same "detail page own header
   // wins" ordering as isOrganizations vs. the `organization` branch.
   const isAccountsList = location.pathname.startsWith('/accounts');
-  const isCopilot = location.pathname === '/copilot';
   const isSettings = location.pathname.startsWith('/settings');
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
   const isDashboard = location.pathname.startsWith('/dashboard');
 
-  const [currentDate, setCurrentDate] = useState(new Date());
-
-  useEffect(() => {
-    const timer = setInterval(() => setCurrentDate(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  
-  const dayName = days[currentDate.getDay()];
-  const monthName = months[currentDate.getMonth()];
-  const dateNum = currentDate.getDate();
-  
-  const getOrdinalNum = (n: number) => {
-    return n + (n > 0 ? ['th', 'st', 'nd', 'rd'][(n > 3 && n < 21) || n % 10 > 3 ? 0 : n % 10] : '');
-  };
-
-  const formattedDate = `${dayName}, ${getOrdinalNum(dateNum)} ${monthName}`;
-
-  const hour = currentDate.getHours();
-  let greeting = 'Good Evening';
-  if (hour < 12) greeting = 'Good Morning';
-  else if (hour < 18) greeting = 'Good Afternoon';
 
   if (isAccountSettings) {
     return (
@@ -230,14 +204,7 @@ export function Navbar() {
   return (
     <header className="h-[64px] border-b border-line-subtle bg-surface flex items-center justify-between px-6 shrink-0 z-20 transition-all duration-300 shadow-sm">
       <div className="flex items-center gap-8 h-full">
-        {isCopilot ? (
-          <div className="flex flex-col">
-            <span className="text-[12.5px] font-medium text-ink-muted tracking-wide mt-1">{formattedDate}</span>
-            <h1 className="text-[20px] font-bold text-ink tracking-tight leading-tight -mt-0.5">
-              {greeting}{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
-            </h1>
-          </div>
-        ) : account ? (
+        {account ? (
           <div className="flex items-center gap-4">
              <button 
                 onClick={() => navigate(-1)}
@@ -423,15 +390,8 @@ export function Navbar() {
       </div>
       
       <div className="flex items-center gap-4">
-        {/* Right side actions */}
-        <button
-          onClick={() => navigate('/copilot')}
-          className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent text-on-accent text-[12px] font-bold shadow-md hover:scale-105 transition-all transform active:scale-95 border border-accent-hover/40"
-        >
-          <Sparkles className="w-3.5 h-3.5" />
-          <span className="mt-[1px]">AI Copilot</span>
-        </button>
-
+        {/* Right side actions. The Copilot is the home page now, first in
+            the sidebar; it no longer needs a button on every other page. */}
         <div className="flex items-center gap-1.5 text-ink-faint ml-1">
           <IconButton icon={<Search className="w-4 h-4" />} />
           <IconButton icon={<PlusCircle className="w-4 h-4" />} />

@@ -27,7 +27,7 @@ main.tsx
                 └── <ProtectedRoute>
                      └── <DashboardLayout>
                           ├── <Sidebar/>     hover-expands, 68px to 240px
-                          ├── <Navbar/>      hidden on /scenarios/*
+                          ├── <Navbar/>      hidden on /scenarios/* and on /copilot (the home page)
                           └── <Outlet/>      the page
 ```
 
@@ -52,7 +52,7 @@ closing it on unmount or token change.
 |---|---|---|
 | `/login`, `/forgot-password`, `/reset-password` | `Login`, `ForgotPassword`, `ResetPassword` | public |
 | `/auth/callback` | `AuthCallback` (hand-off exchange, workspace form, or an explained refusal) | public |
-| `/` | `RootRedirect`: `/login`, then `/onboarding` until `user.tour_completed_at` is set, then `/dashboard` | auth |
+| `/` | `RootRedirect`: `/login`, then `/onboarding` until `user.tour_completed_at` is set, then `/copilot` (staff: `/platform`) | auth |
 | `/onboarding` | `OnboardingCarousel`, the eight-step first-run tour | auth |
 | `/account-settings/{account,billing,integrations,personalization,skills,about}` | `SettingsLayout` with its own left nav and the assistant rail | auth |
 | `/platform`, `/platform/organisations`, `/platform/organisations/:id`, `/platform/staff` | `PlatformLayout` (its own shell) with `PlatformOverview`, `PlatformOrganisations`, `PlatformOrganisationDetail`, `PlatformStaff` | auth + `RequirePlatform` |
@@ -65,7 +65,7 @@ closing it on unmount or token change.
 | `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard`, `AccountDetails` | auth |
 | `/contacts/{list,:id}` | `ContactsList`, `ContactDetails` | auth |
 | `/pipelines/{list,board}` | `PipelinesPage` | auth |
-| `/copilot` | `CopilotIndex` | auth |
+| `/copilot` | `CopilotIndex`: **the home page**. No Navbar, no frame; the greeting, the ask box, three suggested questions and the skills sit directly on the canvas, with a small Copilot/Cockpit switch top-right. First item in the sidebar | auth |
 | `/scenarios`, `/scenarios/create`, `/scenarios/:id` | `ScenariosList`, `CreateScenario` | auth |
 | `/canvas`, `/canvas/create`, `/canvas/:id` | `CanvasPage`, `CanvasEditor` | auth |
 | `/campaigns`, `/campaigns/create`, `/campaigns/:id` | `CampaignsList`, `CampaignEditor` | auth |

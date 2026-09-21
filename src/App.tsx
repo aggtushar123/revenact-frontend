@@ -135,7 +135,9 @@ function RootRedirect() {
   // undefined; they have been here a while, so they are not shown the tour.
   const owesTour = user !== null && user.tour_completed_at === null;
   if (owesTour) return <Navigate to="/onboarding" replace />;
-  return <Navigate to="/dashboard" replace />;
+  // The Copilot is the home page: one question, asked well, is where a day
+  // starts. Dashboards are a click away in the sidebar.
+  return <Navigate to="/copilot" replace />;
 }
 
 function App() {
