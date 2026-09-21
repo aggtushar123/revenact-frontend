@@ -103,7 +103,7 @@ export function HandoffModal({ onHandOff, onClose }: HandoffModalProps) {
           <button
             type="button"
             onClick={handSubmit}
-            className="px-3.5 py-2 rounded-lg text-[12px] font-bold transition-all shadow-sm bg-accent text-[#0D0F0E] hover:bg-accent-hover"
+            className="px-3.5 py-2 rounded-lg text-[12px] font-bold transition-all shadow-sm bg-accent text-on-accent hover:bg-accent-hover"
           >
             Hand off
           </button>

@@ -571,7 +571,7 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
                                      <div className="px-3 pb-1 border-t border-line-subtle pt-2.5">
                                         <button 
                                           onClick={() => setIsToDropdownOpen(false)}
-                                          className="w-[85px] bg-accent hover:bg-accent-hover text-[#0D0F0E] text-[12.5px] font-bold py-[7px] rounded-lg shadow-sm transition-colors"
+                                          className="w-[85px] bg-accent hover:bg-accent-hover text-on-accent text-[12.5px] font-bold py-[7px] rounded-lg shadow-sm transition-colors"
                                         >
                                            Done
                                         </button>
@@ -713,7 +713,7 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
         </button>
         <button
           onClick={handleSave}
-          className="px-6 py-2 bg-accent text-ink rounded-lg text-[13px] font-semibold hover:bg-accent-hover transition-all h-[42px] min-w-[120px] shadow-sm"
+          className="px-6 py-2 bg-accent text-on-accent rounded-lg text-[13px] font-semibold hover:bg-accent-hover transition-all h-[42px] min-w-[120px] shadow-sm"
         >
           Save & Close
         </button>

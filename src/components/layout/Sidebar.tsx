@@ -1,18 +1,24 @@
-import React, { useEffect, useState } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, MessageSquare, Network, Layers, Users,
   Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
-  Brain, Flag, CheckSquare, MessageSquareWarning, Bot, Wand2
+  Brain, Flag, CheckSquare, MessageSquareWarning, Bot, Wand2,
+  Sliders, LogOut,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchProposals } from '../../features/proposals/proposalsSlice';
 import { fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
 import type { CustomObjectDefinition } from '../../features/customObjects/types';
+import { logout } from '../../features/auth/authSlice';
 
 export function Sidebar() {
+  const navigate = useNavigate();
+  const currentUser = useAppSelector((state) => state.auth.user);
   const pendingProposals = useAppSelector((state) => state.proposals?.pending ?? 0);
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   // The badge is the real queue, so it needs the queue loaded on any page —
   // a paid model call is never made here, only a read; and only for those
   // who could open the queue at all.
@@ -24,7 +30,20 @@ export function Sidebar() {
   const [isExpanded, setIsExpanded] = useState(false);
   const location = useLocation();
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    }
+    if (isUserMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [isUserMenuOpen]);
+
   const isOrgsActive = location.pathname.includes('/organizations');
+  const isSettingsActive = location.pathname.startsWith('/settings');
   // The Users link gates on the capability its page actually needs, not
   // on holding a role called "admin" — an org can define any role it
   // likes now, including one that grants exactly this and nothing else.
@@ -53,7 +72,7 @@ export function Sidebar() {
     <aside 
       onMouseEnter={() => setIsExpanded(true)}
       onMouseLeave={() => setIsExpanded(false)}
-      className={`h-full border-r border-line bg-surface flex flex-col transition-all duration-300 z-30 shrink-0 absolute md:relative ${
+      className={`h-full border-r border-[var(--rv-sidebar-border)] bg-[var(--rv-sidebar-bg)] flex flex-col transition-all duration-300 z-30 shrink-0 absolute md:relative ${
         isExpanded ? 'w-[240px] shadow-xl md:shadow-none' : 'w-[68px]'
       }`}
     >
@@ -64,7 +83,7 @@ export function Sidebar() {
           {isExpanded ? (
             <span className="font-display text-[22px] text-ink tracking-tight leading-none" style={{ fontStyle: 'italic' }}>Revenact</span>
           ) : (
-            <div className="w-7 h-7 shrink-0 bg-accent rounded-[7px] shadow-sm flex items-center justify-center text-[#0D0F0E] font-extrabold text-[15px] tracking-tighter mx-auto">
+            <div className="w-7 h-7 shrink-0 bg-brand rounded-[7px] shadow-sm flex items-center justify-center text-white font-extrabold text-[15px] tracking-tighter mx-auto">
               R
             </div>
           )}
@@ -162,7 +181,7 @@ export function Sidebar() {
           <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
         )}
 
-        <NavItem to="/settings" icon={<Box className="w-[18px] h-[18px]" />} label="Settings" isExpanded={isExpanded} />
+        <NavItem to="/settings" icon={<Box className="w-[18px] h-[18px]" />} label="Settings" isExpanded={isExpanded} isActiveOverride={isSettingsActive} />
         <NavItem to="/lifecycle" icon={<CircleDot className="w-[18px] h-[18px]" />} label="Lifecycle" isExpanded={isExpanded} />
         <NavItem to="/health" icon={<HeartPulse className="w-[18px] h-[18px]" />} label="Health" isExpanded={isExpanded} />
         {canManageUsers && (
@@ -170,6 +189,98 @@ export function Sidebar() {
         )}
         <NavItem to="/integrations" icon={<Plug className="w-[18px] h-[18px]" />} label="Integrations" isExpanded={isExpanded} />
 
+      </div>
+
+      {/* Bottom Avatar / Initials Icon (Purple circle 'T' with Account Settings & Sign Out) */}
+      <div ref={userMenuRef} className="relative p-2 border-t border-line shrink-0 bg-surface">
+        {isUserMenuOpen && (
+          <div
+            className="absolute bottom-[calc(100%+8px)] left-2 w-56 bg-surface border border-line rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-100"
+          >
+            <div className="flex items-center gap-3 p-3 border-b border-line-subtle">
+              {currentUser?.avatar ? (
+                <img
+                  src={currentUser.avatar}
+                  alt={currentUser?.name || 'User'}
+                  className="w-9 h-9 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-9 h-9 rounded-full bg-accent text-white flex items-center justify-center font-bold text-sm shrink-0 shadow-xs select-none">
+                  {(currentUser?.name?.charAt(0) || currentUser?.email?.charAt(0) || '?').toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="text-[13px] font-bold text-ink truncate">
+                  {currentUser?.name || 'Your account'}
+                </div>
+                <div className="text-[11px] text-ink-muted truncate">
+                  {currentUser?.email ?? ''}
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsUserMenuOpen(false);
+                navigate('/account-settings');
+              }}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[12.5px] font-medium transition-all cursor-pointer ${
+                location.pathname.startsWith('/account-settings')
+                  ? 'text-accent bg-accent-dim font-semibold'
+                  : 'text-ink-muted hover:text-ink hover:bg-subtle'
+              }`}
+            >
+              <Sliders className="w-[15px] h-[15px]" />
+              Settings
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsUserMenuOpen(false);
+                dispatch(logout());
+                navigate('/login');
+              }}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[12.5px] font-medium text-ink-muted hover:text-danger hover:bg-danger-dim transition-all border-t border-line-subtle cursor-pointer"
+            >
+              <LogOut className="w-[15px] h-[15px]" />
+              Sign out
+            </button>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+          title={currentUser?.name ? `${currentUser.name} — account settings` : 'Account settings'}
+          className={`w-full flex items-center gap-3 p-1.5 rounded-lg hover:bg-subtle transition-all cursor-pointer select-none ${
+            !isExpanded ? 'justify-center' : ''
+          }`}
+        >
+          {currentUser?.avatar ? (
+            <img
+              src={currentUser.avatar}
+              alt={currentUser?.name || 'User'}
+              className="w-9 h-9 rounded-full object-cover shrink-0 ring-2 ring-transparent hover:ring-accent/30 transition-all"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-accent text-white flex items-center justify-center font-bold text-[14px] shrink-0 shadow-xs hover:scale-105 transition-transform">
+              {(currentUser?.name?.charAt(0) || currentUser?.email?.charAt(0) || '?').toUpperCase()}
+            </div>
+          )}
+
+          {isExpanded && (
+            <div className="min-w-0 flex-1 text-left">
+              <div className="text-[13px] font-semibold text-ink truncate leading-tight">
+                {currentUser?.name || 'Your account'}
+              </div>
+              <div className="text-[11px] text-ink-muted truncate leading-tight mt-0.5">
+                Account Settings
+              </div>
+            </div>
+          )}
+        </button>
       </div>
     </aside>
   );
@@ -184,9 +295,9 @@ function NavItem({ icon, to, label, isExpanded, isActiveOverride = false, badge 
         return `flex items-center gap-3.5 px-3 relative transition-colors group rounded-[6px] cursor-pointer overflow-hidden ${
           isExpanded ? 'h-[38px]' : 'h-10 justify-center mx-1 rounded-lg'
         } ${
-          active 
-            ? 'bg-accent-dim' 
-            : 'hover:bg-subtle'
+          active
+            ? 'bg-[var(--rv-sidebar-active-bg)] border border-[var(--rv-sidebar-active-border)] shadow-xs'
+            : 'border border-transparent hover:bg-black/5 dark:hover:bg-white/[0.04]'
         }`;
       }}
       title={!isExpanded ? label : undefined}
@@ -195,12 +306,12 @@ function NavItem({ icon, to, label, isExpanded, isActiveOverride = false, badge 
         const active = isActive || isActiveOverride;
         return (
           <>
-            <div className={`shrink-0 transition-colors ${active ? 'text-accent' : 'text-ink-faint group-hover:text-ink-muted'}`}>
+            <div className={`shrink-0 transition-colors ${active ? 'text-ink' : 'text-ink-faint group-hover:text-ink-muted'}`}>
               {icon}
             </div>
             
             {isExpanded && (
-              <span className={`text-[13px] font-semibold truncate transition-colors flex-1 ${active ? 'text-accent' : 'text-ink-muted group-hover:text-ink'}`}>
+              <span className={`text-[13px] font-semibold truncate transition-colors flex-1 ${active ? 'text-ink' : 'text-ink-muted group-hover:text-ink'}`}>
                 {label}
               </span>
             )}

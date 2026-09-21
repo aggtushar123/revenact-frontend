@@ -27,12 +27,14 @@ import mailReducer from './features/mail/mailSlice';
 import filesReducer from './features/files/filesSlice';
 import callsReducer from './features/calls/callsSlice';
 import communicationsReducer from './features/communications/communicationsSlice';
+import settingsReducer from './features/settings/settingsSlice';
 import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
   reducer: {
     counter: counterReducer,
     communications: communicationsReducer,
+    settings: settingsReducer,
     auth: authReducer,
     tasks: tasksReducer,
     userManagement: userManagementReducer,

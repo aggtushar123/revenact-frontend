@@ -113,7 +113,7 @@ export function RunNowModal({ onRun, onClose }: RunNowModalProps) {
               <button
                 onClick={handleRun}
                 disabled={!selectedId || isRunning}
-                className="px-4 py-2 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[13px] font-bold transition-colors disabled:opacity-50"
+                className="px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold transition-colors disabled:opacity-50"
               >
                 {isRunning ? 'Running…' : 'Run'}
               </button>
@@ -139,7 +139,7 @@ export function RunNowModal({ onRun, onClose }: RunNowModalProps) {
             <div className="flex justify-end pt-1">
               <button
                 onClick={onClose}
-                className="px-4 py-2 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[13px] font-bold transition-colors"
+                className="px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold transition-colors"
               >
                 Done
               </button>

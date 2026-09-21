@@ -84,7 +84,7 @@ function LogCallForm({
     <div className="px-6 py-3 border-b border-line-subtle flex flex-col gap-2 bg-surface shrink-0">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11.5px] text-ink-faint">Log a call with its summary, or hand over the transcript and the summary is written for you. Every call is read for sentiment and counts toward the pulse.</span>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold shrink-0">
+        <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold shrink-0">
           <Plus className="w-3.5 h-3.5" /> {open ? 'Cancel' : 'Log a call'}
         </button>
       </div>
@@ -122,7 +122,7 @@ function LogCallForm({
               <span className="text-ink-faint">Anyone the transcript names is added too.</span>
             </fieldset>
           )}
-          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12.5px] font-bold disabled:opacity-50">
+          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12.5px] font-bold disabled:opacity-50">
             {saving ? 'Logging…' : 'Log call'}
           </button>
           {error && <div className="md:col-span-4 text-[12px] text-danger font-semibold" role="alert">{error}</div>}

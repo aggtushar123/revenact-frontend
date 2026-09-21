@@ -42,7 +42,7 @@ export function ScenariosList() {
         </div>
         <button
           onClick={() => navigate('/scenarios/create')}
-          className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[13px] font-bold shadow-sm transition-colors"
+          className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold shadow-sm transition-colors"
         >
           <Plus className="w-4 h-4" />
           Create Scenario

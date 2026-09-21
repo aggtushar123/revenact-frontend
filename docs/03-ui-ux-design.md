@@ -45,29 +45,42 @@ places.
 
 ### Tier 0, the source of truth
 
-| Token | Value | Role |
-|---|---|---|
-| `--color-base` | `#F9FAFB` | Page background |
-| `--color-surface` | `#FFFFFF` | Cards, tables, inputs |
-| `--color-elevated` | `#FFFFFF` | Modals, popovers |
-| `--color-subtle` | `#F3F4F6` | Hover fills, muted blocks |
-| `--color-ink` | `#111827` | Primary text |
-| `--color-ink-muted` | `#4B5563` | Secondary text |
-| `--color-ink-faint` | `#9CA3AF` | Hints, eyebrow labels |
-| `--color-accent` | `#F43F5E` | **Revenact Rose.** The single accent |
-| `--color-accent-hover` | `#E11D48` | |
-| `--color-accent-dim` | `#FFF1F2` | Active nav, selected chips |
-| `--color-success` / `-dim` | `#10B981` / `#ECFDF5` | Good health, positive sentiment, upward moves |
-| `--color-warning` / `-dim` | `#F59E0B` / `#FFFBEB` | Average health, stale, watch |
-| `--color-danger` / `-dim` | `#EF4444` / `#FEF2F2` | Poor health, negative sentiment, destructive actions |
-| `--color-info` / `-dim` | `#3B82F6` / `#EFF6FF` | Neutral information |
-| `--color-line-subtle` | `#F3F4F6` | Hairlines inside a card |
-| `--color-line` | `#E5E7EB` | The default border |
-| `--color-line-strong` | `#D1D5DB` | Emphasised separation |
+| Token | Light | Dark | Role |
+|---|---|---|---|
+| `--color-base` | `#F5F3EF` | `#0B0C0E` | The canvas: warm off-white, with two faint radial gradients (`.rv-canvas`) |
+| `--color-surface` | `#FFFFFF` | `#111215` | Cards, tables, inputs |
+| `--color-elevated` | `#FFFFFF` | `#16171B` | Modals, popovers |
+| `--color-subtle` | `#F0EEEA` | `#18191E` | Hover fills, muted blocks |
+| `--color-ink` | `#141413` | `#F3F4F6` | Primary text |
+| `--color-ink-muted` | `#6E6D69` | `#9CA3AF` | Secondary text |
+| `--color-ink-faint` | `#9E9D98` | `#6B7280` | Hints, eyebrow labels |
+| `--color-accent` | `#141413` | `#FFFFFF` | **The primary action, monochrome.** Black pills on light, white on dark |
+| `--color-accent-hover` | `#000000` | `#E6E6E6` | |
+| `--color-accent-dim` | `#ECEAE5` | `rgba(255,255,255,.08)` | Active nav, selected chips |
+| `--color-on-accent` | `#FFFFFF` | `#0B0C0E` | Text and icons sitting on `accent` |
+| `--color-brand` | `#F43F5E` | same | **Revenact Rose.** The mark, and nothing else |
+| `--color-success` / `-dim` | `#10B981` / `#ECFDF5` | same / 12% tint | Good health, positive sentiment, upward moves |
+| `--color-warning` / `-dim` | `#F59E0B` / `#FFFBEB` | same / 12% tint | Average health, stale, watch |
+| `--color-danger` / `-dim` | `#EF4444` / `#FEF2F2` | same / 12% tint | Poor health, negative sentiment, destructive actions |
+| `--color-info` / `-dim` | `#3B82F6` / `#EFF6FF` | same / 12% tint | Neutral information |
+| `--color-line-subtle` | `#EFECE6` | `#1E2026` | Hairlines inside a card |
+| `--color-line` | `#E8E5DF` | `#272A33` | The default border |
+| `--color-line-strong` | `#D8D4CC` | `#373B47` | Emphasised separation |
 
 Utility vocabulary: `bg-base`, `bg-surface`, `bg-subtle`, `text-ink`,
-`text-ink-muted`, `text-ink-faint`, `bg-accent`, `bg-accent-dim`,
-`text-success|warning|danger|info`, `border-line`.
+`text-ink-muted`, `text-ink-faint`, `bg-accent`, `text-on-accent`,
+`bg-accent-dim`, `bg-brand`, `text-success|warning|danger|info`, `border-line`.
+
+Dark mode is the same tokens re-pointed under `html.dark` / `[data-theme="dark"]`;
+`ThemeSynchronizer` in `App.tsx` sets both from the settings slice (light, dark,
+or system). A bridge rule in `index.css` keeps legacy `bg-accent text-white`
+pairs readable on the white dark-mode primary until they migrate to
+`text-on-accent`. New code writes `text-on-accent`.
+
+The `--rv-*` names used by the settings pages, navbar and assistant rail are
+aliases of the tokens above, not a second palette. Only the few with no core
+meaning (the canvas gradients, the sidebar's warmer fill, the calendar card's
+teal) carry their own values.
 
 ### Tier 1 and 2
 
@@ -79,10 +92,14 @@ in Tailwind v4 the `@theme` names are the real custom properties, so a bare
 
 ### Rules
 
-- **Never write a raw hex in a component.** Tokens only.
-- One accent. Do not introduce a second brand colour.
+- **Never write a raw hex in a component.** Tokens only. The exception is a
+  third party's logo (Google, Microsoft, the connector marks), whose brand
+  terms forbid recolouring.
+- One primary, and it is monochrome. Rose is the mark, never a button or a
+  state.
 - Semantic colours mean status, trend or severity. Never decoration.
-- **Light theme only.** Do not add a dark mode as a side effect of a polish task.
+- Both modes, always. A new colour goes into the light `@theme` block *and*
+  the dark override, or it is not done.
 
 ---
 

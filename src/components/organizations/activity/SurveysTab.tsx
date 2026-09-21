@@ -177,7 +177,7 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
         <div className="flex items-center justify-end">
           <button
             onClick={() => setShowLogForm((v) => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             Log Survey
@@ -211,7 +211,7 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
           <button
             onClick={handleLogSurvey}
             disabled={isLogging}
-            className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLogging ? 'Logging…' : 'Log'}
           </button>
@@ -275,7 +275,7 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
                     <button
                       onClick={() => handleSaveEdit(survey)}
                       disabled={isSavingEdit}
-                      className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSavingEdit ? 'Saving…' : 'Save'}
                     </button>
@@ -327,7 +327,7 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
                         />
                         <button
                           onClick={() => handleLogResponse(survey)}
-                          className="px-2.5 py-1 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[11.5px] font-bold"
+                          className="px-2.5 py-1 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[11.5px] font-bold"
                         >
                           Save
                         </button>

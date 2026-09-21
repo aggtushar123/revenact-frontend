@@ -250,7 +250,7 @@ function ProviderCard({
             type="button"
             onClick={() => setConnecting(true)}
             className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors shadow-sm ${
-              connectors.length ? 'bg-surface text-ink-muted border border-line hover:bg-subtle' : 'bg-accent text-[#0D0F0E] hover:bg-accent-hover'
+              connectors.length ? 'bg-surface text-ink-muted border border-line hover:bg-subtle' : 'bg-accent text-on-accent hover:bg-accent-hover'
             }`}
           >
             {connectors.length ? 'Add another' : 'Connect'}
@@ -290,7 +290,7 @@ function ProviderCard({
               </select>
             </>
           )}
-          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
             Save
           </button>
           <button type="button" onClick={() => setConnecting(false)} className="text-[12px] font-semibold text-ink-muted">

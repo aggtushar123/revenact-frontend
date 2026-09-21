@@ -338,7 +338,7 @@ export function CockpitView() {
       {/* Bottom section: My Tasks */}
       <div className="bg-surface rounded-xl shadow-[0px_4px_16px_rgba(0,0,0,0.02)] pt-5 pb-2 relative flex-1 min-h-0 flex flex-col">
         <div className="px-6 flex items-center gap-2 mb-6 shrink-0">
-          <div className="bg-accent p-[2px] rounded-md text-[#0D0F0E]">
+          <div className="bg-accent p-[2px] rounded-md text-on-accent">
             <ClipboardList className="w-[14px] h-[14px]" strokeWidth={2.5} />
           </div>
           <h2 className="text-[14.5px] font-bold text-accent tracking-tight">My Tasks</h2>

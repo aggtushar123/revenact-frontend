@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 /* ─────────────────────────────────────────────────────────────
-   TIER 0 — Tailwind theme registration (Revenact Light Theme)
+   TIER 0 — Tailwind theme registration
 
    Tailwind v4 only emits a utility for a colour it knows about, and
    it only learns colours from an @theme block. Without this block
@@ -13,23 +13,34 @@
    Declare each hex ONCE here; the Tier 1 aliases below point back at
    these, so `var(--bg-surface)` (used inline in ~40 components) and
    `bg-surface` (used as a class everywhere else) can never drift.
+
+   The palette: a warm off-white canvas, white surfaces, near-black
+   ink, and a MONOCHROME primary — `accent` is ink-black in light mode
+   and white in dark mode. Revenact Rose survives as `brand`, used by
+   the mark alone. Semantic colours (success/warning/danger/info) are
+   the only other colour on the page, and they mean status, never
+   decoration.
 ───────────────────────────────────────────────────────────── */
 @theme {
   /* Backgrounds */
-  --color-base:         #F9FAFB; /* gray-50 */
-  --color-surface:      #FFFFFF; /* white */
-  --color-elevated:     #FFFFFF; /* white */
-  --color-subtle:       #F3F4F6; /* gray-100 */
+  --color-base:         #F5F3EF; /* warm canvas */
+  --color-surface:      #FFFFFF; /* cards, tables, inputs */
+  --color-elevated:     #FFFFFF; /* modals, popovers */
+  --color-subtle:       #F0EEEA; /* hover fills, muted blocks */
 
   /* Text */
-  --color-ink:          #111827; /* gray-900 */
-  --color-ink-muted:    #4B5563; /* gray-600 */
-  --color-ink-faint:    #9CA3AF; /* gray-400 */
+  --color-ink:          #141413;
+  --color-ink-muted:    #6E6D69;
+  --color-ink-faint:    #9E9D98;
 
-  /* Accent — Revenact Rose */
-  --color-accent:       #F43F5E; /* rose-500 */
-  --color-accent-dim:   #FFF1F2; /* rose-50 */
-  --color-accent-hover: #E11D48; /* rose-600 */
+  /* Primary action — monochrome. Black on light, white on dark. */
+  --color-accent:       #141413;
+  --color-accent-dim:   #ECEAE5; /* active nav, selected chips */
+  --color-accent-hover: #000000;
+  --color-on-accent:    #FFFFFF; /* text and icons sitting on `accent` */
+
+  /* Brand — Revenact Rose. The mark only; never a button, never a state. */
+  --color-brand:        #F43F5E;
 
   /* Semantic */
   --color-success:      #10B981; /* emerald-500 */
@@ -43,9 +54,53 @@
   --color-info-dim:     #EFF6FF; /* blue-50 */
 
   /* Borders */
-  --color-line-subtle:  #F3F4F6; /* gray-100 */
-  --color-line:         #E5E7EB; /* gray-200 */
-  --color-line-strong:  #D1D5DB; /* gray-300 */
+  --color-line-subtle:  #EFECE6;
+  --color-line:         #E8E5DF;
+  --color-line-strong:  #D8D4CC;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   Dark mode — the same tokens, re-pointed. `ThemeSynchronizer` in
+   App.tsx sets both `html.dark` and `data-theme`, so either selector
+   works and a page can never be half-dark.
+
+   The primary flips to white here. Existing markup says
+   `bg-accent text-white` in ~130 places; the bridge rule after this
+   block turns that text ink-dark on a white primary so nothing
+   becomes white-on-white while those call sites migrate to
+   `text-on-accent`.
+───────────────────────────────────────────────────────────── */
+html.dark, [data-theme="dark"] {
+  --color-base:         #0B0C0E;
+  --color-surface:      #111215;
+  --color-elevated:     #16171B;
+  --color-subtle:       #18191E;
+  --color-ink:          #F3F4F6;
+  --color-ink-muted:    #9CA3AF;
+  --color-ink-faint:    #6B7280;
+  --color-line-subtle:  #1E2026;
+  --color-line:         #272A33;
+  --color-line-strong:  #373B47;
+
+  --color-accent:       #FFFFFF;
+  --color-accent-dim:   rgba(255, 255, 255, 0.08);
+  --color-accent-hover: #E6E6E6;
+  --color-on-accent:    #0B0C0E;
+
+  --color-success-dim:  rgba(16, 185, 129, 0.12);
+  --color-warning-dim:  rgba(245, 158, 11, 0.12);
+  --color-danger-dim:   rgba(239, 68, 68, 0.12);
+  --color-info-dim:     rgba(59, 130, 246, 0.12);
+}
+
+/* Bridge: legacy `bg-accent text-white` stays readable on a white
+   primary. Unlayered, so it beats the utility regardless of order.
+   Remove once no component pairs `bg-accent` with `text-white`. */
+html.dark :where(.bg-accent, .bg-accent-hover, .hover\:bg-accent-hover:hover) {
+  color: var(--color-on-accent);
+}
+html.dark :where(.bg-accent, .bg-accent-hover) :where(.text-white) {
+  color: inherit;
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -65,10 +120,12 @@
   --text-secondary:  var(--color-ink-muted);
   --text-tertiary:   var(--color-ink-faint);
 
-  /* Accent — Revenact Rose */
+  /* Primary action */
   --accent:          var(--color-accent);
   --accent-dim:      var(--color-accent-dim);
   --accent-hover:    var(--color-accent-hover);
+  --on-accent:       var(--color-on-accent);
+  --brand:           var(--color-brand);
 
   /* Semantic */
   --success:         var(--color-success);
@@ -180,3 +237,185 @@
 .brain-surface ::-webkit-scrollbar        { width: 6px; }
 .brain-surface ::-webkit-scrollbar-track  { background: var(--bg-base); }
 .brain-surface ::-webkit-scrollbar-thumb  { background: var(--border-strong); border-radius: 3px; }
+
+/* ─────────────────────────────────────────────────────────────
+   Surface tokens for the shell and settings (`--rv-*`).
+
+   These are the names the settings pages, navbar and assistant rail
+   were written against. They are NOT a second palette: every one that
+   has a core equivalent is an alias of it, so changing a Tier 0 value
+   moves the whole app. Only the handful with no core meaning (the
+   canvas gradients, the sidebar's slightly warmer fill, the calendar
+   card's teal) carry their own values, in both modes.
+───────────────────────────────────────────────────────────── */
+:root {
+  --rv-canvas-bg: var(--bg-base);
+  --rv-canvas-gradient-1: rgba(254, 215, 170, 0.45);
+  --rv-canvas-gradient-2: rgba(204, 251, 241, 0.55);
+  --rv-card-bg: var(--bg-surface);
+  --rv-card-border: var(--border-default);
+  --rv-card-border-hover: var(--border-strong);
+  --rv-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --rv-text: var(--text-primary);
+  --rv-text-muted: var(--text-secondary);
+  --rv-text-faint: var(--text-tertiary);
+  --rv-input-bg: #FAF8F5;
+  --rv-input-border: var(--border-default);
+  --rv-input-border-focus: var(--accent);
+  --rv-pill-primary-bg: var(--accent);
+  --rv-pill-primary-text: var(--on-accent);
+  --rv-pill-secondary-bg: var(--bg-subtle);
+  --rv-pill-secondary-border: var(--border-default);
+  --rv-pill-secondary-text: var(--text-primary);
+  --rv-sidebar-bg: #FAF8F5;
+  --rv-sidebar-border: var(--border-default);
+  --rv-sidebar-active-bg: var(--bg-surface);
+  --rv-sidebar-active-border: rgba(0, 0, 0, 0.12);
+  --rv-sidebar-active-text: var(--text-primary);
+  --rv-sidebar-inactive-text: var(--text-secondary);
+  --rv-header-bg: #FAF8F5;
+  --rv-header-border: var(--border-default);
+  --rv-search-bg: var(--bg-surface);
+  --rv-search-border: var(--border-default);
+  --rv-search-text: var(--text-primary);
+  --rv-search-placeholder: var(--text-tertiary);
+  --rv-search-kbd-bg: var(--bg-subtle);
+  --rv-search-kbd-border: var(--border-default);
+  --rv-search-kbd-text: var(--text-secondary);
+  --rv-rail-bg-gradient: linear-gradient(180deg, rgba(242, 247, 246, 0.95) 0%, rgba(237, 245, 244, 0.95) 50%, rgba(232, 242, 241, 0.95) 100%);
+  --rv-event-card-bg: #E1EFEA;
+  --rv-event-card-border: rgba(13, 148, 136, 0.25);
+  --rv-event-title: #0F766E;
+  --rv-event-sub: #115E59;
+  --rv-ask-bg: var(--bg-surface);
+  --rv-ask-border: var(--border-default);
+  --rv-ask-text: var(--text-primary);
+  --rv-ask-tool-bg: var(--bg-subtle);
+  --rv-ask-tool-border: var(--border-default);
+  --rv-ask-tool-text: var(--text-secondary);
+  --rv-ask-btn-bg: var(--accent);
+  --rv-ask-btn-text: var(--on-accent);
+  --rv-scrollbar-thumb: rgba(0, 0, 0, 0.14);
+}
+
+html.dark, [data-theme="dark"] {
+  --rv-canvas-gradient-1: rgba(88, 30, 12, 0.42);
+  --rv-canvas-gradient-2: rgba(10, 48, 48, 0.58);
+  --rv-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --rv-input-bg: #17181A;
+  --rv-sidebar-bg: #0E0F10;
+  --rv-sidebar-active-bg: rgba(255, 255, 255, 0.08);
+  --rv-sidebar-active-border: rgba(255, 255, 255, 0.8);
+  --rv-header-bg: #0E0F10;
+  --rv-search-bg: #141517;
+  --rv-rail-bg-gradient: linear-gradient(180deg, rgba(9, 21, 22, 0.95) 0%, rgba(10, 24, 25, 0.95) 50%, rgba(12, 31, 32, 0.95) 100%);
+  --rv-event-card-bg: rgba(20, 42, 39, 0.9);
+  --rv-event-card-border: rgba(20, 184, 166, 0.25);
+  --rv-event-title: #99F6E4;
+  --rv-event-sub: rgba(45, 212, 191, 0.8);
+  --rv-ask-bg: #141517;
+  --rv-scrollbar-thumb: rgba(255, 255, 255, 0.16);
+}
+
+.rv-canvas {
+  background-color: var(--rv-canvas-bg);
+  background-image: 
+    radial-gradient(circle at 4% 96%, var(--rv-canvas-gradient-1) 0%, transparent 44%),
+    radial-gradient(circle at 96% 45%, var(--rv-canvas-gradient-2) 0%, transparent 45%);
+  background-attachment: fixed;
+  color: var(--rv-text);
+  transition: background-color 200ms ease, color 200ms ease;
+}
+
+.rv-card {
+  background-color: var(--rv-card-bg);
+  border: 1px solid var(--rv-card-border);
+  border-radius: 0.875rem;
+  box-shadow: var(--rv-card-shadow);
+  color: var(--rv-text);
+  transition: border-color 180ms cubic-bezier(0, 0, 0.2, 1), box-shadow 180ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.rv-card-interactive:hover {
+  border-color: var(--rv-card-border-hover);
+}
+
+.rv-pill-primary {
+  background-color: var(--rv-pill-primary-bg);
+  color: var(--rv-pill-primary-text);
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 12px;
+  padding: 0.4rem 0.95rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.rv-pill-primary:hover {
+  opacity: 0.92;
+  transform: translateY(-0.5px);
+}
+
+.rv-pill-primary:active {
+  transform: scale(0.98);
+}
+
+.rv-pill-secondary {
+  background-color: var(--rv-pill-secondary-bg);
+  color: var(--rv-pill-secondary-text);
+  border-radius: 0.5rem;
+  font-weight: 500;
+  font-size: 12px;
+  padding: 0.4rem 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: 1px solid var(--rv-pill-secondary-border);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.rv-pill-secondary:hover {
+  opacity: 0.88;
+}
+
+.rv-input {
+  width: 100%;
+  background-color: var(--rv-input-bg);
+  border: 1px solid var(--rv-input-border);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 12.5px;
+  color: var(--rv-text);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.rv-input:focus {
+  outline: none;
+  border-color: var(--rv-input-border-focus);
+}
+
+.rv-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+.rv-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.rv-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--rv-scrollbar-thumb);
+  border-radius: 9999px;
+}
+.rv-scrollbar::-webkit-scrollbar-thumb:hover {
+  opacity: 0.8;
+}
+
+/* The assistant rail's gradient. A gradient is an image, not a colour, so it
+   cannot ride on `bg-[var(--rv-rail-bg-gradient)]`: Tailwind compiles that
+   to `background-color`, which rejects the value and drops the declaration,
+   leaving the panel with no background at all. */
+.rv-rail {
+  background-image: var(--rv-rail-bg-gradient);
+}

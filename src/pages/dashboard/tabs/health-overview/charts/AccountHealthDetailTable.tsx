@@ -3,9 +3,9 @@
 import type { HealthDataRow } from '../mockData';
 
 const STATUS_COLORS = {
-  Poor: 'bg-danger text-[#0D0F0E]',
-  Average: 'bg-warning text-[#0D0F0E]',
-  Good: 'bg-success text-[#0D0F0E]',
+  Poor: 'bg-danger text-on-accent',
+  Average: 'bg-warning text-on-accent',
+  Good: 'bg-success text-on-accent',
 };
 
 export function AccountHealthDetailTable({ data }: { data: HealthDataRow[] }) {

@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk, type PayloadAction } from '@reduxjs/toolkit';
 import { apiFetch, ApiError } from '../../lib/apiClient';
+import { errorCodeOf } from './oauth';
 
 // --- Types ---
 // Shaped to match revenact-backend's UserSerializer — see
@@ -83,6 +84,15 @@ export interface User {
   reports_to: { id: number; name: string } | null;
   organisation: Organisation;
   is_active: boolean;
+  /** False for someone who only ever signed in with Google or Microsoft:
+   * there is no current password to ask for, so Account settings shows
+   * how they sign in instead of a password form. */
+  has_password?: boolean;
+  /** When they finished or skipped the first-run tour. Server-side, so a
+   * new browser does not replay it. Null until then. */
+  tour_completed_at?: string | null;
+  /** Only `/auth/me/` carries this; login and list rows do not. */
+  sign_in_providers?: string[];
 }
 
 interface AuthState {
@@ -163,6 +173,69 @@ export const login = createAsyncThunk<LoginPayload, { email: string; password: s
       return { user: data.user, accessToken: data.access, refreshToken: data.refresh };
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not reach the server. Please try again.';
+      return rejectWithValue(message);
+    }
+  }
+);
+
+// Second half of "Continue with Google / Microsoft". The provider talks to
+// the backend, which redirects to /auth/callback with a one-time hand-off
+// code; this trades that code for the same {user, access, refresh} the
+// password login returns, so the session is stored identically and nothing
+// downstream needs to know which door was used.
+export const loginWithHandoff = createAsyncThunk<LoginPayload, string, { rejectValue: string }>(
+  'auth/loginWithHandoff',
+  async (handoff, { rejectWithValue }) => {
+    try {
+      const data = await apiFetch<AuthResponse>('/auth/oauth/exchange/', {
+        method: 'POST',
+        body: { handoff },
+        accessToken: null,
+        skipAuthRetry: true, // a 401 here means the code is spent or expired
+      });
+      return { user: data.user, accessToken: data.access, refreshToken: data.refresh };
+    } catch (err) {
+      // The callback screen explains codes itself, so pass the code through
+      // when there is one and fall back to prose when there is not.
+      return rejectWithValue(errorCodeOf(err) ?? 'INVALID_HANDOFF');
+    }
+  }
+);
+
+// The workspace form after a provider sign-in from a domain nobody has
+// claimed. `setup` is the short-lived code the callback arrived with; the
+// backend turns it into an organisation with this person as its first
+// administrator and answers with the same session shape as login.
+export const createWorkspace = createAsyncThunk<
+  LoginPayload,
+  { setup: string; organisationName: string; name: string },
+  { rejectValue: string }
+>('auth/createWorkspace', async ({ setup, organisationName, name }, { rejectWithValue }) => {
+  try {
+    const data = await apiFetch<AuthResponse>('/auth/oauth/workspace/', {
+      method: 'POST',
+      body: { setup, organisation_name: organisationName, name },
+      accessToken: null,
+      skipAuthRetry: true,
+    });
+    return { user: data.user, accessToken: data.access, refreshToken: data.refresh };
+  } catch (err) {
+    return rejectWithValue(errorCodeOf(err) ?? 'INVALID_SETUP');
+  }
+});
+
+// Marks the first-run tour finished (or, with `false`, asks for it again).
+// The server stamps the time; this just reports the decision.
+export const setTourCompleted = createAsyncThunk<User, boolean, { rejectValue: string }>(
+  'auth/setTourCompleted',
+  async (completed, { rejectWithValue }) => {
+    try {
+      return await apiFetch<User>('/auth/me/', {
+        method: 'PATCH',
+        body: { tour_completed: completed },
+      });
+    } catch (err) {
+      const message = err instanceof ApiError ? err.message : 'Could not save your tour progress.';
       return rejectWithValue(message);
     }
   }
@@ -364,6 +437,44 @@ const authSlice = createSlice({
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload ?? 'An unexpected error occurred';
+      })
+      // Provider sign-in — settles into exactly the same state as `login`.
+      .addCase(loginWithHandoff.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(loginWithHandoff.fulfilled, (state, action: PayloadAction<LoginPayload>) => {
+        state.isLoading = false;
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
+        persistAuth(action.payload);
+      })
+      .addCase(loginWithHandoff.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload ?? 'INVALID_HANDOFF';
+      })
+      // Workspace creation ends in a session exactly like a login does.
+      .addCase(createWorkspace.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(createWorkspace.fulfilled, (state, action: PayloadAction<LoginPayload>) => {
+        state.isLoading = false;
+        state.user = action.payload.user;
+        state.accessToken = action.payload.accessToken;
+        state.refreshToken = action.payload.refreshToken;
+        state.isAuthenticated = true;
+        persistAuth(action.payload);
+      })
+      .addCase(createWorkspace.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload ?? 'INVALID_SETUP';
+      })
+      .addCase(setTourCompleted.fulfilled, (state, action: PayloadAction<User>) => {
+        state.user = action.payload;
+        localStorage.setItem('revenact_user', JSON.stringify(action.payload));
       })
       // Own profile — fetchMe/updateProfile both just replace `user` with
       // whatever the server now says it is, and re-persist it.

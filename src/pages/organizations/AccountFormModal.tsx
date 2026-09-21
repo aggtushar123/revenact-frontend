@@ -237,7 +237,7 @@ export function AccountFormModal({
             <button
               type="submit"
               disabled={isSaving || !name.trim()}
-              className="px-3.5 py-2 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold hover:bg-accent-hover transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3.5 py-2 bg-accent text-on-accent rounded-lg text-[12px] font-bold hover:bg-accent-hover transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving…' : isEdit ? 'Save changes' : 'Create Account'}
             </button>

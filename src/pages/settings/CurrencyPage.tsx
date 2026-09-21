@@ -180,7 +180,7 @@ export function CurrencyPage() {
             <button
               onClick={handleSave}
               disabled={!isDirty || isSaving}
-              className="px-4 py-2 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[13px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSaving ? 'Saving…' : 'Save'}
             </button>
@@ -202,7 +202,7 @@ export function CurrencyPage() {
             {availableCurrencies.length > 0 && (
               <button
                 onClick={() => setShowAddRate((v) => !v)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold shrink-0"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold shrink-0"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Add rate
@@ -243,7 +243,7 @@ export function CurrencyPage() {
               <button
                 onClick={handleAddRate}
                 disabled={!newRateCurrency || !newRateValue.trim() || isAddingRate}
-                className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isAddingRate ? 'Adding…' : 'Add'}
               </button>

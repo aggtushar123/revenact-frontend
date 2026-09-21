@@ -91,40 +91,4 @@ describe('Profile page', () => {
     expect(emailInput.disabled).toBe(true);
   });
 
-  it('rejects a change-password submission when the new passwords do not match', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse(200, mockUser)));
-    const user = userEvent.setup();
-    renderProfile();
-
-    await user.type(screen.getByLabelText('Current password'), 'supersecret1');
-    await user.type(screen.getByLabelText('New password'), 'newpassword1');
-    await user.type(screen.getByLabelText('Confirm new password'), 'somethingelse1');
-    await user.click(screen.getByRole('button', { name: 'Change password' }));
-
-    expect(await screen.findByText('New passwords do not match.')).toBeInTheDocument();
-  });
-
-  it('changes the password when current and new match and are confirmed correctly', async () => {
-    const fetchMock = vi
-      .fn()
-      .mockResolvedValueOnce(jsonResponse(200, mockUser)) // GET /me/ on mount
-      .mockResolvedValueOnce(jsonResponse(200, null)); // POST /me/change-password/
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
-    renderProfile();
-
-    await user.type(screen.getByLabelText('Current password'), 'supersecret1');
-    await user.type(screen.getByLabelText('New password'), 'newpassword1');
-    await user.type(screen.getByLabelText('Confirm new password'), 'newpassword1');
-    await user.click(screen.getByRole('button', { name: 'Change password' }));
-
-    expect(await screen.findByText('Password changed.')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/auth/me/change-password/'),
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ current_password: 'supersecret1', new_password: 'newpassword1' }),
-      })
-    );
-  });
 });

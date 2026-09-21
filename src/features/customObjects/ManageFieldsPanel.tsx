@@ -158,7 +158,7 @@ export function ManageFieldsPanel({ definition, isAdmin, onFieldAdded, onFieldDe
             <button
               onClick={handleAddField}
               disabled={!newFieldName.trim() || isFieldSubmitting}
-              className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isFieldSubmitting ? 'Adding…' : 'Add'}
             </button>

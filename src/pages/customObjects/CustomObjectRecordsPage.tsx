@@ -237,7 +237,7 @@ function CustomObjectRecordsPageForId({ definitionId }: { definitionId: number }
           <h2 className="text-[12px] font-bold text-ink-faint uppercase tracking-wide">Records</h2>
           <button
             onClick={startAdding}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             Add record
@@ -303,7 +303,7 @@ function CustomObjectRecordsPageForId({ definitionId }: { definitionId: number }
               <button
                 onClick={handleAdd}
                 disabled={isSubmitting}
-                className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold transition-colors disabled:opacity-50"
+                className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold transition-colors disabled:opacity-50"
               >
                 {isSubmitting ? 'Adding…' : 'Add'}
               </button>
@@ -364,7 +364,7 @@ function CustomObjectRecordsPageForId({ definitionId }: { definitionId: number }
                         <button
                           onClick={handleSaveEdit}
                           disabled={isSubmitting}
-                          className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold transition-colors disabled:opacity-50"
+                          className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold transition-colors disabled:opacity-50"
                         >
                           {isSubmitting ? 'Saving…' : 'Save'}
                         </button>

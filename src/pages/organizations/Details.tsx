@@ -145,7 +145,7 @@ export function Details() {
                    `/copilot?forCustomerId=${organization.id}&forCustomerName=${encodeURIComponent(organization.org)}`
                  )
                }
-               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-[#0D0F0E] text-[12px] font-bold shadow-sm hover:scale-105 transition-all"
+               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent text-on-accent text-[12px] font-bold shadow-sm hover:scale-105 transition-all"
              >
                <Sparkles className="w-3.5 h-3.5" />
                Ask Copilot

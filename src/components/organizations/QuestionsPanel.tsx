@@ -71,7 +71,7 @@ export function QuestionsPanel({ customerId, customerName, members }: { customer
               ))}
             </select>
           </label>
-          <button type="submit" disabled={!text.trim()} className="ml-auto px-3 py-1.5 bg-accent hover:bg-accent-hover text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+          <button type="submit" disabled={!text.trim()} className="ml-auto px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
             Ask
           </button>
         </div>
@@ -119,7 +119,7 @@ function QuestionCard({ q, canAnswer }: { q: Question; canAnswer: boolean }) {
             Your answer — stored as knowledge under {FUNCTION_LABELS[q.assignee.function]}
           </label>
           <textarea id={`answer-${q.id}`} value={body} onChange={(e) => setBody(e.target.value)} rows={2} className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <button type="submit" disabled={!body.trim()} className="self-end px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+          <button type="submit" disabled={!body.trim()} className="self-end px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
             Answer
           </button>
         </form>

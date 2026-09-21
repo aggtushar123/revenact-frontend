@@ -167,7 +167,7 @@ export function CampaignEditor() {
             <>
               <button
                 onClick={persist}
-                className="bg-accent hover:bg-accent-hover text-[#0D0F0E] px-4 py-1.5 rounded-[6px] text-[13px] font-bold transition-all shadow-sm"
+                className="bg-accent hover:bg-accent-hover text-on-accent px-4 py-1.5 rounded-[6px] text-[13px] font-bold transition-all shadow-sm"
               >
                 Save
               </button>

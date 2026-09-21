@@ -44,7 +44,7 @@ function NewNoteForm({ onCreate }: { onCreate: (note: { title: string; body: str
     <div className="px-6 py-2 border-b border-line-subtle flex flex-col gap-2 bg-surface">
       <div className="flex items-center justify-between gap-3">
         <span className="text-[11.5px] text-ink-faint">Notes you write here are seen by you and your management chain only.</span>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold">
+        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold">
           {open ? 'Cancel' : 'New note'}
         </button>
       </div>
@@ -53,7 +53,7 @@ function NewNoteForm({ onCreate }: { onCreate: (note: { title: string; body: str
           <input aria-label="Note title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
           <textarea aria-label="Note body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="What do you want the team above you to know?" rows={4} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
           <div className="flex justify-end">
-            <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-[#0D0F0E] rounded-lg text-[12px] font-bold disabled:opacity-50">
+            <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
               {saving ? 'Saving…' : 'Save note'}
             </button>
           </div>

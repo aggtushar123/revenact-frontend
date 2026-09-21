@@ -58,7 +58,7 @@ export function ActionBar({
       <div className="flex items-center gap-2">
         <button
           onClick={onAddAccount}
-          className="flex items-center gap-1.5 px-4 py-[8px] bg-accent hover:bg-accent-hover text-[#0D0F0E] text-[13px] font-semibold rounded-lg shadow-sm transition-colors tracking-wide"
+          className="flex items-center gap-1.5 px-4 py-[8px] bg-accent hover:bg-accent-hover text-on-accent text-[13px] font-semibold rounded-lg shadow-sm transition-colors tracking-wide"
         >
           <Plus className="w-4 h-4" /> Add Account
         </button>

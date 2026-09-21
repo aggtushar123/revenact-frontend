@@ -130,7 +130,7 @@ export function GlobalConfigSidebar() {
 
       {canManage && (
         <div className="p-6 border-t border-line-subtle flex flex-col gap-3">
-          <button type="submit" disabled={!dirty || status === 'saving'} className="w-full bg-accent text-[#0D0F0E] rounded-lg py-2.5 text-[13px] font-bold hover:bg-accent-hover disabled:opacity-50">
+          <button type="submit" disabled={!dirty || status === 'saving'} className="w-full bg-accent text-on-accent rounded-lg py-2.5 text-[13px] font-bold hover:bg-accent-hover disabled:opacity-50">
             {status === 'saving' ? 'Saving…' : status === 'saved' ? 'Saved' : 'Set Global Attributes'}
           </button>
           <button type="button" onClick={resetFromServer} disabled={!dirty} className="w-full bg-surface text-ink-muted border border-line rounded-lg py-2.5 text-[13px] font-bold hover:bg-subtle disabled:opacity-50">
