@@ -6,7 +6,6 @@ import {
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
   Brain, Flag, CheckSquare, MessageSquareWarning, Bot, Wand2,
   Sliders, LogOut,
-  ShieldCheck,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchProposals } from '../../features/proposals/proposalsSlice';
@@ -49,7 +48,6 @@ export function Sidebar() {
   // on holding a role called "admin" — an org can define any role it
   // likes now, including one that grants exactly this and nothing else.
   const canManageUsers = useCapability('manage_users');
-  const isStaff = useAppSelector((state) => state.auth.user?.is_superuser === true);
 
   // The org's own real custom object types (Settings > Custom Objects)
   // — replaces the single hardcoded "SFDC Opportunity Line Item" nav
@@ -190,9 +188,6 @@ export function Sidebar() {
           <NavItem to="/users" icon={<UserCog className="w-[18px] h-[18px]" />} label="Users" isExpanded={isExpanded} />
         )}
         <NavItem to="/integrations" icon={<Plug className="w-[18px] h-[18px]" />} label="Integrations" isExpanded={isExpanded} />
-        {isStaff && (
-          <NavItem to="/platform" icon={<ShieldCheck className="w-[18px] h-[18px]" />} label="Platform" isExpanded={isExpanded} />
-        )}
 
       </div>
 

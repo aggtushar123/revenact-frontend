@@ -9,12 +9,12 @@ import { Link, Navigate } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
 import { usePlatformAccess } from '../../hooks';
 
-export function RequirePlatform({ children }: { children: React.ReactNode }) {
+export function RequirePlatform({ children, requireMfa = true }: { children: React.ReactNode; requireMfa?: boolean }) {
   const { isStaff, mfaVerified, mfaEnrolled } = usePlatformAccess();
 
   if (!isStaff) return <Navigate to="/dashboard" replace />;
 
-  if (!mfaVerified) {
+  if (requireMfa && !mfaVerified) {
     return (
       <div className="min-h-screen rv-canvas flex items-center justify-center p-6">
         <div className="rv-card max-w-md w-full p-6 flex flex-col items-center text-center gap-3">
@@ -34,15 +34,15 @@ export function RequirePlatform({ children }: { children: React.ReactNode }) {
           ) : (
             <>
               <p className="text-[13px] text-ink-muted leading-relaxed">
-                Platform access is for staff accounts with an authenticator app. Set one up in Account settings, then sign in again.
+                Platform access is for staff accounts with an authenticator app. Set one up on your account page, then sign in again.
               </p>
-              <Link to="/account-settings/account" className="rv-pill-primary mt-1">
+              <Link to="/platform/account" className="rv-pill-primary mt-1">
                 Set up two-factor
               </Link>
             </>
           )}
-          <Link to="/dashboard" className="text-[12px] text-ink-muted hover:text-ink">
-            Back to the app
+          <Link to="/login" className="text-[12px] text-ink-muted hover:text-ink">
+            Sign in as someone else
           </Link>
         </div>
       </div>

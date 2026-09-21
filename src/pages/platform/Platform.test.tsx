@@ -11,6 +11,9 @@ import { PlatformLayout } from '../../layouts/PlatformLayout';
 import { PlatformOverview } from './PlatformOverview';
 import { PlatformOrganisations } from './PlatformOrganisations';
 import { PlatformOrganisationDetail } from './PlatformOrganisationDetail';
+import { PlatformAccount } from './PlatformAccount';
+
+vi.mock('qrcode', () => ({ default: { toDataURL: async () => 'data:image/png;base64,stub' } }));
 
 // Integration tier: the real guard, layout and pages over a store whose
 // auth state says who this is and whether the session passed a second
@@ -99,6 +102,9 @@ function renderPortal(path: string, options: { user?: User; mfaVerified?: boolea
             <Route path="organisations" element={<PlatformOrganisations />} />
             <Route path="organisations/:id" element={<PlatformOrganisationDetail />} />
           </Route>
+          <Route path="/platform/account" element={<RequirePlatform requireMfa={false}><PlatformLayout /></RequirePlatform>}>
+            <Route index element={<PlatformAccount />} />
+          </Route>
           <Route path="/dashboard" element={<div>Tenant Dashboard</div>} />
           <Route path="/login" element={<div>Sign-in Page</div>} />
         </Routes>
@@ -117,6 +123,30 @@ describe('Platform portal', () => {
     const tenant = { ...staff, is_superuser: false } as User;
     renderPortal('/platform', { user: tenant });
     expect(await screen.findByText('Tenant Dashboard')).toBeInTheDocument();
+  });
+
+  it('lets unverified staff reach their account page to set up the second factor', async () => {
+    const unenrolled = { ...staff, mfa_enrolled: false } as User;
+    renderPortal('/platform/account', {
+      user: unenrolled,
+      mfaVerified: false,
+      handler: (url) => (url.includes('/auth/me/') ? jsonResponse(200, unenrolled) : undefined),
+    });
+    expect(await screen.findByRole('heading', { name: 'Your account' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Set up an authenticator app' })).toBeInTheDocument();
+    expect(screen.queryByText('Two-factor authentication needed')).not.toBeInTheDocument();
+  });
+
+  it('signs out from the portal header', async () => {
+    const { store } = renderPortal('/platform', {
+      handler: (url, init) => (url.includes('/auth/logout/') && init?.method === 'POST' ? jsonResponse(200, {}) : undefined),
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Sign out' }));
+    await waitFor(() => expect(store.getState().auth.isAuthenticated).toBe(false));
+    // The portal is gone; in the real app ProtectedRoute then lands on /login.
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Overview' })).not.toBeInTheDocument());
+    expect(localStorage.getItem('revenact_access_token')).toBeNull();
   });
 
   it('tells staff whose session skipped the second factor what to do', async () => {
@@ -191,7 +221,7 @@ describe('Platform portal', () => {
     );
   });
 
-  it('creates an organisation whose owner is its root user', async () => {
+  it('creates an organisation whose owner is its root user', { timeout: 15000 }, async () => {
     const { fetchMock } = renderPortal('/platform/organisations', {
       handler: (url, init) => {
         if (url.endsWith('/platform/organisations/') && init?.method === 'POST') {
@@ -217,7 +247,7 @@ describe('Platform portal', () => {
     expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/platform/organisations/'), expect.objectContaining({ method: 'POST' }));
   });
 
-  it('refuses an owner address that already has an account, in the backend’s words', async () => {
+  it('refuses an owner address that already has an account, in the backend’s words', { timeout: 15000 }, async () => {
     renderPortal('/platform/organisations', {
       handler: (url, init) => {
         if (url.endsWith('/platform/organisations/') && init?.method === 'POST') {

@@ -42,6 +42,7 @@ closing it on unmount or token change.
 | `ProtectedRoute` | Not authenticated, redirect to `/login` carrying `state.from` |
 | `RequireCapability` | Capability absent from `user.permissions`, redirect to `/dashboard`. Replaces the former `AdminRoute` |
 | `RequirePlatform` | Not `user.is_superuser`, redirect to `/dashboard`. Staff whose session lacks the `mfa` claim see a page saying which half is missing (enrol, or sign in again) instead of the portal |
+| `TenantOnly` | Wraps the tenant shell and the tour: a superuser is sent to `/platform`. Staff belong to no tenant and never see the tenant app; `RootRedirect` sends them to the portal on sign-in |
 
 ---
 
@@ -55,6 +56,7 @@ closing it on unmount or token change.
 | `/onboarding` | `OnboardingCarousel`, the eight-step first-run tour | auth |
 | `/account-settings/{account,billing,integrations,personalization,skills,about}` | `SettingsLayout` with its own left nav and the assistant rail | auth |
 | `/platform`, `/platform/organisations`, `/platform/organisations/:id`, `/platform/staff` | `PlatformLayout` (its own shell) with `PlatformOverview`, `PlatformOrganisations`, `PlatformOrganisationDetail`, `PlatformStaff` | auth + `RequirePlatform` |
+| `/platform/account` | `PlatformAccount`: the staff member's password and second factor. Reachable without an MFA session, because it is where MFA is set up | auth + `RequirePlatform` (staff only) |
 | `/dashboard` → `/dashboard/advance` → `/dashboard/advance/health` | `AdvanceDashboard` | auth |
 | `/dashboard/advance/health/{triage,divergence,movement,renewal-date,controls}` | `HealthOverviewContainer` and its five views | auth |
 | `/dashboard/advance/{ai-trending,customer,activity,revenue,usage,product,ticket}/controls` | one container each | auth |

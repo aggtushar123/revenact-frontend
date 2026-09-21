@@ -282,7 +282,8 @@ const platformSlice = createSlice({
         state.organisations.unshift(action.payload);
         state.organisations.sort((a, b) => a.name.localeCompare(b.name));
       })
-      .addCase(createOrganisation.rejected, failed)
+      // The modal reports its own failure; a page-level banner too would say
+      // the same thing twice.
       .addCase(renameOrganisation.fulfilled, (state, action) => {
         if (state.organisation?.id === action.payload.id) state.organisation.name = action.payload.name;
         const row = state.organisations.find((o) => o.id === action.payload.id);
