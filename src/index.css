@@ -255,12 +255,15 @@ html.dark :where(.bg-accent, .bg-accent-hover) :where(.text-white) {
 ───────────────────────────────────────────────────────────── */
 :root {
   --rv-canvas-bg: var(--bg-base);
-  --rv-canvas-gradient-1: rgba(254, 215, 170, 0.45);
-  --rv-canvas-gradient-2: rgba(204, 251, 241, 0.55);
+  --rv-canvas-gradient-1: rgba(253, 186, 116, 0.55);
+  --rv-canvas-gradient-2: rgba(153, 246, 228, 0.65);
   --rv-card-bg: var(--bg-surface);
   --rv-card-border: var(--border-default);
   --rv-card-border-hover: var(--border-strong);
   --rv-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  /* Glass: a card the canvas gradient shows through (Communications). */
+  --rv-glass-bg: rgba(255, 255, 255, 0.5);
+  --rv-glass-inner-bg: rgba(255, 255, 255, 0.5);
   --rv-text: var(--text-primary);
   --rv-text-muted: var(--text-secondary);
   --rv-text-faint: var(--text-tertiary);
@@ -304,9 +307,11 @@ html.dark :where(.bg-accent, .bg-accent-hover) :where(.text-white) {
 }
 
 html.dark, [data-theme="dark"] {
-  --rv-canvas-gradient-1: rgba(88, 30, 12, 0.42);
-  --rv-canvas-gradient-2: rgba(10, 48, 48, 0.58);
+  --rv-canvas-gradient-1: rgba(158, 66, 18, 0.6);
+  --rv-canvas-gradient-2: rgba(14, 98, 92, 0.62);
   --rv-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  --rv-glass-bg: rgba(17, 18, 21, 0.4);
+  --rv-glass-inner-bg: rgba(24, 25, 30, 0.42);
   --rv-input-bg: #17181A;
   --rv-sidebar-bg: #0E0F10;
   --rv-sidebar-active-bg: rgba(255, 255, 255, 0.08);
@@ -325,8 +330,8 @@ html.dark, [data-theme="dark"] {
 .rv-canvas {
   background-color: var(--rv-canvas-bg);
   background-image: 
-    radial-gradient(circle at 4% 96%, var(--rv-canvas-gradient-1) 0%, transparent 44%),
-    radial-gradient(circle at 96% 45%, var(--rv-canvas-gradient-2) 0%, transparent 45%);
+    radial-gradient(circle at 4% 96%, var(--rv-canvas-gradient-1) 0%, transparent 52%),
+    radial-gradient(circle at 96% 45%, var(--rv-canvas-gradient-2) 0%, transparent 52%);
   background-attachment: fixed;
   color: var(--rv-text);
   transition: background-color 200ms ease, color 200ms ease;
@@ -339,6 +344,20 @@ html.dark, [data-theme="dark"] {
   box-shadow: var(--rv-card-shadow);
   color: var(--rv-text);
   transition: border-color 180ms cubic-bezier(0, 0, 0.2, 1), box-shadow 180ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.rv-card-glass {
+  background-color: var(--rv-glass-bg);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(22px) saturate(1.2);
+  border: 1px solid var(--rv-card-border);
+  border-radius: 0.875rem;
+  box-shadow: var(--rv-card-shadow);
+  color: var(--rv-text);
+}
+
+.rv-glass-inner {
+  background-color: var(--rv-glass-inner-bg);
 }
 
 .rv-card-interactive:hover {

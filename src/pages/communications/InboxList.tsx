@@ -73,7 +73,7 @@ export function InboxList({
                     onClick={() => onSelect(row.id)}
                     aria-current={selected ? 'true' : undefined}
                     className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                      selected ? 'bg-subtle border-line-strong' : 'bg-surface border-line hover:border-line-strong'
+                      selected ? 'bg-subtle border-line-strong' : 'rv-glass-inner border-line hover:border-line-strong'
                     }`}
                   >
                     <span className="relative shrink-0">

@@ -15,7 +15,7 @@ const FOLDERS: { kind: CommunicationKind | null; label: string; icon: typeof Inb
   { kind: 'call', label: 'Calls to wrap up', icon: Phone },
 ];
 
-function Switch({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: (next: boolean) => void }) {
+export function Switch({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: (next: boolean) => void }) {
   return (
     <div className="flex items-center justify-between px-3 py-2">
       <label htmlFor={id} className="text-[13px] text-ink">
@@ -29,7 +29,7 @@ function Switch({ id, label, checked, onChange }: { id: string; label: string; c
         onClick={() => onChange(!checked)}
         className={`relative w-10 h-6 rounded-full transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${checked ? 'bg-accent' : 'bg-line-strong'}`}
       >
-        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-surface shadow-sm transition-transform duration-[var(--dur-fast)] ${checked ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full shadow-sm transition-transform duration-[var(--dur-fast)] ${checked ? 'translate-x-[18px] bg-on-accent' : 'translate-x-0.5 bg-ink-faint'}`} />
       </button>
     </div>
   );
@@ -56,7 +56,7 @@ export function InboxPanel({
 }) {
   return (
     <aside aria-label="Inbox folders and filters" className="w-[232px] shrink-0 flex flex-col gap-2.5 pr-3">
-      <nav aria-label="Folders" className="bg-surface border border-line rounded-xl p-1.5 flex flex-col gap-0.5">
+      <nav aria-label="Folders" className="rv-glass-inner border border-line rounded-xl p-1.5 flex flex-col gap-0.5">
         {FOLDERS.map(({ kind: folderKind, label, icon: Icon }) => {
           const active = folderKind === kind;
           const count = folderKind === null ? stats?.total : stats?.counts[folderKind];
@@ -81,7 +81,7 @@ export function InboxPanel({
         })}
       </nav>
 
-      <section aria-label="Filters" className="bg-surface border border-line rounded-xl p-1.5">
+      <section aria-label="Filters" className="rv-glass-inner border border-line rounded-xl p-1.5">
         <div className="flex items-center gap-2 px-3 py-2 text-[13px] text-ink">
           <SlidersHorizontal className="w-4 h-4 text-ink-muted" aria-hidden="true" />
           Filters

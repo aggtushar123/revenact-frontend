@@ -53,7 +53,7 @@ export function CopilotRail({
 
   return (
     <aside aria-label="Copilot" className="w-[320px] shrink-0 flex flex-col gap-3 h-full min-h-0">
-      <section className="rv-card p-3" aria-labelledby="next-event-heading">
+      <section className="rv-card-glass p-3" aria-labelledby="next-event-heading">
         <div className="flex items-center justify-between px-1 pb-1.5">
           <span id="next-event-heading" className="text-[12px] font-medium text-ink">Next event</span>
           <Calendar className="w-3.5 h-3.5 text-ink-muted" aria-hidden="true" />
@@ -65,7 +65,7 @@ export function CopilotRail({
         </div>
       </section>
 
-      <section className="flex-1 min-h-0 flex flex-col rv-card overflow-hidden" aria-label="Copilot conversation">
+      <section className="flex-1 min-h-0 flex flex-col rv-card-glass overflow-hidden" aria-label="Copilot conversation">
         <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-3">
           {messages.length === 0 && !pending ? (
             <p className="m-auto text-[12px] text-ink-faint text-center max-w-[22ch]">

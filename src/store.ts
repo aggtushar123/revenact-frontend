@@ -27,6 +27,7 @@ import connectorsReducer from './features/connectors/connectorsSlice';
 import graphReducer from './features/graph/graphSlice';
 import knowledgeReducer from './features/knowledge/knowledgeSlice';
 import mailReducer from './features/mail/mailSlice';
+import mailboxReducer from './features/mail/mailboxSlice';
 import filesReducer from './features/files/filesSlice';
 import callsReducer from './features/calls/callsSlice';
 import communicationsReducer from './features/communications/communicationsSlice';
@@ -65,6 +66,7 @@ export const store = configureStore({
     graph: graphReducer,
     knowledge: knowledgeReducer,
     mail: mailReducer,
+    mailbox: mailboxReducer,
     files: filesReducer,
     calls: callsReducer,
   },

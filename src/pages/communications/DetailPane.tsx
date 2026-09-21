@@ -174,7 +174,7 @@ export function DetailPane({ row }: { row: CommunicationRow | null }) {
     return (
       <section
         aria-label="Selected item"
-        className="hidden lg:flex grow min-w-0 bg-surface border border-line rounded-xl items-center justify-center"
+        className="hidden lg:flex grow min-w-0 rv-glass-inner border border-line rounded-xl items-center justify-center"
       >
         <p className="text-[12.5px] text-ink-muted">Choose something from the queue to read it.</p>
       </section>
@@ -187,7 +187,7 @@ export function DetailPane({ row }: { row: CommunicationRow | null }) {
     <section
       aria-label="Selected item"
       aria-live="polite"
-      className="hidden lg:flex grow min-w-0 bg-surface border border-line rounded-xl flex-col overflow-hidden"
+      className="hidden lg:flex grow min-w-0 rv-glass-inner border border-line rounded-xl flex-col overflow-hidden"
     >
       <div className="shrink-0 px-4.5 pt-4 pb-3.5 border-b border-line-subtle">
         <div className="flex items-start gap-3">

@@ -11,6 +11,9 @@
 // conversation has its own composer, and the search box lives on as
 // `components/shared/ConversationSearch` for whoever needs it next.
 //
+// On the person's own mailbox source the card is MailboxView instead: their
+// mail whole, in the provider's folders, with this product's triage on top.
+//
 // Everything in the list is real: the four kinds of waiting the backend
 // computes (questions for you, replies owed, open tickets, calls to wrap up),
 // the counts beside the folders, the two filters (the queue versus everything;
@@ -35,6 +38,7 @@ import type { Conversation } from '../copilot/types';
 import { DetailPane } from './DetailPane';
 import { InboxList, InboxZero } from './InboxList';
 import { InboxPanel } from './InboxPanel';
+import { MailboxView } from './MailboxView';
 import { sourcesFrom } from './sources';
 import { CopilotRail, HistoryPopover } from './CopilotRail';
 
@@ -86,10 +90,15 @@ export default function CommunicationsPage() {
   const rows = useMemo(() => page?.results ?? [], [page]);
   const selected = useMemo(() => rows.find((r) => r.id === selectedId) ?? null, [rows, selectedId]);
 
+  // The person's own mailbox is a different page inside the same card: their
+  // mail whole, not the queue narrowed to email. Keyed on the URL, not on the
+  // resolved source, so it never flashes the queue while the connection loads.
+  const mailboxSource = source.startsWith('mailbox:');
+
   // A source maps to a kind; arriving on one narrows the folder to match.
   useEffect(() => {
     setContextCleared(false);
-    if (!activeSource || activeSource.id === 'all') return;
+    if (!activeSource || activeSource.id === 'all' || mailboxSource) return;
     if (activeSource.kind !== kind) dispatch(toggleKind(activeSource.kind ?? (kind as CommunicationKind)));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the source changes, not when the folder does
   }, [source, sources.length]);
@@ -154,7 +163,10 @@ export default function CommunicationsPage() {
 
       <div className="flex-1 min-h-0 flex gap-3 px-4 pb-4">
         {/* Inbox */}
-        <section aria-label="Inbox" className="flex-1 min-w-0 rv-card flex flex-col overflow-hidden">
+        {mailboxSource ? (
+          <MailboxView panelOpen={panelOpen} onTogglePanel={() => setPanelOpen((o) => !o)} />
+        ) : (
+          <section aria-label="Inbox" className="flex-1 min-w-0 rv-card-glass flex flex-col overflow-hidden">
           <div className="h-14 shrink-0 flex items-center gap-2 px-3">
             <button
               type="button"
@@ -247,7 +259,8 @@ export default function CommunicationsPage() {
               )}
             </div>
           </div>
-        </section>
+          </section>
+        )}
 
         {copilotOpen ? (
           <CopilotRail context={context} onClearContext={() => setContextCleared(true)} conversation={conversation} onConversation={setConversation} />
