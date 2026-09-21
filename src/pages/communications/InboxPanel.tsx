@@ -29,7 +29,7 @@ export function Switch({ id, label, checked, onChange }: { id: string; label: st
         onClick={() => onChange(!checked)}
         className={`relative w-10 h-6 rounded-full transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${checked ? 'bg-accent' : 'bg-line-strong'}`}
       >
-        <span className={`absolute top-0.5 w-5 h-5 rounded-full shadow-sm transition-transform duration-[var(--dur-fast)] ${checked ? 'translate-x-[18px] bg-on-accent' : 'translate-x-0.5 bg-ink-faint'}`} />
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full shadow-sm border transition-transform duration-[var(--dur-fast)] ${checked ? 'translate-x-[18px] bg-on-accent border-transparent' : 'translate-x-0.5 bg-surface border-line-strong'}`} />
       </button>
     </div>
   );

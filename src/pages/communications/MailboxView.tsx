@@ -7,12 +7,14 @@
 // or a read mark changed here stays here; nothing is written back to Gmail.
 
 import { useEffect } from 'react';
-import { ArrowLeft, ChevronUp, RefreshCw, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ChevronUp, RefreshCw, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
+  clearMailUpdateError,
   fetchMailMessage,
   fetchMailMessages,
   fetchMailSummary,
+  loadMoreMail,
   replyToMailMessage,
   selectMailMessage,
   setMailFolder,
@@ -21,7 +23,7 @@ import {
   toggleMailCategory,
   updateMailMessage,
 } from '../../features/mail/mailboxSlice';
-import type { MailMessage } from '../../features/mail/mailboxSlice';
+import type { MailFolder, MailMessage } from '../../features/mail/mailboxSlice';
 import { syncMailbox } from '../../features/mail/mailSlice';
 import { InboxZero } from './InboxList';
 import { CategoriesBlock, MailList } from './MailList';
@@ -29,7 +31,7 @@ import { MailDetail } from './MailDetail';
 import { MailboxPanel } from './MailboxPanel';
 import { CATEGORY_LABEL } from './mailCategories';
 
-const FOLDER_TITLE: Record<string, string> = {
+const FOLDER_TITLE: Record<MailFolder, string> = {
   inbox: 'Inbox',
   drafts: 'Drafts',
   sent: 'Sent',
@@ -43,8 +45,9 @@ const FOLDER_TITLE: Record<string, string> = {
 
 export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; onTogglePanel: () => void }) {
   const dispatch = useAppDispatch();
-  const { folder, category, unread, priority, search, page, loading, error, summary, selectedId, detail, detailLoading, replying, replyError, repliedId } = useAppSelector((state) => state.mailbox);
+  const { folder, category, unread, priority, search, page, loading, loadingMore, error, summary, selectedId, detail, detailLoading, detailError, updateError, replying, replyError, repliedId } = useAppSelector((state) => state.mailbox);
   const syncing = useAppSelector((state) => state.mail?.saving ?? false);
+  const syncError = useAppSelector((state) => state.mail?.error ?? null);
 
   useEffect(() => {
     dispatch(fetchMailMessages({ folder, category, unread, priority, search }));
@@ -68,19 +71,30 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
 
   async function update(patch: Parameters<typeof updateMailMessage>[0]['patch']) {
     if (selectedId === null) return;
-    await dispatch(updateMailMessage({ id: selectedId, patch }));
+    const result = await dispatch(updateMailMessage({ id: selectedId, patch }));
+    if (result.meta.requestStatus !== 'fulfilled') return;
     dispatch(fetchMailSummary());
     // Done and muted leave the inbox; the list should show that.
     if (patch.state !== undefined) dispatch(fetchMailMessages({ folder, category, unread, priority, search }));
   }
 
+  async function reply(body: string) {
+    if (selectedId === null) return;
+    const result = await dispatch(replyToMailMessage({ id: selectedId, body }));
+    // A reply marks the original read and adds to Sent: the counts move.
+    if (result.meta.requestStatus === 'fulfilled') dispatch(fetchMailSummary());
+  }
+
   async function sync() {
-    await dispatch(syncMailbox());
+    const result = await dispatch(syncMailbox());
+    if (result.meta.requestStatus !== 'fulfilled') return;
     dispatch(fetchMailSummary());
     dispatch(fetchMailMessages({ folder, category, unread, priority, search }));
   }
 
   const rows = page?.results ?? [];
+  const narrowed = folder !== 'inbox' || category !== null || unread || priority || Boolean(search.trim());
+  const shownOf = page ? (rows.length < page.count ? `${rows.length} of ${page.count}` : `${page.count}`) : '';
 
   return (
     <section aria-label="Mailbox" className="flex-1 min-w-0 rv-card-glass flex flex-col overflow-hidden">
@@ -96,8 +110,13 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
             <X className="w-3 h-3 text-ink-muted" aria-hidden="true" />
           </button>
         ) : null}
-        <span className="ml-auto font-mono-brand text-[11.5px] tabular-nums text-ink-faint">
-          {summary && folder === 'inbox' ? `${summary.unread} unread` : page ? `${page.count}` : ''}
+        {syncError ? (
+          <span role="alert" className="ml-auto text-[12px] text-danger truncate">
+            {syncError}
+          </span>
+        ) : null}
+        <span className={`${syncError ? '' : 'ml-auto'} font-mono-brand text-[11.5px] tabular-nums text-ink-faint`}>
+          {summary && !narrowed ? `${summary.unread} unread` : shownOf}
         </span>
         <button type="button" onClick={sync} disabled={syncing} aria-label="Sync now" title={summary?.last_synced_at ? `Last synced ${new Date(summary.last_synced_at).toLocaleString()}` : 'Sync now'} className="w-9 h-9 rounded-lg flex items-center justify-center text-ink-muted hover:text-ink hover:bg-subtle disabled:opacity-40">
           <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} aria-hidden="true" />
@@ -122,6 +141,7 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
         <div className="flex-1 min-w-0 min-h-0 overflow-y-auto custom-scrollbar pl-1" role="region" aria-label={selectedId !== null ? 'Reading' : 'Mail'}>
           {error ? (
             <div role="alert" className="flex items-start gap-3 p-4 border border-danger/30 rounded-xl bg-danger-dim">
+              <AlertCircle className="w-4 h-4 text-danger shrink-0 mt-0.5" aria-hidden="true" />
               <div>
                 <h3 className="text-[13px] font-semibold text-danger">Could not load your mail</h3>
                 <p className="text-[12.5px] text-danger mt-0.5">{error}</p>
@@ -137,7 +157,20 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
                 {FOLDER_TITLE[folder]}
               </button>
               <div className="flex-1 min-h-0 flex">
-                <MailDetail key={selectedId} message={detail} loading={detailLoading} replying={replying} replyError={replyError} replied={repliedId === selectedId} onUpdate={update} onReply={(body) => dispatch(replyToMailMessage({ id: selectedId, body }))} />
+                <MailDetail
+                  key={selectedId}
+                  message={detail}
+                  loading={detailLoading}
+                  error={detailError}
+                  updateError={updateError}
+                  replying={replying}
+                  replyError={replyError}
+                  replied={repliedId === selectedId}
+                  onRetry={() => dispatch(fetchMailMessage(selectedId))}
+                  onDismissUpdateError={() => dispatch(clearMailUpdateError())}
+                  onUpdate={update}
+                  onReply={reply}
+                />
               </div>
             </div>
           ) : (
@@ -146,6 +179,13 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
               <MailList
                 rows={rows}
                 isLoading={loading}
+                footer={
+                  page?.next ? (
+                    <button type="button" onClick={() => dispatch(loadMoreMail(page.next as string))} disabled={loadingMore} className="mt-4 h-9 px-4 rounded-lg border border-line text-[12.5px] font-semibold text-ink hover:border-line-strong disabled:opacity-50">
+                      {loadingMore ? 'Loading…' : `Load more (${rows.length} of ${page.count})`}
+                    </button>
+                  ) : null
+                }
                 onSelect={(id) => {
                   const row = rows.find((r) => r.id === id);
                   if (row) open(row);
