@@ -21,3 +21,9 @@ export type { CustomObjectsTabProps } from './CustomObjectsTab';
 
 export { PresenceStrip } from './PresenceStrip';
 export type { PresenceStripProps } from './PresenceStrip';
+
+export { ConversationSearch } from './ConversationSearch';
+export type { ConversationSearchProps } from './ConversationSearch';
+
+export { ComposeButton } from './ComposeButton';
+export type { ComposeButtonProps } from './ComposeButton';
