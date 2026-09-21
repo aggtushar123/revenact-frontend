@@ -16,7 +16,7 @@
 // context.
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, ChevronUp, History, MessageSquarePlus, PenSquare, Search, Sparkles, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
@@ -49,7 +49,6 @@ function readCopilotPreference(): boolean {
 
 export default function CommunicationsPage() {
   const dispatch = useAppDispatch();
-  const navigate = useNavigate();
   const { page, isLoading, error, stats, scope, mode, kind, search, selectedId } = useAppSelector((state) => state.communications);
   const mailbox = useAppSelector((state) => state.mail?.connection ?? null);
   const connectors = useAppSelector((state) => state.connectors?.items ?? []);
@@ -104,7 +103,6 @@ export default function CommunicationsPage() {
   }
 
   const context = activeSource && activeSource.id !== 'all' && !contextCleared ? { label: activeSource.label, icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center [&>svg]:w-3.5 [&>svg]:h-3.5">{activeSource.icon}</span> } : null;
-  const showConnectNote = stats !== null && !stats.has_mailbox && mode === 'needs' && (kind === null || kind === 'email');
 
   return (
     <div className="h-full min-h-0 flex flex-col">
@@ -262,16 +260,6 @@ export default function CommunicationsPage() {
                 </div>
               ) : (
                 <>
-                  {showConnectNote ? (
-                    <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface px-4 py-3">
-                      <p className="text-[12.5px] text-ink-muted">
-                        <span className="font-semibold text-ink">Connect your mailbox to see replies you owe.</span> Questions, tickets and calls already work without it.
-                      </p>
-                      <button type="button" onClick={() => navigate('/integrations')} className="rv-pill-primary shrink-0">
-                        Connect mailbox
-                      </button>
-                    </div>
-                  ) : null}
                   {page?.truncated ? <p className="mb-3 text-[11.5px] text-warning">More than we show is outstanding in one of these. Clear some, or narrow the inbox.</p> : null}
                   <InboxList
                     rows={rows}

@@ -112,13 +112,13 @@ describe('CommunicationsPage', () => {
     expect(within(queue).getByRole('heading', { level: 3, name: /September/ })).toBeInTheDocument();
   });
 
-  it('shows the folders with their counts and a dash for replies when no mailbox has been read', async () => {
+  it('shows the folders with their counts and a dash for replies when no mailbox has been read, and no nag', async () => {
     mockApi({ stats: { has_mailbox: false, counts: { email: 0, question: 0, ticket: 1, call: 0 }, total: 1 } });
     renderPage();
     const folders = await screen.findByRole('navigation', { name: /folders/i });
     expect(within(folders).getByRole('button', { name: /Replies owed/ })).toHaveTextContent('–');
     expect(within(folders).getByRole('button', { name: /Open tickets/ })).toHaveTextContent('1');
-    expect(await screen.findByRole('button', { name: /connect mailbox/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /connect mailbox/i })).not.toBeInTheDocument();
   });
 
   it('a folder narrows the inbox to one kind', async () => {
