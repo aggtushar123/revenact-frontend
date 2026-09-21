@@ -65,6 +65,7 @@ closing it on unmount or token change.
 | `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard`, `AccountDetails` | auth |
 | `/contacts/{list,:id}` | `ContactsList`, `ContactDetails` | auth |
 | `/pipelines/{list,board}` | `PipelinesPage` | auth |
+| `/communications` | `CommunicationsPage`, arranged as an inbox with its own top bar (no Navbar): a sources rail of what is connected, the inbox card (folders for the four kinds of waiting with counts, Needs-you and Mine-only switches, a list grouped by month, the open item in place) and a Copilot rail (Next event, a real conversation with the picked source as context; New chat, History and a hide switch live in the top bar) | auth |
 | `/copilot` | `CopilotIndex`: **the home page**. No Navbar, no frame; the greeting, the ask box, three suggested questions and the skills sit directly on the canvas, with a small Copilot/Cockpit switch top-right. Cockpit sits on the same canvas: My book (counts, value, health rings), Renewals with a window selector and drill-down, and My tasks, where the circle on a row completes the task through `PATCH /tasks/<id>/` (optimistic, reverted with the backend's message on refusal). First item in the sidebar | auth |
 | `/scenarios`, `/scenarios/create`, `/scenarios/:id` | `ScenariosList`, `CreateScenario` | auth |
 | `/canvas`, `/canvas/create`, `/canvas/:id` | `CanvasPage`, `CanvasEditor` | auth |
@@ -82,7 +83,7 @@ closing it on unmount or token change.
 
 ### Navigation surfaces
 
-**Sidebar** sections: top (Dashboard, Communications), ENTITIES (Organizations,
+**Sidebar** sections: top (Copilot, Dashboard, Communications), ENTITIES (Organizations,
 Accounts, Contacts, Pipelines), CUSTOM OBJECTS (one item per real definition,
 fetched on mount), TOOLS (Segments, Project Management, Scenarios, Surveys,
 Campaigns, Canvas), KNOWLEDGE BRAIN (seven items, whole section hidden without
@@ -386,7 +387,7 @@ as a query parameter because a WebSocket handshake cannot carry a header.
 
 | Route or control | What happens |
 |---|---|
-| Sidebar: Communications, Product Feedbacks, Segments, Project Management | "Under Construction" |
+| Sidebar: Product Feedbacks, Segments, Project Management | "Under Construction" |
 | `/dashboard/custom` | "Custom Dashboard (Beta) Coming Soon" |
 | Settings: Activities, Connect Widget | Placeholder |
 | Success Plans tab on both detail pages | "Coming Soon" |
