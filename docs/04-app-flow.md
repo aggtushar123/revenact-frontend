@@ -315,10 +315,14 @@ personalization rules, skills and tasks, about.
 `/platform/*`, for Revenact staff only (`features/platform/platformSlice.ts`
 against `/api/v1/platform/`). Its own thin shell, never the tenant one.
 Overview counts; organisations with search by name or domain and a status
-filter; an organisation's owner (transfer to another active member when the
-owner cannot), suspend or reactivate with a required reason, members (owner
-first), domains and the last twenty audit events; staff with their
-second-factor state. Metadata only: nothing here shows a tenant's customers,
+filter, and **New organisation** (name plus the owner's email: the owner is
+created as the tenant's root user, an Admin with no password who signs in
+with a provider on that address or from the reset email); an organisation's
+name (rename in place), owner (transfer to another active member when the
+owner cannot), suspend or reactivate with a required reason, archive (closes
+sign-in, hides it from the list, purges nothing), members (owner first),
+domains and the last twenty audit events; staff with their second-factor
+state. Metadata only: nothing here shows a tenant's customers,
 emails or notes, and the backend pins that. The Sidebar shows a Platform link
 to superusers.
 

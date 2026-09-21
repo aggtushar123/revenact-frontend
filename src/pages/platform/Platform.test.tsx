@@ -191,6 +191,89 @@ describe('Platform portal', () => {
     );
   });
 
+  it('creates an organisation whose owner is its root user', async () => {
+    const { fetchMock } = renderPortal('/platform/organisations', {
+      handler: (url, init) => {
+        if (url.endsWith('/platform/organisations/') && init?.method === 'POST') {
+          expect(JSON.parse(String(init.body))).toEqual({ name: 'Newco', owner_email: 'priya@newco.io', owner_name: 'Priya' });
+          return jsonResponse(201, { ...acme, id: 7, name: 'Newco', slug: 'newco', owner: { id: 20, name: 'Priya', email: 'priya@newco.io' }, members_active: 1, pending_requests: 0, domains: [], owner_mailed: false });
+        }
+        if (/\/platform\/organisations\/7\/$/.test(url)) {
+          return jsonResponse(200, { ...acmeDetail, id: 7, name: 'Newco', slug: 'newco', owner: { id: 20, name: 'Priya', email: 'priya@newco.io' }, memberships: [{ ...acmeDetail.memberships[0], user_id: 20, name: 'Priya', email: 'priya@newco.io' }] });
+        }
+        return undefined;
+      },
+    });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: 'New organisation' }));
+    await user.type(screen.getByLabelText('Organisation name'), 'Newco');
+    await user.type(screen.getByLabelText('Owner’s work email'), 'priya@newco.io');
+    await user.type(screen.getByLabelText('Owner’s name (optional)'), 'Priya');
+    await user.click(screen.getByRole('button', { name: 'Create organisation' }));
+
+    expect(await screen.findByRole('heading', { name: 'Newco' })).toBeInTheDocument();
+    expect(screen.getByText(/priya@newco.io is the root user/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining('/platform/organisations/'), expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('refuses an owner address that already has an account, in the backend’s words', async () => {
+    renderPortal('/platform/organisations', {
+      handler: (url, init) => {
+        if (url.endsWith('/platform/organisations/') && init?.method === 'POST') {
+          return jsonResponse(400, { success: false, error: { code: 'EMAIL_TAKEN', message: 'That address already belongs to an account.' } });
+        }
+        return undefined;
+      },
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'New organisation' }));
+    await user.type(screen.getByLabelText('Organisation name'), 'Again');
+    await user.type(screen.getByLabelText('Owner’s work email'), 'carl@acme.io');
+    await user.click(screen.getByRole('button', { name: 'Create organisation' }));
+    expect(await screen.findByText('That address already belongs to an account.')).toBeInTheDocument();
+  });
+
+  it('renames an organisation in place', async () => {
+    renderPortal('/platform/organisations/1', {
+      handler: (url, init) => {
+        if (/\/platform\/organisations\/1\/$/.test(url) && init?.method === 'PATCH') {
+          expect(JSON.parse(String(init.body))).toEqual({ name: 'Acme Corporation' });
+          return jsonResponse(200, { id: 1, name: 'Acme Corporation', slug: 'acme-inc' });
+        }
+        return undefined;
+      },
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Rename organisation' }));
+    const input = screen.getByLabelText('Organisation name');
+    await user.clear(input);
+    await user.type(input, 'Acme Corporation');
+    await user.click(screen.getByRole('button', { name: 'Save name' }));
+    expect(await screen.findByRole('heading', { name: 'Acme Corporation' })).toBeInTheDocument();
+  });
+
+  it('archives an organisation with a reason, after a confirmation step', async () => {
+    const calls: string[] = [];
+    renderPortal('/platform/organisations/1', {
+      handler: (url, init) => {
+        if (/\/platform\/organisations\/1\/$/.test(url) && init?.method === 'DELETE') {
+          calls.push(String(init.body));
+          return jsonResponse(200, { status: 'archived' });
+        }
+        return undefined;
+      },
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: 'Archive this organisation' }));
+    const archive = screen.getByRole('button', { name: 'Archive organisation' });
+    expect(archive).toBeDisabled();
+    await user.type(screen.getByLabelText('Reason for archiving'), 'Churned');
+    await user.click(archive);
+    expect(await screen.findByRole('heading', { name: 'Archived' })).toBeInTheDocument();
+    expect(calls[0]).toBe(JSON.stringify({ reason: 'Churned' }));
+  });
+
   it('shows a refused action in the backend’s words', async () => {
     renderPortal('/platform/organisations/1', {
       handler: (url, init) => {

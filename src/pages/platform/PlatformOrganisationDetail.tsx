@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, Crown } from 'lucide-react';
+import { Link, useLocation, useParams } from 'react-router-dom';
+import { AlertCircle, ArrowLeft, Archive, Check, Crown, Pencil, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
+  archiveOrganisation,
   fetchOrganisation,
+  renameOrganisation,
   setOrganisationStatus,
   transferOwnership,
 } from '../../features/platform/platformSlice';
@@ -21,6 +23,12 @@ export function PlatformOrganisationDetail() {
   const [newOwner, setNewOwner] = useState<number | ''>('');
   const [actionError, setActionError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [archiveReason, setArchiveReason] = useState('');
+  const [confirmArchive, setConfirmArchive] = useState(false);
+  // Set by the New organisation modal, once: what the owner should do next.
+  const created = (useLocation().state as { ownerMailed?: boolean; ownerEmail?: string } | null) ?? null;
 
   useEffect(() => {
     if (id) dispatch(fetchOrganisation(Number(id)));
@@ -46,6 +54,37 @@ export function PlatformOrganisationDetail() {
   }
 
   const suspended = organisation.status === 'suspended';
+  const archived = organisation.status === 'archived';
+
+  async function saveName(e: FormEvent) {
+    e.preventDefault();
+    if (!draftName.trim()) return;
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch(renameOrganisation({ id: organisation!.id, name: draftName.trim() })).unwrap();
+      setEditingName(false);
+    } catch (err) {
+      setActionError(typeof err === 'string' ? err : 'Could not rename the organisation.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function archive(e: FormEvent) {
+    e.preventDefault();
+    setActionError(null);
+    setBusy(true);
+    try {
+      await dispatch(archiveOrganisation({ id: organisation!.id, reason: archiveReason.trim() })).unwrap();
+      setConfirmArchive(false);
+      setArchiveReason('');
+    } catch (err) {
+      setActionError(typeof err === 'string' ? err : 'Could not archive the organisation.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function changeStatus(e: FormEvent) {
     e.preventDefault();
@@ -88,9 +127,41 @@ export function PlatformOrganisationDetail() {
           Organisations
         </Link>
         <div className="flex flex-wrap items-center gap-3 mt-2">
-          <h1 className="text-[22px] font-semibold tracking-tight text-ink">{organisation.name}</h1>
+          {editingName ? (
+            <form onSubmit={saveName} className="flex items-center gap-2">
+              <label htmlFor="org-name" className="sr-only">Organisation name</label>
+              <input id="org-name" type="text" value={draftName} onChange={(e) => setDraftName(e.target.value)} autoFocus className="rv-input text-[16px] font-semibold max-w-[320px]" />
+              <button type="submit" disabled={busy || !draftName.trim()} className="rv-pill-primary disabled:opacity-40" aria-label="Save name">
+                <Check className="w-3.5 h-3.5" aria-hidden="true" />
+                Save
+              </button>
+              <button type="button" onClick={() => setEditingName(false)} className="rv-pill-secondary" aria-label="Cancel rename">
+                <X className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            </form>
+          ) : (
+            <>
+              <h1 className="text-[22px] font-semibold tracking-tight text-ink">{organisation.name}</h1>
+              <button
+                type="button"
+                onClick={() => { setDraftName(organisation.name); setEditingName(true); }}
+                className="text-ink-faint hover:text-ink p-1"
+                aria-label="Rename organisation"
+              >
+                <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+              </button>
+            </>
+          )}
           <StatusPill status={organisation.status} />
         </div>
+        {created?.ownerEmail && (
+          <p role="status" className="text-[12.5px] text-ink mt-2 bg-success-dim border border-success/25 rounded-lg p-2.5">
+            Created. {created.ownerEmail} is the root user.{' '}
+            {created.ownerMailed
+              ? 'They have been emailed a link to choose a password; signing in with Google or Microsoft on that address also works.'
+              : 'They can sign in with Google or Microsoft on that address straight away.'}
+          </p>
+        )}
         <p className="text-[12.5px] text-ink-muted mt-1">
           {organisation.slug} · created {when(organisation.created_at)} · {organisation.members_active} active members ·{' '}
           {organisation.pending_requests} waiting · {organisation.open_invitations} invited
@@ -148,12 +219,14 @@ export function PlatformOrganisationDetail() {
         {/* Status */}
         <section className="rv-card p-4 space-y-3" aria-labelledby="status-heading">
           <h2 id="status-heading" className="text-[13px] font-bold text-ink">
-            {suspended ? 'Reactivate' : 'Suspend'}
+            {archived ? 'Archived' : suspended ? 'Reactivate' : 'Suspend'}
           </h2>
           <p className="text-[12.5px] text-ink-muted">
-            {suspended
-              ? 'Sign-in is refused and every member holds nothing while suspended. Reactivating restores everything; nothing was deleted.'
-              : 'Refuses sign-in by every door and voids every member’s capabilities. Nothing is deleted. The reason goes on the record.'}
+            {archived
+              ? 'Closed to sign-in and out of the default list. Everything it owns is still here; reactivating brings it back whole.'
+              : suspended
+                ? 'Sign-in is refused and every member holds nothing while suspended. Reactivating restores everything; nothing was deleted.'
+                : 'Refuses sign-in by every door and voids every member’s capabilities. Nothing is deleted. The reason goes on the record.'}
           </p>
           <form onSubmit={changeStatus} className="flex flex-wrap items-end gap-2">
             <div className="flex-1 min-w-[200px]">
@@ -173,12 +246,39 @@ export function PlatformOrganisationDetail() {
               type="submit"
               disabled={busy || !reason.trim()}
               className={`px-3.5 py-1.5 rounded-full text-[12px] font-semibold disabled:opacity-40 ${
-                suspended ? 'bg-accent text-on-accent' : 'bg-danger text-white'
+                suspended || archived ? 'bg-accent text-on-accent' : 'bg-danger text-white'
               }`}
             >
-              {suspended ? 'Reactivate' : 'Suspend organisation'}
+              {suspended || archived ? 'Reactivate' : 'Suspend organisation'}
             </button>
           </form>
+
+          {!archived && (
+            <div className="pt-3 border-t border-line-subtle">
+              {confirmArchive ? (
+                <form onSubmit={archive} className="flex flex-wrap items-end gap-2">
+                  <div className="flex-1 min-w-[200px]">
+                    <label htmlFor="archive-reason" className="block text-[11.5px] text-ink-muted mb-1">
+                      Reason for archiving
+                    </label>
+                    <input id="archive-reason" type="text" value={archiveReason} onChange={(e) => setArchiveReason(e.target.value)} className="rv-input text-[12.5px]" placeholder="e.g. Churned, contract ended" />
+                  </div>
+                  <button type="submit" disabled={busy || !archiveReason.trim()} className="px-3.5 py-1.5 rounded-full text-[12px] font-semibold bg-danger text-white disabled:opacity-40">
+                    Archive organisation
+                  </button>
+                  <button type="button" onClick={() => setConfirmArchive(false)} className="rv-pill-secondary">
+                    Keep it
+                  </button>
+                </form>
+              ) : (
+                <button type="button" onClick={() => setConfirmArchive(true)} className="inline-flex items-center gap-1.5 text-[12px] text-ink-muted hover:text-danger">
+                  <Archive className="w-3.5 h-3.5" aria-hidden="true" />
+                  Archive this organisation
+                </button>
+              )}
+              <p className="text-[11px] text-ink-faint mt-1.5">Archiving closes sign-in and hides it from the list. Nothing is purged; that is a separate, deliberate act with its own retention rules.</p>
+            </div>
+          )}
         </section>
       </div>
 

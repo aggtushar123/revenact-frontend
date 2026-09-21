@@ -170,6 +170,49 @@ export const transferOwnership = createAsyncThunk<
   }
 });
 
+export const createOrganisation = createAsyncThunk<
+  PlatformOrganisationSummary & { owner_mailed: boolean },
+  { name: string; ownerEmail: string; ownerName: string },
+  { rejectValue: string }
+>('platform/create', async ({ name, ownerEmail, ownerName }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<PlatformOrganisationSummary & { owner_mailed: boolean }>('/platform/organisations/', {
+      method: 'POST',
+      body: { name, owner_email: ownerEmail, owner_name: ownerName },
+    });
+  } catch (err) {
+    return rejectWithValue(messageOf(err, 'Could not create the organisation.'));
+  }
+});
+
+export const renameOrganisation = createAsyncThunk<
+  { id: number; name: string },
+  { id: number; name: string },
+  { rejectValue: string }
+>('platform/rename', async ({ id, name }, { rejectWithValue }) => {
+  try {
+    const data = await apiFetch<{ id: number; name: string }>(`/platform/organisations/${id}/`, {
+      method: 'PATCH',
+      body: { name },
+    });
+    return { id, name: data.name };
+  } catch (err) {
+    return rejectWithValue(messageOf(err, 'Could not rename the organisation.'));
+  }
+});
+
+export const archiveOrganisation = createAsyncThunk<{ id: number }, { id: number; reason: string }, { rejectValue: string }>(
+  'platform/archive',
+  async ({ id, reason }, { rejectWithValue }) => {
+    try {
+      await apiFetch(`/platform/organisations/${id}/`, { method: 'DELETE', body: { reason } });
+      return { id };
+    } catch (err) {
+      return rejectWithValue(messageOf(err, 'Could not archive the organisation.'));
+    }
+  }
+);
+
 export const fetchStaff = createAsyncThunk<PlatformStaffMember[], void, { rejectValue: string }>(
   'platform/staff',
   async (_, { rejectWithValue }) => {
@@ -235,6 +278,22 @@ const platformSlice = createSlice({
         }
       })
       .addCase(transferOwnership.rejected, failed)
+      .addCase(createOrganisation.fulfilled, (state, action) => {
+        state.organisations.unshift(action.payload);
+        state.organisations.sort((a, b) => a.name.localeCompare(b.name));
+      })
+      .addCase(createOrganisation.rejected, failed)
+      .addCase(renameOrganisation.fulfilled, (state, action) => {
+        if (state.organisation?.id === action.payload.id) state.organisation.name = action.payload.name;
+        const row = state.organisations.find((o) => o.id === action.payload.id);
+        if (row) row.name = action.payload.name;
+      })
+      .addCase(renameOrganisation.rejected, failed)
+      .addCase(archiveOrganisation.fulfilled, (state, action) => {
+        if (state.organisation?.id === action.payload.id) state.organisation.status = 'archived';
+        state.organisations = state.organisations.filter((o) => o.id !== action.payload.id);
+      })
+      .addCase(archiveOrganisation.rejected, failed)
       .addCase(fetchStaff.fulfilled, (state, action) => {
         state.staff = action.payload;
       })

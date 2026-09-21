@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { AlertCircle, Search } from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { AlertCircle, Plus, Search, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { fetchOrganisations } from '../../features/platform/platformSlice';
+import { createOrganisation, fetchOrganisations } from '../../features/platform/platformSlice';
 
 const STATUS_STYLE: Record<string, string> = {
   active: 'bg-success-dim text-success',
@@ -24,6 +24,7 @@ export function PlatformOrganisations() {
   const { organisations, isLoading, error } = useAppSelector((state) => state.platform);
   const [q, setQ] = useState('');
   const [status, setStatus] = useState('');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     const handle = window.setTimeout(() => {
@@ -34,10 +35,18 @@ export function PlatformOrganisations() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-[20px] font-semibold tracking-tight text-ink">Organisations</h1>
-        <p className="text-[13px] text-ink-muted mt-1">Every tenant: who owns it, who is in it, what it has claimed.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[20px] font-semibold tracking-tight text-ink">Organisations</h1>
+          <p className="text-[13px] text-ink-muted mt-1">Every tenant: who owns it, who is in it, what it has claimed.</p>
+        </div>
+        <button type="button" onClick={() => setCreating(true)} className="rv-pill-primary">
+          <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+          New organisation
+        </button>
       </div>
+
+      {creating && <NewOrganisationModal onClose={() => setCreating(false)} />}
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative flex-1 min-w-[240px]">
@@ -138,3 +147,84 @@ export function PlatformOrganisations() {
 }
 
 export default PlatformOrganisations;
+
+/**
+ * Creating a tenant creates its root user with it: the owner, holding the
+ * Admin role, with no password. They sign in with Google or Microsoft on
+ * that address, or set a password from the reset email where mail is set
+ * up. The modal says which of those happened.
+ */
+function NewOrganisationModal({ onClose }: { onClose: () => void }) {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const [name, setName] = useState('');
+  const [ownerEmail, setOwnerEmail] = useState('');
+  const [ownerName, setOwnerName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!name.trim() || !ownerEmail.includes('@')) {
+      setError('A name and the owner’s email address are needed.');
+      return;
+    }
+    setBusy(true);
+    try {
+      const created = await dispatch(
+        createOrganisation({ name: name.trim(), ownerEmail: ownerEmail.trim(), ownerName: ownerName.trim() })
+      ).unwrap();
+      navigate(`/platform/organisations/${created.id}`, {
+        state: { ownerMailed: created.owner_mailed, ownerEmail: created.owner?.email },
+      });
+    } catch (err) {
+      setError(typeof err === 'string' ? err : 'Could not create the organisation.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4" role="dialog" aria-modal="true" aria-labelledby="new-org-heading">
+      <form onSubmit={submit} noValidate className="rv-card w-full max-w-md p-5 flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 id="new-org-heading" className="text-[15px] font-semibold text-ink">New organisation</h2>
+            <p className="text-[12px] text-ink-muted mt-0.5">
+              The owner becomes its root user: an Admin who can bring everyone else in.
+            </p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Close" className="text-ink-muted hover:text-ink p-1">
+            <X className="w-4 h-4" aria-hidden="true" />
+          </button>
+        </div>
+
+        {error && (
+          <p role="alert" className="text-[12px] text-danger bg-danger-dim rounded-lg p-2.5">
+            {error}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-1">
+          <label htmlFor="new-org-name" className="text-[11.5px] text-ink-muted">Organisation name</label>
+          <input id="new-org-name" type="text" value={name} onChange={(e) => setName(e.target.value)} autoFocus className="rv-input text-[13px]" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="new-org-owner-email" className="text-[11.5px] text-ink-muted">Owner’s work email</label>
+          <input id="new-org-owner-email" type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} className="rv-input text-[13px]" placeholder="owner@company.com" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="new-org-owner-name" className="text-[11.5px] text-ink-muted">Owner’s name (optional)</label>
+          <input id="new-org-owner-name" type="text" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} className="rv-input text-[13px]" />
+        </div>
+
+        <div className="flex items-center justify-end gap-2 pt-2 border-t border-line-subtle">
+          <button type="button" onClick={onClose} className="rv-pill-secondary">Cancel</button>
+          <button type="submit" disabled={busy} className="rv-pill-primary disabled:opacity-40">
+            Create organisation
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
