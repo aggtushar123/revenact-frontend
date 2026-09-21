@@ -5,9 +5,11 @@
 // The sources (the mailbox, each connector, calls) live in the main sidebar's
 // Communications group and arrive here as ?source=.
 //
-// with its own top bar (search everything, compose, new chat, history, and
-// the switch that hides the Copilot). No Navbar above it, nothing framing
-// it; it sits on the canvas like the home page does.
+// with its own top bar (new chat, history, and the switch that hides the
+// Copilot). No Navbar above it, nothing framing it; it sits on the canvas
+// like the home page does. Search and Compose left the bar: the open
+// conversation has its own composer, and the search box lives on as
+// `components/shared/ConversationSearch` for whoever needs it next.
 //
 // Everything in the list is real: the four kinds of waiting the backend
 // computes (questions for you, replies owed, open tickets, calls to wrap up),
@@ -15,9 +17,9 @@
 // mine versus my team). The Copilot in the rail is the same Copilot, with the source you picked as its
 // context.
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertCircle, ArrowLeft, ChevronUp, History, MessageSquarePlus, PenSquare, Search, Sparkles, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ChevronUp, History, MessageSquarePlus, Sparkles, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
   fetchCommunications,
@@ -30,7 +32,6 @@ import {
 } from '../../features/communications/communicationsSlice';
 import type { CommunicationKind } from '../../features/communications/communicationsSlice';
 import type { Conversation } from '../copilot/types';
-import { ComposeEmailModal } from '../../components/shared/ComposeEmailModal';
 import { DetailPane } from './DetailPane';
 import { InboxList, InboxZero } from './InboxList';
 import { InboxPanel } from './InboxPanel';
@@ -53,7 +54,6 @@ export default function CommunicationsPage() {
   const mailbox = useAppSelector((state) => state.mail?.connection ?? null);
   const connectors = useAppSelector((state) => state.connectors?.items ?? []);
 
-  const [searchDraft, setSearchDraft] = useState(search);
   // The source comes from the sidebar's group as ?source=; the page never
   // owns it, so the sidebar and the inbox can never disagree.
   const [params, setParams] = useSearchParams();
@@ -62,7 +62,6 @@ export default function CommunicationsPage() {
   const [copilotOpen, setCopilotOpen] = useState(readCopilotPreference);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [conversation, setConversation] = useState<Conversation | null>(null);
-  const [composing, setComposing] = useState(false);
   const [contextCleared, setContextCleared] = useState(false);
 
   useEffect(() => {
@@ -108,37 +107,6 @@ export default function CommunicationsPage() {
     <div className="h-full min-h-0 flex flex-col">
       {/* Top bar */}
       <header className="h-16 shrink-0 flex items-center gap-3 px-4">
-        <form
-          className="relative flex-1 max-w-[720px]"
-          onSubmit={(e: FormEvent) => {
-            e.preventDefault();
-            dispatch(setSearch(searchDraft));
-          }}
-        >
-          <Search className="w-4 h-4 text-ink-faint absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
-          <label htmlFor="comms-search" className="sr-only">
-            Search all conversations
-          </label>
-          <input
-            id="comms-search"
-            type="search"
-            value={searchDraft}
-            onChange={(e) => setSearchDraft(e.target.value)}
-            placeholder="Search all conversations"
-            className="w-full h-11 pl-10 pr-10 rounded-xl bg-surface border border-line text-[13.5px] text-ink placeholder:text-ink-faint focus-visible:outline-none focus-visible:border-line-strong"
-          />
-          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 font-mono-brand text-[10px] text-ink-faint border border-line rounded px-1.5 py-0.5">/</kbd>
-        </form>
-        <button
-          type="button"
-          onClick={() => setComposing(true)}
-          disabled={!selected?.account || !mailbox}
-          title={!mailbox ? 'Connect a mailbox to compose' : !selected?.account ? 'Open a conversation to compose to its account' : 'Compose'}
-          className="h-11 px-4 rounded-xl bg-accent text-on-accent text-[13px] font-semibold inline-flex items-center gap-2 disabled:opacity-40 hover:opacity-90 transition-opacity duration-[var(--dur-fast)]"
-        >
-          Compose
-          <PenSquare className="w-4 h-4" aria-hidden="true" />
-        </button>
         <div className="ml-auto flex items-center gap-1 rounded-xl bg-surface/70 border border-line p-1 relative">
           <button
             type="button"
@@ -204,13 +172,12 @@ export default function CommunicationsPage() {
                 <X className="w-3 h-3 text-ink-muted" aria-hidden="true" />
               </button>
             ) : null}
+            {/* A term set elsewhere (the slice outlives the page) stays
+                visible here so it can be cleared. */}
             {search.trim() ? (
               <button
                 type="button"
-                onClick={() => {
-                  setSearchDraft('');
-                  dispatch(setSearch(''));
-                }}
+                onClick={() => dispatch(setSearch(''))}
                 className="inline-flex items-center gap-1 rounded-full bg-subtle px-2.5 py-1 text-[12px] text-ink hover:bg-line-subtle"
               >
                 “{search}”
@@ -287,18 +254,6 @@ export default function CommunicationsPage() {
         ) : null}
       </div>
 
-      {composing && selected?.account ? (
-        <ComposeEmailModal
-          customerId={selected.account.type === 'customer' ? selected.account.id : selected.account.id}
-          accountId={selected.account.type === 'account' ? selected.account.id : undefined}
-          recordName={selected.account.name}
-          onClose={() => setComposing(false)}
-          onSent={() => {
-            setComposing(false);
-            dispatch(fetchCommunications({ scope, mode, kind, search }));
-          }}
-        />
-      ) : null}
     </div>
   );
 }
