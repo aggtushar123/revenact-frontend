@@ -81,7 +81,7 @@ export function HomeView({
       <div className="w-full max-w-[760px] mx-auto px-6 pt-12 pb-24 flex flex-col">
         <p className="font-mono-brand text-[11px] uppercase tracking-[0.14em] text-ink-faint">{dateLine}</p>
         <h1 className="font-display text-[34px] leading-[1.1] tracking-tight text-ink mt-2">{greeting}</h1>
-        <p className="text-[14px] text-ink-muted mt-2">Ask about any account, or start from a skill.</p>
+        <p className="text-[14px] text-ink-muted mt-2">Ask about your organisation, or start from a skill.</p>
 
         {selectedSkill ? (
           <div id="active-skill-card" className="mt-8 bg-surface border border-line rounded-xl shadow-sm">
