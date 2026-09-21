@@ -26,6 +26,9 @@ export interface Source {
   /** Which kind of row this source produces; the list filters on it. */
   kind: CommunicationKind | null;
   icon: React.ReactNode;
+  /** False for a channel the platform offers but this organisation has not
+   *  connected yet: shown dimmed, and it leads to Integrations. */
+  connected: boolean;
 }
 
 function connectorIcon(provider: string) {
@@ -58,28 +61,52 @@ function connectorIcon(provider: string) {
   }
 }
 
-/** What the rail shows, from what is connected. */
+/** The channels the platform offers, in the order the group shows them. */
+const CATALOGUE: { provider: string; label: string }[] = [
+  { provider: 'slack', label: 'Slack' },
+  { provider: 'zendesk', label: 'Zendesk' },
+  { provider: 'jira', label: 'Jira' },
+  { provider: 'freshdesk', label: 'Freshdesk' },
+  { provider: 'intercom', label: 'Intercom' },
+  { provider: 'zoom', label: 'Zoom' },
+  { provider: 'ms_teams', label: 'Teams' },
+  { provider: 'salesforce', label: 'Salesforce' },
+  { provider: 'hubspot', label: 'HubSpot' },
+];
+
+/**
+ * What the group shows: everything, the mail providers, every channel in the
+ * catalogue, calls. Connected ones carry the id the inbox filters on; the
+ * rest are there so the group reads as the platform's channels, dimmed, and
+ * lead to Integrations.
+ */
 export function sourcesFrom(mailbox: MailboxConnection | null, connectors: Connector[]): Source[] {
-  const sources: Source[] = [{ id: 'all', label: 'Everything', kind: null, icon: <Inbox className="w-[18px] h-[18px]" aria-hidden="true" /> }];
-  if (mailbox) {
-    sources.push({
-      id: `mailbox:${mailbox.provider}`,
-      label: mailbox.provider === 'google' ? 'Gmail' : mailbox.provider === 'microsoft' ? 'Outlook' : 'Mailbox',
-      kind: 'email',
-      icon: mailbox.provider === 'google' ? <GmailIcon className="w-5 h-5" /> : mailbox.provider === 'microsoft' ? <OutlookIcon className="w-5 h-5" /> : <Inbox className="w-[18px] h-[18px]" aria-hidden="true" />,
-    });
+  const list = Array.isArray(connectors) ? connectors : [];
+  const sources: Source[] = [
+    { id: 'all', label: 'Everything', kind: null, icon: <Inbox className="w-[18px] h-[18px]" aria-hidden="true" />, connected: true },
+  ];
+
+  const google = mailbox?.provider === 'google';
+  const microsoft = mailbox?.provider === 'microsoft';
+  sources.push({ id: google ? 'mailbox:google' : 'provider:gmail', label: 'Gmail', kind: 'email', icon: <GmailIcon className="w-5 h-5" />, connected: google });
+  sources.push({ id: microsoft ? 'mailbox:microsoft' : 'provider:outlook', label: 'Outlook', kind: 'email', icon: <OutlookIcon className="w-5 h-5" />, connected: microsoft });
+  if (mailbox && !google && !microsoft) {
+    sources.push({ id: `mailbox:${mailbox.provider}`, label: 'Mailbox', kind: 'email', icon: <Inbox className="w-[18px] h-[18px]" aria-hidden="true" />, connected: true });
   }
-  for (const connector of Array.isArray(connectors) ? connectors : []) {
-    if (!isConnected(connector)) continue;
+
+  for (const entry of CATALOGUE) {
+    const connected = list.find((c) => c.provider === entry.provider && isConnected(c));
     sources.push({
-      id: `connector:${connector.id}`,
-      label: connector.name || connector.provider_display,
+      id: connected ? `connector:${connected.id}` : `provider:${entry.provider}`,
+      label: connected?.name || entry.label,
       // What picking it narrows the inbox to; a CRM narrows nothing but still
       // gives the Copilot its context.
-      kind: CALL_PROVIDERS.has(connector.provider) ? 'call' : TICKET_PROVIDERS.has(connector.provider) ? 'ticket' : null,
-      icon: connectorIcon(connector.provider),
+      kind: CALL_PROVIDERS.has(entry.provider) ? 'call' : TICKET_PROVIDERS.has(entry.provider) ? 'ticket' : null,
+      icon: connectorIcon(entry.provider),
+      connected: Boolean(connected),
     });
   }
-  sources.push({ id: 'calls', label: 'Calls', kind: 'call', icon: <Phone className="w-[18px] h-[18px]" aria-hidden="true" /> });
+
+  sources.push({ id: 'calls', label: 'Calls', kind: 'call', icon: <Phone className="w-[18px] h-[18px]" aria-hidden="true" />, connected: true });
   return sources;
 }
