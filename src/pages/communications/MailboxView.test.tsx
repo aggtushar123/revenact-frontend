@@ -9,6 +9,7 @@ import mailReducer from '../../features/mail/mailSlice';
 import mailboxReducer from '../../features/mail/mailboxSlice';
 import connectorsReducer from '../../features/connectors/connectorsSlice';
 import CommunicationsPage from './CommunicationsPage';
+import type { MailMessage } from '../../features/mail/mailboxSlice';
 
 const invoice = {
   id: 1,
@@ -16,7 +17,7 @@ const invoice = {
   direction: 'received' as const,
   from_name: 'Circleback',
   from_address: 'billing@circleback.ai',
-  to: [['Dana', 'dana@acme.io']],
+  to: [['Dana', 'dana@acme.io']] as [string, string][],
   subject: 'Subscription renewal',
   snippet: 'Your plan renews on 1 October.',
   sent_at: '2026-09-20T09:00:00Z',
@@ -53,11 +54,25 @@ const summary = {
   categories: [{ category: 'financial', label: 'Financial', count: 2, subjects: ['Subscription renewal', 'Invoice 1042'], senders: ['Circleback'], more_senders: 1 }],
 };
 
-function mockApi() {
+const draftRow: MailMessage = { ...invoice, folder: 'drafts', direction: 'sent', to: [['Sam', 'sam@pizzahut.com']] };
+
+type Overrides = {
+  detailStatus?: number;
+  patchStatus?: number;
+  syncStatus?: number;
+  paged?: boolean;
+  draft?: boolean;
+};
+
+function mockApi(overrides: Overrides = {}) {
   const calls: string[] = [];
   const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url, init) => {
     calls.push(`${init?.method ?? 'GET'} ${url}`);
     const ok = (body: unknown, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => body });
+    if (url.includes('/mail/sync/')) return ok(overrides.syncStatus ? { detail: 'Google refused the token.' } : { filed: 0 }, overrides.syncStatus ?? 200);
+    if (url.includes('/mail/messages/1/') && init?.method === 'PATCH' && overrides.patchStatus) return ok({ detail: 'nope' }, overrides.patchStatus);
+    if (url.includes('/mail/messages/1/') && init?.method !== 'PATCH' && overrides.detailStatus) return ok({ detail: 'Not found.' }, overrides.detailStatus);
+    if (url.includes('/mail/messages/1/') && overrides.draft) return ok({ ...draftRow, body: 'Your plan renews on 1 October. Nothing to do.' });
     if (url.includes('/mail/messages/summary/')) return ok(summary);
     if (url.includes('/mail/messages/2/reply/')) return ok({ ...pizza, id: 9, direction: 'sent', folder: 'sent' }, 201);
     if (url.includes('/mail/messages/1/') && init?.method === 'PATCH') return ok({ ...invoice, ...JSON.parse(String(init.body)), body: 'Your plan renews on 1 October. Nothing to do.' });
@@ -65,9 +80,14 @@ function mockApi() {
     if (url.includes('/mail/messages/2/')) return ok({ ...pizza, body: 'Can we talk Thursday? Sam' });
     if (url.includes('/mail/messages/')) {
       const params = new URL(url, 'http://localhost').searchParams;
-      let rows = [invoice, pizza];
+      let rows: MailMessage[] = [invoice, pizza];
+      if (overrides.draft) rows = [draftRow];
       if (params.get('category') === 'financial') rows = [invoice];
       if (params.get('folder') === 'sent') rows = [];
+      if (overrides.paged) {
+        if (params.get('page') === '2') return ok({ count: 2, next: null, previous: 'x', results: [pizza] });
+        return ok({ count: 2, next: 'http://localhost:8000/api/v1/mail/messages/?page=2', previous: null, results: [invoice] });
+      }
       return ok({ count: rows.length, next: null, previous: null, results: rows });
     }
     if (url.includes('/communications/stats/')) return ok({ counts: { email: 0, question: 0, ticket: 0, call: 0 }, total: 0, oldest_waiting_days: null, stale_questions: 0, has_mailbox: true, scope: 'mine', ticket_scope_note: '' });
@@ -156,5 +176,98 @@ describe('MailboxView', () => {
     await userEvent.click(within(message).getByRole('button', { name: 'Send reply' }));
     expect(await within(message).findByRole('status')).toHaveTextContent('Sent from your mailbox.');
     expect(calls.some((c) => c.startsWith('POST') && c.includes('/mail/messages/2/reply/'))).toBe(true);
+  });
+
+  it('never shows the last message under a new one after a filter change', { timeout: 15000 }, async () => {
+    mockApi();
+    renderMailbox();
+    const mailbox = await screen.findByRole('region', { name: 'Mailbox' });
+    await within(mailbox).findByRole('region', { name: 'September' });
+    await userEvent.click(within(mailbox).getByRole('button', { name: /Subscription renewal: Your plan renews/ }));
+    await within(mailbox).findByText('Your plan renews on 1 October. Nothing to do.');
+    await userEvent.click(within(mailbox).getByRole('switch', { name: 'Unread' }));
+    await userEvent.click(await within(mailbox).findByRole('button', { name: /Re: revised terms/ }));
+    expect(within(mailbox).queryByText('Your plan renews on 1 October. Nothing to do.')).not.toBeInTheDocument();
+    expect(await within(mailbox).findByText('Can we talk Thursday? Sam')).toBeInTheDocument();
+  });
+
+  it('a message that cannot be opened says so in the reading pane, and the list survives', { timeout: 15000 }, async () => {
+    mockApi({ detailStatus: 404 });
+    renderMailbox();
+    const mailbox = await screen.findByRole('region', { name: 'Mailbox' });
+    await within(mailbox).findByRole('region', { name: 'September' });
+    await userEvent.click(within(mailbox).getByRole('button', { name: /Subscription renewal: Your plan renews/ }));
+    const pane = await within(mailbox).findByRole('region', { name: 'Message' });
+    expect(await within(pane).findByRole('alert')).toHaveTextContent('Not found.');
+    expect(within(mailbox).queryByText('Could not load your mail')).not.toBeInTheDocument();
+    await userEvent.click(within(mailbox).getByRole('button', { name: /^Inbox$/ }));
+    expect(await within(mailbox).findByRole('region', { name: 'September' })).toBeInTheDocument();
+  });
+
+  it('a failed star or done says so instead of pretending', { timeout: 15000 }, async () => {
+    mockApi({ patchStatus: 500 });
+    renderMailbox();
+    const mailbox = await screen.findByRole('region', { name: 'Mailbox' });
+    await within(mailbox).findByRole('region', { name: 'September' });
+    await userEvent.click(within(mailbox).getByRole('button', { name: /Subscription renewal: Your plan renews/ }));
+    const pane = await within(mailbox).findByRole('region', { name: 'Message' });
+    await within(pane).findByText('Your plan renews on 1 October. Nothing to do.');
+    await userEvent.click(within(pane).getByRole('button', { name: 'Star' }));
+    expect(await within(pane).findByRole('alert')).toHaveTextContent('nope');
+  });
+
+  it('a failed sync is visible', { timeout: 15000 }, async () => {
+    mockApi({ syncStatus: 502 });
+    renderMailbox();
+    const mailbox = await screen.findByRole('region', { name: 'Mailbox' });
+    await within(mailbox).findByRole('region', { name: 'September' });
+    await userEvent.click(within(mailbox).getByRole('button', { name: 'Sync now' }));
+    expect(await within(mailbox).findByRole('alert')).toHaveTextContent('Google refused the token.');
+  });
+
+  it('follows the next page on Load more', { timeout: 15000 }, async () => {
+    const calls = mockApi({ paged: true });
+    renderMailbox();
+    const mailbox = await screen.findByRole('region', { name: 'Mailbox' });
+    await within(mailbox).findByRole('region', { name: 'September' });
+    expect(within(mailbox).queryByRole('region', { name: 'August' })).not.toBeInTheDocument();
+    await userEvent.click(within(mailbox).getByRole('button', { name: 'Load more (1 of 2)' }));
+    expect(await within(mailbox).findByRole('region', { name: 'August' })).toBeInTheDocument();
+    expect(within(mailbox).getByRole('region', { name: 'September' })).toBeInTheDocument();
+    expect(calls.some((c) => c.includes('/mail/messages/?page=2'))).toBe(true);
+    expect(within(mailbox).queryByRole('button', { name: /Load more/ })).not.toBeInTheDocument();
+  });
+
+  it('a reply refreshes the counts and marks the row read', { timeout: 15000 }, async () => {
+    const calls = mockApi();
+    renderMailbox();
+    const mailbox = await screen.findByRole('region', { name: 'Mailbox' });
+    await within(mailbox).findByRole('region', { name: 'September' });
+    await userEvent.click(within(mailbox).getByRole('button', { name: /Re: revised terms/ }));
+    const pane = await within(mailbox).findByRole('region', { name: 'Message' });
+    await within(pane).findByText('Can we talk Thursday? Sam');
+    const before = calls.filter((c) => c.includes('/mail/messages/summary/')).length;
+    await userEvent.type(within(pane).getByLabelText('Reply'), 'Thursday works.');
+    await userEvent.click(within(pane).getByRole('button', { name: 'Send reply' }));
+    await within(pane).findByRole('status');
+    await waitFor(() => expect(calls.filter((c) => c.includes('/mail/messages/summary/')).length).toBe(before + 1));
+  });
+
+  it('the Copilot has the mailbox as its context', { timeout: 15000 }, async () => {
+    mockApi();
+    renderMailbox();
+    const copilot = await screen.findByRole('complementary', { name: /copilot/i });
+    expect(within(copilot).getByText('Gmail')).toBeInTheDocument();
+  });
+
+  it('a draft has no reply box', { timeout: 15000 }, async () => {
+    mockApi({ draft: true });
+    renderMailbox();
+    const mailbox = await screen.findByRole('region', { name: 'Mailbox' });
+    await within(mailbox).findByRole('region', { name: 'September' });
+    await userEvent.click(within(mailbox).getByRole('button', { name: /Subscription renewal: Your plan/ }));
+    const pane = await within(mailbox).findByRole('region', { name: 'Message' });
+    await within(pane).findByText('Your plan renews on 1 October. Nothing to do.');
+    expect(within(pane).queryByLabelText('Reply')).not.toBeInTheDocument();
   });
 });

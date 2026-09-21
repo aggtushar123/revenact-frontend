@@ -330,7 +330,13 @@ the design skill, reproduced so a reviewer can work through it.
 3. At most four type sizes per surface. Numbers in DM Mono with `tabular-nums`.
    Reading line length 65 to 75 characters.
 4. No card inside a card. No gradient buttons, no purple, no glow, no
-   glassmorphism on product surfaces.
+   glassmorphism on product surfaces. Exception, by the owner's decision on
+   2026-09-21: Communications, whose cards are `.rv-card-glass` /
+   `.rv-glass-inner` so the canvas glow shows through, as in the reference
+   mail client. The canvas gradients (`--rv-canvas-gradient-1/2`) were
+   strengthened in both themes at the same time; that is the intended look
+   for every `.rv-canvas` page, not a side effect. The mailbox's category dots
+   are a categorical filing key, not status, and reuse the semantic tokens.
 5. Every interactive element has all six states and a 44px target or `min-h-9`.
 6. Every list, table and chart has designed empty, loading and error states, with
    a skeleton that matches the layout.
@@ -360,7 +366,7 @@ Ranked by leverage. Each is a task in the
 | 5 | Loading states are text lines, not skeletons | Only `HeadlinesTab` and `ChatView` show any loading affordance |
 | 6 | `h-screen` in `DashboardLayout` | Rule says `min-h-[100dvh]` |
 | 7 | `rounded-2xl` and `rounded-3xl` outside the scale | Contact detail, Account placeholder |
-| 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces |
+| 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass` is the one sanctioned exception) |
 | 9 | `Login.css` requests Inter, which is never loaded | Falls through to the system stack |
 | 10 | Dead files: `App.css` is never imported, the `counter` slice and the seeded `tasks` slice are unused | Template leftovers |
 | 11 | Navbar and ActivityFeed have controls with no handlers | Search, Plus, Help, Message, feed search, "Add Action", title chevrons |

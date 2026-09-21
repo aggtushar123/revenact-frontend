@@ -86,6 +86,11 @@ interface MailboxState extends MailQuery {
   selectedId: number | null;
   detail: MailMessageDetail | null;
   detailLoading: boolean;
+  /** Why the open message could not be read; lives in the reading pane. */
+  detailError: string | null;
+  /** Why the last star / read / done / mute did not take. */
+  updateError: string | null;
+  loadingMore: boolean;
   replying: boolean;
   replyError: string | null;
   /** The id of the message whose reply just went out; the pane says so. */
@@ -105,6 +110,9 @@ const initialState: MailboxState = {
   selectedId: null,
   detail: null,
   detailLoading: false,
+  detailError: null,
+  updateError: null,
+  loadingMore: false,
   replying: false,
   replyError: null,
   repliedId: null,
@@ -132,6 +140,20 @@ export const fetchMailMessages = createAsyncThunk<MailPage, MailQuery, { rejectV
       return await apiFetch<MailPage>(buildMailQuery(query));
     } catch (err) {
       return rejectWithValue(reason(err, 'Could not load your mail.'));
+    }
+  },
+);
+
+/** The next page, appended: month groups stay contiguous because the
+ *  server orders by date and each page continues where the last stopped. */
+export const loadMoreMail = createAsyncThunk<MailPage, string, { rejectValue: string }>(
+  'mailbox/loadMore',
+  async (next, { rejectWithValue }) => {
+    try {
+      // An absolute DRF `next` link goes through untouched, as elsewhere.
+      return await apiFetch<MailPage>(next);
+    } catch (err) {
+      return rejectWithValue(reason(err, 'Could not load more mail.'));
     }
   },
 );
@@ -201,20 +223,29 @@ const mailboxSlice = createSlice({
     setMailUnread(state, action: PayloadAction<boolean>) {
       state.unread = action.payload;
       state.selectedId = null;
+      state.detail = null;
     },
     setMailPriority(state, action: PayloadAction<boolean>) {
       state.priority = action.payload;
       state.selectedId = null;
+      state.detail = null;
     },
     setMailSearch(state, action: PayloadAction<string>) {
       state.search = action.payload;
       state.selectedId = null;
+      state.detail = null;
     },
     selectMailMessage(state, action: PayloadAction<number | null>) {
       state.selectedId = action.payload;
-      if (action.payload === null) state.detail = null;
+      // Never show the last message under a new one while it loads.
+      if (state.detail?.id !== action.payload) state.detail = null;
+      state.detailError = null;
+      state.updateError = null;
       state.replyError = null;
       state.repliedId = null;
+    },
+    clearMailUpdateError(state) {
+      state.updateError = null;
     },
   },
   extraReducers: (builder) => {
@@ -231,11 +262,31 @@ const mailboxSlice = createSlice({
         state.loading = false;
         state.error = action.payload ?? 'Could not load your mail.';
       })
+      .addCase(loadMoreMail.pending, (state) => {
+        state.loadingMore = true;
+      })
+      .addCase(loadMoreMail.fulfilled, (state, action) => {
+        state.loadingMore = false;
+        if (!state.page) {
+          state.page = action.payload;
+          return;
+        }
+        const seen = new Set(state.page.results.map((row) => row.id));
+        state.page = {
+          ...action.payload,
+          results: [...state.page.results, ...action.payload.results.filter((row) => !seen.has(row.id))],
+        };
+      })
+      .addCase(loadMoreMail.rejected, (state, action) => {
+        state.loadingMore = false;
+        state.error = action.payload ?? 'Could not load more mail.';
+      })
       .addCase(fetchMailSummary.fulfilled, (state, action) => {
         state.summary = action.payload;
       })
       .addCase(fetchMailMessage.pending, (state) => {
         state.detailLoading = true;
+        state.detailError = null;
       })
       .addCase(fetchMailMessage.fulfilled, (state, action) => {
         state.detailLoading = false;
@@ -243,7 +294,10 @@ const mailboxSlice = createSlice({
       })
       .addCase(fetchMailMessage.rejected, (state, action) => {
         state.detailLoading = false;
-        state.error = action.payload ?? 'Could not open the message.';
+        state.detailError = action.payload ?? 'Could not open the message.';
+      })
+      .addCase(updateMailMessage.pending, (state) => {
+        state.updateError = null;
       })
       .addCase(updateMailMessage.fulfilled, (state, action) => {
         const updated = action.payload;
@@ -252,6 +306,9 @@ const mailboxSlice = createSlice({
           state.page.results = state.page.results.map((row) => (row.id === updated.id ? { ...row, ...updated } : row));
         }
       })
+      .addCase(updateMailMessage.rejected, (state, action) => {
+        state.updateError = action.payload ?? 'Could not update the message.';
+      })
       .addCase(replyToMailMessage.pending, (state) => {
         state.replying = true;
         state.replyError = null;
@@ -259,7 +316,11 @@ const mailboxSlice = createSlice({
       .addCase(replyToMailMessage.fulfilled, (state, action) => {
         state.replying = false;
         state.repliedId = action.meta.arg.id;
+        // The backend marks the original read; the row should say so too.
         if (state.detail?.id === action.meta.arg.id) state.detail.is_read = true;
+        if (state.page) {
+          state.page.results = state.page.results.map((row) => (row.id === action.meta.arg.id ? { ...row, is_read: true } : row));
+        }
       })
       .addCase(replyToMailMessage.rejected, (state, action) => {
         state.replying = false;
@@ -268,5 +329,5 @@ const mailboxSlice = createSlice({
   },
 });
 
-export const { setMailFolder, toggleMailCategory, setMailUnread, setMailPriority, setMailSearch, selectMailMessage } = mailboxSlice.actions;
+export const { setMailFolder, toggleMailCategory, setMailUnread, setMailPriority, setMailSearch, selectMailMessage, clearMailUpdateError } = mailboxSlice.actions;
 export default mailboxSlice.reducer;

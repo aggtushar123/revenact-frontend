@@ -21,11 +21,21 @@ function initialsOf(name: string): string {
   return (parts[0].charAt(0) + (parts[1]?.charAt(0) ?? '')).toUpperCase();
 }
 
+/** Whose face goes on the row: the sender, or for sent mail the first
+ *  person it went to (not the "To" in "To Dana, Bob"). */
+function faceOf(row: MailMessage): string {
+  if (row.direction === 'sent') {
+    const first = row.to[0];
+    return first ? first[0] || first[1] : '?';
+  }
+  return row.from_name || row.from_address;
+}
+
 export function CategoriesBlock({ blocks, active, onPick }: { blocks: MailCategoryBlock[]; active: MailCategory | null; onPick: (category: MailCategory) => void }) {
   if (blocks.length === 0) return null;
   return (
     <section aria-label="Waiting by category" className="mb-5">
-      <h3 className="text-[12.5px] font-semibold text-ink-muted mb-2">Categories</h3>
+      <h2 className="text-[12.5px] font-semibold text-ink-muted mb-2">Categories</h2>
       <ul className="flex flex-col gap-1.5">
         {blocks.map((block) => (
           <li key={block.category}>
@@ -61,11 +71,14 @@ export function MailList({
   isLoading,
   onSelect,
   emptyState,
+  footer = null,
 }: {
   rows: MailMessage[];
   isLoading: boolean;
   onSelect: (id: number) => void;
   emptyState: React.ReactNode;
+  /** Below the last group: the way to the next page, when there is one. */
+  footer?: React.ReactNode;
 }) {
   if (isLoading && rows.length === 0) {
     return (
@@ -89,7 +102,7 @@ export function MailList({
     <div className="flex flex-col gap-5">
       {[...groups.entries()].map(([month, items]) => (
         <section key={month} aria-label={month}>
-          <h3 className="text-[12.5px] font-semibold text-ink-muted mb-2">{month}</h3>
+          <h2 className="text-[12.5px] font-semibold text-ink-muted mb-2">{month}</h2>
           <ul className="flex flex-col gap-1.5">
             {items.map((row) => {
               const name = who(row);
@@ -101,9 +114,9 @@ export function MailList({
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border rv-glass-inner border-line hover:border-line-strong text-left transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
                     <span className="w-8 h-8 shrink-0 rounded-full bg-subtle text-ink text-[11.5px] font-semibold flex items-center justify-center" aria-hidden="true">
-                      {initialsOf(name)}
+                      {initialsOf(faceOf(row))}
                     </span>
-                    <span className="w-[210px] shrink-0 min-w-0 flex items-center gap-2">
+                    <span className="w-[160px] xl:w-[210px] shrink-0 min-w-0 flex items-center gap-2">
                       {!row.is_read ? <span className="w-1.5 h-1.5 rounded-full bg-info shrink-0" role="img" aria-label="Unread message" /> : null}
                       <span className={`block text-[13px] truncate ${row.is_read ? 'text-ink' : 'font-semibold text-ink'}`}>{name}</span>
                     </span>
@@ -121,6 +134,7 @@ export function MailList({
           </ul>
         </section>
       ))}
+      {footer}
     </div>
   );
 }

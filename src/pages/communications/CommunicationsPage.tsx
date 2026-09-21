@@ -68,13 +68,20 @@ export default function CommunicationsPage() {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [contextCleared, setContextCleared] = useState(false);
 
-  useEffect(() => {
-    dispatch(fetchCommunications({ scope, mode, kind, search }));
-  }, [dispatch, scope, mode, kind, search]);
+  // The person's own mailbox is a different page inside the same card: their
+  // mail whole, not the queue narrowed to email. Keyed on the URL, not on the
+  // resolved source, so it never flashes the queue while the connection loads.
+  const mailboxSource = source.startsWith('mailbox:');
 
   useEffect(() => {
+    if (mailboxSource) return;
+    dispatch(fetchCommunications({ scope, mode, kind, search }));
+  }, [dispatch, scope, mode, kind, search, mailboxSource]);
+
+  useEffect(() => {
+    if (mailboxSource) return;
     dispatch(fetchCommunicationsStats(scope));
-  }, [dispatch, scope]);
+  }, [dispatch, scope, mailboxSource]);
 
   useEffect(() => {
     try {
@@ -89,11 +96,6 @@ export default function CommunicationsPage() {
 
   const rows = useMemo(() => page?.results ?? [], [page]);
   const selected = useMemo(() => rows.find((r) => r.id === selectedId) ?? null, [rows, selectedId]);
-
-  // The person's own mailbox is a different page inside the same card: their
-  // mail whole, not the queue narrowed to email. Keyed on the URL, not on the
-  // resolved source, so it never flashes the queue while the connection loads.
-  const mailboxSource = source.startsWith('mailbox:');
 
   // A source maps to a kind; arriving on one narrows the folder to match.
   useEffect(() => {
