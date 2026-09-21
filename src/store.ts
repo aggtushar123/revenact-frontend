@@ -5,6 +5,7 @@ import tasksReducer from './features/tasks/tasksSlice';
 import userManagementReducer from './features/userManagement/userManagementSlice';
 import accessReducer from './features/access/accessSlice';
 import platformReducer from './features/platform/platformSlice';
+import billingReducer from './features/billing/billingSlice';
 import customersReducer from './features/customers/customersSlice';
 import copilotSessionsReducer from './features/copilotSessions/copilotSessionsSlice';
 import notificationsReducer from './features/notifications/notificationsSlice';
@@ -42,6 +43,7 @@ export const store = configureStore({
     userManagement: userManagementReducer,
     access: accessReducer,
     platform: platformReducer,
+    billing: billingReducer,
     customers: customersReducer,
     copilotSessions: copilotSessionsReducer,
     notifications: notificationsReducer,

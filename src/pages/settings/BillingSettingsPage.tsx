@@ -1,15 +1,44 @@
-import { useState } from 'react';
-import { CreditCard, ExternalLink, Check } from 'lucide-react';
-import { useAppSelector } from '../../hooks';
+// Account settings › Plan & billing: what this organisation has and has used.
+//
+// Every number here is the server's. Seats are people (an active member
+// holds one); credits are AI (one per model call). A new workspace starts on
+// the trial. Buying a plan goes through the payment provider once that phase
+// lands; until then the page says how to upgrade rather than pretending.
+
+import { useEffect } from 'react';
+import { AlertCircle, Sparkles, Users, CalendarClock } from 'lucide-react';
+import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
+import { fetchBillingLedger, fetchBillingSummary, fetchPlans } from '../../features/billing/billingSlice';
+
+function when(iso: string | null) {
+  return iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : null;
+}
+
+function money(cents: number, currency: string) {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(cents / 100);
+}
+
+const KIND_LABEL: Record<string, string> = {
+  grant: 'Granted',
+  consume: 'Model call',
+  refund: 'Refunded',
+  adjust: 'Adjusted by Revenact',
+  expire: 'Expired',
+};
 
 export function BillingSettingsPage() {
-  const billing = useAppSelector((state) => state.settings.billing);
-  const [modalNotice, setModalNotice] = useState<string | null>(null);
+  const dispatch = useAppDispatch();
+  const { summary, ledger, plans, error } = useAppSelector((state) => state.billing);
+  const canSeeLedger = useCapability('manage_org_settings');
 
-  const showToast = (msg: string) => {
-    setModalNotice(msg);
-    setTimeout(() => setModalNotice(null), 3000);
-  };
+  useEffect(() => {
+    dispatch(fetchBillingSummary());
+    dispatch(fetchPlans());
+    if (canSeeLedger) dispatch(fetchBillingLedger());
+  }, [dispatch, canSeeLedger]);
+
+  const seatPct = summary && summary.seats.limit > 0 ? Math.min(100, Math.round((summary.seats.used / summary.seats.limit) * 100)) : 0;
+  const trialEnds = when(summary?.trial_ends_at ?? null);
 
   return (
     <div className="flex flex-col gap-4" aria-label="Plan and Billing Settings">
@@ -17,106 +46,140 @@ export function BillingSettingsPage() {
         <h1 className="text-[14px] font-semibold text-[var(--rv-text)] tracking-tight">Plan & billing</h1>
       </div>
 
-      {modalNotice && (
-        <div className="bg-[var(--rv-input-bg)] text-[var(--rv-text)] border border-[var(--rv-card-border)] px-3.5 py-2 rounded-xl text-[12px] font-medium flex items-center justify-between shadow-md">
-          <span className="flex items-center gap-2">
-            <Check className="w-3.5 h-3.5 text-emerald-400" /> {modalNotice}
-          </span>
+      {error && (
+        <div role="alert" className="flex items-center gap-2 text-[12px] text-danger p-3 bg-danger-dim rounded-lg">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+          {error}
         </div>
       )}
 
-      {/* Card 1: Plan Status */}
-      <section className="rv-card p-5 md:p-6 flex flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <h2 className="text-[14px] font-semibold text-[var(--rv-text)] tracking-tight">
-              {billing.planName}
-            </h2>
-            {billing.isTrial && (
-              <span className="px-2 py-0.5 rounded-full text-[10.5px] font-medium bg-[var(--rv-pill-secondary-bg)] text-[var(--rv-text-muted)] border border-[var(--rv-card-border)]">
-                Trial
+      {summary && (
+        <>
+          <section className="rv-card p-5 md:p-6 flex flex-col gap-4" aria-labelledby="plan-heading">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 id="plan-heading" className="text-[14px] font-semibold text-[var(--rv-text)] tracking-tight">
+                  {summary.plan.name} plan
+                </h2>
+                <p className="text-[12px] text-[var(--rv-text-muted)] mt-0.5">
+                  {summary.plan.is_trial
+                    ? trialEnds
+                      ? `Free until ${trialEnds}. Seats stay at ${summary.plan.seats_included} until a plan is bought.`
+                      : 'Free while you evaluate.'
+                    : `${money(summary.plan.price_cents, summary.plan.currency)} a month · ${summary.plan.seats_included} seats · ${summary.plan.monthly_credits} AI credits a month`}
+                </p>
+              </div>
+              <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${
+                summary.status === 'active' ? 'bg-success-dim text-success' : summary.status === 'trialing' ? 'bg-warning-dim text-warning' : 'bg-danger-dim text-danger'
+              }`}>
+                {summary.status.replace('_', ' ')}
               </span>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="rounded-xl border border-[var(--rv-card-border)] p-3.5">
+                <div className="flex items-center gap-2 text-[11.5px] font-semibold text-[var(--rv-text-muted)]">
+                  <Users className="w-3.5 h-3.5" aria-hidden="true" />
+                  Seats
+                </div>
+                <div className="text-[22px] font-semibold text-[var(--rv-text)] mt-1 tabular-nums">
+                  {summary.seats.used} <span className="text-[13px] text-[var(--rv-text-muted)] font-medium">of {summary.seats.limit}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-[var(--rv-input-bg)] mt-2 overflow-hidden" aria-hidden="true">
+                  <div className={`h-full rounded-full ${seatPct >= 100 ? 'bg-danger' : 'bg-accent'}`} style={{ width: `${seatPct}%` }} />
+                </div>
+                <p className="text-[11px] text-[var(--rv-text-muted)] mt-1.5">
+                  {summary.seats.used >= summary.seats.limit ? 'Every seat is taken. Free one, or upgrade, before approving anyone else.' : `${summary.seats.limit - summary.seats.used} free.`}
+                </p>
+              </div>
+              <div className="rounded-xl border border-[var(--rv-card-border)] p-3.5">
+                <div className="flex items-center gap-2 text-[11.5px] font-semibold text-[var(--rv-text-muted)]">
+                  <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
+                  AI credits
+                </div>
+                <div className="text-[22px] font-semibold text-[var(--rv-text)] mt-1 tabular-nums">{summary.credits.balance}</div>
+                <p className="text-[11px] text-[var(--rv-text-muted)] mt-1.5">
+                  One credit per Copilot or agent call. A failed call costs nothing.
+                  {summary.credits.balance === 0 ? ' None left: the Copilot will refuse until credits are added.' : ''}
+                </p>
+              </div>
+            </div>
+
+            {summary.current_period_end && (
+              <p className="text-[11.5px] text-[var(--rv-text-muted)] flex items-center gap-1.5">
+                <CalendarClock className="w-3.5 h-3.5" aria-hidden="true" />
+                Current period ends {when(summary.current_period_end)}.
+              </p>
             )}
-          </div>
-          <p className="text-[12px] text-[var(--rv-text-muted)]">
-            ${billing.pricePerMonth.toFixed(2)}/mo · Trial ends {billing.trialEndDate}
-          </p>
-        </div>
+            {!summary.enforced && (
+              <p className="text-[11.5px] text-[var(--rv-text-muted)]">Limits are being recorded but not enforced during the beta.</p>
+            )}
+          </section>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={() => showToast('Redirecting to plan selection...')}
-            className="rv-pill-secondary text-[11.5px] cursor-pointer"
-          >
-            Change plan
-          </button>
-          <button
-            type="button"
-            onClick={() => showToast('Cancellation options modal will open.')}
-            className="text-[11.5px] font-medium text-[var(--rv-text-muted)] hover:text-[var(--rv-text)] px-2.5 py-1 transition-colors cursor-pointer"
-          >
-            Cancel plan
-          </button>
-        </div>
-
-        <p className="text-[11.5px] text-[var(--rv-text-muted)] leading-relaxed pt-2 border-t border-[var(--rv-card-border)]">
-          You have {billing.trialDaysRemaining} days remaining of your trial. On {billing.trialEndDate}, your Revenact plan will start and you will be charged ${billing.pricePerMonth.toFixed(2)} on a monthly basis.
-        </p>
-      </section>
-
-      {/* Card 2: Payment Method */}
-      <section className="rv-card p-5 md:p-6 flex flex-col gap-3">
-        <div>
-          <h2 className="text-[13.5px] font-semibold text-[var(--rv-text)]">Payment method</h2>
-          <p className="text-[11.5px] text-[var(--rv-text-muted)] mt-0.5">The card we charge each period.</p>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 pt-1 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-7 rounded-lg bg-[var(--rv-input-bg)] border border-[var(--rv-card-border)] flex items-center justify-center text-[var(--rv-text-muted)] shrink-0">
-              <CreditCard className="w-4 h-4" />
+          <section className="rv-card p-5 md:p-6 flex flex-col gap-3" aria-labelledby="plans-heading">
+            <div>
+              <h2 id="plans-heading" className="text-[13.5px] font-semibold text-[var(--rv-text)]">Plans</h2>
+              <p className="text-[12px] text-[var(--rv-text-muted)] mt-0.5">
+                Online checkout is coming. To change plans today, contact Revenact and it is applied to your account the same day.
+              </p>
             </div>
-            <div className="flex flex-col">
-              <span className="text-[12px] font-medium text-[var(--rv-text)]">
-                Your card is stored securely with Stripe.
-              </span>
-              <span className="text-[11px] text-[var(--rv-text-faint)]">{billing.paymentMethodMask}</span>
-            </div>
-          </div>
+            {plans.length > 0 ? (
+              <ul className="grid sm:grid-cols-2 gap-3">
+                {plans.map((plan) => (
+                  <li key={plan.code} className={`rounded-xl border p-3.5 ${plan.code === summary.plan.code ? 'border-accent' : 'border-[var(--rv-card-border)]'}`}>
+                    <div className="flex items-baseline justify-between gap-2">
+                      <span className="text-[13px] font-semibold text-[var(--rv-text)]">{plan.name}</span>
+                      <span className="text-[13px] text-[var(--rv-text)] tabular-nums">{money(plan.price_cents, plan.currency)}<span className="text-[11px] text-[var(--rv-text-muted)]">/mo</span></span>
+                    </div>
+                    <p className="text-[11.5px] text-[var(--rv-text-muted)] mt-1">{plan.seats_included} seats · {plan.monthly_credits} AI credits a month</p>
+                    {plan.code === summary.plan.code && <p className="text-[11px] font-semibold text-accent mt-1.5">Current plan</p>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[12px] text-[var(--rv-text-muted)]">No plans are published yet.</p>
+            )}
+          </section>
 
-          <button
-            type="button"
-            onClick={() => showToast('Connecting to Stripe customer portal...')}
-            className="rv-pill-secondary text-[11.5px] cursor-pointer"
-          >
-            Update card
-          </button>
-        </div>
-      </section>
-
-      {/* Card 3: Invoices */}
-      <section className="rv-card p-5 md:p-6 flex flex-col gap-3">
-        <div>
-          <h2 className="text-[13.5px] font-semibold text-[var(--rv-text)]">Invoices</h2>
-          <p className="text-[11.5px] text-[var(--rv-text-muted)] mt-0.5">Your billing history.</p>
-        </div>
-
-        <div className="flex items-center justify-between gap-4 pt-1 flex-wrap">
-          <p className="text-[12px] text-[var(--rv-text-muted)]">
-            Invoices are available in the secure Stripe billing portal.
-          </p>
-
-          <button
-            type="button"
-            onClick={() => showToast('Opening Stripe invoices view...')}
-            className="rv-pill-secondary text-[11.5px] flex items-center gap-1.5 cursor-pointer"
-          >
-            <span>View invoices</span>
-            <ExternalLink className="w-3 h-3 text-[var(--rv-text-muted)]" />
-          </button>
-        </div>
-      </section>
+          {canSeeLedger && (
+            <section className="rv-card p-5 md:p-6 flex flex-col gap-3" aria-labelledby="ledger-heading">
+              <div>
+                <h2 id="ledger-heading" className="text-[13.5px] font-semibold text-[var(--rv-text)]">Credit history</h2>
+                <p className="text-[12px] text-[var(--rv-text-muted)] mt-0.5">Every movement, newest first. This is the record your balance is computed from.</p>
+              </div>
+              {ledger.length === 0 ? (
+                <p className="text-[12px] text-[var(--rv-text-muted)]">Nothing yet.</p>
+              ) : (
+                <table className="w-full text-[12px]">
+                  <thead className="text-[10.5px] uppercase tracking-[0.08em] text-[var(--rv-text-faint)] text-left">
+                    <tr>
+                      <th className="py-1.5 font-semibold">When</th>
+                      <th className="py-1.5 font-semibold">What</th>
+                      <th className="py-1.5 font-semibold text-right">Change</th>
+                      <th className="py-1.5 font-semibold text-right">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--rv-card-border)]">
+                    {ledger.map((row) => (
+                      <tr key={row.id}>
+                        <td className="py-1.5 text-[var(--rv-text-muted)] whitespace-nowrap">{new Date(row.at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                        <td className="py-1.5 text-[var(--rv-text)]">
+                          {KIND_LABEL[row.kind] ?? row.kind}
+                          {row.reason && <span className="text-[var(--rv-text-muted)]"> · {row.reason}</span>}
+                        </td>
+                        <td className={`py-1.5 text-right tabular-nums ${row.amount < 0 ? 'text-[var(--rv-text-muted)]' : 'text-success'}`}>{row.amount > 0 ? `+${row.amount}` : row.amount}</td>
+                        <td className="py-1.5 text-right tabular-nums text-[var(--rv-text)]">{row.balance_after}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }
+
+export default BillingSettingsPage;

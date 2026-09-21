@@ -34,7 +34,7 @@ export interface PlatformOrganisationSummary {
   members_active: number;
   pending_requests: number;
   domains: { domain: string; verification_status: 'pending' | 'verified' | 'revoked' }[];
-  plan: null;
+  plan: PlatformBilling | null;
 }
 
 export interface PlatformMembership {
@@ -73,10 +73,25 @@ export interface PlatformStaffMember {
   last_login: string | null;
 }
 
+export interface PlatformBilling {
+  plan: { code: string; name: string; seats_included: number; monthly_credits: number; price_cents: number; currency: string; is_trial: boolean };
+  status: string;
+  seats: { used: number; limit: number };
+  credits: { balance: number };
+  trial_ends_at: string | null;
+  current_period_end: string | null;
+  enforced: boolean;
+  stripe_customer_id?: string;
+  stripe_subscription_id?: string;
+  ledger?: { id: number; kind: string; amount: number; balance_after: number; reason: string; actor: string | null; at: string }[];
+  plans?: { code: string; name: string; seats_included: number; monthly_credits: number }[];
+}
+
 interface PlatformState {
   overview: PlatformOverview | null;
   organisations: PlatformOrganisationSummary[];
   organisation: PlatformOrganisation | null;
+  billing: PlatformBilling | null;
   staff: PlatformStaffMember[];
   isLoading: boolean;
   error: string | null;
@@ -86,6 +101,7 @@ const initialState: PlatformState = {
   overview: null,
   organisations: [],
   organisation: null,
+  billing: null,
   staff: [],
   isLoading: false,
   error: null,
@@ -213,6 +229,29 @@ export const archiveOrganisation = createAsyncThunk<{ id: number }, { id: number
   }
 );
 
+export const fetchOrganisationBilling = createAsyncThunk<PlatformBilling, number, { rejectValue: string }>(
+  'platform/billing',
+  async (id, { rejectWithValue }) => {
+    try {
+      return await apiFetch<PlatformBilling>(`/platform/organisations/${id}/billing/`);
+    } catch (err) {
+      return rejectWithValue(messageOf(err, 'Could not load billing.'));
+    }
+  }
+);
+
+export const billingAction = createAsyncThunk<
+  PlatformBilling,
+  { id: number; action: 'credits' | 'seats' | 'plan'; body: Record<string, unknown> },
+  { rejectValue: string }
+>('platform/billingAction', async ({ id, action, body }, { rejectWithValue }) => {
+  try {
+    return await apiFetch<PlatformBilling>(`/platform/organisations/${id}/billing/${action}/`, { method: 'POST', body });
+  } catch (err) {
+    return rejectWithValue(messageOf(err, 'Could not update billing.'));
+  }
+});
+
 export const fetchStaff = createAsyncThunk<PlatformStaffMember[], void, { rejectValue: string }>(
   'platform/staff',
   async (_, { rejectWithValue }) => {
@@ -295,6 +334,14 @@ const platformSlice = createSlice({
         state.organisations = state.organisations.filter((o) => o.id !== action.payload.id);
       })
       .addCase(archiveOrganisation.rejected, failed)
+      .addCase(fetchOrganisationBilling.fulfilled, (state, action) => {
+        state.billing = action.payload;
+      })
+      .addCase(fetchOrganisationBilling.rejected, failed)
+      .addCase(billingAction.fulfilled, (state, action) => {
+        // The action answers with the summary only; keep the ledger and plans we had.
+        state.billing = { ...(state.billing ?? {}), ...action.payload, ledger: state.billing?.ledger, plans: state.billing?.plans } as PlatformBilling;
+      })
       .addCase(fetchStaff.fulfilled, (state, action) => {
         state.staff = action.payload;
       })

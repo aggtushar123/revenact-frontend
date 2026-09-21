@@ -61,6 +61,20 @@ const acmeDetail = {
   recent_events: [{ action: 'auth.login', actor: 'owner@acme.io', outcome: 'success', target: '', at: '2026-09-20T10:00:00Z' }],
 };
 
+const acmeBilling = {
+  plan: { code: 'trial', name: 'Trial', seats_included: 3, monthly_credits: 200, price_cents: 0, currency: 'USD', is_trial: true },
+  status: 'trialing',
+  seats: { used: 2, limit: 3 },
+  credits: { balance: 200 },
+  trial_ends_at: '2026-10-05T00:00:00Z',
+  current_period_end: null,
+  enforced: true,
+  stripe_customer_id: '',
+  stripe_subscription_id: '',
+  ledger: [{ id: 1, kind: 'grant', amount: 200, balance_after: 200, reason: 'Trial', actor: null, at: '2026-09-21T00:00:00Z' }],
+  plans: [{ code: 'trial', name: 'Trial', seats_included: 3, monthly_credits: 200 }, { code: 'team', name: 'Team', seats_included: 10, monthly_credits: 2000 }],
+};
+
 function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
@@ -72,6 +86,7 @@ function renderPortal(path: string, options: { user?: User; mfaVerified?: boolea
     if (url.includes('/platform/overview/')) {
       return Promise.resolve(jsonResponse(200, { organisations: { total: 1, pending: 0, active: 1, suspended: 0, archived: 0 }, members_active: 2, pending_requests: 1, open_invitations: 0, verified_domains: 1, staff: 1 }));
     }
+    if (/\/platform\/organisations\/\d+\/billing\/$/.test(url)) return Promise.resolve(jsonResponse(200, acmeBilling));
     if (/\/platform\/organisations\/1\/$/.test(url)) return Promise.resolve(jsonResponse(200, acmeDetail));
     if (url.includes('/platform/organisations/')) return Promise.resolve(jsonResponse(200, [acme]));
     throw new Error(`unexpected request: ${url}`);
@@ -302,6 +317,45 @@ describe('Platform portal', () => {
     await user.click(archive);
     expect(await screen.findByRole('heading', { name: 'Archived' })).toBeInTheDocument();
     expect(calls[0]).toBe(JSON.stringify({ reason: 'Churned' }));
+  });
+
+  it('shows billing and lets staff adjust credits with a reason', async () => {
+    renderPortal('/platform/organisations/1', {
+      handler: (url, init) => {
+        if (url.includes('/billing/credits/') && init?.method === 'POST') {
+          expect(JSON.parse(String(init.body))).toEqual({ amount: 100, reason: 'Onboarding gift' });
+          return jsonResponse(200, { ...acmeBilling, credits: { balance: 300 }, ledger: undefined, plans: undefined });
+        }
+        return undefined;
+      },
+    });
+    const user = userEvent.setup();
+
+    expect(await screen.findByRole('heading', { name: 'Billing' })).toBeInTheDocument();
+    expect(screen.getAllByText('200').length).toBeGreaterThan(0);
+    await user.type(screen.getByLabelText('Adjust credits (signed)'), '100');
+    await user.type(screen.getByLabelText('Credit reason'), 'Onboarding gift');
+    await user.click(screen.getByRole('button', { name: 'Apply credits' }));
+
+    expect(await screen.findByText('300')).toBeInTheDocument();
+  });
+
+  it('changes the plan from the portal', async () => {
+    renderPortal('/platform/organisations/1', {
+      handler: (url, init) => {
+        if (url.includes('/billing/plan/') && init?.method === 'POST') {
+          expect(JSON.parse(String(init.body))).toEqual({ plan_code: 'team', reason: 'Signed' });
+          return jsonResponse(200, { ...acmeBilling, plan: { ...acmeBilling.plan, code: 'team', name: 'Team', is_trial: false }, status: 'active', seats: { used: 2, limit: 10 }, trial_ends_at: null, ledger: undefined, plans: undefined });
+        }
+        return undefined;
+      },
+    });
+    const user = userEvent.setup();
+    await screen.findByRole('heading', { name: 'Billing' });
+    await user.selectOptions(screen.getByLabelText('Plan'), 'team');
+    await user.type(screen.getByLabelText('Plan reason'), 'Signed');
+    await user.click(screen.getByRole('button', { name: 'Change plan' }));
+    expect(await screen.findByText(/of 10/)).toBeInTheDocument();
   });
 
   it('shows a refused action in the backend’s words', async () => {
