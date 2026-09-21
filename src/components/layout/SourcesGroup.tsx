@@ -1,8 +1,9 @@
 // The Communications group in the sidebar: the inbox, then every source
 // connected to the platform, in a pill that opens and closes.
 //
-// Collapsed it shows the inbox, the first source and a chevron; open, all of
-// them. The inbox goes to /communications; a source goes to
+// Collapsed it shows the inbox, the first connected channel and a chevron;
+// open, every channel the platform offers, the unconnected ones dimmed and
+// leading to Integrations. The inbox goes to /communications; a source goes to
 // /communications?source=<id>, which the page reads to narrow the inbox and
 // to give the Copilot its context. Only what is actually connected appears.
 
@@ -47,8 +48,10 @@ export function SourcesGroup({ isExpanded }: { isExpanded: boolean }) {
   const sources = useMemo(() => sourcesFrom(mailbox, connectors), [mailbox, connectors]);
   const onPage = location.pathname.startsWith('/communications');
   const activeId = onPage ? (params.get('source') ?? 'all') : null;
-  // The inbox is always first; when closed, one source keeps it company.
-  const shown = open ? sources : sources.slice(0, 2);
+  // The inbox is always first; when closed, the first connected channel
+  // keeps it company (or the first channel at all, dimmed).
+  const companion = sources.slice(1).find((s) => s.connected && s.id !== 'calls') ?? sources[1];
+  const shown = open ? sources : [sources[0], companion];
   const hasMore = sources.length > 2;
 
   return (
@@ -59,21 +62,26 @@ export function SourcesGroup({ isExpanded }: { isExpanded: boolean }) {
     >
       {shown.map((source) => {
         const active = source.id === activeId;
-        const to = source.id === 'all' ? '/communications' : `/communications?source=${encodeURIComponent(source.id)}`;
+        const name = source.id === 'all' ? 'Communications' : source.label;
+        // A channel that is not connected leads to Integrations to connect it.
+        const label = source.connected ? name : `Connect ${name}`;
+        const to = !source.connected ? '/integrations' : source.id === 'all' ? '/communications' : `/communications?source=${encodeURIComponent(source.id)}`;
         return (
           <button
             key={source.id}
             type="button"
             onClick={() => navigate(to)}
             aria-current={active ? 'page' : undefined}
-            aria-label={source.id === 'all' ? 'Communications' : source.label}
-            title={source.id === 'all' ? 'Communications' : source.label}
+            aria-label={label}
+            title={label}
             className={`flex items-center gap-3 rounded-xl transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
               isExpanded ? 'w-full h-[38px] px-3' : 'w-10 h-10 justify-center'
-            } ${active ? 'bg-surface border border-line text-ink shadow-xs' : 'border border-transparent text-ink-muted hover:bg-black/5 dark:hover:bg-white/[0.06]'}`}
+            } ${active ? 'bg-surface border border-line text-ink shadow-xs' : 'border border-transparent text-ink-muted hover:bg-black/5 dark:hover:bg-white/[0.06]'} ${
+              source.connected ? '' : 'opacity-40 hover:opacity-70'
+            }`}
           >
             <span className="shrink-0 flex items-center justify-center [&>svg]:w-[18px] [&>svg]:h-[18px]">{source.icon}</span>
-            {isExpanded ? <span className="text-[13px] font-semibold truncate">{source.id === 'all' ? 'Communications' : source.label}</span> : null}
+            {isExpanded ? <span className="text-[13px] font-semibold truncate">{name}</span> : null}
           </button>
         );
       })}

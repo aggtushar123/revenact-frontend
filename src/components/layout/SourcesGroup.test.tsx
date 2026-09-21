@@ -63,8 +63,10 @@ describe('Sidebar Communications group', () => {
     expect(within(group).getByRole('button', { name: 'Calls' })).toBeInTheDocument();
     // Salesforce is set up and enabled: connected, the way Integrations says it is.
     expect(within(group).getByRole('button', { name: 'Salesforce' })).toBeInTheDocument();
-    // Zendesk pulls tickets and has no credentials yet: not connected.
+    // Zendesk pulls tickets and has no credentials yet: shown dimmed, leads to Integrations.
     expect(within(group).queryByRole('button', { name: 'Zendesk' })).not.toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: 'Connect Zendesk' })).toBeInTheDocument();
+    expect(within(group).getByRole('button', { name: 'Connect Outlook' })).toBeInTheDocument();
     expect(localStorage.getItem('revenact_sidebar_sources_open')).toBe('true');
 
     await userEvent.click(within(group).getByRole('button', { name: 'Show fewer sources' }));
@@ -79,5 +81,8 @@ describe('Sidebar Communications group', () => {
     await userEvent.click(await within(group).findByRole('button', { name: 'Gmail' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/communications?source=mailbox%3Agoogle');
     expect(within(group).getByRole('button', { name: 'Gmail' })).toHaveAttribute('aria-current', 'page');
+    await userEvent.click(within(group).getByRole('button', { name: 'Show all sources' }));
+    await userEvent.click(within(group).getByRole('button', { name: 'Connect Zendesk' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/integrations');
   });
 });
