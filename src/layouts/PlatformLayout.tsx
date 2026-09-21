@@ -2,19 +2,23 @@
 // customer sidebar, no copilot, no notifications. A thin bar that says
 // where you are, three sections, and a way back to the app.
 
-import { NavLink, Outlet, Link } from 'react-router-dom';
-import { Building2, LayoutGrid, ShieldCheck, ArrowLeft } from 'lucide-react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Building2, LayoutGrid, ShieldCheck, UserCircle, LogOut } from 'lucide-react';
 import { RevenactMark } from '../components/shared/RevenactMark';
-import { useAppSelector } from '../hooks';
+import { useAppDispatch, useAppSelector } from '../hooks';
+import { logout } from '../features/auth/authSlice';
 
 const NAV = [
   { to: '/platform', label: 'Overview', icon: LayoutGrid, end: true },
   { to: '/platform/organisations', label: 'Organisations', icon: Building2, end: false },
   { to: '/platform/staff', label: 'Staff', icon: ShieldCheck, end: false },
+  { to: '/platform/account', label: 'Account', icon: UserCircle, end: false },
 ];
 
 export function PlatformLayout() {
   const user = useAppSelector((state) => state.auth.user);
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   return (
     <div className="min-h-screen rv-canvas text-ink">
       <header className="sticky top-0 z-20 border-b border-line bg-[var(--rv-header-bg)]/95 backdrop-blur">
@@ -40,10 +44,17 @@ export function PlatformLayout() {
           </nav>
           <div className="ml-auto flex items-center gap-3 text-[12px] text-ink-muted">
             <span className="hidden sm:inline">{user?.email}</span>
-            <Link to="/dashboard" className="inline-flex items-center gap-1 hover:text-ink">
-              <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
-              Back to the app
-            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                dispatch(logout());
+                navigate('/login', { replace: true });
+              }}
+              className="inline-flex items-center gap-1 hover:text-ink"
+            >
+              <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+              Sign out
+            </button>
           </div>
         </div>
       </header>

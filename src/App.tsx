@@ -83,6 +83,7 @@ import { PlatformOverview } from './pages/platform/PlatformOverview';
 import { PlatformOrganisations } from './pages/platform/PlatformOrganisations';
 import { PlatformOrganisationDetail } from './pages/platform/PlatformOrganisationDetail';
 import { PlatformStaff } from './pages/platform/PlatformStaff';
+import { PlatformAccount } from './pages/platform/PlatformAccount';
 
 function ThemeSynchronizer() {
   const theme = useAppSelector((state) => state.settings.theme);
@@ -115,10 +116,20 @@ function ThemeSynchronizer() {
   return null;
 }
 
+// The tenant shell is not for staff. Anything under it sends a superuser to
+// the portal, so there is no way to wander into an empty tenant view.
+function TenantOnly({ children }: { children: React.ReactNode }) {
+  const isStaff = useAppSelector((state) => state.auth.user?.is_superuser === true);
+  if (isStaff) return <Navigate to="/platform" replace />;
+  return <>{children}</>;
+}
+
 function RootRedirect() {
   const isAuthenticated = useAppSelector((state) => state.auth.isAuthenticated);
   const user = useAppSelector((state) => state.auth.user);
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  // Staff belong to no tenant: the portal is the whole of their app.
+  if (user?.is_superuser) return <Navigate to="/platform" replace />;
   // `tour_completed_at` is stamped by the server when the tour is finished
   // or skipped. A user cached from before the field existed has it
   // undefined; they have been here a while, so they are not shown the tour.
@@ -145,7 +156,9 @@ function App() {
           path="/onboarding"
           element={
             <ProtectedRoute>
-              <OnboardingCarousel />
+              <TenantOnly>
+                <OnboardingCarousel />
+              </TenantOnly>
             </ProtectedRoute>
           }
         />
@@ -167,11 +180,26 @@ function App() {
           <Route path="organisations/:id" element={<PlatformOrganisationDetail />} />
           <Route path="staff" element={<PlatformStaff />} />
         </Route>
+        {/* Where the second factor is set up, so it cannot require one. */}
+        <Route
+          path="/platform/account"
+          element={
+            <ProtectedRoute>
+              <RequirePlatform requireMfa={false}>
+                <PlatformLayout />
+              </RequirePlatform>
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<PlatformAccount />} />
+        </Route>
 
-        {/* Protected routes */}
+        {/* Protected routes (tenant shell) */}
         <Route path="/" element={
           <ProtectedRoute>
-            <DashboardLayout />
+            <TenantOnly>
+              <DashboardLayout />
+            </TenantOnly>
           </ProtectedRoute>
         }>
           <Route index element={<RootRedirect />} />
