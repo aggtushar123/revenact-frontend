@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -67,36 +67,64 @@ describe('Sidebar CUSTOM OBJECTS section', () => {
     );
 
     renderSidebar();
-    // Labels only render in the DOM once expanded (a real hover, same
-    // as a user resting their pointer on the sidebar) — collapsed, a
-    // NavItem exposes its label as a `title` tooltip attribute instead.
-    await userEvent.hover(screen.getByRole('complementary'));
-
-    expect(await screen.findByText('Salesforce.com')).toBeInTheDocument();
-    expect(screen.queryByText(/SFDC Opportunity/)).not.toBeInTheDocument();
-    expect(screen.getByText('Salesforce.com').closest('a')).toHaveAttribute(
-      'href',
-      '/custom-objects/4'
-    );
+    // The rail is icons only; every item carries its name as its
+    // accessible name, and shows it in a pill on hover.
+    expect(await screen.findByRole('link', { name: 'Salesforce.com' })).toHaveAttribute('href', '/custom-objects/4');
+    expect(screen.queryByRole('link', { name: /SFDC Opportunity/ })).not.toBeInTheDocument();
   });
 
   it('renders no custom object items when the org has defined none yet', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, []))));
 
     renderSidebar();
-    await userEvent.hover(screen.getByRole('complementary'));
-    await screen.findByText('Dashboard');
+    await screen.findByRole('link', { name: 'Dashboard' });
 
-    expect(screen.queryByText(/SFDC Opportunity/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /SFDC Opportunity/ })).not.toBeInTheDocument();
   });
 
   it('a failed fetch leaves the rest of the sidebar working', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(500, { detail: 'error' }))));
 
     renderSidebar();
-    await userEvent.hover(screen.getByRole('complementary'));
 
-    expect(await screen.findByText('Dashboard')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Dashboard' })).toBeInTheDocument();
+  });
+});
+
+describe('Sidebar hover labels', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, []))));
+  });
+
+  it('never widens; resting on an item shows its name in a pill, leaving hides it', async () => {
+    renderSidebar();
+    const rail = screen.getByRole('complementary');
+    const dashboard = await screen.findByRole('link', { name: 'Dashboard' });
+    await userEvent.hover(rail);
+    expect(rail.className).not.toMatch(/w-\[240px\]/);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+
+    await userEvent.hover(dashboard);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Dashboard');
+    await userEvent.unhover(dashboard);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('keyboard focus shows the name too', async () => {
+    renderSidebar();
+    const copilot = await screen.findByRole('link', { name: 'Copilot' });
+    copilot.focus();
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Copilot');
+    copilot.blur();
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
+  });
+
+  it('the account button shows the person’s name', async () => {
+    renderSidebar('csm');
+    const account = await screen.findByRole('button', { name: /account settings/i });
+    await userEvent.hover(account);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('X');
   });
 });
 

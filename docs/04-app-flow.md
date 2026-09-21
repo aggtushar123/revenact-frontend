@@ -83,7 +83,7 @@ closing it on unmount or token change.
 
 ### Navigation surfaces
 
-**Sidebar** sections: top (Copilot, Dashboard, then the Communications group: the inbox and every connected source in a pill that opens and closes with a chevron; a source goes to `/communications?source=`), ENTITIES (Organizations,
+**Sidebar** is an icon rail that never widens: resting the pointer on an item (or focusing it) shows its name in a pill beside it (`useHoverLabel` / `HoverLabel`); section headings are thin separators. Sections: top (Copilot, Dashboard, then the Communications group: the inbox and every connected source in a pill that opens and closes with a chevron; a source goes to `/communications?source=`), ENTITIES (Organizations,
 Accounts, Contacts, Pipelines), CUSTOM OBJECTS (one item per real definition,
 fetched on mount), TOOLS (Segments, Project Management, Scenarios, Surveys,
 Campaigns, Canvas), KNOWLEDGE BRAIN (seven items, whole section hidden without
