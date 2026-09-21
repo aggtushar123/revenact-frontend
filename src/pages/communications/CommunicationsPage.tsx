@@ -1,6 +1,9 @@
 // Communications, arranged as an inbox.
 //
-//   [sources rail] [ inbox: folders + filters | grouped list or the open item ] [ Copilot rail ]
+//   [ inbox: folders + filters | grouped list or the open item ] [ Copilot rail ]
+//
+// The sources (the mailbox, each connector, calls) live in the main sidebar's
+// Communications group and arrive here as ?source=.
 //
 // with its own top bar (search everything, compose, new chat, history, and
 // the switch that hides the Copilot). No Navbar above it, nothing framing
@@ -9,12 +12,11 @@
 // Everything in the list is real: the four kinds of waiting the backend
 // computes (questions for you, replies owed, open tickets, calls to wrap up),
 // the counts beside the folders, the two filters (the queue versus everything;
-// mine versus my team). The sources rail shows only what is connected. The
-// Copilot in the rail is the same Copilot, with the source you picked as its
+// mine versus my team). The Copilot in the rail is the same Copilot, with the source you picked as its
 // context.
 
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, ChevronUp, History, MessageSquarePlus, PenSquare, Search, Sparkles, X } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
@@ -27,14 +29,11 @@ import {
   toggleKind,
 } from '../../features/communications/communicationsSlice';
 import type { CommunicationKind } from '../../features/communications/communicationsSlice';
-import { fetchConnectors } from '../../features/connectors/connectorsSlice';
-import { fetchMailbox } from '../../features/mail/mailSlice';
 import type { Conversation } from '../copilot/types';
 import { ComposeEmailModal } from '../../components/shared/ComposeEmailModal';
 import { DetailPane } from './DetailPane';
 import { InboxList, InboxZero } from './InboxList';
 import { InboxPanel } from './InboxPanel';
-import { SourcesRail } from './SourcesRail';
 import { sourcesFrom } from './sources';
 import { CopilotRail, HistoryPopover } from './CopilotRail';
 
@@ -56,7 +55,10 @@ export default function CommunicationsPage() {
   const connectors = useAppSelector((state) => state.connectors?.items ?? []);
 
   const [searchDraft, setSearchDraft] = useState(search);
-  const [source, setSource] = useState('all');
+  // The source comes from the sidebar's group as ?source=; the page never
+  // owns it, so the sidebar and the inbox can never disagree.
+  const [params, setParams] = useSearchParams();
+  const source = params.get('source') ?? 'all';
   const [panelOpen, setPanelOpen] = useState(true);
   const [copilotOpen, setCopilotOpen] = useState(readCopilotPreference);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -73,11 +75,6 @@ export default function CommunicationsPage() {
   }, [dispatch, scope]);
 
   useEffect(() => {
-    dispatch(fetchMailbox());
-    dispatch(fetchConnectors());
-  }, [dispatch]);
-
-  useEffect(() => {
     try {
       localStorage.setItem(COPILOT_KEY, copilotOpen ? 'on' : 'off');
     } catch {
@@ -91,20 +88,19 @@ export default function CommunicationsPage() {
   const rows = useMemo(() => page?.results ?? [], [page]);
   const selected = useMemo(() => rows.find((r) => r.id === selectedId) ?? null, [rows, selectedId]);
 
-  function chooseSource(id: string) {
-    setSource(id);
+  // A source maps to a kind; arriving on one narrows the folder to match.
+  useEffect(() => {
     setContextCleared(false);
-    const next = sources.find((s) => s.id === id);
-    // The rail's sources map to a kind; picking one narrows the folder too.
-    if (next && next.kind !== kind) dispatch(toggleKind(next.kind ?? (kind as CommunicationKind)));
-    if (next && next.kind === null && kind !== null) dispatch(toggleKind(kind));
-  }
+    if (!activeSource || activeSource.id === 'all') return;
+    if (activeSource.kind !== kind) dispatch(toggleKind(activeSource.kind ?? (kind as CommunicationKind)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the source changes, not when the folder does
+  }, [source, sources.length]);
 
   function chooseFolder(next: CommunicationKind | null) {
     if (next === kind) return;
     if (next === null) dispatch(toggleKind(kind as CommunicationKind));
     else dispatch(toggleKind(next));
-    setSource('all');
+    if (source !== 'all') setParams({});
   }
 
   const context = activeSource && activeSource.id !== 'all' && !contextCleared ? { label: activeSource.label, icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center [&>svg]:w-3.5 [&>svg]:h-3.5">{activeSource.icon}</span> } : null;
@@ -191,8 +187,6 @@ export default function CommunicationsPage() {
       </header>
 
       <div className="flex-1 min-h-0 flex gap-3 px-4 pb-4">
-        <SourcesRail sources={sources} active={activeSource?.id ?? 'all'} onSelect={chooseSource} />
-
         {/* Inbox */}
         <section aria-label="Inbox" className="flex-1 min-w-0 rv-card flex flex-col overflow-hidden">
           <div className="h-14 shrink-0 flex items-center gap-2 px-3">
