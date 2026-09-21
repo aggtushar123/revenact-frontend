@@ -2,7 +2,7 @@ import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, Loader2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { login, clearError } from '../../features/auth/authSlice';
+import { login, loginWithMfa, clearError } from '../../features/auth/authSlice';
 import { loginSchema } from '../../features/auth/loginSchema';
 import {
   fetchOAuthProviders,
@@ -20,7 +20,8 @@ export function Login() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { isAuthenticated, isLoading, error } = useAppSelector((state) => state.auth);
+  const { isAuthenticated, isLoading, error, mfaChallenge } = useAppSelector((state) => state.auth);
+  const [mfaCode, setMfaCode] = useState('');
 
   // Which "Continue with ..." buttons exist is the server's answer, not a
   // constant here: the backend returns an empty list when provider sign-in
@@ -99,6 +100,76 @@ export function Login() {
 
   const loadingProviders = providers === null;
   const hasProviders = (providers?.length ?? 0) > 0;
+
+  // The password was accepted and a second factor is owed: the page becomes
+  // the code form and nothing else, so there is no way to "go around" it.
+  if (mfaChallenge) {
+    return (
+      <div className="auth-page">
+        <main className="auth-card" aria-labelledby="auth-heading">
+          <header className="flex flex-col items-center text-center mb-6">
+            <RevenactMark size="lg" className="mb-4" />
+            <h1 id="auth-heading" className="font-display text-[24px] tracking-tight text-ink mb-2">
+              Enter your code
+            </h1>
+            <p className="text-[13px] text-ink-muted leading-relaxed max-w-[19rem]">
+              The six-digit code from your authenticator app, or one of your recovery codes.
+            </p>
+          </header>
+
+          {error && (
+            <div
+              role="alert"
+              className="w-full mb-4 p-3 bg-danger-dim border border-danger/25 rounded-lg text-[12px] text-danger flex items-start gap-2"
+            >
+              <AlertCircle className="w-4 h-4 shrink-0 mt-px" aria-hidden="true" />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (mfaCode.trim()) dispatch(loginWithMfa({ mfaToken: mfaChallenge, code: mfaCode.trim() }));
+            }}
+            noValidate
+            className="w-full text-left space-y-3.5"
+          >
+            <div>
+              <label htmlFor="auth-mfa-code" className="block text-[12px] font-medium text-ink mb-1.5">
+                Code
+              </label>
+              <input
+                id="auth-mfa-code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                autoFocus
+                className="auth-input font-mono-brand tracking-[0.2em]"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+              />
+            </div>
+            <button type="submit" className="auth-submit-btn" disabled={isLoading || !mfaCode.trim()}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                  <span>Checking</span>
+                </>
+              ) : (
+                <span>Continue</span>
+              )}
+            </button>
+          </form>
+
+          <p className="text-[11px] text-ink-faint leading-relaxed mt-6 text-center max-w-[20rem]">
+            Lost the app and the recovery codes? Ask another Revenact staff member to reset your
+            second factor.
+          </p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="auth-page">

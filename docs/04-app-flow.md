@@ -41,6 +41,7 @@ closing it on unmount or token change.
 |---|---|
 | `ProtectedRoute` | Not authenticated, redirect to `/login` carrying `state.from` |
 | `RequireCapability` | Capability absent from `user.permissions`, redirect to `/dashboard`. Replaces the former `AdminRoute` |
+| `RequirePlatform` | Not `user.is_superuser`, redirect to `/dashboard`. Staff whose session lacks the `mfa` claim see a page saying which half is missing (enrol, or sign in again) instead of the portal |
 
 ---
 
@@ -53,6 +54,7 @@ closing it on unmount or token change.
 | `/` | `RootRedirect`: `/login`, then `/onboarding` until `user.tour_completed_at` is set, then `/dashboard` | auth |
 | `/onboarding` | `OnboardingCarousel`, the eight-step first-run tour | auth |
 | `/account-settings/{account,billing,integrations,personalization,skills,about}` | `SettingsLayout` with its own left nav and the assistant rail | auth |
+| `/platform`, `/platform/organisations`, `/platform/organisations/:id`, `/platform/staff` | `PlatformLayout` (its own shell) with `PlatformOverview`, `PlatformOrganisations`, `PlatformOrganisationDetail`, `PlatformStaff` | auth + `RequirePlatform` |
 | `/dashboard` → `/dashboard/advance` → `/dashboard/advance/health` | `AdvanceDashboard` | auth |
 | `/dashboard/advance/health/{triage,divergence,movement,renewal-date,controls}` | `HealthOverviewContainer` and its five views | auth |
 | `/dashboard/advance/{ai-trending,customer,activity,revenue,usage,product,ticket}/controls` | one container each | auth |
@@ -151,6 +153,12 @@ Two doors, one session shape.
 2. `dispatch(login)` → `POST /auth/login/` with `skipAuthRetry`, so a bad
    password does not trigger a refresh attempt. The error stays visible until
    the person edits a field.
+3. Someone with an authenticator app enrolled gets `{mfa_required, mfa_token}`
+   and no session: the page becomes the code form (`auth.mfaChallenge`), and
+   `loginWithMfa` → `POST /auth/login/mfa/` mints tokens whose `mfa` claim the
+   slice reads into `auth.mfaVerified` (also after every refresh). Enrolment
+   lives in Account settings (`TwoFactorSection`: QR from the server's
+   `otpauth://` URI, confirm with a code, recovery codes shown once).
 
 **Either way**
 
@@ -301,6 +309,18 @@ Domains need `manage_org_settings`; the rest needs `manage_users`.
 assistant rail): profile name, password or sign-in method, appearance (light,
 dark, system), timezone, cached-data reset, plan and billing, integrations,
 personalization rules, skills and tasks, about.
+
+### 4.10a The internal portal
+
+`/platform/*`, for Revenact staff only (`features/platform/platformSlice.ts`
+against `/api/v1/platform/`). Its own thin shell, never the tenant one.
+Overview counts; organisations with search by name or domain and a status
+filter; an organisation's owner (transfer to another active member when the
+owner cannot), suspend or reactivate with a required reason, members (owner
+first), domains and the last twenty audit events; staff with their
+second-factor state. Metadata only: nothing here shows a tenant's customers,
+emails or notes, and the backend pins that. The Sidebar shows a Platform link
+to superusers.
 
 ### 4.11 Brain
 
