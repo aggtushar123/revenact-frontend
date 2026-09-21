@@ -7,7 +7,7 @@
 // what it says.
 
 import { useEffect, useRef, useState } from 'react';
-import { Calendar, Clock, MessageSquarePlus, Search, X } from 'lucide-react';
+import { Calendar, ChevronDown, Clock, MessageSquare, Plus, Search, X } from 'lucide-react';
 import { AskRevenactBox } from '../../components/shared/AskRevenactBox';
 import { fetchConversation, fetchConversations, sendMessage } from '../copilot/copilotApi';
 import type { Conversation, ConversationSummary, CopilotMessage } from '../copilot/types';
@@ -110,6 +110,8 @@ export function CopilotRail({
 export function HistoryPopover({ onClose, onOpen }: { onClose: () => void; onOpen: (conversation: Conversation) => void }) {
   const [recents, setRecents] = useState<ConversationSummary[] | null>(null);
   const [query, setQuery] = useState('');
+  const [scheduledOpen, setScheduledOpen] = useState(true);
+  const [recentsOpen, setRecentsOpen] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -124,68 +126,106 @@ export function HistoryPopover({ onClose, onOpen }: { onClose: () => void; onOpe
     function onDoc(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
     document.addEventListener('mousedown', onDoc);
+    document.addEventListener('keydown', onKey);
     return () => {
       cancelled = true;
       document.removeEventListener('mousedown', onDoc);
+      document.removeEventListener('keydown', onKey);
     };
   }, [onClose]);
 
   const shown = (recents ?? []).filter((c) => c.title.toLowerCase().includes(query.toLowerCase()));
 
   return (
-    <div ref={ref} role="dialog" aria-label="History" className="absolute right-0 top-[calc(100%+8px)] w-[320px] rv-card p-4 z-30 shadow-md">
+    <div
+      ref={ref}
+      role="dialog"
+      aria-label="History"
+      className="absolute right-0 top-[calc(100%+10px)] w-[340px] h-[min(70vh,640px)] rv-card p-4 z-30 shadow-md flex flex-col gap-3"
+    >
       <div className="flex items-center justify-between">
-        <h2 className="text-[14px] font-semibold text-ink">History</h2>
-        <button type="button" onClick={onClose} aria-label="Close history" className="text-ink-faint hover:text-ink p-1">
+        <h2 className="text-[16px] font-semibold text-ink">History</h2>
+        <button type="button" onClick={onClose} aria-label="Close history" className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-faint hover:text-ink hover:bg-subtle">
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </div>
-      <label className="relative block mt-3">
+
+      <label className="relative block">
         <span className="sr-only">Search chats</span>
-        <Search className="w-3.5 h-3.5 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2" aria-hidden="true" />
-        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search chats…" className="rv-input pl-8 text-[12.5px]" />
+        <Search className="w-4 h-4 text-ink-faint absolute left-3.5 top-1/2 -translate-y-1/2" aria-hidden="true" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search chats…"
+          className="w-full h-11 pl-10 pr-3 rounded-xl bg-surface border border-line text-[13px] text-ink placeholder:text-ink-faint focus-visible:outline-none focus-visible:border-line-strong"
+        />
       </label>
-      <section className="mt-3 rounded-xl border border-line-subtle p-3" aria-labelledby="scheduled-heading">
-        <h3 id="scheduled-heading" className="text-[12.5px] font-medium text-ink">Scheduled tasks</h3>
-        <p className="mt-2 flex items-center gap-2 text-[12px] text-ink-muted">
-          <Clock className="w-3.5 h-3.5" aria-hidden="true" />
-          No scheduled tasks yet
-        </p>
-      </section>
-      <section className="mt-2 rounded-xl border border-line-subtle p-3" aria-labelledby="recents-heading">
-        <h3 id="recents-heading" className="text-[12.5px] font-medium text-ink">Recents</h3>
-        {recents === null ? (
-          <p className="mt-2 text-[12px] text-ink-faint">Loading…</p>
-        ) : shown.length === 0 ? (
-          <p className="mt-2 flex items-center gap-2 text-[12px] text-ink-muted">
-            <MessageSquarePlus className="w-3.5 h-3.5" aria-hidden="true" />
-            No chats yet
+
+      <section className="rounded-xl bg-subtle/60 border border-line-subtle" aria-labelledby="scheduled-heading">
+        <div className="flex items-center gap-1 pl-4 pr-2 py-2.5">
+          <h3 id="scheduled-heading" className="flex-1 text-[13.5px] font-medium text-ink">Scheduled tasks</h3>
+          {/* Scheduling arrives with the agents phase; until then the plus
+              says so rather than opening a form that saves nothing. */}
+          <button type="button" disabled title="Scheduling arrives with agents" aria-label="New scheduled task (coming soon)" className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-faint disabled:opacity-50">
+            <Plus className="w-4 h-4" aria-hidden="true" />
+          </button>
+          <button type="button" onClick={() => setScheduledOpen((o) => !o)} aria-expanded={scheduledOpen} aria-label={scheduledOpen ? 'Collapse scheduled tasks' : 'Expand scheduled tasks'} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-faint hover:text-ink">
+            <ChevronDown className={`w-4 h-4 transition-transform duration-[var(--dur-fast)] ${scheduledOpen ? '' : '-rotate-90'}`} aria-hidden="true" />
+          </button>
+        </div>
+        {scheduledOpen ? (
+          <p className="flex items-center gap-2.5 px-4 pb-3.5 text-[13px] text-ink-muted">
+            <Clock className="w-4 h-4" aria-hidden="true" />
+            No scheduled tasks yet
           </p>
-        ) : (
-          <ul className="mt-1.5 flex flex-col">
-            {shown.slice(0, 12).map((c) => (
-              <li key={c.id}>
-                <button
-                  type="button"
-                  onClick={async () => {
-                    try {
-                      onOpen(await fetchConversation(c.id));
-                    } catch {
-                      /* the popover closes; the rail keeps what it had */
-                    }
-                    onClose();
-                  }}
-                  className="w-full text-left px-2 py-1.5 rounded-md text-[12.5px] text-ink hover:bg-subtle truncate"
-                >
-                  {c.title}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+        ) : null}
+      </section>
+
+      <section className={`rounded-xl bg-subtle/60 border border-line-subtle min-h-0 flex flex-col ${recentsOpen ? 'flex-1' : ''}`} aria-labelledby="recents-heading">
+        <div className="flex items-center gap-1 pl-4 pr-2 py-2.5">
+          <h3 id="recents-heading" className="flex-1 text-[13.5px] font-medium text-ink">Recents</h3>
+          <button type="button" onClick={() => setRecentsOpen((o) => !o)} aria-expanded={recentsOpen} aria-label={recentsOpen ? 'Collapse recents' : 'Expand recents'} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-faint hover:text-ink">
+            <ChevronDown className={`w-4 h-4 transition-transform duration-[var(--dur-fast)] ${recentsOpen ? '' : '-rotate-90'}`} aria-hidden="true" />
+          </button>
+        </div>
+        {recentsOpen ? (
+          recents === null ? (
+            <p className="px-4 pb-3.5 text-[13px] text-ink-faint">Loading…</p>
+          ) : shown.length === 0 ? (
+            <p className="flex items-center gap-2.5 px-4 pb-3.5 text-[13px] text-ink-muted">
+              <MessageSquare className="w-4 h-4" aria-hidden="true" />
+              {query ? 'No chats match' : 'No chats yet'}
+            </p>
+          ) : (
+            <ul className="flex-1 min-h-0 px-2 pb-2 overflow-y-auto custom-scrollbar flex flex-col">
+              {shown.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        onOpen(await fetchConversation(c.id));
+                      } catch {
+                        /* the popover closes; the rail keeps what it had */
+                      }
+                      onClose();
+                    }}
+                    className="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-lg text-[13px] text-ink hover:bg-surface"
+                  >
+                    <MessageSquare className="w-4 h-4 text-ink-faint shrink-0" aria-hidden="true" />
+                    <span className="truncate">{c.title}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : null}
       </section>
     </div>
   );
 }
-

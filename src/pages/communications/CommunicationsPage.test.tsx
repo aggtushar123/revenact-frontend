@@ -57,7 +57,7 @@ const stats = {
   ticket_scope_note: 'Tickets are read by department.',
 };
 
-function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown>; mailbox?: unknown; connectors?: unknown[] } = {}) {
+function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown>; mailbox?: unknown; connectors?: unknown[]; conversations?: unknown[] } = {}) {
   const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url, init) => {
     const ok = (body: unknown, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => body });
     if (url.includes('/communications/stats/')) return ok({ ...stats, ...(overrides.stats ?? {}) });
@@ -67,7 +67,7 @@ function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown>;
       const content = JSON.parse(String(init.body)).content as string;
       return ok({ id: 1, title: 'Chat', created_at: '', updated_at: '', messages: [{ id: 1, role: 'user', content, sources: [], questions: [] }, { id: 2, role: 'assistant', content: 'Two tickets and one reply.', sources: [], questions: [] }] });
     }
-    if (url.includes('/copilot/conversations/')) return ok([]);
+    if (url.includes('/copilot/conversations/')) return ok(overrides.conversations ?? []);
     const results = overrides.rows ?? [emailRow, ticketRow];
     const kind = new URL(url, 'http://localhost').searchParams.get('kind');
     const filtered = kind ? results.filter((r) => (r as { kind: string }).kind === kind) : results;
@@ -161,6 +161,34 @@ describe('CommunicationsPage', () => {
     await userEvent.click(screen.getByRole('button', { name: /hide copilot/i }));
     expect(screen.queryByRole('complementary', { name: /copilot/i })).not.toBeInTheDocument();
     expect(localStorage.getItem('revenact_comms_copilot')).toBe('off');
+  });
+
+  it('History opens as a panel of scheduled tasks and searchable, collapsible recents', async () => {
+    mockApi({
+      conversations: [
+        { id: 1, title: 'Which renewals are at risk?', created_at: '', updated_at: '' },
+        { id: 2, title: 'What is going on with Pizza Hut?', created_at: '', updated_at: '' },
+      ],
+    });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /^history$/i }));
+    const panel = screen.getByRole('dialog', { name: 'History' });
+    // Scheduling does not exist yet, so the plus is honest about it rather than opening a form.
+    expect(within(panel).getByText('No scheduled tasks yet')).toBeInTheDocument();
+    expect(within(panel).getByRole('button', { name: /new scheduled task/i })).toBeDisabled();
+    expect(await within(panel).findByText('Which renewals are at risk?')).toBeInTheDocument();
+
+    await userEvent.type(within(panel).getByPlaceholderText('Search chats…'), 'pizza');
+    expect(within(panel).queryByText('Which renewals are at risk?')).not.toBeInTheDocument();
+    expect(within(panel).getByText('What is going on with Pizza Hut?')).toBeInTheDocument();
+
+    await userEvent.click(within(panel).getByRole('button', { name: /collapse recents/i }));
+    expect(within(panel).queryByText('What is going on with Pizza Hut?')).not.toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('button', { name: /expand recents/i }));
+    expect(within(panel).getByText('What is going on with Pizza Hut?')).toBeInTheDocument();
+
+    await userEvent.click(within(panel).getByRole('button', { name: /close history/i }));
+    expect(screen.queryByRole('dialog', { name: 'History' })).not.toBeInTheDocument();
   });
 
   it('treats an empty inbox as inbox zero', async () => {
