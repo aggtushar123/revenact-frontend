@@ -40,7 +40,7 @@ function renderGroup(path = '/dashboard', mailbox: unknown = { id: 1, provider: 
     <Provider store={store}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="*" element={<><SourcesGroup isExpanded={false} /><WhereAmI /></>} />
+          <Route path="*" element={<><SourcesGroup /><WhereAmI /></>} />
         </Routes>
       </MemoryRouter>
     </Provider>
@@ -82,6 +82,17 @@ describe('Sidebar Communications group', () => {
     expect(within(group).queryByRole('button', { name: 'Intercom' })).not.toBeInTheDocument();
     await userEvent.click(within(group).getByRole('button', { name: 'Connect Gmail' }));
     expect(screen.getByTestId('where')).toHaveTextContent('/integrations');
+  });
+
+  it('resting on a source shows its name in a pill', async () => {
+    renderGroup();
+    const group = screen.getByRole('group', { name: 'Communications' });
+    const gmail = await within(group).findByRole('button', { name: 'Gmail' });
+    expect(within(group).queryByText('Gmail')).not.toBeInTheDocument();
+    await userEvent.hover(gmail);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Gmail');
+    await userEvent.unhover(gmail);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
 
   it('the inbox goes to Communications and a source narrows it by the URL', async () => {

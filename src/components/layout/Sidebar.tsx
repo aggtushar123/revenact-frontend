@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, Network, Layers, Users,
-  Target, Globe, PieChart, GitBranch, List, ChevronDown, GitCommit,
+  Target, Globe, PieChart, GitBranch, List, GitCommit,
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
   Brain, Flag, CheckSquare, MessageSquareWarning, Bot, Wand2,
   Sliders, LogOut,
@@ -14,6 +14,7 @@ import { fetchCustomObjectDefinitions } from '../../features/customObjects/custo
 import type { CustomObjectDefinition } from '../../features/customObjects/types';
 import { logout } from '../../features/auth/authSlice';
 import { SourcesGroup } from './SourcesGroup';
+import { useHoverLabel } from './useHoverLabel';
 
 export function Sidebar() {
   const navigate = useNavigate();
@@ -29,7 +30,6 @@ export function Sidebar() {
   useEffect(() => {
     if (canSeeAll) dispatch(fetchProposals());
   }, [dispatch, canSeeAll]);
-  const [isExpanded, setIsExpanded] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
@@ -60,6 +60,8 @@ export function Sidebar() {
   // that needs this list (after Settings' own page), still not enough
   // call sites to justify a shared slice over a plain fetch.
   const [customObjects, setCustomObjects] = useState<CustomObjectDefinition[]>([]);
+  const accountRef = useRef<HTMLButtonElement>(null);
+  const account = useHoverLabel(accountRef, currentUser?.name || 'Your account');
 
   useEffect(() => {
     fetchCustomObjectDefinitions()
@@ -71,84 +73,55 @@ export function Sidebar() {
   }, []);
 
   return (
-    <aside 
-      onMouseEnter={() => setIsExpanded(true)}
-      onMouseLeave={() => setIsExpanded(false)}
-      className={`h-full border-r border-[var(--rv-sidebar-border)] bg-[var(--rv-sidebar-bg)] flex flex-col transition-all duration-300 z-30 shrink-0 absolute md:relative ${
-        isExpanded ? 'w-[240px] shadow-xl md:shadow-none' : 'w-[68px]'
-      }`}
+    <aside
+      className="h-full w-[72px] border-r border-[var(--rv-sidebar-border)] bg-[var(--rv-sidebar-bg)] flex flex-col z-30 shrink-0 absolute md:relative"
     >
       {/* Header section with Logo */}
-      <div className={`flex items-center h-[60px] px-5 ${isExpanded ? 'justify-start' : 'justify-center'} border-b border-transparent shrink-0 mt-3 mb-8`}>
-        <div className="flex items-center cursor-pointer w-full">
-          {/* Revenact Logo */}
-          {isExpanded ? (
-            <span className="font-display text-[22px] text-ink tracking-tight leading-none" style={{ fontStyle: 'italic' }}>Revenact</span>
-          ) : (
-            <div className="w-7 h-7 shrink-0 bg-brand rounded-[7px] shadow-sm flex items-center justify-center text-white font-extrabold text-[15px] tracking-tighter mx-auto">
-              R
-            </div>
-          )}
+      <div className="flex items-center justify-center h-[60px] shrink-0 mt-3 mb-6">
+        <div className="w-8 h-8 shrink-0 bg-brand rounded-[8px] shadow-sm flex items-center justify-center text-white font-extrabold text-[16px] tracking-tighter" aria-label="Revenact">
+          R
         </div>
       </div>
 
       {/* Nav Content */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar py-2 flex flex-col gap-0.5 px-3">
+      <div className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar py-2 flex flex-col items-center gap-1 px-2">
         
         {/* Top Links */}
-        <NavItem to="/copilot" icon={<Sparkles className="w-[18px] h-[18px]" />} label="Copilot" isExpanded={isExpanded} />
-        <NavItem to="/dashboard" icon={<LayoutGrid className="w-[18px] h-[18px]" />} label="Dashboard" isExpanded={isExpanded} />
-        <SourcesGroup isExpanded={isExpanded} />
+        <NavItem to="/copilot" icon={<Sparkles className="w-5 h-5" />} label="Copilot" />
+        <NavItem to="/dashboard" icon={<LayoutGrid className="w-5 h-5" />} label="Dashboard" />
+        <SourcesGroup />
 
         {/* ENTITIES Section */}
-        {isExpanded ? (
-          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
-            ENTITIES <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
-          </div>
-        ) : (
-          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
-        )}
+        <div className="h-px bg-line my-2 w-8" role="separator"></div>
         
-        <NavItem to="/organizations/list" icon={<Network className="w-[18px] h-[18px]" />} label="Organizations" isExpanded={isExpanded} isActiveOverride={isOrgsActive} />
-        <NavItem to="/accounts" icon={<Layers className="w-[18px] h-[18px]" />} label="Accounts" isExpanded={isExpanded} />
-        <NavItem to="/contacts" icon={<Users className="w-[18px] h-[18px]" />} label="Contacts" isExpanded={isExpanded} />
-        <NavItem to="/pipelines" icon={<Target className="w-[18px] h-[18px]" />} label="Pipelines" isExpanded={isExpanded} />
+        <NavItem to="/organizations/list" icon={<Network className="w-5 h-5" />} label="Organizations" isActiveOverride={isOrgsActive} />
+        <NavItem to="/accounts" icon={<Layers className="w-5 h-5" />} label="Accounts" />
+        <NavItem to="/contacts" icon={<Users className="w-5 h-5" />} label="Contacts" />
+        <NavItem to="/pipelines" icon={<Target className="w-5 h-5" />} label="Pipelines" />
 
         {/* CUSTOM OBJECTS Section */}
-        {isExpanded ? (
-          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-1.5 cursor-pointer hover:text-ink-muted">
-            CUSTOM OBJECTS <ChevronDown className="w-3 h-3 ml-0.5" /> <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
-          </div>
-        ) : (
-          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
-        )}
+        <div className="h-px bg-line my-2 w-8" role="separator"></div>
 
         {customObjects.map((definition) => (
           <NavItem
             key={definition.id}
             to={`/custom-objects/${definition.id}`}
-            icon={<Boxes className="w-[18px] h-[18px]" />}
+            icon={<Boxes className="w-5 h-5" />}
             label={definition.name}
-            isExpanded={isExpanded}
+           
           />
         ))}
-        <NavItem to="/feedbacks" icon={<Globe className="w-[18px] h-[18px]" />} label="Product Feedbacks" isExpanded={isExpanded} />
+        <NavItem to="/feedbacks" icon={<Globe className="w-5 h-5" />} label="Product Feedbacks" />
 
         {/* TOOLS Section */}
-        {isExpanded ? (
-          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
-            TOOLS <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
-          </div>
-        ) : (
-          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
-        )}
+        <div className="h-px bg-line my-2 w-8" role="separator"></div>
 
-        <NavItem to="/segments" icon={<PieChart className="w-[18px] h-[18px]" />} label="Segments" isExpanded={isExpanded} />
-        <NavItem to="/projects" icon={<GitCommit className="w-[18px] h-[18px]" />} label="Project Management" isExpanded={isExpanded} />
-        <NavItem to="/scenarios" icon={<GitBranch className="w-[18px] h-[18px]" />} label="Scenarios" isExpanded={isExpanded} />
-        <NavItem to="/surveys" icon={<List className="w-[18px] h-[18px]" />} label="Surveys" isExpanded={isExpanded} />
-        <NavItem to="/campaigns" icon={<Columns className="w-[18px] h-[18px]" />} label="Campaigns" isExpanded={isExpanded} />
-        <NavItem to="/canvas" icon={<PenTool className="w-[18px] h-[18px]" />} label="Canvas" isExpanded={isExpanded} />
+        <NavItem to="/segments" icon={<PieChart className="w-5 h-5" />} label="Segments" />
+        <NavItem to="/projects" icon={<GitCommit className="w-5 h-5" />} label="Project Management" />
+        <NavItem to="/scenarios" icon={<GitBranch className="w-5 h-5" />} label="Scenarios" />
+        <NavItem to="/surveys" icon={<List className="w-5 h-5" />} label="Surveys" />
+        <NavItem to="/campaigns" icon={<Columns className="w-5 h-5" />} label="Campaigns" />
+        <NavItem to="/canvas" icon={<PenTool className="w-5 h-5" />} label="Canvas" />
 
         {/* KNOWLEDGE BRAIN Section — organisation-wide figures and the
             agents that act on them. Hidden, not greyed, for anyone whose
@@ -156,41 +129,29 @@ export function Sidebar() {
         {canSeeAll && (
           <>
           {/* KNOWLEDGE BRAIN Section */}
-          {isExpanded ? (
-            <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
-              KNOWLEDGE BRAIN <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
-            </div>
-          ) : (
-            <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
-          )}
+          <div className="h-px bg-line my-2 w-8" role="separator"></div>
 
-          <NavItem to="/brain/dashboard" icon={<Brain className="w-[18px] h-[18px]" />} label="Brain Overview" isExpanded={isExpanded} />
-          <NavItem to="/brain/graph" icon={<Network className="w-[18px] h-[18px]" />} label="Knowledge Graph" isExpanded={isExpanded} />
-          <NavItem to="/brain/initiatives" icon={<Flag className="w-[18px] h-[18px]" />} label="Initiatives" isExpanded={isExpanded} />
-          <NavItem to="/brain/review" icon={<CheckSquare className="w-[18px] h-[18px]" />} label="Review Queue" isExpanded={isExpanded} badge={pendingProposals} />
-          <NavItem to="/brain/feedback" icon={<MessageSquareWarning className="w-[18px] h-[18px]" />} label="Feedback Log" isExpanded={isExpanded} />
-          <NavItem to="/brain/agents" icon={<Bot className="w-[18px] h-[18px]" />} label="Agents" isExpanded={isExpanded} />
-          <NavItem to="/brain/skills" icon={<Wand2 className="w-[18px] h-[18px]" />} label="Skills" isExpanded={isExpanded} />
+          <NavItem to="/brain/dashboard" icon={<Brain className="w-5 h-5" />} label="Brain Overview" />
+          <NavItem to="/brain/graph" icon={<Network className="w-5 h-5" />} label="Knowledge Graph" />
+          <NavItem to="/brain/initiatives" icon={<Flag className="w-5 h-5" />} label="Initiatives" />
+          <NavItem to="/brain/review" icon={<CheckSquare className="w-5 h-5" />} label="Review Queue" badge={pendingProposals} />
+          <NavItem to="/brain/feedback" icon={<MessageSquareWarning className="w-5 h-5" />} label="Feedback Log" />
+          <NavItem to="/brain/agents" icon={<Bot className="w-5 h-5" />} label="Agents" />
+          <NavItem to="/brain/skills" icon={<Wand2 className="w-5 h-5" />} label="Skills" />
 
           </>
         )}
 
         {/* SETUP Section */}
-        {isExpanded ? (
-          <div className="text-[10px] font-bold text-ink-faint mt-5 mb-1.5 ml-3 tracking-[0.1em] flex items-center gap-3">
-            SETUP <div className="h-px bg-line flex-1 ml-1 mr-2"></div>
-          </div>
-        ) : (
-          <div className="h-px bg-line mt-4 mb-2 mx-2"></div>
-        )}
+        <div className="h-px bg-line my-2 w-8" role="separator"></div>
 
-        <NavItem to="/settings" icon={<Box className="w-[18px] h-[18px]" />} label="Settings" isExpanded={isExpanded} isActiveOverride={isSettingsActive} />
-        <NavItem to="/lifecycle" icon={<CircleDot className="w-[18px] h-[18px]" />} label="Lifecycle" isExpanded={isExpanded} />
-        <NavItem to="/health" icon={<HeartPulse className="w-[18px] h-[18px]" />} label="Health" isExpanded={isExpanded} />
+        <NavItem to="/settings" icon={<Box className="w-5 h-5" />} label="Settings" isActiveOverride={isSettingsActive} />
+        <NavItem to="/lifecycle" icon={<CircleDot className="w-5 h-5" />} label="Lifecycle" />
+        <NavItem to="/health" icon={<HeartPulse className="w-5 h-5" />} label="Health" />
         {canManageUsers && (
-          <NavItem to="/users" icon={<UserCog className="w-[18px] h-[18px]" />} label="Users" isExpanded={isExpanded} />
+          <NavItem to="/users" icon={<UserCog className="w-5 h-5" />} label="Users" />
         )}
-        <NavItem to="/integrations" icon={<Plug className="w-[18px] h-[18px]" />} label="Integrations" isExpanded={isExpanded} />
+        <NavItem to="/integrations" icon={<Plug className="w-5 h-5" />} label="Integrations" />
 
       </div>
 
@@ -254,12 +215,12 @@ export function Sidebar() {
         )}
 
         <button
+          ref={accountRef}
+          {...account.handlers}
           type="button"
           onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
-          title={currentUser?.name ? `${currentUser.name} — account settings` : 'Account settings'}
-          className={`w-full flex items-center gap-3 p-1.5 rounded-lg hover:bg-subtle transition-all cursor-pointer select-none ${
-            !isExpanded ? 'justify-center' : ''
-          }`}
+          aria-label={currentUser?.name ? `${currentUser.name} — account settings` : 'Account settings'}
+          className="w-full flex items-center justify-center p-1.5 rounded-lg hover:bg-subtle transition-all cursor-pointer select-none"
         >
           {currentUser?.avatar ? (
             <img
@@ -273,59 +234,40 @@ export function Sidebar() {
             </div>
           )}
 
-          {isExpanded && (
-            <div className="min-w-0 flex-1 text-left">
-              <div className="text-[13px] font-semibold text-ink truncate leading-tight">
-                {currentUser?.name || 'Your account'}
-              </div>
-              <div className="text-[11px] text-ink-muted truncate leading-tight mt-0.5">
-                Account Settings
-              </div>
-            </div>
-          )}
         </button>
+        {account.node}
       </div>
     </aside>
   );
 }
 
-function NavItem({ icon, to, label, isExpanded, isActiveOverride = false, badge }: { icon: React.ReactNode, to: string, label: string, isExpanded: boolean, isActiveOverride?: boolean, badge?: number }) {
+function NavItem({ icon, to, label, isActiveOverride = false, badge }: { icon: React.ReactNode, to: string, label: string, isActiveOverride?: boolean, badge?: number }) {
+  const ref = useRef<HTMLAnchorElement>(null);
+  const hover = useHoverLabel(ref, label);
   return (
-    <NavLink
-      to={to}
-      className={({ isActive }) => {
-        const active = isActive || isActiveOverride;
-        return `flex items-center gap-3.5 px-3 relative transition-colors group rounded-[6px] cursor-pointer overflow-hidden ${
-          isExpanded ? 'h-[38px]' : 'h-10 justify-center mx-1 rounded-lg'
-        } ${
-          active
-            ? 'bg-[var(--rv-sidebar-active-bg)] border border-[var(--rv-sidebar-active-border)] shadow-xs'
-            : 'border border-transparent hover:bg-black/5 dark:hover:bg-white/[0.04]'
-        }`;
-      }}
-      title={!isExpanded ? label : undefined}
-    >
-      {({ isActive }) => {
-        const active = isActive || isActiveOverride;
-        return (
-          <>
-            <div className={`shrink-0 transition-colors ${active ? 'text-ink' : 'text-ink-faint group-hover:text-ink-muted'}`}>
-              {icon}
-            </div>
-            
-            {isExpanded && (
-              <span className={`text-[13px] font-semibold truncate transition-colors flex-1 ${active ? 'text-ink' : 'text-ink-muted group-hover:text-ink'}`}>
-                {label}
-              </span>
-            )}
-
-            {/* Badge */}
-            {badge !== undefined && badge > 0 && isExpanded && (
-              <span style={{ background: 'var(--warning)', color: '#ffffff', borderRadius: '3px', padding: '1px 5px', fontSize: '9px', fontFamily: "'DM Mono', monospace", fontWeight: 700, flexShrink: 0, lineHeight: 1.6 }}>{badge}</span>
-            )}
-          </>
-        );
-      }}
-    </NavLink>
+    <>
+      <NavLink
+        ref={ref}
+        {...hover.handlers}
+        to={to}
+        aria-label={label}
+        className={({ isActive }) => {
+          const active = isActive || isActiveOverride;
+          return `relative w-11 h-11 shrink-0 flex items-center justify-center rounded-xl transition-colors group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+            active
+              ? 'bg-[var(--rv-sidebar-active-bg)] border border-[var(--rv-sidebar-active-border)] shadow-xs text-ink'
+              : 'border border-transparent text-ink-muted hover:text-ink hover:bg-black/5 dark:hover:bg-white/[0.06]'
+          }`;
+        }}
+      >
+        <span className="shrink-0 [&>svg]:w-5 [&>svg]:h-5" aria-hidden="true">{icon}</span>
+        {badge !== undefined && badge > 0 ? (
+          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-warning text-on-accent font-mono-brand text-[9.5px] font-bold leading-4 text-center" aria-label={`${badge} pending`}>
+            {badge}
+          </span>
+        ) : null}
+      </NavLink>
+      {hover.node}
+    </>
   );
 }
