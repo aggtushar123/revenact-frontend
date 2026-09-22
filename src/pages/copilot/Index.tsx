@@ -437,13 +437,8 @@ export function CopilotIndex() {
               onAcceptInvite={handleAcceptInvite}
               onDeclineInvite={handleDeclineInvite}
             />
-            <div
-              className={
-                view === 'home'
-                  ? 'flex-1 overflow-hidden relative flex'
-                  : 'flex-1 overflow-hidden relative bg-surface border border-line rounded-xl shadow-sm m-1 mr-4 mb-4 flex'
-              }
-            >
+            {/* Home and chat share the canvas: no card around either. */}
+            <div className="flex-1 overflow-hidden relative flex">
               {view === 'home' ? (
                 <HomeView onSendPrompt={handleSendPrompt} selectedSkill={selectedSkill} onSelectSkill={handleSelectSkill} />
               ) : (

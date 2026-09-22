@@ -363,7 +363,7 @@ Ranked by leverage. Each is a task in the
 | 2 | No `focus-visible` styling anywhere | Grep returns zero occurrences |
 | 3 | 108 raw hex values in components | Worst offenders: `Integrations.tsx` (11, vendor logos), `SurveysTab.tsx` (4), the recurring `text-[#0D0F0E]` on accent backgrounds |
 | 4 | No modal focus management, three `role="dialog"` in fifteen modals | |
-| 5 | Loading states are text lines, not skeletons | Only `HeadlinesTab` and `ChatView` show any loading affordance |
+| 5 | Loading states are text lines, not skeletons | Only `HeadlinesTab` shows a text-line affordance; `ChatView` uses a layout-matching skeleton since 2026-09-22 |
 | 6 | `h-screen` in `DashboardLayout` | Rule says `min-h-[100dvh]` |
 | 7 | `rounded-2xl` and `rounded-3xl` outside the scale | Contact detail, Account placeholder |
 | 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass` is the one sanctioned exception) |

@@ -244,8 +244,11 @@ scoped server-side by department.
 1. `/copilot`. `HomeView` offers skill cards that prefill a prompt, and a
    `MentionTextarea` that completes colleague and function mentions.
 2. Sending posts to `/copilot/messages/`, creating or continuing a conversation.
-   `ChatView` shows an optimistic user bubble, then the assistant turn with its
-   sources.
+   `ChatView` sits straight on the canvas (no card): the user's question is a
+   surface pill on the right, the answer is a reading column (`AnswerText`
+   renders paragraphs, numbered and bulleted lists, bold and code) with its
+   sources and a single Copy action; the ask box stays pinned at the bottom.
+   While the answer is pending, a skeleton with a live status line shows.
 3. The owner clicks "Make this a live session" → `POST .../session/` → the
    `ws/copilot/sessions/:id/` socket opens. A slow 20 second poll stays as a
    resilience fallback only.
