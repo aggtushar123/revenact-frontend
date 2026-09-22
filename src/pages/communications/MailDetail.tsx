@@ -2,11 +2,11 @@
 // the body, the triage actions, and a reply box that sends from the mailbox
 // it arrived in.
 
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertCircle, ArrowUpRight, Check, MailOpen, Star, VolumeX, X } from 'lucide-react';
 import type { MailMessageDetail } from '../../features/mail/mailboxSlice';
 import { CATEGORY_LABEL } from './mailCategories';
+import { ReplyBox } from './ReplyBox';
 import { who } from './mailWho';
 
 function whenOf(iso: string): string {
@@ -45,8 +45,6 @@ export function MailDetail({
   onUpdate: (patch: Partial<Pick<MailMessageDetail, 'is_read' | 'is_starred' | 'state'>>) => void;
   onReply: (body: string) => void;
 }) {
-  const [draft, setDraft] = useState('');
-
   if (!message) {
     return (
       <section aria-label="Message" aria-busy={loading} className="grow min-w-0 rv-glass-inner border border-line rounded-xl flex items-center justify-center">
@@ -142,37 +140,17 @@ export function MailDetail({
       </div>
 
       {canReply ? (
-        <form
-          className="shrink-0 px-4.5 pb-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (draft.trim()) onReply(draft.trim());
-          }}
-        >
-          <div className="border border-line rounded-lg overflow-hidden">
-            <label htmlFor="mail-reply" className="block px-3.5 pt-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-              Reply
-            </label>
-            <textarea id="mail-reply" rows={2} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Write your reply." className="w-full px-3.5 pt-1.5 pb-2.5 text-[13px] leading-snug text-ink resize-none outline-none bg-transparent" />
-            <div className="px-3 py-2 border-t border-line-subtle rv-glass-inner flex items-center gap-2">
-              {replyError ? (
-                <span role="alert" className="text-[11.5px] text-danger">
-                  {replyError}
-                </span>
-              ) : replied ? (
-                <span role="status" className="text-[11.5px] text-success">
-                  Sent from your mailbox.
-                </span>
-              ) : (
-                <span className="text-[11px] text-ink-muted">Sends from your connected mailbox{message.account ? `, filed on ${message.account.name}` : ''}</span>
-              )}
-              <span className="grow" />
-              <button type="submit" disabled={draft.trim().length === 0 || replying} className="h-[30px] px-3.5 rounded-md bg-accent text-on-accent text-[12px] font-bold disabled:opacity-40 disabled:cursor-not-allowed">
-                {replying ? 'Sending…' : 'Send reply'}
-              </button>
-            </div>
-          </div>
-        </form>
+        <ReplyBox
+          label="Reply"
+          placeholder="Write your reply."
+          hint={`Sends from your connected mailbox${message.account ? `, filed on ${message.account.name}` : ''}`}
+          sendLabel="Send reply"
+          draftSource={{ kind: 'mail_message', id: message.id }}
+          onSend={onReply}
+          sending={replying}
+          sent={replied}
+          error={replyError}
+        />
       ) : null}
     </section>
   );

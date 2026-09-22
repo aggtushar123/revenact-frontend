@@ -17,6 +17,13 @@ export interface MessageSource {
   company_id: number;
 }
 
+/** What `POST /copilot/draft-reply/` returns: the reply written as the
+ *  person, and the records it was built from. */
+export interface DraftReply {
+  draft: string;
+  sources: MessageSource[];
+}
+
 export interface CopilotMessage {
   id: number;
   role: MessageRole;

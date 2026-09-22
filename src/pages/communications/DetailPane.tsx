@@ -1,6 +1,6 @@
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Sparkles } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import { ReplyBox } from './ReplyBox';
 import type { CommunicationRow } from '../../features/communications/communicationsSlice';
 import { waitingTone } from '../../features/communications/communicationsSlice';
 
@@ -113,63 +113,25 @@ function ContextStrip({ row }: { row: CommunicationRow }) {
   );
 }
 
-/**
- * The composer, split out so it can be keyed on the row.
- *
- * A draft belongs to the row it was typed under: carrying a half-written reply
- * across to another customer would be the worst bug this page could have. The
- * fix is identity, not an effect — `key={row.id}` at the call site remounts
- * this component with an empty draft, which is what React recommends over
- * resetting state from an effect.
- */
-function Composer({
-  spec,
-}: {
-  spec: { label: string; placeholder: string; send: string; hint: string };
-}) {
-  const [draft, setDraft] = useState('');
-
-  return (
-    <div className="shrink-0 px-4.5 pb-4">
-      <div className="border border-line rounded-lg overflow-hidden">
-        <label
-          htmlFor="communications-draft"
-          className="block px-3.5 pt-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted"
-        >
-          {spec.label}
-        </label>
-        <textarea
-          id="communications-draft"
-          rows={2}
-          value={draft}
-          onChange={(event) => setDraft(event.target.value)}
-          placeholder={spec.placeholder}
-          className="w-full px-3.5 pt-1.5 pb-2.5 text-[13px] leading-snug text-ink resize-none outline-none"
-        />
-        <div className="px-3 py-2 border-t border-line-subtle bg-base flex items-center gap-2">
-          <button
-            type="button"
-            className="h-[30px] px-2.5 rounded-md border border-line bg-surface text-[11.5px] font-bold text-ink flex items-center gap-1.5 hover:border-line-strong transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            <Sparkles size={13} aria-hidden="true" />
-            Draft with Copilot
-          </button>
-          <span className="grow" />
-          <span className="text-[11px] text-ink-muted">{spec.hint}</span>
-          <button
-            type="button"
-            disabled={draft.trim().length === 0}
-            className="h-[30px] px-3.5 rounded-md bg-accent text-surface text-[12px] font-bold hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2"
-          >
-            {spec.send}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+/** The numeric part of a row id such as "email:412". */
+function recordId(row: CommunicationRow): number {
+  return Number(row.id.split(':')[1]);
 }
 
-export function DetailPane({ row }: { row: CommunicationRow | null }) {
+export function DetailPane({
+  row,
+  onReply,
+  replying = false,
+  replied = false,
+  replyError = null,
+}: {
+  row: CommunicationRow | null;
+  /** Sends a reply to an email row from the person's mailbox; only email rows are wired. */
+  onReply?: (body: string) => void;
+  replying?: boolean;
+  replied?: boolean;
+  replyError?: string | null;
+}) {
   if (!row) {
     return (
       <section
@@ -225,7 +187,18 @@ export function DetailPane({ row }: { row: CommunicationRow | null }) {
       </div>
 
       {composer ? (
-        <Composer key={row.id} spec={composer} />
+        <ReplyBox
+          key={row.id}
+          label={composer.label}
+          placeholder={composer.placeholder}
+          hint={composer.hint}
+          sendLabel={composer.send}
+          draftSource={row.kind === 'email' ? { kind: 'email', id: recordId(row) } : undefined}
+          onSend={row.action === 'reply' ? onReply : undefined}
+          sending={replying}
+          sent={replied}
+          error={replyError}
+        />
       ) : row.action === 'open_external' && row.external_url ? (
         <div className="shrink-0 px-4.5 pb-4">
           <a

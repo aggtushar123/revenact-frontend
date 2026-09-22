@@ -75,6 +75,7 @@ function mockApi(overrides: Overrides = {}) {
     if (url.includes('/mail/messages/1/') && overrides.draft) return ok({ ...draftRow, body: 'Your plan renews on 1 October. Nothing to do.' });
     if (url.includes('/mail/messages/summary/')) return ok(summary);
     if (url.includes('/mail/messages/2/reply/')) return ok({ ...pizza, id: 9, direction: 'sent', folder: 'sent' }, 201);
+    if (url.includes('/copilot/draft-reply/')) return ok({ draft: 'Hi Sam, Thursday works for us.', sources: [{ type: 'note', id: 7, label: 'Billing preference', date: '2026-09-01', company: 'Pizza Hut', company_type: 'customer', company_id: 3 }] });
     if (url.includes('/mail/messages/1/') && init?.method === 'PATCH') return ok({ ...invoice, ...JSON.parse(String(init.body)), body: 'Your plan renews on 1 October. Nothing to do.' });
     if (url.includes('/mail/messages/1/')) return ok({ ...invoice, body: 'Your plan renews on 1 October. Nothing to do.' });
     if (url.includes('/mail/messages/2/')) return ok({ ...pizza, body: 'Can we talk Thursday? Sam' });
@@ -251,6 +252,20 @@ describe('MailboxView', () => {
     await userEvent.click(within(pane).getByRole('button', { name: 'Send reply' }));
     await within(pane).findByRole('status');
     await waitFor(() => expect(calls.filter((c) => c.includes('/mail/messages/summary/')).length).toBe(before + 1));
+  });
+
+  it('Draft with Copilot drafts from the open message', { timeout: 15000 }, async () => {
+    const calls = mockApi();
+    renderMailbox();
+    const mailbox = await screen.findByRole('region', { name: 'Mailbox' });
+    await within(mailbox).findByRole('region', { name: 'September' });
+    await userEvent.click(within(mailbox).getByRole('button', { name: /Re: revised terms/ }));
+    const pane = await within(mailbox).findByRole('region', { name: 'Message' });
+    await within(pane).findByText('Can we talk Thursday? Sam');
+    await userEvent.click(within(pane).getByRole('button', { name: /draft with copilot/i }));
+    expect(await within(pane).findByDisplayValue(/Thursday works for us/)).toBeInTheDocument();
+    expect(within(pane).getByText('1 source used')).toBeInTheDocument();
+    expect(calls.some((c) => c.startsWith('POST') && c.includes('/copilot/draft-reply/'))).toBe(true);
   });
 
   it('the Copilot has the mailbox as its context', { timeout: 15000 }, async () => {

@@ -68,6 +68,7 @@ function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown>;
       return ok({ id: 1, title: 'Chat', created_at: '', updated_at: '', messages: [{ id: 1, role: 'user', content, sources: [], questions: [] }, { id: 2, role: 'assistant', content: 'Two tickets and one reply.', sources: [], questions: [] }] });
     }
     if (url.includes('/copilot/conversations/')) return ok(overrides.conversations ?? []);
+    if (url.includes('/communications/emails/412/reply/')) return ok({ id: 900, direction: 'sent', subject: 'Re: revised renewal terms' }, 201);
     const results = overrides.rows ?? [emailRow, ticketRow];
     const kind = new URL(url, 'http://localhost').searchParams.get('kind');
     const filtered = kind ? results.filter((r) => (r as { kind: string }).kind === kind) : results;
@@ -189,6 +190,19 @@ describe('CommunicationsPage', () => {
 
     await userEvent.click(within(panel).getByRole('button', { name: /close history/i }));
     expect(screen.queryByRole('dialog', { name: 'History' })).not.toBeInTheDocument();
+  });
+
+  it('replies to a queue email from the mailbox and says so', { timeout: 15000 }, async () => {
+    const spy = mockApi();
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /Dana Whitfield/ }));
+    const pane = await screen.findByRole('region', { name: 'Conversation' });
+    await userEvent.type(within(pane).getByLabelText('Reply'), 'Thursday works.');
+    await userEvent.click(within(pane).getByRole('button', { name: 'Send reply' }));
+    expect(await within(pane).findByRole('status')).toHaveTextContent(/Sent/);
+    const call = spy.mock.calls.find(([url, init]) => String(url).includes('/communications/emails/412/reply/') && init?.method === 'POST');
+    expect(call).toBeTruthy();
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ body: 'Thursday works.' });
   });
 
   it('treats an empty inbox as inbox zero', async () => {
