@@ -12,7 +12,7 @@ import type { AIAttribute, AttributeRefresh, AttributeValueType } from '../../fe
 // attribute is tenant-wide schema, gated by the same capability. The
 // answers themselves live on each company page (AIAttributesPanel).
 
-const INPUT = 'w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-line-strong';
+const INPUT = 'w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent';
 const LABEL = 'text-[12px] font-bold text-ink-muted uppercase tracking-wide';
 
 export function AIAttributesPage() {
@@ -22,6 +22,7 @@ export function AIAttributesPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<AIAttribute | null>(null);
   const [fillNote, setFillNote] = useState<Record<number, string>>({});
+  const [actionError, setActionError] = useState<string | null>(null);
   const [filling, setFilling] = useState<number | null>(null);
 
   const [showAddForm, setShowAddForm] = useState(false);
@@ -90,22 +91,25 @@ export function AIAttributesPage() {
     if (!deleteTarget) return;
     const target = deleteTarget;
     setDeleteTarget(null);
+    setActionError(null);
     try {
       await deleteAttribute(target.id);
       setAttributes((current) => current.filter((a) => a.id !== target.id));
     } catch (err) {
-      setLoadError(err instanceof ApiError ? err.message : 'Could not delete the attribute.');
+      setActionError(err instanceof ApiError ? err.message : 'Could not delete the attribute.');
     }
   }
 
   async function handleFillAll(attribute: AIAttribute) {
     setFilling(attribute.id);
+    setActionError(null);
+    setFillNote((current) => ({ ...current, [attribute.id]: '' }));
     try {
       const result = await fillAttribute(attribute.id);
       const note = result.remaining > 0 ? `${result.filled} filled, ${result.remaining} left for tonight` : `${result.filled} filled`;
       setFillNote((current) => ({ ...current, [attribute.id]: note }));
     } catch (err) {
-      setFillNote((current) => ({ ...current, [attribute.id]: err instanceof ApiError ? err.message : 'Could not fill.' }));
+      setActionError(err instanceof ApiError ? err.message : `Could not fill ${attribute.name}.`);
     } finally {
       setFilling(null);
     }
@@ -117,7 +121,7 @@ export function AIAttributesPage() {
         <h1 className="text-[20px] font-bold text-ink tracking-tight mb-4">AI Attributes</h1>
         <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg bg-warning-dim border border-warning/30 text-[12.5px] text-warning">
           <ShieldAlert className="w-4 h-4 shrink-0" aria-hidden="true" />
-          You don't have permission to define AI attributes — ask an admin to add one. Their answers show on every Organization and Account page.
+          You don't have permission to define AI attributes. Ask an admin to add one; the answers show on every Organization and Account page.
         </div>
       </div>
     );
@@ -135,7 +139,7 @@ export function AIAttributesPage() {
         <button
           type="button"
           onClick={() => setShowAddForm((v) => !v)}
-          className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold shadow-sm transition-colors shrink-0"
+          className="flex items-center gap-1.5 px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold shadow-sm transition-colors shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           <Plus className="w-4 h-4" aria-hidden="true" />
           New attribute
@@ -195,12 +199,16 @@ export function AIAttributesPage() {
           </div>
           {addError && <p className="text-[12.5px] text-danger" role="alert">{addError}</p>}
           <div className="flex items-center gap-3">
-            <button type="submit" disabled={!canCreate} className="px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            <button type="submit" disabled={!canCreate} className="px-4 py-2 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
               {isSubmitting ? 'Creating…' : 'Create'}
             </button>
-            <button type="button" onClick={resetForm} className="text-[13px] font-semibold text-ink-muted hover:text-ink">Cancel</button>
+            <button type="button" onClick={resetForm} className="text-[13px] font-semibold text-ink-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">Cancel</button>
           </div>
         </form>
+      )}
+
+      {actionError && (
+        <p className="text-[12.5px] text-danger" role="alert">{actionError}</p>
       )}
 
       <div className="flex-1 bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden">
@@ -246,11 +254,11 @@ export function AIAttributesPage() {
                         onClick={() => handleFillAll(attribute)}
                         disabled={filling === attribute.id}
                         aria-label={`Fill all for ${attribute.name}`}
-                        className="px-2.5 py-1 rounded-md text-[12px] font-semibold text-ink-muted hover:text-ink hover:bg-subtle disabled:opacity-50"
+                        className="px-2.5 py-1 rounded-md text-[12px] font-semibold text-ink-muted hover:text-ink hover:bg-subtle disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                       >
                         {filling === attribute.id ? 'Filling…' : 'Fill all'}
                       </button>
-                      <button type="button" onClick={() => setDeleteTarget(attribute)} aria-label={`Delete ${attribute.name}`} className="p-1.5 rounded-md text-ink-faint hover:text-danger hover:bg-danger-dim">
+                      <button type="button" onClick={() => setDeleteTarget(attribute)} aria-label={`Delete ${attribute.name}`} className="p-1.5 rounded-md text-ink-faint hover:text-danger hover:bg-danger-dim focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
                         <Trash2 className="w-4 h-4" aria-hidden="true" />
                       </button>
                     </div>

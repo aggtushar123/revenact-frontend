@@ -63,3 +63,38 @@ describe('AIAttributesPage', () => {
     expect(fetchMock.mock.calls[1][0]).toMatch(/\/attributes\/definitions\/3\/fill\/$/);
   });
 });
+
+describe('AIAttributesPage actions', () => {
+  beforeEach(() => {
+    fetchMock.mockReset();
+  });
+
+  it('deletes after confirmation, and keeps the list when a delete fails', { timeout: 15000 }, async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, [attribute(), attribute({ id: 4, name: 'Seats in use' })]))
+      .mockResolvedValueOnce(jsonResponse(500, { detail: 'Database busy' }))
+      .mockResolvedValueOnce(jsonResponse(204, null));
+    renderPage();
+    await screen.findByText('Product tier');
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Product tier' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Database busy');
+    expect(screen.getByText('Product tier')).toBeInTheDocument();
+    expect(screen.getByText('Seats in use')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete Seats in use' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText('Product tier')).toBeInTheDocument();
+    expect(screen.queryByText('Seats in use')).not.toBeInTheDocument();
+    expect(fetchMock.mock.calls[2][0]).toMatch(/\/attributes\/definitions\/4\/$/);
+  });
+
+  it('reports a fill failure as an error', { timeout: 15000 }, async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(200, [attribute()]))
+      .mockResolvedValueOnce(jsonResponse(429, { detail: 'This organisation has spent its monthly model budget.' }));
+    renderPage();
+    await screen.findByText('Product tier');
+    await userEvent.click(screen.getByRole('button', { name: 'Fill all for Product tier' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/monthly model budget/);
+  });
+});

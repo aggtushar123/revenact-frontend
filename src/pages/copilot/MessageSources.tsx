@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { Mail, FileText, LifeBuoy, CheckCircle, Users } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { MessageSource } from './types';
+import { hrefOf } from './sourceHref';
 
 const ICONS: Record<MessageSource['type'], ReactNode> = {
   email: <Mail className="w-3 h-3" />,
@@ -54,13 +55,9 @@ export function MessageSources({ sources }: { sources: MessageSource[] }) {
         {sources.map((source) => (
           <Link
             key={`${source.type}-${source.id}`}
-            to={
-              source.company_type === 'account'
-                ? `/accounts/${source.company_id}`
-                : `/organizations/${source.company_id}`
-            }
+            to={hrefOf(source)}
             title={`${source.label} — ${source.company}`}
-            className="group flex items-center gap-1.5 max-w-[280px] rounded-lg border border-line-subtle bg-surface px-2.5 py-1.5 hover:border-accent/40 hover:bg-subtle/50 transition-colors"
+            className="group flex items-center gap-1.5 max-w-[280px] rounded-lg border border-line-subtle bg-surface px-2.5 py-1.5 hover:border-accent/40 hover:bg-subtle/50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <span className="text-ink-faint group-hover:text-accent transition-colors shrink-0">
               {ICONS[source.type]}

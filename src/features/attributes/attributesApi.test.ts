@@ -15,8 +15,9 @@ describe('attributesApi', () => {
   it('lists, creates and deletes definitions', async () => {
     await fetchAttributes();
     expect(mocked).toHaveBeenLastCalledWith('/attributes/definitions/');
-    await createAttribute({ name: 'Tier', prompt: 'Which tier?', value_type: 'text', picklist_options: [], applies_to_customer: true, applies_to_account: false, refresh: 'manual' });
-    expect(mocked).toHaveBeenLastCalledWith('/attributes/definitions/', expect.objectContaining({ method: 'POST' }));
+    const payload = { name: 'Tier', prompt: 'Which tier?', value_type: 'picklist' as const, picklist_options: ['SMB'], applies_to_customer: true, applies_to_account: true, refresh: 'nightly' as const };
+    await createAttribute(payload);
+    expect(mocked).toHaveBeenLastCalledWith('/attributes/definitions/', { method: 'POST', body: payload });
     await deleteAttribute(4);
     expect(mocked).toHaveBeenLastCalledWith('/attributes/definitions/4/', { method: 'DELETE' });
   });

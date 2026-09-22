@@ -54,7 +54,7 @@ describe('AI attributes flow', () => {
     // Then the organization page, where the answer is read and corrected.
     await userEvent.click(screen.getByRole('link', { name: 'Open Pizza Hut' }));
     expect(await screen.findByText('Field service scheduling')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Why Field service scheduling?' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Why Primary use case: Field service scheduling?' }));
     expect(screen.getByText('Three tickets describe dispatching crews.')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Edit Primary use case' }));
     await userEvent.clear(screen.getByLabelText('Primary use case'));
