@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowUp, Copy, ThumbsUp, ThumbsDown, Sparkles, AlertCircle, Users, Radio, UserPlus, ClipboardCheck, XCircle } from 'lucide-react';
+import { ArrowUp, Check, Copy, Sparkles, AlertCircle, Users, Radio, UserPlus, ClipboardCheck, XCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Proposal } from '../../features/proposals/proposalsSlice';
 import { PresenceStrip } from '../../components/shared';
@@ -10,6 +10,7 @@ import { MentionTextarea } from '../../components/shared/MentionTextarea';
 import { FUNCTION_LABELS } from '../../features/auth/authSlice';
 import type { UserFunction } from '../../features/auth/authSlice';
 import { MessageSources } from './MessageSources';
+import { AnswerText } from './AnswerText';
 
 interface Props {
   messages: CopilotMessage[];
@@ -44,9 +45,13 @@ interface Props {
 }
 
 // Real messages only — no more hardcoded chatStep turns/fixed-timer
-// "thinking" indicator. Plain text, no markdown rendering (an explicit
-// scope cut — see docs/API_CONTRACTS.md's copilot section); `isSending`
-// reflects the real in-flight POST /copilot/messages/ call.
+// "thinking" indicator. Answers render as structure through AnswerText
+// (lists, emphasis, code; nothing else); `isSending` reflects the real
+// in-flight POST /copilot/messages/ call.
+//
+// The chat sits on the canvas like the home does: no card around it, the
+// messages scroll in a reading column and the ask box is the last flex
+// child, never floating over the text.
 //
 // `session` (Multiplayer Copilot, Phase 2a — real cross-user sessions,
 // see revenact-backend's services/copilot/models.py) is entirely
@@ -82,6 +87,7 @@ export function ChatView({
   visibility,
 }: Props) {
   const [inputText, setInputText] = useState('');
+  const [copiedId, setCopiedId] = useState<number | null>(null);
   const [isHandoffOpen, setIsHandoffOpen] = useState(false);
   const [isClosingOpen, setIsClosingOpen] = useState(false);
   const isOwner = !!session && !!currentUserId && session.owner.id === currentUserId;
@@ -90,6 +96,15 @@ export function ChatView({
     if (inputText.trim() && !isSending) {
       onSendPrompt(inputText);
       setInputText('');
+    }
+  }
+
+  async function copy(message: CopilotMessage) {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopiedId(message.id);
+    } catch {
+      /* the clipboard is unavailable in some contexts; the text is still on screen */
     }
   }
 
@@ -102,8 +117,8 @@ export function ChatView({
     session?.events.filter((e) => e.kind === 'joined' || e.kind === 'handed_off') ?? [];
 
   return (
-    <div className="flex-1 h-full flex flex-col bg-surface relative">
-      <div className="flex-1 overflow-y-auto px-6 py-8 w-full mx-auto pb-[180px] custom-scrollbar selection:bg-accent-dim">
+    <div className="flex-1 h-full min-h-0 flex flex-col relative">
+      <div className="flex-1 min-h-0 overflow-y-auto px-6 py-6 w-full custom-scrollbar selection:bg-accent-dim">
         {(pendingAccountName || session) && (
           <div className="w-full max-w-[860px] mx-auto mb-6 flex flex-col gap-2.5">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -266,7 +281,7 @@ export function ChatView({
           </div>
         )}
         {!isEmpty && (
-          <div className="flex flex-col gap-10 w-full max-w-[860px] mx-auto">
+          <div className="flex flex-col gap-8 w-full max-w-[820px] mx-auto">
             {messages.map((message) => {
               const redirect = redirectFor(message);
               return message.role === 'user' ? (
@@ -297,7 +312,7 @@ export function ChatView({
                       </span>
                     );
                   })()}
-                  <div className="max-w-[65%] bg-accent-dim border border-accent/30 rounded-2xl rounded-tr-sm px-4 py-3 text-[13.5px] text-ink-muted font-medium leading-[1.65] shadow-sm whitespace-pre-wrap">
+                  <div className="max-w-[70%] bg-surface border border-line rounded-2xl rounded-tr-md px-4 py-2.5 text-[13.5px] text-ink leading-[1.6] whitespace-pre-wrap">
                     {message.content}
                   </div>
                   {(message.questions ?? []).length > 0 && (
@@ -317,10 +332,14 @@ export function ChatView({
                   )}
                 </div>
               ) : (
-                <div key={message.id} className="flex flex-col gap-1 border-l-2 border-accent/30 pl-7 py-1">
-                  <p className="text-[13.5px] text-ink font-medium leading-relaxed whitespace-pre-wrap">
-                    {message.content}
-                  </p>
+                <article key={message.id} aria-label="Copilot answer" className="flex gap-3 animate-in fade-in duration-[var(--dur-slow)]">
+                  <span className="w-6 h-6 rounded-md bg-accent text-on-accent flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </span>
+                  <div className="min-w-0 flex-1 flex flex-col gap-1">
+                    <div className="text-[14px] leading-[1.65] text-ink max-w-[72ch]">
+                      <AnswerText text={message.content} />
+                    </div>
                   <MessageSources sources={message.sources} />
                   {(message.ask_suggestions ?? []).length > 0 && onAskSuggested && (() => {
                     // The question this answer replied to — the user turn just
@@ -348,40 +367,38 @@ export function ChatView({
                       </div>
                     );
                   })()}
-                  <div className="flex items-center gap-[18px] mt-4 text-ink-faint">
-                    <button className="hover:text-ink-muted hover:bg-subtle rounded-md p-1.5 transition-colors -ml-1.5">
-                      <Copy className="w-4 h-4 stroke-[2px]" />
-                    </button>
-                    <button className="hover:text-ink-muted hover:bg-subtle rounded-md p-1.5 transition-colors">
-                      <ThumbsUp className="w-4 h-4 stroke-[2px]" />
-                    </button>
-                    <button className="hover:text-ink-muted hover:bg-subtle rounded-md p-1.5 transition-colors">
-                      <ThumbsDown className="w-4 h-4 stroke-[2px]" />
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => copy(message)}
+                      aria-label="Copy answer"
+                      className="inline-flex items-center gap-1.5 h-7 px-2 -ml-2 rounded-md text-[11.5px] font-medium text-ink-faint hover:text-ink hover:bg-subtle transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      {copiedId === message.id ? <Check className="w-3.5 h-3.5 text-success" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
+                      {copiedId === message.id ? 'Copied' : 'Copy'}
                     </button>
                   </div>
-                </div>
+                  </div>
+                </article>
               );
             })}
 
             {isSending && (
-              <div className="flex flex-col gap-1 border-l-2 border-accent/30 pl-7 py-2 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex items-center gap-3 text-[var(--accent)]">
-                  <div className="w-[22px] h-[22px] rounded-full bg-gradient-to-br from-accent to-accent-hover flex items-center justify-center text-white shadow-[0_2px_8px_rgba(45,212,168,0.4)] animate-pulse">
-                    <Sparkles className="w-[12px] h-[12px]" />
-                  </div>
-                  <span className="text-[13.5px] font-bold tracking-tight">Copilot is thinking...</span>
-                  <div className="flex items-center gap-1 ml-1 mt-1">
-                    <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:-0.3s]"></div>
-                    <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce [animation-delay:-0.15s] mx-1"></div>
-                    <div className="w-1.5 h-1.5 bg-[var(--accent)] rounded-full animate-bounce"></div>
-                  </div>
+              <div role="status" aria-live="polite" className="flex gap-3 animate-in fade-in duration-[var(--dur-slow)]">
+                <span className="w-6 h-6 rounded-md bg-accent text-on-accent flex items-center justify-center shrink-0 mt-0.5" aria-hidden="true">
+                  <Sparkles className="w-3.5 h-3.5" />
+                </span>
+                <div className="flex-1 flex flex-col gap-2.5 pt-1">
+                  <span className="text-[12.5px] text-ink-muted">Copilot is thinking</span>
+                  <div className="h-3 w-2/3 rounded bg-subtle animate-pulse" />
+                  <div className="h-3 w-1/2 rounded bg-subtle animate-pulse" />
                 </div>
               </div>
             )}
 
             {sendError && (
-              <div className="flex items-center gap-2 pl-7 text-[13px] text-danger font-medium">
-                <AlertCircle className="w-4 h-4 shrink-0" />
+              <div role="alert" className="flex items-center gap-2 pl-9 text-[13px] text-danger">
+                <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
                 {sendError}
               </div>
             )}
@@ -389,27 +406,28 @@ export function ChatView({
         )}
       </div>
 
-      {/* Floating input */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white via-white to-transparent pt-12 pb-10 px-6">
-        <div className="w-full max-w-[860px] mx-auto relative pl-4">
-          <div className="absolute -inset-[3px] rounded-xl bg-gradient-to-r from-accent/20 to-accent-hover/20 blur-sm pointer-events-none"></div>
-          <div className="relative bg-surface border-2 border-accent/30 rounded-xl flex items-end min-h-[72px] shadow-[0_4px_20px_rgba(0,0,0,0.03)] focus-within:ring-4 focus-within:ring-accent/10 transition-shadow">
-            <MentionTextarea
-              className="w-full h-full min-h-[64px] bg-transparent resize-none outline-none border-none p-4 text-[15px] placeholder:text-ink-faint placeholder:italic text-ink-muted font-medium leading-relaxed"
-              placeholder="Ask anything — @mention a colleague or a function to route a question to them"
-              aria-label="Message Copilot"
-              value={inputText}
-              onChange={setInputText}
-              onSubmit={submit}
-            />
-            <button
-              onClick={submit}
-              disabled={isSending}
-              className="absolute right-3.5 bottom-3.5 w-[26px] h-[26px] bg-subtle hover:bg-accent hover:text-on-accent rounded-full flex items-center justify-center text-white shadow-sm transition-all cursor-pointer group disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <ArrowUp className="w-[14px] h-[14px] stroke-[3.5px] text-ink-faint group-hover:text-on-accent" />
-            </button>
-          </div>
+      {/* The ask box: the last child, the same box as the home page's */}
+      <div className="shrink-0 px-6 pb-6 pt-2">
+        <div className="relative w-full max-w-[820px] mx-auto bg-surface border border-line rounded-xl shadow-sm focus-within:border-line-strong transition-colors duration-[var(--dur-fast)] flex items-end">
+          <MentionTextarea
+            className="w-full min-h-[56px] max-h-[40vh] bg-transparent resize-none outline-none border-none px-4 pt-3.5 pb-3 pr-14 text-[14px] leading-relaxed text-ink placeholder:text-ink-faint"
+            placeholder="Ask anything — @mention a colleague or a function to route a question to them"
+            aria-label="Message Copilot"
+            value={inputText}
+            onChange={setInputText}
+            onSubmit={submit}
+          />
+          <button
+            type="button"
+            onClick={submit}
+            disabled={isSending || inputText.trim().length === 0}
+            aria-label="Send"
+            className={`absolute right-3 bottom-3 w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:cursor-not-allowed ${
+              inputText.trim() && !isSending ? 'bg-accent text-on-accent hover:opacity-90' : 'bg-subtle text-ink-faint'
+            }`}
+          >
+            <ArrowUp className="w-4 h-4" aria-hidden="true" />
+          </button>
         </div>
       </div>
 
