@@ -75,7 +75,7 @@ export function MailDetail({
           <div className="grow min-w-0">
             <h2 className="text-[16.5px] font-bold text-ink tracking-tight mb-1.5">{message.subject}</h2>
             <div className="flex items-center gap-2 flex-wrap text-[12.5px]">
-              <span className="font-bold text-ink">{who(message)}</span>
+              <span className="font-bold text-ink">{message.direction === 'sent' ? `To ${who(message)}` : who(message)}</span>
               {message.direction === 'received' && message.from_name ? <span className="text-ink-muted">{message.from_address}</span> : null}
               <span className="text-line-strong" aria-hidden="true">
                 /

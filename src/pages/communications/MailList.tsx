@@ -21,16 +21,6 @@ function initialsOf(name: string): string {
   return (parts[0].charAt(0) + (parts[1]?.charAt(0) ?? '')).toUpperCase();
 }
 
-/** Whose face goes on the row: the sender, or for sent mail the first
- *  person it went to (not the "To" in "To Dana, Bob"). */
-function faceOf(row: MailMessage): string {
-  if (row.direction === 'sent') {
-    const first = row.to[0];
-    return first ? first[0] || first[1] : '?';
-  }
-  return row.from_name || row.from_address;
-}
-
 export function CategoriesBlock({ blocks, active, onPick }: { blocks: MailCategoryBlock[]; active: MailCategory | null; onPick: (category: MailCategory) => void }) {
   if (blocks.length === 0) return null;
   return (
@@ -114,11 +104,11 @@ export function MailList({
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border rv-glass-inner border-line hover:border-line-strong text-left transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                   >
                     <span className="w-8 h-8 shrink-0 rounded-full bg-subtle text-ink text-[11.5px] font-semibold flex items-center justify-center" aria-hidden="true">
-                      {initialsOf(faceOf(row))}
+                      {initialsOf(name)}
                     </span>
                     <span className="w-[160px] xl:w-[210px] shrink-0 min-w-0 flex items-center gap-2">
                       {!row.is_read ? <span className="w-1.5 h-1.5 rounded-full bg-info shrink-0" role="img" aria-label="Unread message" /> : null}
-                      <span className={`block text-[13px] truncate ${row.is_read ? 'text-ink' : 'font-semibold text-ink'}`}>{name}</span>
+                      <span className={`block text-[13px] truncate ${row.is_read ? 'text-ink' : 'font-semibold text-ink'}`}>{row.direction === 'sent' ? `To ${name}` : name}</span>
                     </span>
                     <span className="flex-1 min-w-0 text-[13px] truncate">
                       <span className={row.is_read ? 'text-ink' : 'font-semibold text-ink'}>{row.subject}</span>
