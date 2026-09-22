@@ -10,16 +10,8 @@ import {
 import { useState } from 'react';
 import { ConfirmDialog } from '../ConfirmDialog';
 import type { Headline } from '../../../features/customers/customersSlice';
+import { formatDate } from '../../../features/customers/formatters';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-// "2025-11-20" -> "20 Nov 2025" — the span shown on a headline card's
-// own footer. Same parse-the-parts approach as NotesTab's formatDate
-// (no Date, so no timezone shift on a date-only string).
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return `${d} ${MONTHS[m - 1]} ${y}`;
-}
 
 // A status dot, coloured by what the status actually means — the mock
 // hardcoded `bg-danger` for every card, including "Closed", which read

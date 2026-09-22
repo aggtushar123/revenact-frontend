@@ -1,14 +1,7 @@
 import { AlertTriangle, ExternalLink, Ticket as TicketIcon, Circle, Flag, Building2 } from 'lucide-react';
 import type { Ticket } from '../../../features/customers/customersSlice';
+import { formatDateUS } from '../../../features/customers/formatters';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-// "2026-03-03" -> "Mar 3, 2026" — the card's own date display, and the
-// group-header text, both derived from the one real opened_at field.
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
-}
 
 // The flag icon's color by priority — the mock carried real priority
 // values but never actually used them to style this icon (it rendered
@@ -83,7 +76,7 @@ export function TicketsTab({ tickets, isLoading, error }: TicketsTabProps) {
         <div key={day} className="relative z-10 mb-8">
           {/* Group Date Pill */}
           <div className="mb-6 inline-block bg-subtle rounded-full px-4 py-1.5 text-[11.5px] font-bold text-ink-muted border border-line/50 shadow-[0_1px_2px_rgba(0,0,0,0.02)] relative z-10 transition-colors">
-            {formatDate(day)}
+            {formatDateUS(day)}
           </div>
 
           <div className="flex flex-col gap-6">
@@ -141,7 +134,7 @@ function TicketCard({ ticket }: { ticket: Ticket }) {
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="text-[12px] font-bold text-ink-muted">{formatDate(ticket.opened_at)}</span>
+            <span className="text-[12px] font-bold text-ink-muted">{formatDateUS(ticket.opened_at)}</span>
             {ticket.external_url && (
               <a
                 href={ticket.external_url}

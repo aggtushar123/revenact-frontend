@@ -9,13 +9,8 @@ import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 import { SurveyTrendChart } from './SurveyTrendChart';
 import { EntityAvatar } from '../../components/shared';
 import { companyLabel } from '../../features/customers/formatters';
+import { formatDate } from '../../features/customers/formatters';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return `${d} ${MONTHS[m - 1]} ${y}`;
-}
 
 const TYPE_CARDS: { type: Survey['survey_type']; label: string; icon: typeof ThumbsUp }[] = [
   { type: 'nps', label: 'NPS', icon: ThumbsUp },
