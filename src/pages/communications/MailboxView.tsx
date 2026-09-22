@@ -45,13 +45,13 @@ const FOLDER_TITLE: Record<MailFolder, string> = {
 
 export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; onTogglePanel: () => void }) {
   const dispatch = useAppDispatch();
-  const { folder, category, unread, priority, search, page, loading, loadingMore, error, summary, selectedId, detail, detailLoading, detailError, updateError, replying, replyError, repliedId } = useAppSelector((state) => state.mailbox);
+  const { folder, category, unread, priority, page, loading, loadingMore, error, summary, selectedId, detail, detailLoading, detailError, updateError, replying, replyError, repliedId } = useAppSelector((state) => state.mailbox);
   const syncing = useAppSelector((state) => state.mail?.saving ?? false);
   const syncError = useAppSelector((state) => state.mail?.error ?? null);
 
   useEffect(() => {
-    dispatch(fetchMailMessages({ folder, category, unread, priority, search }));
-  }, [dispatch, folder, category, unread, priority, search]);
+    dispatch(fetchMailMessages({ folder, category, unread, priority }));
+  }, [dispatch, folder, category, unread, priority]);
 
   useEffect(() => {
     dispatch(fetchMailSummary());
@@ -75,7 +75,7 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
     if (result.meta.requestStatus !== 'fulfilled') return;
     dispatch(fetchMailSummary());
     // Done and muted leave the inbox; the list should show that.
-    if (patch.state !== undefined) dispatch(fetchMailMessages({ folder, category, unread, priority, search }));
+    if (patch.state !== undefined) dispatch(fetchMailMessages({ folder, category, unread, priority }));
   }
 
   async function reply(body: string) {
@@ -89,11 +89,11 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
     const result = await dispatch(syncMailbox());
     if (result.meta.requestStatus !== 'fulfilled') return;
     dispatch(fetchMailSummary());
-    dispatch(fetchMailMessages({ folder, category, unread, priority, search }));
+    dispatch(fetchMailMessages({ folder, category, unread, priority }));
   }
 
   const rows = page?.results ?? [];
-  const narrowed = folder !== 'inbox' || category !== null || unread || priority || Boolean(search.trim());
+  const narrowed = folder !== 'inbox' || category !== null || unread || priority;
   const shownOf = page ? (rows.length < page.count ? `${rows.length} of ${page.count}` : `${page.count}`) : '';
 
   return (
@@ -145,7 +145,7 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
               <div>
                 <h3 className="text-[13px] font-semibold text-danger">Could not load your mail</h3>
                 <p className="text-[12.5px] text-danger mt-0.5">{error}</p>
-                <button type="button" onClick={() => dispatch(fetchMailMessages({ folder, category, unread, priority, search }))} className="mt-2 h-8 px-3 rounded-md border border-danger bg-surface text-[12px] font-semibold text-danger">
+                <button type="button" onClick={() => dispatch(fetchMailMessages({ folder, category, unread, priority }))} className="mt-2 h-8 px-3 rounded-md border border-danger bg-surface text-[12px] font-semibold text-danger">
                   Try again
                 </button>
               </div>
@@ -175,7 +175,7 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
             </div>
           ) : (
             <>
-              {folder === 'inbox' && !unread && !priority && !search ? <CategoriesBlock blocks={summary?.categories ?? []} active={category} onPick={(c) => dispatch(toggleMailCategory(c))} /> : null}
+              {folder === 'inbox' && !unread && !priority ? <CategoriesBlock blocks={summary?.categories ?? []} active={category} onPick={(c) => dispatch(toggleMailCategory(c))} /> : null}
               <MailList
                 rows={rows}
                 isLoading={loading}
@@ -191,9 +191,7 @@ export function MailboxView({ panelOpen, onTogglePanel }: { panelOpen: boolean; 
                   if (row) open(row);
                 }}
                 emptyState={
-                  search.trim() ? (
-                    <InboxZero title={`No match for “${search}”`} line="Try a sender or a subject." />
-                  ) : folder === 'inbox' && !category && !unread && !priority ? (
+                  folder === 'inbox' && !category && !unread && !priority ? (
                     summary && !summary.has_mailbox ? (
                       <InboxZero title="No mailbox" line="Connect one from Integrations and your mail appears here." />
                     ) : (

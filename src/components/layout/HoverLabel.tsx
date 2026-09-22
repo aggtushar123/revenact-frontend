@@ -8,7 +8,6 @@
 import { createPortal } from 'react-dom';
 
 export function HoverLabel({ label, left, top }: { label: string; left: number; top: number }) {
-  if (typeof document === 'undefined') return null;
   return createPortal(
     <div
       role="tooltip"

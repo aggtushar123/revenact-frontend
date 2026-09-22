@@ -75,7 +75,6 @@ export interface MailQuery {
   category: MailCategory | null;
   unread: boolean;
   priority: boolean;
-  search: string;
 }
 
 interface MailboxState extends MailQuery {
@@ -102,7 +101,6 @@ const initialState: MailboxState = {
   category: null,
   unread: false,
   priority: false,
-  search: '',
   page: null,
   loading: false,
   error: null,
@@ -118,13 +116,12 @@ const initialState: MailboxState = {
   repliedId: null,
 };
 
-export function buildMailQuery({ folder, category, unread, priority, search }: MailQuery): string {
+export function buildMailQuery({ folder, category, unread, priority }: MailQuery): string {
   const params = new URLSearchParams();
   if (folder !== 'inbox') params.set('folder', folder);
   if (category) params.set('category', category);
   if (unread) params.set('unread', 'true');
   if (priority) params.set('priority', 'true');
-  if (search.trim()) params.set('q', search.trim());
   const query = params.toString();
   return query ? `/mail/messages/?${query}` : '/mail/messages/';
 }
@@ -204,36 +201,33 @@ export const replyToMailMessage = createAsyncThunk<
   }
 });
 
+/** Any change to what the list shows closes the open message. */
+function closeMessage(state: MailboxState) {
+  state.selectedId = null;
+  state.detail = null;
+}
+
 const mailboxSlice = createSlice({
   name: 'mailbox',
   initialState,
   reducers: {
     setMailFolder(state, action: PayloadAction<MailFolder>) {
       state.folder = action.payload;
-      state.selectedId = null;
-      state.detail = null;
+      closeMessage(state);
     },
     /** Picking the category already picked clears it, so the block both
      *  narrows and widens. */
     toggleMailCategory(state, action: PayloadAction<MailCategory>) {
       state.category = state.category === action.payload ? null : action.payload;
-      state.selectedId = null;
-      state.detail = null;
+      closeMessage(state);
     },
     setMailUnread(state, action: PayloadAction<boolean>) {
       state.unread = action.payload;
-      state.selectedId = null;
-      state.detail = null;
+      closeMessage(state);
     },
     setMailPriority(state, action: PayloadAction<boolean>) {
       state.priority = action.payload;
-      state.selectedId = null;
-      state.detail = null;
-    },
-    setMailSearch(state, action: PayloadAction<string>) {
-      state.search = action.payload;
-      state.selectedId = null;
-      state.detail = null;
+      closeMessage(state);
     },
     selectMailMessage(state, action: PayloadAction<number | null>) {
       state.selectedId = action.payload;
@@ -267,15 +261,9 @@ const mailboxSlice = createSlice({
       })
       .addCase(loadMoreMail.fulfilled, (state, action) => {
         state.loadingMore = false;
-        if (!state.page) {
-          state.page = action.payload;
-          return;
-        }
-        const seen = new Set(state.page.results.map((row) => row.id));
-        state.page = {
-          ...action.payload,
-          results: [...state.page.results, ...action.payload.results.filter((row) => !seen.has(row.id))],
-        };
+        // ponytail: pages are appended as served; if a new arrival ever shifts
+        // a page and repeats a row, dedupe by id here.
+        state.page = { ...action.payload, results: [...(state.page?.results ?? []), ...action.payload.results] };
       })
       .addCase(loadMoreMail.rejected, (state, action) => {
         state.loadingMore = false;
@@ -329,5 +317,5 @@ const mailboxSlice = createSlice({
   },
 });
 
-export const { setMailFolder, toggleMailCategory, setMailUnread, setMailPriority, setMailSearch, selectMailMessage, clearMailUpdateError } = mailboxSlice.actions;
+export const { setMailFolder, toggleMailCategory, setMailUnread, setMailPriority, selectMailMessage, clearMailUpdateError } = mailboxSlice.actions;
 export default mailboxSlice.reducer;
