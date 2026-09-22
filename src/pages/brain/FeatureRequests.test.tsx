@@ -102,14 +102,16 @@ describe('FeatureRequestsPage', () => {
     expect(await screen.findByText('Slack alerts')).toBeInTheDocument();
   });
 
-  it('reports a gather that ran out of budget as an error, keeping what it filed', { timeout: 15000 }, async () => {
+  it('says what a stopped gather still filed, and shows it', { timeout: 15000 }, async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(200, []))
-      .mockResolvedValueOnce(jsonResponse(429, { created: 1, linked: 2, remaining: 3, detail: 'This organisation has spent its monthly model budget.' }));
+      .mockResolvedValueOnce(jsonResponse(429, { created: 1, linked: 2, remaining: 3, detail: 'This organisation has spent its monthly model budget.' }))
+      .mockResolvedValueOnce(jsonResponse(200, [requestRow()]));
     renderPage();
     await screen.findByText(/No feature requests yet/);
     await userEvent.click(screen.getByRole('button', { name: 'Gather asks' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent(/monthly model budget/);
+    expect(await screen.findByRole('alert')).toHaveTextContent(/1 new request from 2 asks was still filed/);
+    expect(await screen.findByText('Slack alerts')).toBeInTheDocument();
   });
 
   it('changes a status from the detail pane', { timeout: 15000 }, async () => {

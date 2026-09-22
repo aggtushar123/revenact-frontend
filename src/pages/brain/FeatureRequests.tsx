@@ -38,6 +38,20 @@ function errorText(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
 
+function filed(created: number, linked: number): string {
+  const made = created === 1 ? '1 new request' : `${created} new requests`;
+  const from = linked === 1 ? '1 ask' : `${linked} asks`;
+  return `${made} from ${from}`;
+}
+
+/** What a gather that stopped part-way still managed to file, if anything. */
+function partial(err: unknown): string {
+  if (!(err instanceof ApiError) || typeof err.body !== 'object' || err.body === null) return '';
+  const body = err.body as { created?: number; linked?: number };
+  if (!body.created && !body.linked) return '';
+  return ` ${filed(body.created ?? 0, body.linked ?? 0)} was still filed.`;
+}
+
 function trend(row: Pick<FeatureRequestRow, 'last_90_days' | 'previous_90_days'>): string {
   const { last_90_days: now, previous_90_days: before } = row;
   if (now === 0 && before === 0) return 'No asks in six months';
@@ -85,12 +99,14 @@ export function FeatureRequestsPage() {
     setGatherError(null);
     try {
       const result = await gatherRequests();
-      const made = result.created === 1 ? '1 new request' : `${result.created} new requests`;
-      const from = result.linked === 1 ? '1 ask' : `${result.linked} asks`;
-      setGatherNote(result.remaining > 0 ? `${made} from ${from}, ${result.remaining} left for tonight` : `${made} from ${from}`);
+      const made = filed(result.created, result.linked);
+      setGatherNote(result.remaining > 0 ? `${made}, ${result.remaining} left for tonight` : made);
       setAttempt((n) => n + 1);
     } catch (err) {
-      setGatherError(errorText(err, 'Could not gather asks.'));
+      setGatherError(`${errorText(err, 'Could not gather asks.')}${partial(err)}`);
+      // A stopped gather keeps what it had already filed, so the list has
+      // moved on even though the run failed.
+      setAttempt((n) => n + 1);
     } finally {
       setGathering(false);
     }
@@ -99,6 +115,7 @@ export function FeatureRequestsPage() {
   if (openId !== null) {
     return (
       <RequestDetail
+        key={openId}
         id={openId}
         currency={currency}
         mayCurate={mayCurate}
