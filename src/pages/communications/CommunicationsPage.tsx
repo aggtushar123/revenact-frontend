@@ -27,6 +27,7 @@ import { useAppDispatch, useAppSelector } from '../../hooks';
 import {
   fetchCommunications,
   fetchCommunicationsStats,
+  replyToEmail,
   selectRow,
   setMode,
   setScope,
@@ -54,7 +55,7 @@ function readCopilotPreference(): boolean {
 
 export default function CommunicationsPage() {
   const dispatch = useAppDispatch();
-  const { page, isLoading, error, stats, scope, mode, kind, search, selectedId } = useAppSelector((state) => state.communications);
+  const { page, isLoading, error, stats, scope, mode, kind, search, selectedId, replying, replyError, repliedId } = useAppSelector((state) => state.communications);
   const mailbox = useAppSelector((state) => state.mail?.connection ?? null);
   const connectors = useAppSelector((state) => state.connectors?.items ?? []);
 
@@ -236,7 +237,18 @@ export default function CommunicationsPage() {
                     Inbox
                   </button>
                   <div className="flex-1 min-h-0 flex">
-                    <DetailPane row={selected} />
+                    <DetailPane
+                      row={selected}
+                      onReply={(body) =>
+                        dispatch(replyToEmail({ rowId: selected.id, body })).then((result) => {
+                          // A sent reply is no longer owed: the counts move now, the row leaves on the next fetch.
+                          if (result.meta.requestStatus === 'fulfilled') dispatch(fetchCommunicationsStats(scope));
+                        })
+                      }
+                      replying={replying}
+                      replied={repliedId === selected.id}
+                      replyError={replyError}
+                    />
                   </div>
                 </div>
               ) : (

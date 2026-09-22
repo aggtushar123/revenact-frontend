@@ -115,6 +115,10 @@ interface CommunicationsState {
   /** Row id. Null means "the first row", resolved at render so the pane is
    *  never empty while rows exist. */
   selectedId: string | null;
+  replying: boolean;
+  replyError: string | null;
+  /** The row id whose reply just went out; the pane says so. */
+  repliedId: string | null;
 }
 
 const initialState: CommunicationsState = {
@@ -129,6 +133,9 @@ const initialState: CommunicationsState = {
   kind: null,
   search: '',
   selectedId: null,
+  replying: false,
+  replyError: null,
+  repliedId: null,
 };
 
 export interface QueueQuery {
@@ -179,6 +186,21 @@ export const fetchCommunicationsStats = createAsyncThunk<
   }
 });
 
+/** Reply to a queue email from the person's own mailbox; the copy is
+ *  filed on the customer. `rowId` is the row's "email:<id>". */
+export const replyToEmail = createAsyncThunk<
+  { id: number },
+  { rowId: string; body: string },
+  { rejectValue: string }
+>('communications/reply', async ({ rowId, body }, { rejectWithValue }) => {
+  const id = Number(rowId.split(':')[1]);
+  try {
+    return await apiFetch<{ id: number }>(`/communications/emails/${id}/reply/`, { method: 'POST', body: { body } });
+  } catch (err) {
+    return rejectWithValue(err instanceof ApiError ? err.message : 'Could not send the reply.');
+  }
+});
+
 const communicationsSlice = createSlice({
   name: 'communications',
   initialState,
@@ -203,6 +225,8 @@ const communicationsSlice = createSlice({
     },
     selectRow(state, action: PayloadAction<string>) {
       state.selectedId = action.payload;
+      state.replyError = null;
+      state.repliedId = null;
     },
     clearCommunications() {
       return initialState;
@@ -210,6 +234,18 @@ const communicationsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
+      .addCase(replyToEmail.pending, (state) => {
+        state.replying = true;
+        state.replyError = null;
+      })
+      .addCase(replyToEmail.fulfilled, (state, action) => {
+        state.replying = false;
+        state.repliedId = action.meta.arg.rowId;
+      })
+      .addCase(replyToEmail.rejected, (state, action) => {
+        state.replying = false;
+        state.replyError = action.payload ?? 'Could not send the reply.';
+      })
       // The previous page stays on screen while a refetch runs, so changing a
       // filter dims the queue rather than blanking it and reflowing the pane.
       .addCase(fetchCommunications.pending, (state) => {

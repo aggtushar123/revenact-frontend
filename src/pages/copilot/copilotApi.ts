@@ -3,7 +3,7 @@
 // conversation is scoped to one User, not a Customer/Account, so it
 // lives here rather than as thunks in features/customers/customersSlice.ts.
 import { apiFetch } from '../../lib/apiClient';
-import type { Conversation, ConversationSummary } from './types';
+import type { DraftReply, Conversation, ConversationSummary } from './types';
 
 // Pagination is off on this endpoint (see ConversationListView's own
 // docstring) — a plain array, not fetchAllPages's {count,next,...} shape.
@@ -26,4 +26,10 @@ export function sendMessage(params: { conversationId?: number; content: string }
     method: 'POST',
     body: { conversation_id: params.conversationId, content: params.content },
   });
+}
+
+/** A reply drafted as the current user for one email or mailbox message,
+ *  grounded in the thread and the account's history, with its sources. */
+export function draftReply(params: { kind: 'email' | 'mail_message'; id: number }): Promise<DraftReply> {
+  return apiFetch<DraftReply>('/copilot/draft-reply/', { method: 'POST', body: params });
 }
