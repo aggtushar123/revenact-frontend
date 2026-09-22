@@ -4,7 +4,7 @@ import {
   LayoutGrid, Network, Layers, Users,
   Target, Globe, PieChart, GitBranch, List, GitCommit,
   Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
-  Brain, Flag, CheckSquare, MessageSquareWarning, Bot, Wand2,
+  Brain, Flag, CheckSquare, MessageSquareWarning, Bot, Wand2, Lightbulb,
   Sliders, LogOut,
   Sparkles,
 } from 'lucide-react';
@@ -134,6 +134,7 @@ export function Sidebar() {
           <NavItem to="/brain/dashboard" icon={<Brain className="w-5 h-5" />} label="Brain Overview" />
           <NavItem to="/brain/graph" icon={<Network className="w-5 h-5" />} label="Knowledge Graph" />
           <NavItem to="/brain/initiatives" icon={<Flag className="w-5 h-5" />} label="Initiatives" />
+          <NavItem to="/brain/requests" icon={<Lightbulb className="w-5 h-5" />} label="Feature Requests" />
           <NavItem to="/brain/review" icon={<CheckSquare className="w-5 h-5" />} label="Review Queue" badge={pendingProposals} />
           <NavItem to="/brain/feedback" icon={<MessageSquareWarning className="w-5 h-5" />} label="Feedback Log" />
           <NavItem to="/brain/agents" icon={<Bot className="w-5 h-5" />} label="Agents" />

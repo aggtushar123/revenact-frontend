@@ -244,6 +244,20 @@ two record kinds, drag a card between stage columns to patch its `stage`, use th
 Filters popover (department, priority, stage). What a person sees is already
 scoped server-side by department.
 
+### 4.5b Feature requests (Brain > Feature Requests)
+
+1. `/brain/requests`. `FeatureRequestsPage` lists what customers keep asking
+   for, most revenue first, with a status filter. Every figure is the
+   reader's own: the ARR, the company and ask counts and the evidence cover
+   only the companies they may open and the records they may read.
+2. Leadership presses "Gather asks": the backend clusters the interactions
+   the classifier tagged as feature requests and names each new group. The
+   result says how many requests were made, from how many asks, and how many
+   are left for the nightly pass.
+3. Opening a request shows its summary, the companies asking with their ARR,
+   and the evidence with a link to each company. Leadership can change the
+   status from the same pane.
+
 ### 4.6 Copilot and multiplayer sessions
 
 1. `/copilot`. `HomeView` offers skill cards that prefill a prompt, and a
