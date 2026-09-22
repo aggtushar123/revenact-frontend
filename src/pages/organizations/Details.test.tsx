@@ -126,7 +126,7 @@ describe('Organization Details page (/organizations/:id)', () => {
     vi.stubGlobal(
       'fetch',
       vi.fn((url: string) => {
-        const body = url.includes('/accounts/') || (url.includes('/activities/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')))))) ? [] : globex;
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || (url.includes('/activities/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')))))) ? [] : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
       })
     );
@@ -185,7 +185,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))))) ? [] : globex;
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))))) ? [] : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
       })
     );
@@ -222,7 +222,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))))
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))))
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -260,7 +260,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')))
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')))
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -299,7 +299,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -341,7 +341,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/calendar-events/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -386,7 +386,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -437,7 +437,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       if (url.includes('/surveys/')) {
         return Promise.resolve({ ok: true, status: 200, json: async () => surveys });
       }
-      const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+      const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
         ? []
         : globex;
       return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -493,7 +493,7 @@ describe('Organization Details page (/organizations/:id)', () => {
       if (url.includes('/surveys/')) {
         return Promise.resolve({ ok: true, status: 200, json: async () => (survey ? [survey] : []) });
       }
-      const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+      const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
         ? []
         : globex;
       return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -606,7 +606,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/contacts/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -652,7 +652,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -709,7 +709,7 @@ describe('Organization Details page (/organizations/:id)', () => {
         if (method === 'GET' && url.includes('/contacts/')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => contactsResponse });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -799,7 +799,7 @@ describe('Organization Details page (/organizations/:id)', () => {
         if (method === 'GET' && url.includes('/contacts/')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -832,7 +832,7 @@ describe('Organization Details page (/organizations/:id)', () => {
         if (method === 'GET' && url.includes('/contacts/')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -864,7 +864,7 @@ describe('Organization Details page (/organizations/:id)', () => {
         if (method === 'GET' && url.includes('/contacts/')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -929,7 +929,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -977,7 +977,7 @@ describe('Organization Details page (/organizations/:id)', () => {
             ],
           });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/') || url.includes('/opportunities/') || url.includes('/risks/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/') || url.includes('/opportunities/') || url.includes('/risks/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -1049,7 +1049,7 @@ describe('Organization Details page (/organizations/:id)', () => {
         if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => risks });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -1148,7 +1148,7 @@ describe('Organization Details page (/organizations/:id)', () => {
         if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => [] });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -1184,7 +1184,7 @@ describe('Organization Details page (/organizations/:id)', () => {
         if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => [] });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -1218,7 +1218,7 @@ describe('Organization Details page (/organizations/:id)', () => {
         if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => [] });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });
@@ -1256,7 +1256,7 @@ describe('Organization Details page (/organizations/:id)', () => {
         if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
           return Promise.resolve({ ok: true, status: 200, json: async () => risksData });
         }
-        const body = url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
+        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
           ? []
           : globex;
         return Promise.resolve({ ok: true, status: 200, json: async () => body });

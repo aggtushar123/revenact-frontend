@@ -17,6 +17,8 @@ export { CanvasListTab } from './CanvasListTab';
 export type { CanvasListTabProps } from './CanvasListTab';
 
 export { CustomObjectsTab } from './CustomObjectsTab';
+export { AIAttributesPanel } from './AIAttributesPanel';
+export type { AIAttributesPanelProps } from './AIAttributesPanel';
 export type { CustomObjectsTabProps } from './CustomObjectsTab';
 
 export { PresenceStrip } from './PresenceStrip';
