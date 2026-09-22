@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, RefreshCw, MoreHorizontal, Globe, ChevronUp, Search, Maximize2, ChevronRight, Plus, Filter, Layout, ExternalLink, Download, X, Sparkles } from 'lucide-react';
 import type { OrgRow } from '../../components/organizations/tableData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab, CustomObjectsTab } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab, CustomObjectsTab, AIAttributesPanel } from '../../components/shared';
 import { CompanyViewTab } from '../../components/organizations/CompanyViewTab';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../hooks';
@@ -196,7 +196,9 @@ export function Details() {
                      attributes={buildOrgAttributes(organization)}
                      onCollapse={() => setIsPinnedOpen(false)}
                      onExpand={() => setIsAttrModalOpen(true)}
-                   />
+                   >
+                     <AIAttributesPanel customerId={orgId} />
+                   </PinnedAttributes>
                  </div>
                )}
                <div className="flex-1 h-full overflow-hidden bg-surface rounded-xl border border-line-subtle shadow-sm flex flex-col">

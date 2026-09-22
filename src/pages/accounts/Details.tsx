@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { ACCOUNTS_DATA } from '../../components/organizations/accountsData';
 import type { AccountRow } from '../../components/organizations/accountsData';
-import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab, CustomObjectsTab } from '../../components/shared';
+import { ActivityFeed, PinnedAttributes, EntityAvatar, ContactsTab, PipelinesTab, CanvasListTab, CustomObjectsTab, AIAttributesPanel } from '../../components/shared';
 import type { AttributeDef } from '../../components/shared';
 import { useAppDispatch, useAppSelector, useOrgCurrency, useCapability } from '../../hooks';
 import { useMembers } from '../../features/knowledge/useMembers';
@@ -228,7 +228,9 @@ export function AccountDetails() {
                     entityName={account.name}
                     attributes={accountAttributes}
                     onCollapse={() => setIsPinnedOpen(false)}
-                  />
+                  >
+                    {isRealAccount ? <AIAttributesPanel accountId={account.revenactId} /> : null}
+                  </PinnedAttributes>
                 </div>
               )}
 

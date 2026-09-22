@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { Maximize2, ChevronLeft, Search, Pencil, Mail } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -24,11 +25,13 @@ export interface PinnedAttributesProps {
   onCollapse?: () => void;
   /** Called when the user clicks the expand (⤢) icon */
   onExpand?: () => void;
+  /** Rendered under the pinned fields: the company's AI attributes. */
+  children?: ReactNode;
 }
 
 // ── Component ──────────────────────────────────────────────────────────────────
 
-export function PinnedAttributes({ entityName, attributes, onCollapse, onExpand }: PinnedAttributesProps) {
+export function PinnedAttributes({ entityName, attributes, onCollapse, onExpand, children }: PinnedAttributesProps) {
   const [activeSubTab, setActiveSubTab] = useState('Pinned Attributes');
   const [search, setSearch] = useState('');
 
@@ -93,6 +96,7 @@ export function PinnedAttributes({ entityName, attributes, onCollapse, onExpand 
                 <p className="text-[12px] text-ink-faint text-center py-4">No attributes match your search.</p>
               )}
             </div>
+            {children}
           </>
         ) : (
           <div className="py-10 text-center">

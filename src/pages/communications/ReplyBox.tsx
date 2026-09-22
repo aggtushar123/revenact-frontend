@@ -11,6 +11,7 @@ import { Link } from 'react-router-dom';
 import { ChevronDown, Sparkles } from 'lucide-react';
 import { draftReply } from '../copilot/copilotApi';
 import type { MessageSource } from '../copilot/types';
+import { hrefOf } from '../copilot/sourceHref';
 import { ApiError } from '../../lib/apiClient';
 
 export interface ReplyBoxProps {
@@ -25,10 +26,6 @@ export interface ReplyBoxProps {
   sending?: boolean;
   sent?: boolean;
   error?: string | null;
-}
-
-function hrefOf(source: MessageSource): string {
-  return source.company_type === 'customer' ? `/organizations/${source.company_id}` : `/accounts/${source.company_id}`;
 }
 
 export function ReplyBox({ label, placeholder, hint, sendLabel, draftSource, onSend, sending = false, sent = false, error = null }: ReplyBoxProps) {

@@ -197,7 +197,12 @@ in instead.
 4. Row click → `/organizations/:id`, which dispatches six parallel fetches:
    the customer, its accounts, contacts, opportunities, risks and canvases.
 5. Tabs: General (metrics banner, `PinnedAttributes`, `ActivityFeed`), Company
-   View, Accounts, Contacts, Pipelines, Custom Objects, Success Plans
+   View, Accounts, Contacts, Pipelines, Custom Objects, Success Plans.
+   Under the pinned attributes, `AIAttributesPanel` lists the AI attributes
+   defined in Settings > AI Attributes with the Copilot's latest answer, a
+   "why" with reasoning and cited sources, the history of answers and
+   corrections, an inline override and a refresh (see the backend's
+   `attributes` contract)
    (placeholder), Canvas List.
 6. "Ask Copilot" navigates to `/copilot?forCustomerId=&forCustomerName=`.
 
