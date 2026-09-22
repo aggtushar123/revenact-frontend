@@ -38,6 +38,12 @@ export function formatDate(iso: string | null): string {
   return `${d} ${MONTHS[m - 1]} ${y}`;
 }
 
+// The US order, "Sep 12, 2026", used by the activity tabs' day headings.
+export function formatDateUS(iso: string): string {
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${MONTHS[m - 1]} ${d}, ${y}`;
+}
+
 // Full precision, e.g. "$1,234.56" / "¥12,345" (JPY's minor unit is 0 —
 // Intl handles that automatically, so this doesn't need a currency-specific
 // special case). Currency-aware replacement for the old formatMoney(val),

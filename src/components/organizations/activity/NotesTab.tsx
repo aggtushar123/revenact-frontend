@@ -1,17 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { FileText, MoreHorizontal, Sparkles } from 'lucide-react';
 import type { Note } from '../../../features/customers/customersSlice';
+import { formatDateUS } from '../../../features/customers/formatters';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-// "2026-03-04" -> "Mar 4, 2026" — the card's own date display, and the
-// group-header text (the mock's separate "group" string was just this
-// same date in a different order — derived here instead of stored,
-// same convention as Activity/Task's own date fields).
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
-}
 
 export interface NotesTabProps {
   notes: Note[];
@@ -113,7 +104,7 @@ export function NotesTab({ notes, isLoading, error, onCreate }: NotesTabProps) {
         <div key={day} className="relative z-10 mb-8">
           {/* Group Date Pill */}
           <div className="mb-6 inline-block bg-subtle rounded-full px-4 py-1.5 text-[11.5px] font-bold text-ink-muted border border-line/50 shadow-[0_1px_2px_rgba(0,0,0,0.02)] relative z-10 transition-colors">
-            {formatDate(day)}
+            {formatDateUS(day)}
           </div>
 
           <div className="flex flex-col gap-6">
@@ -144,7 +135,7 @@ function NoteCard({ note }: { note: Note }) {
           </h4>
           <div className="flex items-center gap-2 shrink-0">
             <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span className="text-[12px] font-bold text-ink-muted">{formatDate(note.logged_at)}</span>
+            <span className="text-[12px] font-bold text-ink-muted">{formatDateUS(note.logged_at)}</span>
             <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-ink-faint hover:text-ink-muted ml-1">
               <MoreHorizontal className="w-4 h-4" />
             </button>

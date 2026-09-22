@@ -1,5 +1,4 @@
 import { configureStore } from '@reduxjs/toolkit';
-import counterReducer from './features/counter/counterSlice';
 import authReducer, { loggedOut, refreshSession } from './features/auth/authSlice';
 import tasksReducer from './features/tasks/tasksSlice';
 import userManagementReducer from './features/userManagement/userManagementSlice';
@@ -36,7 +35,6 @@ import { setAuthHooks } from './lib/apiClient';
 
 export const store = configureStore({
   reducer: {
-    counter: counterReducer,
     communications: communicationsReducer,
     settings: settingsReducer,
     auth: authReducer,

@@ -3,6 +3,7 @@ import type { CSSProperties, RefObject } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import type { Customer } from '../../features/customers/customersSlice';
+import { formatDate } from '../../features/customers/formatters';
 
 interface RenewalPopoverProps {
   customers: Customer[];
@@ -32,12 +33,6 @@ const HEALTH_DOT: Record<Customer['health_category'], string> = {
   poor: 'bg-danger',
 };
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return `${d} ${MONTHS[m - 1]} ${y}`;
-}
 
 // Whole calendar days between today and the (date-only) renewal_date,
 // without going through `Date` parsing of the ISO string directly (which

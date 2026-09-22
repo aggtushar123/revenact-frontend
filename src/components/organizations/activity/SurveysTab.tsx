@@ -12,13 +12,8 @@ import {
 import type { Survey } from '../../../features/customers/customersSlice';
 import { ApiError } from '../../../lib/apiClient';
 import { ConfirmDialog } from '../../organizations/ConfirmDialog';
+import { formatDateUS } from '../../../features/customers/formatters';
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatDate(iso: string): string {
-  const [y, m, d] = iso.split('-').map(Number);
-  return `${MONTHS[m - 1]} ${d}, ${y}`;
-}
 
 const STATUS_STYLES: Record<Survey['status'], { text: string; bg: string; icon: typeof CheckCircle2 }> = {
   sent: { text: 'text-info', bg: 'bg-info-dim', icon: Clock },
@@ -307,7 +302,7 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
                         {survey.status_display}
                       </span>
                     </div>
-                    <span className="text-[12px] text-ink-faint font-medium">Sent {formatDate(survey.sent_at)}</span>
+                    <span className="text-[12px] text-ink-faint font-medium">Sent {formatDateUS(survey.sent_at)}</span>
                   </div>
                 </div>
 
