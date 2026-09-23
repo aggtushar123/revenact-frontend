@@ -76,7 +76,7 @@ export function DashboardToolbar({
         ))}
         {active > 0 && (
           <>
-            {count && <span className="ml-2 text-[11px] text-ink-muted whitespace-nowrap">{count}</span>}
+            {count && <span className="ml-2 text-[11px] text-ink-muted whitespace-nowrap font-mono-brand tabular-nums">{count}</span>}
             <button
               type="button"
               onClick={() => clear(clearable)}
