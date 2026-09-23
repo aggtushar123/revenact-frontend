@@ -369,6 +369,20 @@ budgets and recent calls), Skills, and the Knowledge Graph.
 connect them, click one to configure it in a slide-over, save the graph as JSON,
 and Run Now against a chosen customer to see the run log.
 
+A Condition or Filter node asks one of two things. A fact about the
+organization: its lifecycle stage, owner, health, NPS, ARR, days until
+renewal, open tickets, name, or any AI attribute the organization has
+defined, compared with the usual operators plus contains, is one of, is
+empty and is not empty. Or what they have been saying: a plain-English
+phrase matched against their recent emails, tickets and calls, with a
+match strength. The run log says which record matched and how closely.
+
+Two action nodes route work. Assign Owner hands the organization to a
+named colleague or to whoever in a function carries the fewest, and tells
+them. Notify puts it in front of the owner, their manager or someone
+named. The On Event trigger can also start a scenario when an email,
+ticket or call is classified, which is what a phrase condition is for.
+
 **Canvas**: drag contacts of a company onto a board and connect them with labelled
 relationships.
 

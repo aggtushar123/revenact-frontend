@@ -1,24 +1,55 @@
 import { useEffect, useState } from 'react';
 import { X, Info, ChevronDown, Settings } from 'lucide-react';
 import { LIFECYCLE_LABELS } from '../../features/customers/formatters';
+import { FUNCTION_LABELS } from '../../features/auth/authSlice';
+import type { UserFunction } from '../../features/auth/authSlice';
 import type { LifecycleCategory } from '../../components/organizations/tableData';
-import type { ScenarioNodeData, ScenarioNodeDetail } from './types';
+import { apiFetch } from '../../lib/apiClient';
+import type { AIAttribute } from '../../features/attributes/types';
+import { VALUELESS_OPERATORS } from './types';
+import type { ConditionOperator, ScenarioNodeData, ScenarioNodeDetail } from './types';
 
 // The fixed, real attribute allowlist services/scenarios/engine.py's
 // CONDITION_ATTRIBUTES accepts — see that module's own docstring on why
-// it's a small allowlist rather than "any Customer field".
-const CONDITION_ATTRIBUTES: { value: NonNullable<ScenarioNodeData['conditionAttribute']>; label: string }[] = [
+// it's a small allowlist rather than "any Customer field". The
+// organisation's own AI attributes are offered alongside these, read by
+// name as `attr:<api_name>`.
+const CONDITION_ATTRIBUTES: { value: string; label: string }[] = [
   { value: 'lifecycle_stage', label: 'Lifecycle Stage' },
   { value: 'health_score', label: 'Health Score' },
   { value: 'nps_score', label: 'NPS Score' },
+  { value: 'arr', label: 'ARR' },
+  { value: 'renewal_days', label: 'Days until renewal' },
+  { value: 'open_tickets', label: 'Open tickets' },
+  { value: 'owner', label: 'Owner (email)' },
+  { value: 'name', label: 'Name' },
 ];
 
-const CONDITION_OPERATORS: { value: NonNullable<ScenarioNodeData['conditionOperator']>; label: string }[] = [
+const CONDITION_OPERATORS: { value: ConditionOperator; label: string }[] = [
   { value: 'equals', label: 'is equal to' },
   { value: 'not_equals', label: 'is not equal to' },
   { value: 'greater_than', label: 'is greater than' },
   { value: 'less_than', label: 'is less than' },
+  { value: 'contains', label: 'contains' },
+  { value: 'is_one_of', label: 'is one of' },
+  { value: 'is_empty', label: 'is empty' },
+  { value: 'is_not_empty', label: 'is not empty' },
 ];
+
+const NOTIFY_TARGETS: { value: NonNullable<ScenarioNodeData['notifyWho']>; label: string }[] = [
+  { value: 'owner', label: 'The owner' },
+  { value: 'manager', label: "The owner's manager" },
+  { value: 'user', label: 'Someone in particular' },
+];
+
+interface Colleague {
+  id: number;
+  name: string;
+  function: UserFunction;
+}
+
+const FIELD = 'w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent';
+const LABEL = 'text-[12px] font-bold text-ink-muted uppercase tracking-wide';
 
 const LIFECYCLE_OPTIONS = Object.entries(LIFECYCLE_LABELS) as [LifecycleCategory, string][];
 
@@ -53,9 +84,20 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
   const [emailBody, setEmailBody] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
   const [attributeValue, setAttributeValue] = useState('');
-  const [conditionAttribute, setConditionAttribute] = useState<ScenarioNodeData['conditionAttribute']>('lifecycle_stage');
-  const [conditionOperator, setConditionOperator] = useState<ScenarioNodeData['conditionOperator']>('equals');
+  const [conditionKind, setConditionKind] = useState<'field' | 'semantic'>('field');
+  const [conditionAttribute, setConditionAttribute] = useState('lifecycle_stage');
+  const [conditionOperator, setConditionOperator] = useState<ConditionOperator>('equals');
   const [conditionValue, setConditionValue] = useState('');
+  const [conditionPhrase, setConditionPhrase] = useState('');
+  const [conditionThreshold, setConditionThreshold] = useState('0.6');
+  const [aiAttributes, setAiAttributes] = useState<AIAttribute[]>([]);
+  const [colleagues, setColleagues] = useState<Colleague[]>([]);
+  const [assignRule, setAssignRule] = useState<'' | 'least_loaded'>('');
+  const [assignTo, setAssignTo] = useState('');
+  const [assignFunction, setAssignFunction] = useState('cs');
+  const [notifyWho, setNotifyWho] = useState<NonNullable<ScenarioNodeData['notifyWho']>>('owner');
+  const [notifyUser, setNotifyUser] = useState('');
+  const [notifyMessage, setNotifyMessage] = useState('');
 
   useEffect(() => {
     if (!node) return;
@@ -67,15 +109,57 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
     setEmailBody(node.data.emailBody ?? '');
     setTaskTitle(node.data.taskTitle ?? '');
     setAttributeValue(node.data.attributeValue ?? '');
+    setConditionKind(node.data.conditionKind ?? (node.data.conditionPhrase ? 'semantic' : 'field'));
     setConditionAttribute(node.data.conditionAttribute ?? 'lifecycle_stage');
     setConditionOperator(node.data.conditionOperator ?? 'equals');
     setConditionValue(node.data.conditionValue ?? '');
+    setConditionPhrase(node.data.conditionPhrase ?? '');
+    setConditionThreshold(node.data.conditionThreshold ?? '0.6');
+    setAssignRule(node.data.assignRule ?? '');
+    setAssignTo(node.data.assignTo ? String(node.data.assignTo) : '');
+    setAssignFunction(node.data.assignFunction ?? 'cs');
+    setNotifyWho(node.data.notifyWho ?? 'owner');
+    setNotifyUser(node.data.notifyUser ? String(node.data.notifyUser) : '');
+    setNotifyMessage(node.data.notifyMessage ?? '');
     setIsEmailDropdownOpen(false);
     setIsToDropdownOpen(false);
     // Re-sync whenever a *different* node is opened for editing — not
     // on every keystroke, which would fight the fields above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [node?.id]);
+
+  const openAction = node?.data?.action ?? '';
+  const needsAttributes = openAction === 'Condition' || openAction === 'Filter';
+  const needsColleagues = openAction === 'Assign Owner' || openAction === 'Notify';
+
+  useEffect(() => {
+    if (!isOpen || !needsAttributes) return;
+    let cancelled = false;
+    // A failed list simply means no AI attributes to pick: the fixed
+    // allowlist above is still there, so this never blocks the pane.
+    apiFetch<AIAttribute[]>('/attributes/definitions/')
+      .then((rows) => {
+        if (!cancelled && Array.isArray(rows)) setAiAttributes(rows.filter((row) => row.applies_to_customer));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, needsAttributes]);
+
+  useEffect(() => {
+    if (!isOpen || !needsColleagues) return;
+    let cancelled = false;
+    apiFetch<{ results: Colleague[] } | Colleague[]>('/auth/users/')
+      .then((data) => {
+        const rows = Array.isArray(data) ? data : (data?.results ?? []);
+        if (!cancelled) setColleagues(rows);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, needsColleagues]);
 
   if (!isOpen || !node) return null;
 
@@ -93,9 +177,25 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
       updates.orgEnters = selectedOrgEnters;
     }
     if (action === 'Condition' || action === 'Filter') {
-      updates.conditionAttribute = conditionAttribute;
-      updates.conditionOperator = conditionOperator;
-      updates.conditionValue = conditionValue;
+      updates.conditionKind = conditionKind;
+      if (conditionKind === 'semantic') {
+        updates.conditionPhrase = conditionPhrase.trim();
+        updates.conditionThreshold = conditionThreshold;
+      } else {
+        updates.conditionAttribute = conditionAttribute;
+        updates.conditionOperator = conditionOperator;
+        updates.conditionValue = VALUELESS_OPERATORS.includes(conditionOperator) ? '' : conditionValue;
+      }
+    }
+    if (action === 'Assign Owner') {
+      updates.assignRule = assignRule;
+      updates.assignFunction = assignRule === 'least_loaded' ? assignFunction : '';
+      updates.assignTo = assignRule === 'least_loaded' ? undefined : Number(assignTo) || undefined;
+    }
+    if (action === 'Notify') {
+      updates.notifyWho = notifyWho;
+      updates.notifyUser = notifyWho === 'user' ? Number(notifyUser) || undefined : undefined;
+      updates.notifyMessage = notifyMessage.trim();
     }
     if (action === 'Create Task') updates.taskTitle = taskTitle;
     if (action === 'Set Attribute') updates.attributeValue = attributeValue;
@@ -128,6 +228,10 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
     title = 'Edit Set Attribute Action Node';
   } else if (action === 'Churn Entity') {
     title = 'Edit Churn Entity Action Node';
+  } else if (action === 'Assign Owner') {
+    title = 'Edit Assign Owner Action Node';
+  } else if (action === 'Notify') {
+    title = 'Edit Notify Action Node';
   }
 
   const renderFilterContent = () => (
@@ -164,58 +268,234 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
     </>
   );
 
-  // Condition/Filter's real, single-clause config — deliberately
-  // narrower than the fancier multi-clause canvas mockup this replaces:
-  // one attribute (from a fixed allowlist) + operator + value, exactly
-  // what services/scenarios/engine.py's own CONDITION_ATTRIBUTES/
-  // _evaluate_condition actually reads at run time.
+  // Condition/Filter's real clause. Two kinds, exactly what
+  // services/scenarios/engine.py evaluates: one fact about the customer,
+  // or a phrase matched against what they have recently said.
   function renderConditionClause(introText?: string) {
+    const valueless = VALUELESS_OPERATORS.includes(conditionOperator);
+    const attributeId = `cond-attr-${node!.id}`;
+    const operatorId = `cond-op-${node!.id}`;
+    const valueId = `cond-val-${node!.id}`;
+    const phraseId = `cond-phrase-${node!.id}`;
+    const thresholdId = `cond-threshold-${node!.id}`;
+
     return (
       <div className="bg-accent-dim/30 border border-accent/30 rounded-xl p-4 flex flex-col gap-3">
         {introText && <p className="text-[12.5px] text-ink-muted">{introText}</p>}
-        <div className="flex items-center gap-2">
-          <select
-            value={conditionAttribute}
-            onChange={(e) => setConditionAttribute(e.target.value as ScenarioNodeData['conditionAttribute'])}
-            className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
-          >
-            {CONDITION_ATTRIBUTES.map((attr) => (
-              <option key={attr.value} value={attr.value}>{attr.label}</option>
-            ))}
-          </select>
-          <select
-            value={conditionOperator}
-            onChange={(e) => setConditionOperator(e.target.value as ScenarioNodeData['conditionOperator'])}
-            className="flex-1 px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
-          >
-            {CONDITION_OPERATORS.map((op) => (
-              <option key={op.value} value={op.value}>{op.label}</option>
-            ))}
-          </select>
+
+        <div className="flex flex-col gap-1.5">
+          {[
+            { value: 'field' as const, label: 'A fact about the organization' },
+            { value: 'semantic' as const, label: 'What they have been saying' },
+          ].map((option) => (
+            <label key={option.value} className="flex items-center gap-2 text-[13px] text-ink-muted cursor-pointer">
+              <input
+                type="radio"
+                name={`cond-kind-${node!.id}`}
+                checked={conditionKind === option.value}
+                onChange={() => setConditionKind(option.value)}
+                className="w-[14px] h-[14px] text-accent focus:ring-accent border-line-strong"
+              />
+              {option.label}
+            </label>
+          ))}
         </div>
-        {conditionAttribute === 'lifecycle_stage' ? (
-          <select
-            value={conditionValue}
-            onChange={(e) => setConditionValue(e.target.value)}
-            className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
-          >
-            <option value="" disabled>Select a value</option>
-            {LIFECYCLE_OPTIONS.map(([value, lbl]) => (
-              <option key={value} value={value}>{lbl}</option>
-            ))}
-          </select>
+
+        {conditionKind === 'semantic' ? (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor={phraseId} className={LABEL}>Phrase</label>
+              <input
+                id={phraseId}
+                type="text"
+                value={conditionPhrase}
+                onChange={(e) => setConditionPhrase(e.target.value)}
+                placeholder="asking about pricing"
+                className={FIELD}
+              />
+              <p className="text-[12px] text-ink-faint">
+                Matched against the organization's recent emails, tickets and calls. Written the way you would say it, not as
+                keywords.
+              </p>
+            </div>
+            <div className="flex flex-col gap-1.5 max-w-[200px]">
+              <label htmlFor={thresholdId} className={LABEL}>Match strength</label>
+              <input
+                id={thresholdId}
+                type="number"
+                step="0.05"
+                min="0"
+                max="1"
+                value={conditionThreshold}
+                onChange={(e) => setConditionThreshold(e.target.value)}
+                className={FIELD}
+              />
+              <p className="text-[12px] text-ink-faint">Higher is stricter. 0.6 suits most phrases.</p>
+            </div>
+          </>
         ) : (
-          <input
-            type="number"
-            value={conditionValue}
-            onChange={(e) => setConditionValue(e.target.value)}
-            placeholder="Value"
-            className="w-full px-3 py-2 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
-          />
+          <>
+            <div className="flex items-end gap-2">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label htmlFor={attributeId} className={LABEL}>Attribute</label>
+                <select
+                  id={attributeId}
+                  value={conditionAttribute}
+                  onChange={(e) => setConditionAttribute(e.target.value)}
+                  className={FIELD}
+                >
+                  {CONDITION_ATTRIBUTES.map((attr) => (
+                    <option key={attr.value} value={attr.value}>{attr.label}</option>
+                  ))}
+                  {aiAttributes.map((attr) => (
+                    <option key={attr.id} value={`attr:${attr.api_name}`}>{attr.name} (AI)</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label htmlFor={operatorId} className={LABEL}>Operator</label>
+                <select
+                  id={operatorId}
+                  value={conditionOperator}
+                  onChange={(e) => setConditionOperator(e.target.value as ConditionOperator)}
+                  className={FIELD}
+                >
+                  {CONDITION_OPERATORS.map((op) => (
+                    <option key={op.value} value={op.value}>{op.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {!valueless && (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor={valueId} className={LABEL}>Value</label>
+                {conditionAttribute === 'lifecycle_stage' && conditionOperator !== 'is_one_of' ? (
+                  <select id={valueId} value={conditionValue} onChange={(e) => setConditionValue(e.target.value)} className={FIELD}>
+                    <option value="">Choose…</option>
+                    {LIFECYCLE_OPTIONS.map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    id={valueId}
+                    type="text"
+                    value={conditionValue}
+                    onChange={(e) => setConditionValue(e.target.value)}
+                    placeholder={conditionOperator === 'is_one_of' ? 'live, onboarding' : ''}
+                    className={FIELD}
+                  />
+                )}
+                {conditionOperator === 'is_one_of' && (
+                  <p className="text-[12px] text-ink-faint">Comma separated. Any one of them counts as a match.</p>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     );
   }
+
+  const renderAssignOwnerContent = () => {
+    const personId = `assign-person-${node!.id}`;
+    const functionId = `assign-function-${node!.id}`;
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="text-[14px] text-ink-muted">Hand the organization to someone, and tell them it is theirs.</p>
+        <div className="flex flex-col gap-2">
+          <label className="flex items-center gap-2 text-[13px] text-ink-muted cursor-pointer">
+            <input
+              type="radio"
+              name={`assign-rule-${node!.id}`}
+              checked={assignRule === ''}
+              onChange={() => setAssignRule('')}
+              className="w-[14px] h-[14px] text-accent focus:ring-accent border-line-strong"
+            />
+            A specific person
+          </label>
+          {assignRule === '' && (
+            <div className="flex flex-col gap-1.5 pl-6">
+              <label htmlFor={personId} className={LABEL}>Person</label>
+              <select id={personId} value={assignTo} onChange={(e) => setAssignTo(e.target.value)} className={FIELD}>
+                <option value="">Choose…</option>
+                {colleagues.map((person) => (
+                  <option key={person.id} value={person.id}>{person.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <label className="flex items-center gap-2 text-[13px] text-ink-muted cursor-pointer">
+            <input
+              type="radio"
+              name={`assign-rule-${node!.id}`}
+              checked={assignRule === 'least_loaded'}
+              onChange={() => setAssignRule('least_loaded')}
+              className="w-[14px] h-[14px] text-accent focus:ring-accent border-line-strong"
+            />
+            Whoever has the fewest organizations
+          </label>
+          {assignRule === 'least_loaded' && (
+            <div className="flex flex-col gap-1.5 pl-6">
+              <label htmlFor={functionId} className={LABEL}>Function</label>
+              <select id={functionId} value={assignFunction} onChange={(e) => setAssignFunction(e.target.value)} className={FIELD}>
+                {(Object.keys(FUNCTION_LABELS) as UserFunction[]).map((value) => (
+                  <option key={value} value={value}>{FUNCTION_LABELS[value]}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderNotifyContent = () => {
+    const whoId = `notify-who-${node!.id}`;
+    const personId = `notify-person-${node!.id}`;
+    const messageId = `notify-message-${node!.id}`;
+    return (
+      <div className="flex flex-col gap-4">
+        <p className="text-[14px] text-ink-muted">Put this organization in front of someone.</p>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor={whoId} className={LABEL}>Who</label>
+          <select
+            id={whoId}
+            value={notifyWho}
+            onChange={(e) => setNotifyWho(e.target.value as NonNullable<ScenarioNodeData['notifyWho']>)}
+            className={FIELD}
+          >
+            {NOTIFY_TARGETS.map((target) => (
+              <option key={target.value} value={target.value}>{target.label}</option>
+            ))}
+          </select>
+        </div>
+        {notifyWho === 'user' && (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor={personId} className={LABEL}>Person</label>
+            <select id={personId} value={notifyUser} onChange={(e) => setNotifyUser(e.target.value)} className={FIELD}>
+              <option value="">Choose…</option>
+              {colleagues.map((person) => (
+                <option key={person.id} value={person.id}>{person.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor={messageId} className={LABEL}>Message</label>
+          <textarea
+            id={messageId}
+            rows={3}
+            value={notifyMessage}
+            onChange={(e) => setNotifyMessage(e.target.value)}
+            placeholder="Health dropped and the renewal is close."
+            className={`${FIELD} resize-y`}
+          />
+        </div>
+      </div>
+    );
+  };
 
   const renderAssignPlaybookContent = () => (
     <>
@@ -470,6 +750,11 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
                <input type="radio" name="event_trigger" checked={selectedEventTrigger === 'new_entity'} onChange={() => setSelectedEventTrigger('new_entity')} className="w-[14px] h-[14px] text-accent focus:ring-accent border-line-strong" />
                <span className="text-[13px] font-medium text-ink-muted">Creation of new entity</span>
             </label>
+
+            <label className="flex items-center gap-2.5 cursor-pointer">
+               <input type="radio" name="event_trigger" checked={selectedEventTrigger === 'interaction_classified'} onChange={() => setSelectedEventTrigger('interaction_classified')} className="w-[14px] h-[14px] text-accent focus:ring-accent border-line-strong" />
+               <span className="text-[13px] font-medium text-ink-muted">An email, ticket or call is classified</span>
+            </label>
             
             <div className="flex flex-col gap-3">
               <label className="flex items-center gap-2.5 cursor-pointer">
@@ -693,6 +978,8 @@ export function EditNodePane({ node, isOpen, onClose, onSave }: EditNodePaneProp
         {action === 'Create Task' && renderCreateTaskContent()}
         {action === 'Set Attribute' && renderSetAttributeContent()}
         {action === 'Churn Entity' && renderChurnEntityContent()}
+        {action === 'Assign Owner' && renderAssignOwnerContent()}
+        {action === 'Notify' && renderNotifyContent()}
 
         {/* Fallback for unhandled nodes */}
         {!['Filter', 'Condition', 'Assign Playbook', 'Create Pipeline', 'Slack Message', 'Send Email', 'On Event', 'Create Task', 'Set Attribute', 'Churn Entity'].includes(action) && (
