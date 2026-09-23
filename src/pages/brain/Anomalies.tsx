@@ -182,7 +182,7 @@ export function AnomaliesPage() {
           <p className="text-[14px] font-semibold text-ink-muted">Nothing unusual right now.</p>
           <p className="text-[12.5px] text-ink-faint max-w-sm">
             A cluster shows here when the same report reaches at least three companies and clearly more often than the
-            fortnight before.
+            fortnight before. A cluster made only of personal mail is named from its shape rather than its words.
           </p>
         </div>
       ) : (
