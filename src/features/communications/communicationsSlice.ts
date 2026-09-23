@@ -59,6 +59,10 @@ export interface CommunicationRow {
   snippet: string;
   /** Up to 1200 characters, enough for the detail pane without a second call. */
   preview: string;
+  /** The language the writer writes in, when a contact of theirs says so.
+   *  Empty for rows nobody wrote (a question, a task) and for a writer the
+   *  company has no contact for. */
+  writer_language?: string;
   sentiment: string;
   waiting_since: string;
   waiting_days: number;

@@ -63,3 +63,65 @@ describe('ReplyBox', () => {
     expect(onSend).toHaveBeenCalledWith('Thursday works.');
   });
 });
+
+describe('ReplyBox in their language', () => {
+  function renderIn(language?: string) {
+    render(
+      <MemoryRouter>
+        <ReplyBox label="Reply" placeholder="Write your reply." hint="" sendLabel="Send reply" theirLanguage={language} onSend={vi.fn()} />
+      </MemoryRouter>
+    );
+  }
+
+  it('offers to put the draft into the language they write in', { timeout: 15000 }, async () => {
+    const calls = mockDraft(201, { text: 'Bonjour, voici la facture.', to: 'fr', detected_language: 'en', made_now: true });
+    renderIn('fr');
+    await userEvent.type(screen.getByRole('textbox'), 'Hello, here is the invoice.');
+    await userEvent.click(screen.getByRole('button', { name: /Write in French/ }));
+    expect(await screen.findByDisplayValue('Bonjour, voici la facture.')).toBeInTheDocument();
+    expect(calls[0]).toContain('/translations/');
+    expect(calls[0]).toContain('"to":"fr"');
+  });
+
+  it('says nothing about a language nobody knows', () => {
+    mockDraft();
+    renderIn(undefined);
+    expect(screen.queryByRole('button', { name: /Write in/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the draft when a translation fails', { timeout: 15000 }, async () => {
+    mockDraft(429, { detail: 'This organisation has spent its monthly model budget.' });
+    renderIn('fr');
+    await userEvent.type(screen.getByRole('textbox'), 'Hello there');
+    await userEvent.click(screen.getByRole('button', { name: /Write in French/ }));
+    expect(await screen.findByText(/monthly model budget/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Hello there')).toBeInTheDocument();
+  });
+});
+
+describe('ReplyBox protects what the person typed', () => {
+  it('keeps their words when a translation lands after they kept typing', { timeout: 15000 }, async () => {
+    let release: ((value: unknown) => void) | null = null;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ ok: true, status: 201, json: async () => ({ text: 'Bonjour.', to: 'fr', detected_language: 'en', made_now: true }) });
+        })
+      )
+    );
+    render(
+      <MemoryRouter>
+        <ReplyBox label="Reply" placeholder="Write." hint="" sendLabel="Send" theirLanguage="fr" onSend={vi.fn()} />
+      </MemoryRouter>
+    );
+    const box = screen.getByRole('textbox');
+    await userEvent.type(box, 'Hello');
+    await userEvent.click(screen.getByRole('button', { name: /Write in French/ }));
+    await userEvent.type(box, ' again');
+    release!(undefined);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByDisplayValue('Hello again')).toBeInTheDocument();
+  });
+});
