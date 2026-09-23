@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ArrowUpRight } from 'lucide-react';
 import { ReplyBox } from './ReplyBox';
+import { TranslateBlock } from '../../components/shared';
+import type { TranslatableKind } from '../../features/translation/translationApi';
 import type { CommunicationRow } from '../../features/communications/communicationsSlice';
 import { waitingTone } from '../../features/communications/communicationsSlice';
 
@@ -114,6 +116,14 @@ function ContextStrip({ row }: { row: CommunicationRow }) {
 }
 
 /** The numeric part of a row id such as "email:412". */
+// Which queue rows are a record the backend can translate. A row that is
+// not one of these keeps its plain preview.
+const TRANSLATABLE: Record<string, TranslatableKind | undefined> = {
+  email: 'email',
+  ticket: 'ticket',
+  call: 'call',
+};
+
 function recordId(row: CommunicationRow): number {
   return Number(row.id.split(':')[1]);
 }
@@ -181,9 +191,20 @@ export function DetailPane({
       </div>
 
       <div className="grow overflow-y-auto px-4.5 py-3.5">
-        <p className="text-[13px] leading-relaxed text-ink max-w-[68ch] whitespace-pre-line">
-          {row.preview}
-        </p>
+        {TRANSLATABLE[row.kind] ? (
+          // Keyed by the record: switching rows must not leave the last
+          // one's translation on screen under this one's name.
+          <TranslateBlock
+            key={row.id}
+            kind={TRANSLATABLE[row.kind]!}
+            id={recordId(row)}
+            text={row.preview}
+          />
+        ) : (
+          <p className="text-[13px] leading-relaxed text-ink max-w-[68ch] whitespace-pre-line">
+            {row.preview}
+          </p>
+        )}
       </div>
 
       {composer ? (
@@ -194,6 +215,7 @@ export function DetailPane({
           hint={composer.hint}
           sendLabel={composer.send}
           draftSource={row.kind === 'email' ? { kind: 'email', id: recordId(row) } : undefined}
+          theirLanguage={row.writer_language || undefined}
           onSend={row.action === 'reply' ? onReply : undefined}
           sending={replying}
           sent={replied}

@@ -35,6 +35,7 @@ import { GlobalPresetsPage } from './pages/settings/GlobalPresetsPage';
 import { AIAgentPage } from './pages/settings/AIAgentPage';
 import { AIAttributesPage } from './pages/settings/AIAttributesPage';
 import { BriefDeliveryPage } from './pages/settings/BriefDeliveryPage';
+import { AgentAccessPage } from './pages/settings/AgentAccessPage';
 import { EntityUploadsPage } from './pages/settings/EntityUploadsPage';
 import { WebhooksPage } from './pages/settings/WebhooksPage';
 import { Integrations } from './pages/integrations/Integrations';
@@ -383,6 +384,7 @@ function App() {
             <Route path="ai-agent" element={<AIAgentPage />} />
             <Route path="ai-attributes" element={<AIAttributesPage />} />
             <Route path="brief-delivery" element={<BriefDeliveryPage />} />
+            <Route path="agent-access" element={<AgentAccessPage />} />
           </Route>
 
           <Route path="account-settings" element={<SettingsLayout />}>

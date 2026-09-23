@@ -285,6 +285,19 @@ scoped server-side by department.
    one records an ordinary contribution and closes the gap; a gap not worth
    answering can be dismissed.
 
+### 4.5e Reading in your language, writing in theirs (Communications)
+
+1. An email, ticket or call in the queue detail pane carries a Translate
+   control with a language picker. The original shows until somebody asks;
+   the translation then replaces it with a line saying what it was written
+   in, and "Show original" puts it back.
+2. Translating the same message again costs nothing: the backend keeps it
+   per record per language, and the pane keeps what it has already asked
+   for.
+3. When the contact's own language is known, the reply box offers "Write in
+   French" (or whichever): it puts the draft into their language in place.
+   The person still reads it and still presses send.
+
 ### 4.5f Brief delivery (Settings > Brief Delivery)
 
 1. `/settings/brief-delivery`. An admin pastes a Slack incoming webhook and
@@ -296,6 +309,17 @@ scoped server-side by department.
 3. "Send one now" proves a new schedule without waiting a week. It reports
    plainly when no brief has been written yet, because the schedule posts
    what exists and never writes one itself.
+
+### 4.5g Agent access (Settings > Agent Access)
+
+1. `/settings/agent-access`. Anyone can make a key for an agent that reads
+   Revenact as them over MCP: it sees their book, their mail and their
+   department's tickets, and cannot change anything.
+2. The secret is shown once, on the screen that made it, with a copy
+   button and a plain warning that nobody can recover it afterwards.
+3. The list shows each key by name, its last four characters, when it was
+   made and when it was last used. Revoking asks first and takes effect
+   immediately.
 
 ### 4.6 Copilot and multiplayer sessions
 
