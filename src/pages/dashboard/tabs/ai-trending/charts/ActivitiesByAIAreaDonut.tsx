@@ -3,6 +3,7 @@ import type { InteractionBucket } from '../../../../../features/interactions/int
 import { AREA_COLORS, FALLBACK_COLOR, percentOf } from '../chartTheme';
 import { UnclassifiedNote } from './UnclassifiedNote';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 /** Classified interactions by AI Area — which side of the business owns the
  *  conversation.
@@ -76,11 +77,7 @@ export function ActivitiesByAIAreaDonut({
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{
-                borderRadius: '8px',
-                border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-              }}
+              contentStyle={TOOLTIP_STYLE}
               itemStyle={{ fontSize: '13px', fontWeight: 500 }}
             />
           </PieChart>

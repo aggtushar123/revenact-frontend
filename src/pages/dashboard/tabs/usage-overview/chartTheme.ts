@@ -3,21 +3,29 @@
 // Colour lives here rather than in the payload, the same arrangement the other
 // dashboards use — the backend returns names and numbers and has no opinion
 // about the theme.
+//
+// The actual colours and axis helpers live in the dashboard-wide
+// `shared/chartPalette.ts` now — re-exported here so every chart in this tab
+// keeps importing from `./chartTheme` rather than reaching across tabs.
+import { ROLE, niceMax } from '../../shared/chartPalette';
+
+export { niceMax };
 
 /**
  * The utilisation bands, coloured by what they mean commercially rather than
  * by position on a scale: red is money going to waste, green is money working,
- * and blue is the top end — an account out of room is *good* news with an
- * action attached, and colouring it like a problem would bury the expansion
- * list at the bottom of the screen.
+ * and ink is the top end — at-capacity and over are ink rather than a warm
+ * colour because an account out of room is an *opportunity* with an action
+ * attached, not a state to alarm on, and colouring it like a problem would
+ * bury the expansion list at the bottom of the screen.
  */
 export const BAND_COLORS: Record<string, string> = {
-  dormant: 'var(--danger)',
-  low: 'var(--warning)',
-  fair: 'var(--warning)',
-  healthy: 'var(--success)',
-  at_capacity: 'var(--info)',
-  over: 'var(--accent)',
+  dormant: ROLE.loss,
+  low: ROLE.caution,
+  fair: ROLE.muted,
+  healthy: ROLE.gain,
+  at_capacity: ROLE.ink,
+  over: ROLE.ink,
 };
 
 /** Short axis labels. The API's own names carry their range ("Dormant
@@ -31,13 +39,4 @@ export const BAND_SHORT: Record<string, string> = {
   over: 'Over',
 };
 
-export const FALLBACK_COLOR = 'var(--text-tertiary)';
-
-/** Recharts needs a numeric domain, and a hard-coded maximum silently clips
- *  real data. Rounds up to a clean boundary above the data. */
-export function niceMax(values: number[], fallback = 10): number {
-  const peak = Math.max(0, ...values);
-  if (peak <= 0) return fallback;
-  const magnitude = 10 ** Math.floor(Math.log10(peak));
-  return Math.ceil(peak / magnitude) * magnitude;
-}
+export const FALLBACK_COLOR = ROLE.faint;

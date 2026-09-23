@@ -2,6 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { TicketBucket } from '../../../../../features/tickets/ticketsSlice';
 import { PRIORITY_COLORS, FALLBACK_COLOR } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 export function PriorityDonut({ data }: { data: TicketBucket[] }) {
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
@@ -64,8 +65,8 @@ export function PriorityDonut({ data }: { data: TicketBucket[] }) {
                 <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.name] ?? FALLBACK_COLOR} />
               ))}
             </Pie>
-            <Tooltip 
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               formatter={(value: any) => [value, 'Count']}
             />

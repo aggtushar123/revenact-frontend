@@ -15,6 +15,7 @@ import {
   formatMoney,
 } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
 
 export interface ProductChurnChartProps {
   rows: ProductRow[];
@@ -105,12 +106,8 @@ export function ProductChurnChart({ rows, currency }: ProductChurnChartProps) {
                 tickFormatter={(value: number) => `${value}%`}
               />
               <Tooltip
-                cursor={{ fill: 'var(--bg-subtle)' }}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
-                }}
+                cursor={{ fill: CURSOR_FILL }}
+                contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
                 formatter={(value, name, item) =>
                   name === 'rate'
                     ? [`${value}% of everyone it ever led`, item?.payload?.name ?? '']
@@ -134,7 +131,7 @@ export function ProductChurnChart({ rows, currency }: ProductChurnChartProps) {
                 yAxisId="rate"
                 type="monotone"
                 dataKey="rate"
-                stroke="var(--ink, #111827)"
+                stroke={ROLE.ink}
                 strokeWidth={2}
                 dot={{ r: 2 }}
               />

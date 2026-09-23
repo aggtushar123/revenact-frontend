@@ -15,6 +15,7 @@ import type { UsageAccount } from '../../../../../features/usage/usageSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { BAND_COLORS, FALLBACK_COLOR, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { ROLE, TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 export interface UsageScatterProps {
   points: UsageAccount[];
@@ -114,23 +115,19 @@ export function UsageScatter({
               />
               <ReferenceLine
                 x={capacityFloor}
-                stroke="var(--info)"
+                stroke={ROLE.ink}
                 strokeDasharray="4 4"
                 label={{
                   value: `${capacityFloor}%`,
                   position: 'top',
-                  fill: 'var(--info)',
+                  fill: ROLE.ink,
                   fontSize: 10,
                 }}
               />
 
               <Tooltip
                 cursor={{ strokeDasharray: '3 3' }}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
-                }}
+                contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
                 formatter={(_value, _name, item) => {
                   const point = item?.payload?.point as UsageAccount | undefined;
                   if (!point) return ['', ''];

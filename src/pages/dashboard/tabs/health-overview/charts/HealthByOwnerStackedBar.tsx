@@ -4,6 +4,7 @@ import { BarChart, Bar, LabelList, XAxis, YAxis, Tooltip, ResponsiveContainer } 
 import type { HealthDataRow, HealthStatus } from '../mockData';
 import { HEALTH_ORDER, healthByOwner } from '../controls';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
 
 const STATUS_COLORS: Record<HealthStatus, string> = {
   Poor: 'var(--danger)',
@@ -64,14 +65,8 @@ export function HealthByOwnerStackedBar({ data }: { data: HealthDataRow[] }) {
                 tick={{ fontSize: 11, fill: 'var(--text-secondary)', fontWeight: 500 }}
               />
               <Tooltip
-                cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default)',
-                  boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)',
-                  backgroundColor: 'var(--bg-elevated)',
-                  color: 'var(--text-primary)',
-                }}
+                cursor={{ fill: CURSOR_FILL }}
+                contentStyle={TOOLTIP_STYLE}
                 formatter={(value, name) => [
                   `${value} ${Number(value) === 1 ? 'account' : 'accounts'}`,
                   name,

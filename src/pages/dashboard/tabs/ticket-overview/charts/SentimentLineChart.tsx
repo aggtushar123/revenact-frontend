@@ -2,6 +2,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import type { TicketSentimentPoint } from '../../../../../features/tickets/ticketsSlice';
 import { niceMax, ticksTo } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 export function SentimentLineChart({ data }: { data: TicketSentimentPoint[] }) {
   // The mock's domain={[0, 100]} clipped any month past 100 tickets.
@@ -29,8 +30,8 @@ export function SentimentLineChart({ data }: { data: TicketSentimentPoint[] }) {
               domain={[0, max]}
               ticks={ticksTo(max, 5)}
             />
-            <Tooltip 
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
             />
             <Line {...STATIC_SERIES}
               type="linear" 

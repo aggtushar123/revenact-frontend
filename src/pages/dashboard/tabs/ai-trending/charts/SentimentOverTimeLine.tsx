@@ -2,6 +2,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tool
 import type { SentimentPoint } from '../../../../../features/interactions/interactionsSlice';
 import { SENTIMENT_SERIES, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 /** How many weeks the line shows. A year of weekly points is 52 ticks on an axis
  *  about 700px wide, which is unreadable; the most recent half-year is what a
@@ -50,11 +51,7 @@ export function SentimentOverTimeLine({ data }: { data: SentimentPoint[] }) {
                 domain={[0, max]}
               />
               <Tooltip
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: 'none',
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                }}
+                contentStyle={TOOLTIP_STYLE}
               />
               <Legend verticalAlign="top" height={24} iconType="plainline" />
 

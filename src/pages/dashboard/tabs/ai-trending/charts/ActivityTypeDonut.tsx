@@ -2,6 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { InteractionBucket } from '../../../../../features/interactions/interactionsSlice';
 import { SOURCE_COLORS, FALLBACK_COLOR, percentOf } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 /** Interactions by where they came from: email, call or ticket.
  *
@@ -52,11 +53,7 @@ export function ActivityTypeDonut({ data }: { data: InteractionBucket[] }) {
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{
-                borderRadius: '8px',
-                border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-              }}
+              contentStyle={TOOLTIP_STYLE}
               itemStyle={{ fontSize: '13px', fontWeight: 500 }}
             />
           </PieChart>

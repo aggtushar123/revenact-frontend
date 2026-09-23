@@ -1,16 +1,19 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { ActivityWeek, SourceCount } from '../../../../../features/activity/activitySlice';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { ROLE, TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 /** One colour per source. Not semantic — a note is not better or worse than a
  *  call — so these are five distinguishable hues rather than a red-to-green
- *  scale, which would imply a ranking that doesn't exist. */
+ *  scale, which would imply a ranking that doesn't exist. Warning/success are
+ *  legacy hues kept for `calls`/`emails`; `meetings`/`activities` use the
+ *  monochrome scale directly now that `info` is no longer a series colour. */
 const SOURCE_SERIES = [
   { key: 'calls', label: 'Calls', color: 'var(--warning)' },
-  { key: 'meetings', label: 'Meetings', color: 'var(--accent)' },
-  { key: 'activities', label: 'Activities', color: 'var(--info)' },
+  { key: 'meetings', label: 'Meetings', color: ROLE.ink },
+  { key: 'activities', label: 'Activities', color: ROLE.muted },
   { key: 'emails', label: 'Emails', color: 'var(--success)' },
-  { key: 'notes', label: 'Notes', color: 'var(--text-tertiary)' },
+  { key: 'notes', label: 'Notes', color: ROLE.faint },
 ] as const;
 
 export interface TouchTimelineProps {
@@ -81,11 +84,7 @@ export function TouchTimeline({ weeks, sources, inbound, windowDays }: TouchTime
                 tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
               />
               <Tooltip
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
-                }}
+                contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               />
               <Legend verticalAlign="top" height={22} iconType="plainline" />
               {SOURCE_SERIES.map((series) => (

@@ -2,6 +2,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import type { TicketAssigneeRow } from '../../../../../features/tickets/ticketsSlice';
 import { STATUS_COLORS, STATUS_ORDER, FALLBACK_COLOR, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+
+// STATUS_COLORS spans the whole ink/muted/faint/gain scale, so no single
+// text colour sits safely on every segment — white reads fine on the darker
+// ink/muted/gain fills but disappears into the light faint ones. These are
+// the two statuses that map to the light end (`On Hold`, `Closed`, both
+// `ROLE.faint`); their labels use dark ink text instead of the on-accent
+// white the other segments use.
+const LIGHT_BG_STATUSES = new Set(['On Hold', 'Closed']);
 
 export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
   // The mock's domain={[0, 80]} clipped any assignee past 80 tickets.
@@ -13,14 +22,15 @@ export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
     const ny = Number(y) || 0;
     const nw = Number(width) || 0;
     const nh = Number(height) || 0;
-    
+
     const nVal = payload && dataKey ? Number(payload[dataKey]) : 0;
 
     if (!nVal || nVal <= 0) return null;
     if (nw < 20) return null; // hide label if slice is too thin
-    
+
+    const fill = LIGHT_BG_STATUSES.has(dataKey) ? ROLE.ink : 'var(--color-on-accent)';
     return (
-      <text x={nx + nw / 2} y={ny + nh / 2} fill="#ffffff" fontSize={10} fontWeight={600} textAnchor="middle" dy={4}>
+      <text x={nx + nw / 2} y={ny + nh / 2} fill={fill} fontSize={10} fontWeight={600} textAnchor="middle" dy={4}>
         {nVal}
       </text>
     );
@@ -50,9 +60,9 @@ export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
               width={110}
               tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 500 }}
             />
-            <Tooltip 
-              cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            <Tooltip
+              cursor={{ fill: CURSOR_FILL }}
+              contentStyle={TOOLTIP_STYLE}
             />
 
             {/* Total Label Hack: Invisible un-stacked bar reaching the row end */}
