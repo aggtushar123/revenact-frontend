@@ -246,7 +246,22 @@ describe('Ticket Overview', () => {
     renderTickets();
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(lastUrl(fetchMock)).not.toContain('?');
+    // Every call, not just the last — a stray query on an earlier fetch
+    // (e.g. a double fetch on mount) would otherwise go unnoticed.
+    for (const call of fetchMock.mock.calls) {
+      expect(String(call[0])).not.toContain('?');
+    }
+  });
+
+  it('treats a malformed days value as absent rather than crashing', async () => {
+    // A hand-edited or corrupted link (?days=abc) used to reach
+    // isoDaysAgo(NaN), whose toISOString() throws mid-render.
+    const fetchMock = mockFetch();
+    renderTickets('/dashboard/support/tickets?days=abc');
+
+    await screen.findByText('Total Ticket Volume');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(lastUrl(fetchMock)).not.toContain('from=');
   });
 });
 

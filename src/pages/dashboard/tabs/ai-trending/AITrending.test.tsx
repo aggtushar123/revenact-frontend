@@ -281,15 +281,50 @@ describe('AI Trending Topics', () => {
     expect(lastUrl(fetchMock)).not.toContain('subcategory=');
   });
 
-  it('never sends a subcategory left over from a different category, even on the first load', async () => {
-    // Landing on a URL where the two params already disagree (a stale
-    // bookmark, a back-navigation) must not leak the stale value into the
-    // very first fetch either.
+  it('keeps a valid deep-linked category+subcategory through the first fetch and after options load', async () => {
+    // Before the stats response lands, `options` (and so `subcategories`) is
+    // undefined — there is no way yet to know whether the URL's subcategory
+    // belongs to the URL's category, so a good deep link must not be judged
+    // invalid and thrown away before it gets the chance to be confirmed.
+    const fetchMock = mockFetch();
+    renderTopics('/dashboard/support/topics?category=bug_report&subcategory=ui_bug');
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(String(fetchMock.mock.calls[0][0])).toContain('subcategory=ui_bug');
+
+    await screen.findByLabelText('AI Subcategory');
+    await waitFor(() =>
+      expect(screen.getByLabelText('AI Subcategory')).toHaveValue('ui_bug')
+    );
+
+    // Confirmed valid once options load — it never drops out afterwards.
+    for (const call of fetchMock.mock.calls) {
+      expect(String(call[0])).toContain('subcategory=ui_bug');
+    }
+  });
+
+  it('drops a deep-linked subcategory that turns out to belong to a different category, once options load', async () => {
+    // ui_bug belongs to bug_report, not onboarding, in this fixture. Before
+    // options load that can't be known, so the very first fetch is allowed to
+    // still carry the URL's value through unfiltered; once the stats response
+    // proves it stale, the URL is cleaned up and nothing fetched afterwards
+    // may carry it.
     const fetchMock = mockFetch();
     renderTopics('/dashboard/support/topics?category=onboarding&subcategory=ui_bug');
 
-    await waitFor(() => expect(lastUrl(fetchMock)).toContain('category=onboarding'));
-    expect(lastUrl(fetchMock)).not.toContain('subcategory=');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(String(fetchMock.mock.calls[0][0])).toContain('subcategory=ui_bug');
+
+    await screen.findByLabelText('AI Subcategory');
+    await waitFor(() =>
+      expect(screen.getByLabelText('AI Subcategory')).toHaveValue('')
+    );
+
+    const afterLoad = fetchMock.mock.calls.slice(1);
+    expect(afterLoad.length).toBeGreaterThan(0);
+    for (const call of afterLoad) {
+      expect(String(call[0])).not.toContain('subcategory=');
+    }
   });
 
   it('counts the active filters and clears them all', async () => {

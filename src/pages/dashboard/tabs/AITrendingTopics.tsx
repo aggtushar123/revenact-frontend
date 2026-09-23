@@ -25,6 +25,13 @@ export function AITrendingTopics() {
   const options = useAppSelector((state) => state.interactions.stats?.filters);
   const { values, set } = useDashboardFilters(KEYS);
 
+  // Filter options arrive with the stats response, so on the very first
+  // render (before that response lands) `options` is undefined and there is
+  // no way to know yet whether a deep-linked subcategory belongs to the
+  // chosen category. Judging it invalid at that point would delete a
+  // perfectly good deep link before it ever got a chance to prove itself.
+  const loaded = options?.subcategories !== undefined;
+
   /** Subcategories are narrowed to the chosen category, because offering
    *  twenty-five values of which three can match is worse than offering three.
    *  With no category chosen they are all on offer, since picking one on its
@@ -34,23 +41,26 @@ export function AITrendingTopics() {
   );
   const subcategoryValid = subcategoryOptions.some((s) => s.value === values.subcategory);
 
-  // A category change (or landing on a stale link) can leave a subcategory
-  // behind that no longer belongs to it. The query below already never sends
-  // it, but the URL itself is cleaned up too, so the chip doesn't keep
-  // pointing at a value it no longer offers.
+  // A category change (or a stale link) can leave a subcategory behind that
+  // no longer belongs to it. Once the options have loaded and proven it
+  // stale, the URL is cleaned up too, so the chip doesn't keep pointing at a
+  // value it no longer offers.
   useEffect(() => {
-    if (values.subcategory && !subcategoryValid) {
+    if (loaded && values.subcategory && !subcategoryValid) {
       set('subcategory', '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values.category, values.subcategory, subcategoryValid]);
+  }, [loaded, values.category, values.subcategory, subcategoryValid]);
 
   let query = toQuery({
     type: values.type,
     sentiment: values.sentiment,
     area: values.area,
     category: values.category,
-    subcategory: subcategoryValid ? values.subcategory : '',
+    // Before the options load, pass the URL's subcategory through
+    // unfiltered rather than guessing it's invalid; once loaded, send it
+    // only if it's confirmed to belong to the chosen category.
+    subcategory: loaded ? (subcategoryValid ? values.subcategory : '') : values.subcategory,
     revenue_bracket: values.revenue_bracket,
   });
 

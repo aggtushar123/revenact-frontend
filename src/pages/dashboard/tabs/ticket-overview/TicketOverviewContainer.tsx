@@ -24,6 +24,12 @@ function isoDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** The `days` values a preset actually offers — anything else in the URL
+ *  (a hand-edited link, `?days=abc`) is nonsense rather than a filter, and
+ *  is treated the same as no `days` key at all rather than crashing
+ *  `isoDaysAgo` with `NaN`. */
+const DATE_PRESET_DAYS = DATE_PRESETS.map((p) => String(p.days ?? ''));
+
 const KEYS = ['days', 'owner', 'priority', 'customer'];
 
 /**
@@ -47,7 +53,7 @@ export function TicketOverviewContainer() {
 
   const base = toQuery({ owner: values.owner, priority: values.priority, customer: values.customer });
   let query = base;
-  if (values.days) {
+  if (values.days && DATE_PRESET_DAYS.includes(values.days)) {
     const params = new URLSearchParams(base);
     params.set('from', isoDaysAgo(Number(values.days)));
     query = params.toString();
