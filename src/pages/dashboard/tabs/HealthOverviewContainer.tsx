@@ -1,7 +1,13 @@
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import { useAppDispatch } from '../../../hooks';
-import { clearHealthFilters, setHealthFilter } from '../../../features/health/healthSlice';
+import { useAppDispatch, useAppSelector } from '../../../hooks';
+import {
+  FILTER_ORDER,
+  clearHealthFilters,
+  pruneFilters,
+  replaceHealthFilters,
+} from '../../../features/health/healthSlice';
+import type { HealthFilters } from '../../../features/health/healthSlice';
 import { DashboardToolbar } from '../shared/DashboardToolbar';
 import { SHARED_KEYS, useDashboardFilters } from '../shared/useDashboardFilters';
 import { useSubViews } from '../useSubViews';
@@ -26,18 +32,48 @@ const choices = (options: FilterOption[]) => [
  * and writes it — and this container mirrors it into `state.health` on every
  * change, because the views and their tests already read filters from Redux.
  * URL `customer` is Redux `account`: both are a customer id.
+ *
+ * The copy is exact (`replaceHealthFilters`, no pruning): a deep link can
+ * arrive before the book does, and pruning against no rows would drop every
+ * filter in Redux while the URL, the chips and the Clear count still showed
+ * it. A combination the loaded book cannot honour is fixed in the URL itself,
+ * so every reader of the URL — chips, Clear, other areas — agrees.
  */
 export function HealthOverviewContainer() {
   const dispatch = useAppDispatch();
   const subViews = useSubViews();
-  const { values } = useDashboardFilters(SHARED_KEYS);
+  const { values, clear } = useDashboardFilters(SHARED_KEYS);
   const { owners, lifecycles, accounts, rows, totalCount } = useHealthOverview();
+  const book = useAppSelector((state) => state.health.rows);
+  const loadedAt = useAppSelector((state) => state.health.loadedAt);
 
   useEffect(() => {
-    dispatch(setHealthFilter({ key: 'owner', value: values.owner || null }));
-    dispatch(setHealthFilter({ key: 'lifecycle', value: values.lifecycle || null }));
-    dispatch(setHealthFilter({ key: 'account', value: values.customer || null }));
+    dispatch(
+      replaceHealthFilters({
+        owner: values.owner || null,
+        lifecycle: values.lifecycle || null,
+        account: values.customer || null,
+      }),
+    );
   }, [dispatch, values.owner, values.lifecycle, values.customer]);
+
+  // Once a book has loaded, drop from the URL any filter it cannot honour —
+  // narrowest first, per `pruneFilters` (an account the chosen owner doesn't
+  // hold, an owner who has left). Never before a load: no rows yet is not
+  // "nothing matches".
+  useEffect(() => {
+    if (loadedAt === null) return;
+    const wanted: HealthFilters = {
+      owner: values.owner || null,
+      lifecycle: values.lifecycle || null,
+      account: values.customer || null,
+    };
+    const kept = pruneFilters(book, wanted);
+    const drop = FILTER_ORDER.filter((key) => wanted[key] !== kept[key]).map((key) =>
+      key === 'account' ? 'customer' : key,
+    );
+    if (drop.length > 0) clear(drop);
+  }, [book, loadedAt, values.owner, values.lifecycle, values.customer, clear]);
 
   // The URL stays the only source of truth: without this, leaving Health
   // would leave a stale filter sitting in Redux, narrowing whatever reads

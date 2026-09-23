@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { healthRow, renderHealthAt, renderWithHealth } from './testUtils';
@@ -395,6 +395,39 @@ describe('URL filters', () => {
     });
 
     expect(await screen.findByText('1 of 2 accounts')).toBeInTheDocument();
+  });
+
+  it('applies a deep-linked filter once the book arrives after mount', async () => {
+    // Cold load: nothing in the store yet, the fetch still in flight. The
+    // URL filter must survive until the rows land rather than being pruned
+    // against an empty book.
+    const { store } = renderHealthAt('/dashboard/health/triage?owner=7', {
+      rows: [],
+      loaded: false,
+      isLoading: true,
+    });
+
+    act(() => {
+      store.dispatch({
+        type: 'health/fetchHealthOverview/fulfilled',
+        payload: { rows: BOOK, historyMonths: 12, truncated: false, currency: 'USD', unconvertedCount: 0 },
+      });
+    });
+
+    expect(await screen.findByText('1 of 3 accounts')).toBeInTheDocument();
+    expect(screen.getByText('Nova Enterprises')).toBeInTheDocument();
+    expect(screen.queryByText('Hyatt Hotels')).not.toBeInTheDocument();
+  });
+
+  it('clears a filter the loaded book cannot honour from the URL, not just from Redux', async () => {
+    // Owner 3 does not hold account 1: the narrower key gives way, and it
+    // goes from the URL so the chip, the Clear count and other areas agree.
+    renderHealthAt('/dashboard/health/triage?owner=3&customer=1', { rows: BOOK });
+
+    expect(await screen.findByText('1 of 3 accounts')).toBeInTheDocument();
+    expect(screen.getByText('Hyatt Hotels')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear 1' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Account')).toHaveValue('');
   });
 });
 
