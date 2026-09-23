@@ -349,7 +349,8 @@ export function Navbar() {
                 { name: 'Global Presets', path: '/settings/global-presets' },
                 { name: 'Connect Widget', path: '/settings/connect-widget' },
                 { name: 'AI Agent', path: '/settings/ai-agent' },
-                { name: 'AI Attributes', path: '/settings/ai-attributes' }
+                { name: 'AI Attributes', path: '/settings/ai-attributes' },
+                { name: 'Agent Access', path: '/settings/agent-access' }
               ].map((tab) => (
                 <NavLink 
                   key={tab.path}
