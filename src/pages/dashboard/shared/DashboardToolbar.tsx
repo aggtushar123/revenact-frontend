@@ -49,8 +49,12 @@ export function DashboardToolbar({
           {subViews.map((view) => (
             <NavLink
               key={view.path}
-              to={{ pathname: `../${view.path}`, search }}
-              relative="path"
+              // `view.path` is the area's absolute path (`AreaLayout`
+              // builds it), not a bare segment — resolving it relative to
+              // wherever this toolbar happens to be mounted is what broke
+              // it in production, where a pathless container sits between
+              // the area route and the view.
+              to={{ pathname: view.path, search }}
               className={({ isActive }) =>
                 `min-h-8 px-3 inline-flex items-center rounded-md text-[13px] font-semibold transition-colors duration-[var(--dur-fast)] ${
                   isActive ? 'bg-accent text-on-accent' : 'text-ink-muted hover:text-ink hover:bg-subtle'

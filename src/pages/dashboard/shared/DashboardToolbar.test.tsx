@@ -23,7 +23,10 @@ function renderAt(url: string) {
           element={
             <>
               <DashboardToolbar
-                subViews={[{ label: 'Usage', path: 'usage' }, { label: 'Activity', path: 'activity' }]}
+                subViews={[
+                  { label: 'Usage', path: '/dashboard/health/usage' },
+                  { label: 'Activity', path: '/dashboard/health/activity' },
+                ]}
                 filters={filters}
                 defaults={{ days: '90' }}
                 count="3 of 9 accounts"

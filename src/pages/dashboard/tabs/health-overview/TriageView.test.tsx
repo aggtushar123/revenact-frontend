@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { renderWithHealth } from './testUtils';
+import { renderWithHealth, renderHealthAt } from './testUtils';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { TriageView } from './TriageView';
@@ -139,6 +139,36 @@ describe('Health Overview routing', () => {
   // (`DashboardToolbar`, fed by `AREAS` in `areas.ts`), which has its own
   // tests — the container no longer renders a tab bar of its own for this
   // to reach through.
+
+  // DashboardToolbar's own test mounts it one level deep
+  // (`/dashboard/health/:view`), which doesn't match production: the real
+  // tree is `health` (AreaLayout) -> a pathless container route -> the view
+  // route. Only this shape — the real route tree, via `renderHealthAt` —
+  // catches a toolbar link that resolves against the wrong ancestor.
+  it('links every sub-view to its own area path through the real route tree', () => {
+    renderHealthAt('/dashboard/health/triage', { rows: BOOK });
+
+    const nav = screen.getByRole('navigation', { name: /views/i });
+    expect(within(nav).getByRole('link', { name: 'Triage' })).toHaveAttribute(
+      'href',
+      '/dashboard/health/triage',
+    );
+    expect(within(nav).getByRole('link', { name: 'Triage' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'Divergence' })).toHaveAttribute(
+      'href',
+      '/dashboard/health/divergence',
+    );
+    expect(within(nav).getByRole('link', { name: 'Divergence' })).not.toHaveAttribute(
+      'aria-current',
+    );
+    expect(within(nav).getByRole('link', { name: 'Distribution' })).toHaveAttribute(
+      'href',
+      '/dashboard/health/distribution',
+    );
+  });
 });
 
 describe('TriageView data states', () => {
