@@ -19,7 +19,11 @@ import { scoreRow } from './triage';
 // never on a specific account or count. (The scoring itself is pinned to
 // fixtures in triage.test.ts.)
 
-const rows = () => screen.queryAllByRole('listitem');
+// Scoped to the risk-score list specifically: the KPI strip above it also
+// renders `<li>` items now that `TriageTiles` shares `KpiStrip`, so an
+// unscoped `listitem` query would double-count them as queue rows.
+const queue = () => screen.getByRole('list', { name: /accounts by risk score/i });
+const rows = () => within(queue()).queryAllByRole('listitem');
 const statusOf = (row: HTMLElement) =>
   within(row).getByText(/^(Poor|Average|Good)$/).textContent as 'Poor' | 'Average' | 'Good';
 

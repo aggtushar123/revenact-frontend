@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../../hooks';
 import { fetchProductUsage } from '../../../../features/products/productsSlice';
 import { formatCompactMoney } from '../../../../features/customers/formatters';
+import { Kpi, KpiStrip } from '../../shared/Kpi';
 import { ProductMoneyChart } from './charts/ProductMoneyChart';
 import { ProductChurnChart } from './charts/ProductChurnChart';
 import { ProductScorecard } from './charts/ProductScorecard';
@@ -10,36 +11,6 @@ import { ProductScorecard } from './charts/ProductScorecard';
 /** The filter query string, handed down by ProductUsageContainer's bar. */
 export interface ProductUsageContext {
   query: string;
-}
-
-interface TileProps {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: 'neutral' | 'danger' | 'success';
-}
-
-function Tile({ label, value, detail, tone = 'neutral' }: TileProps) {
-  const accent = {
-    neutral: 'border-l-info',
-    danger: 'border-l-danger',
-    success: 'border-l-success',
-  }[tone];
-  const figure = { neutral: 'text-ink', danger: 'text-danger', success: 'text-success' }[tone];
-
-  return (
-    <div
-      className={`bg-surface border border-line-subtle rounded-lg shadow-sm px-[13px] py-[11px] border-l-[3px] ${accent}`}
-    >
-      <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">{label}</div>
-      <div
-        className={`text-[25px] font-semibold leading-tight tracking-tight mt-[3px] tabular-nums ${figure}`}
-      >
-        {value}
-      </div>
-      <div className="text-[11px] text-ink-muted mt-[1px]">{detail}</div>
-    </div>
-  );
 }
 
 /**
@@ -109,8 +80,8 @@ export function ControlsView() {
           isLoading && stats ? 'opacity-60' : ''
         }`}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          <Tile
+        <KpiStrip>
+          <Kpi
             label="Products"
             value={kpis ? String(kpis.products) : '—'}
             detail={
@@ -119,7 +90,7 @@ export function ControlsView() {
                 : 'loading'
             }
           />
-          <Tile
+          <Kpi
             label="Largest"
             value={kpis?.largest ? `${kpis.largest.share}%` : '—'}
             detail={
@@ -128,7 +99,7 @@ export function ControlsView() {
                 : 'no priced customers'
             }
           />
-          <Tile
+          <Kpi
             label="Most at stake"
             value={kpis?.weakest ? money(kpis.weakest.unhealthy_arr) : '—'}
             detail={
@@ -136,9 +107,9 @@ export function ControlsView() {
                 ? `${kpis.weakest.product} · ${kpis.weakest.healthy ?? 0} of ${kpis.weakest.customers} healthy`
                 : 'every product is in good health'
             }
-            tone={kpis?.weakest ? 'danger' : 'success'}
+            tone={kpis?.weakest ? 'loss' : 'neutral'}
           />
-          <Tile
+          <Kpi
             label="Worst churn"
             value={kpis?.worst_churn ? money(kpis.worst_churn.churned_arr) : '—'}
             detail={
@@ -146,9 +117,9 @@ export function ControlsView() {
                 ? `${kpis.worst_churn.product} · ${kpis.worst_churn.churned} left`
                 : 'no churn on any product'
             }
-            tone={kpis?.worst_churn ? 'danger' : 'success'}
+            tone={kpis?.worst_churn ? 'loss' : 'neutral'}
           />
-        </div>
+        </KpiStrip>
 
         <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
           {stats && <ProductMoneyChart rows={stats.rows} currency={currency} />}

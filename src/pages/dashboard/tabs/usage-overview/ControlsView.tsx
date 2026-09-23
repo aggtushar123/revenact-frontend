@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../../hooks';
 import { fetchUsageStats } from '../../../../features/usage/usageSlice';
 import { formatCompactMoney } from '../../../../features/customers/formatters';
+import { Kpi, KpiStrip } from '../../shared/Kpi';
 import { UtilisationBandChart } from './charts/UtilisationBandChart';
 import { UsageScatter } from './charts/UsageScatter';
 import { AccountUsageList } from './charts/AccountUsageList';
@@ -11,34 +12,6 @@ import { AdoptionBreadthChart } from './charts/AdoptionBreadthChart';
 /** The filter query string, handed down by UsageOverviewContainer's own bar. */
 export interface UsageOverviewContext {
   query: string;
-}
-
-interface TileProps {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: 'neutral' | 'danger' | 'info';
-}
-
-function Tile({ label, value, detail, tone = 'neutral' }: TileProps) {
-  const accent = { neutral: 'border-l-line-strong', danger: 'border-l-danger', info: 'border-l-info' }[
-    tone
-  ];
-  const figure = { neutral: 'text-ink', danger: 'text-danger', info: 'text-info' }[tone];
-
-  return (
-    <div
-      className={`bg-surface border border-line-subtle rounded-lg shadow-sm px-[13px] py-[11px] border-l-[3px] ${accent}`}
-    >
-      <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">{label}</div>
-      <div
-        className={`text-[25px] font-semibold leading-tight tracking-tight mt-[3px] tabular-nums ${figure}`}
-      >
-        {value}
-      </div>
-      <div className="text-[11px] text-ink-muted mt-[1px]">{detail}</div>
-    </div>
-  );
 }
 
 /**
@@ -84,8 +57,8 @@ export function ControlsView() {
           isLoading && stats ? 'opacity-60' : ''
         }`}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          <Tile
+        <KpiStrip>
+          <Kpi
             label="Seat utilisation"
             value={kpis?.utilisation === null || kpis === undefined ? '—' : `${kpis.utilisation}%`}
             detail={
@@ -94,15 +67,14 @@ export function ControlsView() {
                 : 'loading'
             }
           />
-          <Tile
+          <Kpi
             label="Shelfware"
             value={kpis ? money(kpis.shelfware_arr) : '—'}
             detail={
               kpis ? `${kpis.idle_seats.toLocaleString()} idle seats, below 75% used` : 'loading'
             }
-            tone="danger"
           />
-          <Tile
+          <Kpi
             label="At capacity"
             value={kpis ? money(kpis.at_capacity_arr) : '—'}
             detail={
@@ -110,9 +82,8 @@ export function ControlsView() {
                 ? `${kpis.at_capacity_count} ${kpis.at_capacity_count === 1 ? 'account is' : 'accounts are'} out of room`
                 : 'loading'
             }
-            tone="info"
           />
-          <Tile
+          <Kpi
             label="No seat data"
             value={kpis ? String(kpis.unmeasured_count) : '—'}
             detail={
@@ -121,7 +92,7 @@ export function ControlsView() {
                 : 'loading'
             }
           />
-        </div>
+        </KpiStrip>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">

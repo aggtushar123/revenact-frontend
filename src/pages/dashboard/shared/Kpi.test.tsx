@@ -33,4 +33,33 @@ describe('Kpi', () => {
     );
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
+
+  it('KpiStrip drops a conditionally-absent child instead of rendering an empty item', () => {
+    const showThird = false;
+    render(
+      <KpiStrip>
+        <Kpi label="a" value="1" />
+        <Kpi label="b" value="2" />
+        {showThird && <Kpi label="c" value="3" />}
+      </KpiStrip>,
+    );
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+});
+
+describe('dashboard Tile guard', () => {
+  it('no dashboard view defines its own Tile', () => {
+    const modules = import.meta.glob('../tabs/**/*.tsx', {
+      query: '?raw',
+      eager: true,
+      import: 'default',
+    }) as Record<string, string>;
+
+    const offenders = Object.entries(modules)
+      .filter(([file]) => !file.endsWith('.test.tsx'))
+      .filter(([, source]) => /function Tile\(/.test(source))
+      .map(([file]) => file);
+
+    expect(offenders).toEqual([]);
+  });
 });

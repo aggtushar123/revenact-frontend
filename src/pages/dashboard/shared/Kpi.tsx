@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { Children, type ReactNode } from 'react';
 
 const FIGURE_TONE = {
   neutral: 'text-ink',
@@ -33,7 +33,9 @@ export function Kpi({
 
 /** Four across from `md`, two below, separated by hairlines rather than boxes. */
 export function KpiStrip({ children }: { children: ReactNode }) {
-  const items = Array.isArray(children) ? children : [children];
+  // `Children.toArray` (rather than `Array.isArray`) drops `null`/`false`, so
+  // a conditionally-rendered `cond && <Kpi/>` never leaves an empty `<li>`.
+  const items = Children.toArray(children);
   return (
     <ul className="grid grid-cols-2 md:grid-cols-4 gap-y-4 bg-surface border border-line rounded-xl p-4 md:divide-x md:divide-line">
       {items.map((child, i) => (
