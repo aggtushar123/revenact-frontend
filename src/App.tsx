@@ -17,7 +17,6 @@ import { Board as AccountsBoard } from './pages/accounts/Board';
 import { CopilotIndex } from './pages/copilot/Index';
 import CommunicationsPage from './pages/communications/CommunicationsPage';
 import { LifecyclePage } from './pages/lifecycle/LifecyclePage';
-import { HealthPage } from './pages/health/HealthPage';
 import { CreateScenario } from './pages/scenarios/CreateScenario';
 import { ScenariosList } from './pages/scenarios/ScenariosList';
 import { SettingsPage } from './pages/settings/SettingsPage';
@@ -49,27 +48,7 @@ import { CanvasEditor } from './pages/canvas/CanvasEditor';
 import { CampaignsList } from './pages/campaigns/CampaignsList';
 import { CampaignEditor } from './pages/campaigns/CampaignEditor';
 import { useAppSelector } from './hooks';
-import { AdvanceDashboard } from './pages/dashboard/AdvanceDashboard';
-import { AITrendingTopics } from './pages/dashboard/tabs/AITrendingTopics';
-import { ControlsView } from './pages/dashboard/tabs/ai-trending/ControlsView';
-import { HealthOverviewContainer } from './pages/dashboard/tabs/HealthOverviewContainer';
-import { ControlsView as HealthControlsView } from './pages/dashboard/tabs/health-overview/ControlsView';
-import { TriageView } from './pages/dashboard/tabs/health-overview/TriageView';
-import { DivergenceView } from './pages/dashboard/tabs/health-overview/DivergenceView';
-import { MovementView } from './pages/dashboard/tabs/health-overview/MovementView';
-import { RenewalView } from './pages/dashboard/tabs/health-overview/RenewalView';
-import { ActivityContainer } from './pages/dashboard/tabs/ActivityContainer';
-import { CustomerOverviewContainer } from './pages/dashboard/tabs/CustomerOverviewContainer';
-import { ControlsView as CustomerControlsView } from './pages/dashboard/tabs/customer-overview/ControlsView';
-import { ControlsView as ActivityControlsView } from './pages/dashboard/tabs/activity/ControlsView';
-import { ForecastContainer } from './pages/dashboard/tabs/ForecastContainer';
-import { ControlsView as ForecastControlsView } from './pages/dashboard/tabs/forecast/ControlsView';
-import { UsageOverviewContainer } from './pages/dashboard/tabs/UsageOverviewContainer';
-import { ControlsView as UsageControlsView } from './pages/dashboard/tabs/usage-overview/ControlsView';
-import { ProductUsageContainer } from './pages/dashboard/tabs/ProductUsageContainer';
-import { ControlsView as ProductControlsView } from './pages/dashboard/tabs/product-usage/ControlsView';
-import { TicketOverviewContainer } from './pages/dashboard/tabs/ticket-overview/TicketOverviewContainer';
-import { ControlsView as TicketControlsView } from './pages/dashboard/tabs/ticket-overview/ControlsView';
+import { dashboardRoutes } from './pages/dashboard/routes';
 // Company Brain pages
 import { BrainDashboard } from './pages/brain/Dashboard';
 import { InitiativesPage } from './pages/brain/Initiatives';
@@ -211,124 +190,8 @@ function App() {
         }>
           <Route index element={<RootRedirect />} />
           
-          <Route path="dashboard">
-            <Route index element={<Navigate to="advance" replace />} />
-            <Route path="advance" element={<AdvanceDashboard />}>
-              <Route index element={<Navigate to="health" replace />} />
-              <Route path="ai-trending" element={<AITrendingTopics />}>
-                <Route index element={<Navigate to="controls" replace />} />
-                <Route path="controls" element={<ControlsView />} />
-                {/* Account Name / Activity Type / Sentiment / AI Area /
-                    AI Category / AI Subcategory / Revenue Bracket used to be
-                    routes here, each falling through to a placeholder — so
-                    clicking a control that reads "All" unmounted the
-                    dashboard. They're real filter dropdowns on the
-                    container's own bar now, and the old paths land back on
-                    Controls. Same fix, and same absolute-redirect reason, as
-                    the ticket block below. */}
-                <Route
-                  path="*"
-                  element={<Navigate to="/dashboard/advance/ai-trending/controls" replace />}
-                />
-              </Route>
-              <Route path="health" element={<HealthOverviewContainer />}>
-                {/* Triage lands first: it answers "who do I call today", which
-                    is what a CSM opens this screen for. Controls keeps the
-                    nine-card portfolio view for the manager's read. */}
-                <Route index element={<Navigate to="triage" replace />} />
-                <Route path="triage" element={<TriageView />} />
-                <Route path="divergence" element={<DivergenceView />} />
-                <Route path="movement" element={<MovementView />} />
-                <Route path="renewal-date" element={<RenewalView />} />
-                <Route path="controls" element={<HealthControlsView />} />
-                {/* Primary Owner / Lifecycle Stage / Account used to be
-                    routes here, each falling through to a placeholder. Primary
-                    Owner is a real filter on the container's own bar now; the
-                    other two are gone rather than left as dead ends. Old paths
-                    land back on Triage, same as the other two dashboards.
-                    Absolute, not relative: a relative "triage" resolves against
-                    the unmatched path and would match this catch-all again. */}
-                <Route
-                  path="*"
-                  element={<Navigate to="/dashboard/advance/health/triage" replace />}
-                />
-              </Route>
-              <Route path="customer" element={<CustomerOverviewContainer />}>
-                <Route index element={<Navigate to="controls" replace />} />
-                <Route path="controls" element={<CustomerControlsView />} />
-                <Route
-                  path="*"
-                  element={<Navigate to="/dashboard/advance/customer/controls" replace />}
-                />
-              </Route>
-              <Route path="activity" element={<ActivityContainer />}>
-                <Route index element={<Navigate to="controls" replace />} />
-                <Route path="controls" element={<ActivityControlsView />} />
-                <Route
-                  path="*"
-                  element={<Navigate to="/dashboard/advance/activity/controls" replace />}
-                />
-              </Route>
-              <Route path="revenue" element={<ForecastContainer />}>
-                <Route index element={<Navigate to="controls" replace />} />
-                <Route path="controls" element={<ForecastControlsView />} />
-                <Route
-                  path="*"
-                  element={<Navigate to="/dashboard/advance/revenue/controls" replace />}
-                />
-              </Route>
-              <Route path="usage" element={<UsageOverviewContainer />}>
-                <Route index element={<Navigate to="controls" replace />} />
-                <Route path="controls" element={<UsageControlsView />} />
-                {/* Same absolute redirect as the other dashboards — a relative
-                    "controls" resolves against the unmatched path and would
-                    match this catch-all again, appending forever. */}
-                <Route
-                  path="*"
-                  element={<Navigate to="/dashboard/advance/usage/controls" replace />}
-                />
-              </Route>
-              <Route path="product" element={<ProductUsageContainer />}>
-                <Route index element={<Navigate to="controls" replace />} />
-                <Route path="controls" element={<ProductControlsView />} />
-                <Route
-                  path="*"
-                  element={<Navigate to="/dashboard/advance/product/controls" replace />}
-                />
-              </Route>
-              <Route path="ticket" element={<TicketOverviewContainer />}>
-                <Route index element={<Navigate to="controls" replace />} />
-                <Route path="controls" element={<TicketControlsView />} />
-                {/* Ticket Date / Primary Owner / Ticket Priority / Account
-                    used to be routes here, each falling through to the
-                    placeholder below — so clicking a control that reads
-                    "All" unmounted the dashboard. They're real filter
-                    dropdowns on the container's own bar now, and anything
-                    still pointing at the old paths lands back on Controls
-                    rather than on "under development". */}
-                {/* Absolute, not relative: a relative "controls" resolves
-                    against the unmatched path, so /ticket/ticket-priority
-                    would redirect to /ticket/ticket-priority/controls,
-                    match this same catch-all again, and append forever. */}
-                <Route
-                  path="*"
-                  element={<Navigate to="/dashboard/advance/ticket/controls" replace />}
-                />
-              </Route>
-              {/* Fallback for other tabs */}
-              <Route path="*" element={
-                <div className="w-full h-full border-2 border-dashed border-line/60 rounded-xl flex items-center justify-center bg-surface/50 backdrop-blur-sm">
-                  <p className="text-ink-faint font-medium tracking-wide">Tab under development</p>
-                </div>
-              } />
-            </Route>
-            <Route path="custom" element={
-              <div className="w-full h-full border-2 border-dashed border-line/60 rounded-xl flex items-center justify-center bg-surface/50 backdrop-blur-sm m-4 p-8">
-                <p className="text-ink-faint font-medium tracking-wide">Custom Dashboard (Beta) Coming Soon...</p>
-              </div>
-            } />
-          </Route>
-          
+          {dashboardRoutes()}
+
           <Route path="organizations">
             <Route index element={<Navigate to="list" replace />} />
             <Route path="list" element={<List />} />
@@ -348,8 +211,6 @@ function App() {
           <Route path="copilot" element={<CopilotIndex />} />
 
           <Route path="lifecycle" element={<LifecyclePage />} />
-
-          <Route path="health" element={<HealthPage />} />
 
           <Route path="scenarios">
             <Route index element={<ScenariosList />} />
