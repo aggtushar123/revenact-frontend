@@ -258,6 +258,19 @@ scoped server-side by department.
    and the evidence with a link to each company. Leadership can change the
    status from the same pane.
 
+### 4.5d Anomalies (Brain > Anomalies)
+
+1. `/brain/anomalies`. `AnomaliesPage` lists what is going wrong at several
+   companies at once, most revenue first, with a status filter. Every
+   figure is the reader's own: the companies they can open and the reports
+   they can read.
+2. Leadership presses "Look now" to run detection rather than waiting for
+   the nightly pass, and the result says how many clusters were named and
+   how many reports joined existing ones.
+3. Opening one shows the summary, the revenue and spread, the companies hit
+   with links, and the reports behind it. Leadership can mark it
+   acknowledged or resolved, and a resolved cluster stops collecting.
+
 ### 4.5c The account brief and what nobody can answer (Company View)
 
 1. Organization Details › Company View opens with `AccountBriefPanel`: the

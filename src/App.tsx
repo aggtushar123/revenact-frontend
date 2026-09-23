@@ -77,6 +77,7 @@ import { AgentsPage } from './pages/brain/Agents';
 import { SkillsPage } from './pages/brain/Skills';
 import { GraphPage } from './pages/brain/Graph';
 import { FeatureRequestsPage } from './pages/brain/FeatureRequests';
+import { AnomaliesPage } from './pages/brain/Anomalies';
 import { OnboardingCarousel } from './pages/onboarding/OnboardingCarousel';
 import { AuthCallback } from './pages/auth/AuthCallback';
 import { RequirePlatform } from './components/auth/RequirePlatform';
@@ -423,6 +424,7 @@ function App() {
             <Route path="skills" element={<SkillsPage />} />
             <Route path="graph" element={<GraphPage />} />
             <Route path="requests" element={<FeatureRequestsPage />} />
+            <Route path="anomalies" element={<AnomaliesPage />} />
             <Route path="*" element={<Navigate to="/brain/dashboard" replace />} />
           </Route>
           
