@@ -112,6 +112,7 @@ export function RenewalView() {
               ? `${money(summary.overdueArr)} past its renewal date`
               : 'every renewal date is still ahead'
           }
+          tone={summary.overdueCount > 0 ? 'loss' : 'neutral'}
         />
       </KpiStrip>
 

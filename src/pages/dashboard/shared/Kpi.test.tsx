@@ -45,6 +45,19 @@ describe('Kpi', () => {
     );
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
   });
+
+  it('KpiStrip lays a three-figure strip out in three columns, not four with a gap', () => {
+    const { container } = render(
+      <KpiStrip columns={3}>
+        <Kpi label="a" value="1" />
+        <Kpi label="b" value="2" />
+        <Kpi label="c" value="3" />
+      </KpiStrip>,
+    );
+    const list = container.querySelector('ul')!;
+    expect(list.className).toContain('md:grid-cols-3');
+    expect(list.className).not.toContain('md:grid-cols-4');
+  });
 });
 
 describe('dashboard Tile guard', () => {

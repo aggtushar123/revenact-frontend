@@ -97,6 +97,9 @@ describe('RenewalView', () => {
 
     expect(within(tile('Past due')).getByText('1')).toBeInTheDocument();
     expect(within(tile('Past due')).getByText(/\$80\.0K past its renewal date/)).toBeInTheDocument();
+    // Money past its renewal date is a loss, coloured the same as every other
+    // loss figure on this tab.
+    expect(within(tile('Past due')).getByText('1').className).toContain('text-danger');
     // Still $360K: an overdue renewal is not "due now".
     expect(within(tile('Up for renewal')).getByText('$360.0K')).toBeInTheDocument();
   });
@@ -105,6 +108,8 @@ describe('RenewalView', () => {
     renderWithHealth(<RenewalView />, { rows: BOOK });
 
     expect(within(tile('Past due')).getByText(/every renewal date is still ahead/)).toBeInTheDocument();
+    // Nothing overdue: back to plain ink, not a false alarm.
+    expect(within(tile('Past due')).getByText('0').className).toContain('text-ink');
   });
 
   it('names what it cannot speak for rather than quietly dropping it', () => {

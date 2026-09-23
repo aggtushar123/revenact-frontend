@@ -31,13 +31,28 @@ export function Kpi({
   );
 }
 
-/** Four across from `md`, two below, separated by hairlines rather than boxes. */
-export function KpiStrip({ children }: { children: ReactNode }) {
+const STRIP_COLUMNS = {
+  3: 'md:grid-cols-3',
+  4: 'md:grid-cols-4',
+} as const;
+
+/** Four across from `md` by default, two below, separated by hairlines rather
+ *  than boxes. Pass `columns={3}` for a strip that shouldn't leave an empty
+ *  fourth slot (e.g. a three-figure summary like `TriageTiles`). */
+export function KpiStrip({
+  children,
+  columns = 4,
+}: {
+  children: ReactNode;
+  columns?: keyof typeof STRIP_COLUMNS;
+}) {
   // `Children.toArray` (rather than `Array.isArray`) drops `null`/`false`, so
   // a conditionally-rendered `cond && <Kpi/>` never leaves an empty `<li>`.
   const items = Children.toArray(children);
   return (
-    <ul className="grid grid-cols-2 md:grid-cols-4 gap-y-4 bg-surface border border-line rounded-xl p-4 md:divide-x md:divide-line">
+    <ul
+      className={`grid grid-cols-2 ${STRIP_COLUMNS[columns]} gap-y-4 bg-surface border border-line rounded-xl p-4 md:divide-x md:divide-line`}
+    >
       {items.map((child, i) => (
         <li key={i} className="md:px-4 md:first:pl-0">
           {child}

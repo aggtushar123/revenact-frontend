@@ -22,7 +22,7 @@ export function TriageTiles({ summary }: { summary: TriageSummary }) {
           : `up from ${atGoodPreviousMonth} last month`;
 
   return (
-    <KpiStrip>
+    <KpiStrip columns={3}>
       <Kpi
         label="Needs action now"
         value={String(needsAction)}
