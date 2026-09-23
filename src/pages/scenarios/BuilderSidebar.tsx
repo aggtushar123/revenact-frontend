@@ -1,10 +1,5 @@
 import React, { useState } from 'react';
-import { 
-  Play, Calendar, Zap, Hourglass, Split, Filter, List, 
-  Mail, MessageCircle, FileText, CheckSquare, 
-  Settings, ChevronDown, Clock, ChevronRight, Binary, 
-  Users, Share2, AlertCircle
-} from 'lucide-react';
+import { AlertCircle, Bell, Binary, Calendar, CheckSquare, ChevronDown, ChevronRight, Clock, FileText, Filter, Hourglass, List, Mail, MessageCircle, Play, Settings, Share2, Split, UserCheck, Users, Zap } from 'lucide-react';
 
 interface SidebarItemProps {
   type: string;
@@ -86,6 +81,8 @@ export function BuilderSidebar() {
         <SidebarItem type="action" label="Create Pipeline" icon={<Share2 className="w-3.5 h-3.5" />} color="bg-info-dim text-info" />
         <SidebarItem type="action" label="MS Teams" icon={<Users className="w-3.5 h-3.5" />} color="bg-info-dim text-info" />
         <SidebarItem type="action" label="Send Survey" icon={<List className="w-3.5 h-3.5" />} color="bg-info-dim text-info" />
+        <SidebarItem type="action" label="Assign Owner" icon={<UserCheck className="w-3.5 h-3.5" />} color="bg-info-dim text-info" />
+        <SidebarItem type="action" label="Notify" icon={<Bell className="w-3.5 h-3.5" />} color="bg-info-dim text-info" />
         <SidebarItem type="action" label="Churn Entity" icon={<AlertCircle className="w-3.5 h-3.5" />} color="bg-info-dim text-info" />
       </Section>
     </div>

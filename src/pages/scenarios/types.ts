@@ -21,13 +21,44 @@ export type ScenarioNodeData = {
   // engine.py's own docstring on why only a small allowlist of
   // Customer fields is settable at all).
   attributeValue?: string;
-  // Condition / Filter's single real clause — replaces the fancier
-  // multi-clause canvas mockup with what the engine actually
-  // evaluates: one attribute + operator + value.
-  conditionAttribute?: 'lifecycle_stage' | 'health_score' | 'nps_score';
-  conditionOperator?: 'equals' | 'not_equals' | 'greater_than' | 'less_than';
+  // Condition / Filter's single real clause — one of two kinds, exactly
+  // what services/scenarios/engine.py evaluates at run time.
+  //
+  // A field clause reads one fact about the customer. `conditionAttribute`
+  // is an allowlist key, or `attr:<api_name>` for any AI attribute the
+  // organisation has defined (services/attributes), so it is a string
+  // rather than a union of the fixed names.
+  conditionKind?: 'field' | 'semantic';
+  conditionAttribute?: string;
+  conditionOperator?: ConditionOperator;
   conditionValue?: string;
+  // A semantic clause matches a plain-English phrase against the company's
+  // recent interactions by embedding. `conditionThreshold` is the cosine
+  // similarity it must clear, as a string because it is saved from an input.
+  conditionPhrase?: string;
+  conditionThreshold?: string;
+  // Assign Owner — a person in this organisation, or a rule that picks one.
+  assignTo?: number;
+  assignRule?: '' | 'least_loaded';
+  assignFunction?: string;
+  // Notify — who hears about it, and what they are told.
+  notifyWho?: 'owner' | 'manager' | 'user';
+  notifyUser?: number;
+  notifyMessage?: string;
 };
+
+export type ConditionOperator =
+  | 'equals'
+  | 'not_equals'
+  | 'greater_than'
+  | 'less_than'
+  | 'contains'
+  | 'is_one_of'
+  | 'is_empty'
+  | 'is_not_empty';
+
+/** The operators that compare against nothing, so the value box goes away. */
+export const VALUELESS_OPERATORS: ConditionOperator[] = ['is_empty', 'is_not_empty'];
 
 export type ScenarioNodeType = 'entry' | 'operator' | 'action';
 
