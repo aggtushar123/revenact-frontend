@@ -258,6 +258,20 @@ scoped server-side by department.
    and the evidence with a link to each company. Leadership can change the
    status from the same pane.
 
+### 4.5c The account brief and what nobody can answer (Company View)
+
+1. Organization Details › Company View opens with `AccountBriefPanel`: the
+   standing brief on what this account uses the product for, who the
+   stakeholders are and what is still open, with the date it was written
+   and who asked for it.
+2. "Write the brief" or "Rewrite" asks the Copilot to read what the company
+   knows and write a new one. It cites the records it used; a reader is
+   shown only the citations they may open, with a count of the rest.
+3. Under it, "What we cannot answer": questions asked of the Copilot that
+   had nothing to go on, and routed questions nobody answered. Answering
+   one records an ordinary contribution and closes the gap; a gap not worth
+   answering can be dismissed.
+
 ### 4.6 Copilot and multiplayer sessions
 
 1. `/copilot`. `HomeView` offers skill cards that prefill a prompt, and a
