@@ -124,7 +124,7 @@ const ACCOUNT_STATS = {
   ),
 };
 
-function renderPage() {
+function renderPage(url = '/dashboard/health/distribution') {
   const store = configureStore({
     reducer: { customers: customersReducer, auth: authReducer },
     preloadedState: {
@@ -162,7 +162,7 @@ function renderPage() {
   });
   render(
     <Provider store={store}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[url]}>
         <HealthDistribution />
       </MemoryRouter>
     </Provider>
@@ -307,5 +307,24 @@ describe('HealthDistribution', () => {
     renderPage();
 
     expect(await screen.findByText('Server error.')).toBeInTheDocument();
+  });
+
+  it('warns that a shared filter is on, since /customers/stats/ and /accounts/stats/ can\'t honour it', async () => {
+    vi.stubGlobal('fetch', fetchMockWith([]));
+    renderPage('/dashboard/health/distribution?owner=1');
+
+    expect(await screen.findByText(
+      'Covers the whole book; the filters above do not apply to this section.'
+    )).toBeInTheDocument();
+  });
+
+  it('says nothing when no shared filter is on', async () => {
+    vi.stubGlobal('fetch', fetchMockWith([]));
+    renderPage('/dashboard/health/distribution');
+
+    await screen.findByText('Good'); // wait for the section to render
+    expect(
+      screen.queryByText('Covers the whole book; the filters above do not apply to this section.')
+    ).not.toBeInTheDocument();
   });
 });
