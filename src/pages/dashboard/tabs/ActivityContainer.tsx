@@ -15,6 +15,7 @@ const WINDOWS = [
   { value: '365', label: 'Last 12 months' },
 ];
 const DEFAULTS = { days: '90' };
+// `days` is also Tickets' key (Support area); safe because area links carry only SHARED_KEYS.
 const KEYS = [...SHARED_KEYS, 'days'];
 
 /** Health › Activity. The window is always sent; the book filters narrow it. */

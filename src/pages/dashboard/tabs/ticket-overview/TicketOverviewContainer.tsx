@@ -30,6 +30,7 @@ function isoDaysAgo(days: number): string {
  *  `isoDaysAgo` with `NaN`. */
 const DATE_PRESET_DAYS = DATE_PRESETS.map((p) => String(p.days ?? ''));
 
+// `days` is also Activity's key (Health area); safe because area links carry only SHARED_KEYS.
 const KEYS = ['days', 'owner', 'priority', 'customer'];
 
 /**
