@@ -2,7 +2,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import type { TicketSentimentPoint } from '../../../../../features/tickets/ticketsSlice';
 import { niceMax, ticksTo } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { ROLE, TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 export function SentimentLineChart({ data }: { data: TicketSentimentPoint[] }) {
   // The mock's domain={[0, 100]} clipped any month past 100 tickets.
@@ -42,14 +42,17 @@ export function SentimentLineChart({ data }: { data: TicketSentimentPoint[] }) {
               dot={{ r: 4, fill: 'var(--success)', strokeWidth: 0 }}
               label={{ position: 'top', fill: 'var(--success)', fontSize: 11, fontWeight: 600, dy: -5 }}
             />
+            {/* Negative is a category on this axis (which sentiment), not a
+                caution in this instant — the KPI strip above already owns
+                "this figure is a loss" for the one number that means it. */}
             <Line {...STATIC_SERIES}
-              type="linear" 
-              dataKey="negative" 
-              stroke="var(--warning)" 
+              type="linear"
+              dataKey="negative"
+              stroke={ROLE.ink}
               strokeWidth={2}
-              activeDot={{ r: 6, fill: 'var(--warning)', strokeWidth: 0 }}
-              dot={{ r: 4, fill: 'var(--warning)', strokeWidth: 0 }}
-              label={{ position: 'top', fill: 'var(--warning)', fontSize: 11, fontWeight: 600, dy: -5 }}
+              activeDot={{ r: 6, fill: ROLE.ink, strokeWidth: 0 }}
+              dot={{ r: 4, fill: ROLE.ink, strokeWidth: 0 }}
+              label={{ position: 'top', fill: ROLE.ink, fontSize: 11, fontWeight: 600, dy: -5 }}
             />
           </LineChart>
         </ResponsiveContainer>
