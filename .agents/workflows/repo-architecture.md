@@ -78,15 +78,24 @@ react-ts-app/
 /login                         → [PUBLIC] Login page (no layout)
 
 /  (DashboardLayout + ProtectedRoute)
-├── dashboard/
-│   ├── advance/               → AdvanceDashboard shell (tab container)
-│   │   ├── health/            → HealthOverviewContainer
-│   │   │   └── controls       → Health ControlsView (charts + table)
-│   │   ├── ticket/            → TicketOverviewContainer
-│   │   │   └── controls       → Ticket ControlsView (charts)
-│   │   └── ai-trending/       → AITrendingTopics shell
-│   │       └── controls       → AI Trending ControlsView (donut+bar charts)
-│   └── custom/                → Placeholder ("Custom Dashboard Beta")
+├── dashboard/                 → DashboardFrame (scroll + p-4); tree in pages/dashboard/routes.tsx
+│   ├── (index)                → Redirects to /dashboard/overview
+│   ├── overview               → Overview (links to each area)
+│   ├── revenue/               → AreaLayout area="revenue" (index → forecast)
+│   │   ├── forecast           → ForecastContainer → forecast/ControlsView
+│   │   ├── customers          → CustomerOverviewContainer → customer-overview/ControlsView
+│   │   └── products           → ProductUsageContainer → product-usage/ControlsView
+│   ├── health/                → AreaLayout area="health" (index → triage)
+│   │   ├── triage | divergence | movement | renewals | distribution
+│   │   │                      → HealthOverviewContainer → the matching health-overview view
+│   │   ├── usage              → UsageOverviewContainer → usage-overview/ControlsView
+│   │   └── activity           → ActivityContainer → activity/ControlsView
+│   ├── support/               → AreaLayout area="support" (index → tickets)
+│   │   ├── tickets            → TicketOverviewContainer → ticket-overview/ControlsView
+│   │   └── topics             → AITrendingTopics → ai-trending/ControlsView
+│   ├── advance, advance/*     → Legacy redirects (redirects.tsx, LEGACY map in areas.ts), query kept
+│   └── custom                 → Redirects to /dashboard/overview
+├── health                     → Redirects to /dashboard/health/distribution
 ├── organizations/
 │   ├── (index)                → Redirects to /organizations/list
 │   ├── list                   → OrganizationsTable (main list view)
@@ -465,10 +474,12 @@ App.tsx
   │     ├── Sidebar (dispatches logout, reads auth.user)
   │     └── Navbar
   │
-  ├── pages/dashboard/AdvanceDashboard.tsx
-  │     ├── HealthOverviewContainer → health-overview/ControlsView → charts/*
-  │     ├── TicketOverviewContainer → ticket-overview/ControlsView → charts/*
-  │     └── AITrendingTopics → ai-trending/ControlsView → components/dashboard/charts/*
+  ├── pages/dashboard/routes.tsx (dashboardRoutes) — areas.ts lists areas + sub-views
+  │     ├── DashboardFrame → AreaLayout (hands sub-views via outlet context; read with useSubViews)
+  │     ├── <Area>Container → shared/DashboardToolbar (sub-view switch + URL filters, useDashboardFilters)
+  │     │     └── the view (tabs/<section>/ControlsView or a health-overview view) → charts/*
+  │     ├── shared/ — DashboardToolbar, useDashboardFilters (SHARED_KEYS), Kpi, Panel, DataState, chartPalette (ROLE)
+  │     └── redirects.tsx — Keep / LegacyRedirect for old /dashboard/advance/* links
   │
   ├── pages/organizations/Details.tsx & pages/accounts/Details.tsx
   │     ├── components/organizations/MetricsPanel (or AccountMetricsPanel)
@@ -535,10 +546,9 @@ App.tsx
 | `/accounts` (list) | No list route, only `/accounts/:id` |
 | `/sfdc`, `/feedbacks` | No route defined |
 | `/segments`, `/projects`, `/surveys`, `/campaigns`, `/canvas` | No route defined |
-| `/lifecycle`, `/health` | No route defined |
+| `/lifecycle` | No route defined (`/health` redirects to `/dashboard/health/distribution`) |
 | `/settings/currency` … `/settings/ai-agent` | Stub `SettingPlaceholder` |
-| `/dashboard/advance/*` (non-controls sub-routes) | `PlaceholderView` |
-| `/dashboard/custom` | Placeholder div |
+| `/dashboard/custom`, `/dashboard/advance/*` | Redirect to the new areas (`redirects.tsx`) |
 
 ---
 

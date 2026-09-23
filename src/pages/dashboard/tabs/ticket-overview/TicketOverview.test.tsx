@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ticketsReducer from '../../../../features/tickets/ticketsSlice';
+import { AreaLayout } from '../../AreaLayout';
 import { TicketOverviewContainer } from './TicketOverviewContainer';
 import { ControlsView } from './ControlsView';
 import { niceMax, ticksTo } from './chartTheme';
@@ -72,20 +73,26 @@ function mockFetch(body: unknown = stats, status = 200) {
   return spy;
 }
 
-function renderDashboard() {
+function renderTickets(url = '/dashboard/support/tickets') {
   const store = configureStore({ reducer: { tickets: ticketsReducer } });
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/ticket/controls']}>
+      <MemoryRouter initialEntries={[url]}>
         <Routes>
-          <Route path="/ticket" element={<TicketOverviewContainer />}>
-            <Route path="controls" element={<ControlsView />} />
+          <Route path="/dashboard/support" element={<AreaLayout area="support" />}>
+            <Route element={<TicketOverviewContainer />}>
+              <Route path="tickets" element={<ControlsView />} />
+            </Route>
           </Route>
         </Routes>
       </MemoryRouter>
     </Provider>
   );
+  return store;
 }
+
+const lastUrl = (spy: ReturnType<typeof mockFetch>) =>
+  spy.mock.calls[spy.mock.calls.length - 1][0];
 
 describe('Ticket Overview', () => {
   beforeEach(() => {
@@ -94,7 +101,7 @@ describe('Ticket Overview', () => {
 
   it('fetches real stats on mount instead of reading a fixture', async () => {
     const fetchMock = mockFetch();
-    renderDashboard();
+    renderTickets();
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -106,7 +113,7 @@ describe('Ticket Overview', () => {
 
   it('renders the real KPI figures', async () => {
     mockFetch();
-    renderDashboard();
+    renderTickets();
 
     // Scoped to each card: 735 legitimately appears three times — the
     // KPI plus both donut centres, since priority and status each sum
@@ -123,7 +130,7 @@ describe('Ticket Overview', () => {
 
   it('the donut centres agree with the KPI total', async () => {
     mockFetch();
-    renderDashboard();
+    renderTickets();
 
     // Each donut sums its own buckets client-side; if they disagreed
     // with the KPI, one of the three aggregations would be wrong.
@@ -134,14 +141,14 @@ describe('Ticket Overview', () => {
     // "0 tickets" is a claim; "—" is an admission that nothing has
     // loaded yet.
     mockFetch();
-    renderDashboard();
+    renderTickets();
 
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 
   it('surfaces a failed load without blanking the page', async () => {
     mockFetch({ detail: 'Not found.' }, 404);
-    renderDashboard();
+    renderTickets();
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Not found.');
   });
@@ -152,7 +159,7 @@ describe('Ticket Overview', () => {
     // They used to be NavLinks to routes that fell through to a
     // placeholder — clicking one unmounted the whole dashboard.
     mockFetch();
-    renderDashboard();
+    renderTickets();
 
     for (const label of ['Ticket Date', 'Primary Owner', 'Ticket Priority', 'Account']) {
       expect(await screen.findByLabelText(label)).toBeInTheDocument();
@@ -161,7 +168,7 @@ describe('Ticket Overview', () => {
 
   it('populates filter options from the response, not from a hardcoded list', async () => {
     mockFetch();
-    renderDashboard();
+    renderTickets();
 
     const owner = (await screen.findByLabelText('Primary Owner')) as HTMLSelectElement;
     await waitFor(() =>
@@ -172,7 +179,7 @@ describe('Ticket Overview', () => {
   it('refetches with the chosen priority', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderTickets();
 
     await screen.findByText('Total Ticket Volume');
     await waitFor(() => expect(screen.getAllByText('735').length).toBeGreaterThan(0));
@@ -189,7 +196,7 @@ describe('Ticket Overview', () => {
   it('turns a date preset into a real from= bound', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderTickets();
 
     await screen.findByText('Total Ticket Volume');
     await waitFor(() => expect(screen.getAllByText('735').length).toBeGreaterThan(0));
@@ -203,10 +210,20 @@ describe('Ticket Overview', () => {
     );
   });
 
+  it('turns the URL date preset into a from= date', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => stats });
+    vi.stubGlobal('fetch', fetchMock);
+    renderTickets('/dashboard/support/tickets?days=30&priority=high');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toMatch(/from=\d{4}-\d{2}-\d{2}/);
+    expect(url).toContain('priority=high');
+  });
+
   it('shows the current selection on the chip and offers to clear it', async () => {
     mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderTickets();
 
     await screen.findByText('Total Ticket Volume');
     await waitFor(() => expect(screen.getAllByText('735').length).toBeGreaterThan(0));
@@ -226,10 +243,25 @@ describe('Ticket Overview', () => {
 
   it('sends no query at all when nothing is filtered', async () => {
     const fetchMock = mockFetch();
-    renderDashboard();
+    renderTickets();
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(fetchMock.mock.calls[0][0]).not.toContain('?');
+    // Every call, not just the last — a stray query on an earlier fetch
+    // (e.g. a double fetch on mount) would otherwise go unnoticed.
+    for (const call of fetchMock.mock.calls) {
+      expect(String(call[0])).not.toContain('?');
+    }
+  });
+
+  it('treats a malformed days value as absent rather than crashing', async () => {
+    // A hand-edited or corrupted link (?days=abc) used to reach
+    // isoDaysAgo(NaN), whose toISOString() throws mid-render.
+    const fetchMock = mockFetch();
+    renderTickets('/dashboard/support/tickets?days=abc');
+
+    await screen.findByText('Total Ticket Volume');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(lastUrl(fetchMock)).not.toContain('from=');
   });
 });
 

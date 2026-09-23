@@ -64,7 +64,7 @@ export function OwnerLoadChart({ load, currency, horizonDays }: OwnerLoadChartPr
                   )} expected loss`}
                 >
                   <div
-                    className="h-full rounded-[3px] bg-info/70 flex"
+                    className="h-full rounded-[3px] bg-ink-faint flex"
                     style={{ width: `${width}%` }}
                   >
                     <div className="h-full bg-danger/80" style={{ width: `${atRisk}%` }} />

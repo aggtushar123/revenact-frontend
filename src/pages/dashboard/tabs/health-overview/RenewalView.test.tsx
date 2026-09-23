@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { healthRow, renderWithHealth } from './testUtils';
 import { RenewalView } from './RenewalView';
-import { HealthOverviewContainer } from '../HealthOverviewContainer';
 
 // Integration tier. The two Recharts charts need a sized container jsdom won't
 // give them, so they're asserted on by their headings and their own summary
@@ -99,6 +97,9 @@ describe('RenewalView', () => {
 
     expect(within(tile('Past due')).getByText('1')).toBeInTheDocument();
     expect(within(tile('Past due')).getByText(/\$80\.0K past its renewal date/)).toBeInTheDocument();
+    // Money past its renewal date is a loss, coloured the same as every other
+    // loss figure on this tab.
+    expect(within(tile('Past due')).getByText('1').className).toContain('text-danger');
     // Still $360K: an overdue renewal is not "due now".
     expect(within(tile('Up for renewal')).getByText('$360.0K')).toBeInTheDocument();
   });
@@ -107,6 +108,8 @@ describe('RenewalView', () => {
     renderWithHealth(<RenewalView />, { rows: BOOK });
 
     expect(within(tile('Past due')).getByText(/every renewal date is still ahead/)).toBeInTheDocument();
+    // Nothing overdue: back to plain ink, not a false alarm.
+    expect(within(tile('Past due')).getByText('0').className).toContain('text-ink');
   });
 
   it('names what it cannot speak for rather than quietly dropping it', () => {
@@ -197,22 +200,8 @@ describe('RenewalView', () => {
     expect(screen.getByText('Could not load account health.')).toBeInTheDocument();
   });
 
-  it('is reachable from the tab bar as a tab, not as a filter chip', () => {
-    // It used to render as a chip reading "All" and route to a placeholder.
-    renderWithHealth(
-      <MemoryRouter initialEntries={['/dashboard/advance/health/renewal-date']}>
-        <Routes>
-          <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
-            <Route index element={<Navigate to="triage" replace />} />
-            <Route path="renewal-date" element={<RenewalView />} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-      { rows: BOOK }
-    );
-
-    const link = screen.getByRole('link', { name: 'Renewal Date' });
-    expect(link).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByText('Renewal calendar')).toBeInTheDocument();
-  });
+  // Reachability as a tab (not a filter chip) is now the shared sub-view
+  // nav's job — `DashboardToolbar`, fed by `AREAS` in `areas.ts` — which has
+  // its own tests; the container no longer renders a tab bar of its own for
+  // this suite to reach through.
 });

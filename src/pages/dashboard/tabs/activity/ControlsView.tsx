@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../../hooks';
 import { fetchActivityStats } from '../../../../features/activity/activitySlice';
 import { formatCompactMoney } from '../../../../features/customers/formatters';
+import { Kpi, KpiStrip } from '../../shared/Kpi';
 import { TouchTimeline } from './charts/TouchTimeline';
 import { CadenceChart } from './charts/CadenceChart';
 import { OwnerCoverageList } from './charts/OwnerCoverageList';
@@ -11,36 +12,6 @@ import { GoingDarkTable } from './charts/GoingDarkTable';
 /** The filter query string, handed down by ActivityContainer's own bar. */
 export interface ActivityContext {
   query: string;
-}
-
-interface TileProps {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: 'neutral' | 'danger' | 'success';
-}
-
-function Tile({ label, value, detail, tone = 'neutral' }: TileProps) {
-  const accent = {
-    neutral: 'border-l-info',
-    danger: 'border-l-danger',
-    success: 'border-l-success',
-  }[tone];
-  const figure = { neutral: 'text-ink', danger: 'text-danger', success: 'text-success' }[tone];
-
-  return (
-    <div
-      className={`bg-surface border border-line-subtle rounded-lg shadow-sm px-[13px] py-[11px] border-l-[3px] ${accent}`}
-    >
-      <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">{label}</div>
-      <div
-        className={`text-[25px] font-semibold leading-tight tracking-tight mt-[3px] tabular-nums ${figure}`}
-      >
-        {value}
-      </div>
-      <div className="text-[11px] text-ink-muted mt-[1px]">{detail}</div>
-    </div>
-  );
 }
 
 /**
@@ -67,10 +38,6 @@ export function ControlsView() {
   const windowDays = stats?.window_days ?? 90;
   const threshold = stats?.going_dark_threshold ?? 60;
 
-  // The finding worth leading with when it's true: a team being pulled by
-  // tickets rather than working a cadence.
-  const reactive = kpis !== undefined && kpis.inbound > kpis.touches;
-
   return (
     <div className="w-full flex flex-col gap-4 pb-12">
       {error && (
@@ -88,8 +55,8 @@ export function ControlsView() {
           isLoading && stats ? 'opacity-60' : ''
         }`}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          <Tile
+        <KpiStrip>
+          <Kpi
             label="Touches logged"
             value={kpis ? kpis.touches.toLocaleString() : '—'}
             detail={
@@ -97,9 +64,8 @@ export function ControlsView() {
                 ? `${kpis.inbound.toLocaleString()} inbound tickets in the same ${windowDays} days`
                 : 'loading'
             }
-            tone={reactive ? 'danger' : 'neutral'}
           />
-          <Tile
+          <Kpi
             label="Coverage"
             value={kpis?.coverage === null || kpis === undefined ? '—' : `${kpis.coverage}%`}
             detail={
@@ -107,9 +73,8 @@ export function ControlsView() {
                 ? `${kpis.touched_accounts} of ${kpis.accounts} accounts contacted`
                 : 'loading'
             }
-            tone={kpis && kpis.coverage !== null && kpis.coverage < 80 ? 'danger' : 'success'}
           />
-          <Tile
+          <Kpi
             label="Gone quiet"
             value={kpis ? String(kpis.dark_accounts) : '—'}
             detail={
@@ -119,9 +84,9 @@ export function ControlsView() {
                   : `everything contacted inside ${threshold} days`
                 : 'loading'
             }
-            tone={kpis && kpis.dark_accounts > 0 ? 'danger' : 'success'}
+            tone={kpis && kpis.dark_accounts > 0 ? 'loss' : 'neutral'}
           />
-          <Tile
+          <Kpi
             label="Overdue tasks"
             value={kpis ? String(kpis.overdue_tasks) : '—'}
             detail={
@@ -129,9 +94,9 @@ export function ControlsView() {
                 ? `of ${kpis.open_tasks} open · ${kpis.completed_tasks} completed`
                 : 'loading'
             }
-            tone={kpis && kpis.overdue_tasks > 0 ? 'danger' : 'success'}
+            tone={kpis && kpis.overdue_tasks > 0 ? 'loss' : 'neutral'}
           />
-        </div>
+        </KpiStrip>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div className="xl:col-span-2 bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">

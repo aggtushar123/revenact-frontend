@@ -25,6 +25,8 @@ import {
   markAllNotificationsRead,
 } from '../../features/notifications/notificationApi';
 import { notificationRead, allRead } from '../../features/notifications/notificationsSlice';
+import { AREAS } from '../../pages/dashboard/areas';
+import { sharedSearch } from '../../pages/dashboard/shared/useDashboardFilters';
 
 export function Navbar() {
   const location = useLocation();
@@ -119,6 +121,7 @@ export function Navbar() {
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
   const isDashboard = location.pathname.startsWith('/dashboard');
+  const dashboardSharedSearch = sharedSearch(location.search);
 
 
   if (isAccountSettings) {
@@ -366,22 +369,23 @@ export function Navbar() {
         ) : isDashboard ? (
           <div className="flex items-center gap-4 h-full">
             <h1 className="text-[17px] font-bold text-ink tracking-tight">Dashboard</h1>
-            
-            <div className="flex items-center p-1 rounded-lg">
-              <NavLink
-                to="/dashboard/advance"
-                className={({ isActive }) => `text-[13px] font-bold px-3 py-1.5 rounded-md transition-colors ${isActive ? 'text-accent bg-accent-dim shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] border border-accent/30' : 'text-ink-muted hover:text-ink hover:bg-subtle'}`}
-              >
-                Advance Dashboards
-              </NavLink>
-              <NavLink
-                to="/dashboard/custom"
-                className={({ isActive }) => `text-[13px] font-bold px-3 py-1.5 flex items-center gap-2 rounded-md transition-colors ${isActive ? 'text-accent bg-accent-dim shadow-[inset_0_1px_2px_rgba(0,0,0,0.02)] border border-accent/30' : 'text-ink-muted hover:text-ink hover:bg-subtle'}`}
-              >
-                Custom Dashboard
-                <span className="text-[9px] uppercase font-bold tracking-widest bg-warning-dim text-warning px-1 py-0.5 rounded shadow-sm">beta</span>
-              </NavLink>
-            </div>
+
+            <nav aria-label="Dashboard areas" className="flex items-center gap-4 h-full">
+              {[{ key: 'overview', label: 'Overview' }, ...AREAS].map((area) => (
+                <NavLink
+                  key={area.key}
+                  // Only the shared book filters travel between areas.
+                  to={{ pathname: `/dashboard/${area.key}`, search: dashboardSharedSearch }}
+                  className={({ isActive }) =>
+                    `h-full inline-flex items-center text-[13px] font-semibold border-b-2 transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                      isActive ? 'border-accent text-ink' : 'border-transparent text-ink-muted hover:text-ink'
+                    }`
+                  }
+                >
+                  {area.label}
+                </NavLink>
+              ))}
+            </nav>
           </div>
         ) : (
           <div className="flex items-center gap-2 py-1.5 px-2 -ml-2 rounded-md">

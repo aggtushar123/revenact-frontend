@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import productsReducer from '../../../../features/products/productsSlice';
+import { AreaLayout } from '../../AreaLayout';
 import { ProductUsageContainer } from '../ProductUsageContainer';
 import { ControlsView } from './ControlsView';
 
@@ -116,18 +117,20 @@ function mockFetch(body: unknown = stats, status = 200) {
   return spy;
 }
 
-function renderDashboard() {
+function renderProductUsage(url = '/dashboard/revenue/products') {
   const store = configureStore({ reducer: { products: productsReducer } });
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/product/controls']}>
+      <MemoryRouter initialEntries={[url]}>
         <Routes>
-          <Route path="/product" element={<ProductUsageContainer />}>
-            <Route path="controls" element={<ControlsView />} />
+          <Route path="/dashboard/revenue" element={<AreaLayout area="revenue" />}>
+            <Route element={<ProductUsageContainer />}>
+              <Route path="products" element={<ControlsView />} />
+            </Route>
           </Route>
         </Routes>
       </MemoryRouter>
-    </Provider>
+    </Provider>,
   );
   return store;
 }
@@ -135,7 +138,10 @@ function renderDashboard() {
 const lastUrl = (spy: ReturnType<typeof mockFetch>) =>
   spy.mock.calls[spy.mock.calls.length - 1][0];
 
-const tile = (label: string) => screen.getByText(label).parentElement as HTMLElement;
+// getByText would be ambiguous for "Products": the sub-view switch in the
+// bar reads the same word as the KPI tile it sits above.
+const tile = (label: string) =>
+  screen.getAllByText(label).find((el) => el.tagName !== 'A')!.parentElement as HTMLElement;
 
 const productRow = (name: string) =>
   screen.getByRole('cell', { name: new RegExp(`^${name}`) }).closest('tr') as HTMLElement;
@@ -147,7 +153,7 @@ describe('Product Usage', () => {
 
   it('fetches product usage on mount', async () => {
     const fetchMock = mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     await waitFor(() => expect(lastUrl(fetchMock)).toContain('/customers/products/'));
   });
@@ -156,7 +162,7 @@ describe('Product Usage', () => {
     // The one thing a reader must not miss: these are customers *led by* a
     // product, and a customer on three products is counted once.
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     expect(await screen.findByText(/How to read this:/)).toBeInTheDocument();
     expect(
@@ -166,16 +172,16 @@ describe('Product Usage', () => {
 
   it('leads with how many products carry how much', async () => {
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
-    await screen.findByText('Products');
+    await screen.findAllByText('Products');
     expect(within(tile('Products')).getByText('3')).toBeInTheDocument();
     expect(within(tile('Products')).getByText('8 customers · $646.6K led')).toBeInTheDocument();
   });
 
   it('names the largest product by the share of the book it leads', async () => {
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByText('Largest');
     expect(within(tile('Largest')).getByText('64.4%')).toBeInTheDocument();
@@ -184,7 +190,7 @@ describe('Product Usage', () => {
 
   it('ranks the weakest product on money at stake, not on a percentage', async () => {
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByText('Most at stake');
     const card = tile('Most at stake');
@@ -194,7 +200,7 @@ describe('Product Usage', () => {
 
   it('says so plainly when no product is in trouble', async () => {
     mockFetch({ ...stats, kpis: { ...stats.kpis, weakest: null, worst_churn: null } });
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByText('Most at stake');
     expect(
@@ -205,7 +211,7 @@ describe('Product Usage', () => {
 
   it('reports worst churn by the ARR that left', async () => {
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByText('Worst churn');
     expect(within(tile('Worst churn')).getByText('$152.6K')).toBeInTheDocument();
@@ -218,7 +224,7 @@ describe('Product Usage', () => {
 
   it('puts every product on a row with its own measures', async () => {
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByText('Product by product');
     const card = productRow('Product B');
@@ -231,7 +237,7 @@ describe('Product Usage', () => {
   it('prints a dash for a product nobody surveyed rather than a zero', async () => {
     // Zero would rank it below a product customers actively dislike.
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByText('Product by product');
     const card = productRow('Integrations Module');
@@ -255,7 +261,7 @@ describe('Product Usage', () => {
         }),
       ],
     });
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByText('Product by product');
     expect(within(productRow('Dead Product')).getByText('nobody left')).toBeInTheDocument();
@@ -269,7 +275,7 @@ describe('Product Usage', () => {
       ...stats,
       kpis: { ...stats.kpis, without_customers: ['Product D', 'Pilot Add-on'] },
     });
-    renderDashboard();
+    renderProductUsage();
 
     expect(
       await screen.findByText('Nobody in this selection is on Product D, Pilot Add-on.')
@@ -278,7 +284,7 @@ describe('Product Usage', () => {
 
   it('stays quiet when every product has somebody on it', async () => {
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByText('Product by product');
     expect(screen.queryByText(/Nobody in this selection/)).not.toBeInTheDocument();
@@ -292,7 +298,7 @@ describe('Product Usage', () => {
         row({ id: 10, product: 'Never Sold', customers: 0, arr: 0, churned: 0 }),
       ],
     });
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByText('Product by product');
     expect(within(productRow('Dead Product')).getByText('nobody left')).toBeInTheDocument();
@@ -301,7 +307,7 @@ describe('Product Usage', () => {
 
   it('names customers left out of the money figures', async () => {
     mockFetch({ ...stats, rows: [row({ unpriced: 2 })] });
-    renderDashboard();
+    renderProductUsage();
 
     expect(
       await screen.findByText(/2 customers counted in every seat and health figure/)
@@ -312,7 +318,7 @@ describe('Product Usage', () => {
 
   it('splits each product’s ARR by the health of the accounts holding it', async () => {
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     expect(await screen.findByText('ARR by product')).toBeInTheDocument();
     expect(screen.getByText(/split by the health of the accounts holding it/)).toBeInTheDocument();
@@ -320,7 +326,7 @@ describe('Product Usage', () => {
 
   it('charts churn by money and leaves the clean products out', async () => {
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     expect(await screen.findByText('Churn by product')).toBeInTheDocument();
     expect(
@@ -330,7 +336,7 @@ describe('Product Usage', () => {
 
   it('says so when nothing has churned at all', async () => {
     mockFetch({ ...stats, rows: [row()] });
-    renderDashboard();
+    renderProductUsage();
 
     expect(
       await screen.findByText('No customers in this selection have churned.')
@@ -351,7 +357,7 @@ describe('Product Usage', () => {
         worst_churn: null,
       },
     });
-    renderDashboard();
+    renderProductUsage();
 
     expect(
       await screen.findByText(/No products on this organisation's list yet/)
@@ -363,7 +369,7 @@ describe('Product Usage', () => {
 
   it('leads the filter bar with Product, the axis of the screen', async () => {
     mockFetch();
-    renderDashboard();
+    renderProductUsage();
 
     const products = await screen.findByLabelText('Product');
     expect(within(products).getByRole('option', { name: 'Product A' })).toBeInTheDocument();
@@ -376,7 +382,7 @@ describe('Product Usage', () => {
   it('refetches with a query string when a filter changes', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByLabelText('Product');
     await user.selectOptions(screen.getByLabelText('Product'), '1');
@@ -387,7 +393,7 @@ describe('Product Usage', () => {
   it('clears the filters', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderProductUsage();
 
     await screen.findByLabelText('Primary Owner');
     await user.selectOptions(screen.getByLabelText('Primary Owner'), '5');
@@ -396,9 +402,19 @@ describe('Product Usage', () => {
     await waitFor(() => expect(lastUrl(fetchMock)).toMatch(/\/customers\/products\/$/));
   });
 
+  it('sends the URL filters to the API', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => stats });
+    vi.stubGlobal('fetch', fetchMock);
+    renderProductUsage('/dashboard/revenue/products?product=1&owner=5');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('product=1');
+    expect(url).toContain('owner=5');
+  });
+
   it('surfaces a failed fetch', async () => {
     mockFetch({ detail: 'Server exploded' }, 500);
-    renderDashboard();
+    renderProductUsage();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Server exploded|Could not load/);
   });

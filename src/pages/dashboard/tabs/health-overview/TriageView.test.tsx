@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { renderWithHealth } from './testUtils';
+import { renderWithHealth, renderHealthAt } from './testUtils';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { TriageView } from './TriageView';
@@ -19,7 +19,11 @@ import { scoreRow } from './triage';
 // never on a specific account or count. (The scoring itself is pinned to
 // fixtures in triage.test.ts.)
 
-const rows = () => screen.queryAllByRole('listitem');
+// Scoped to the risk-score list specifically: the KPI strip above it also
+// renders `<li>` items now that `TriageTiles` shares `KpiStrip`, so an
+// unscoped `listitem` query would double-count them as queue rows.
+const queue = () => screen.getByRole('list', { name: /accounts by risk score/i });
+const rows = () => within(queue()).queryAllByRole('listitem');
 const statusOf = (row: HTMLElement) =>
   within(row).getByText(/^(Poor|Average|Good)$/).textContent as 'Poor' | 'Average' | 'Good';
 
@@ -116,35 +120,54 @@ describe('Health Overview routing', () => {
     renderWithHealth(
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
+          <Route path="/dashboard/health" element={<HealthOverviewContainer />}>
             <Route index element={<Navigate to="triage" replace />} />
             <Route path="triage" element={<TriageView />} />
-            <Route path="controls" element={<p>Controls stub</p>} />
+            <Route path="distribution" element={<p>Distribution stub</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
       { rows: BOOK },
     );
 
-  it('lands on Triage rather than Controls', () => {
-    renderAt('/dashboard/advance/health');
+  it('lands on Triage rather than Distribution', () => {
+    renderAt('/dashboard/health');
     expect(screen.getByRole('heading', { name: /accounts by risk score/i })).toBeInTheDocument();
   });
 
-  it('offers Triage first in the sub-tab bar, ahead of the rest', () => {
-    renderAt('/dashboard/advance/health/triage');
-    const tabs = screen.getAllByRole('link').map((a) => a.textContent?.trim());
-    expect(tabs[0]).toBe('Triage');
-    expect(tabs).toContain('Controls');
-  });
+  // Tab order and cross-tab navigation now live in the shared sub-view nav
+  // (`DashboardToolbar`, fed by `AREAS` in `areas.ts`), which has its own
+  // tests — the container no longer renders a tab bar of its own for this
+  // to reach through.
 
-  it('still routes through to Controls', async () => {
-    const user = userEvent.setup();
-    renderAt('/dashboard/advance/health/triage');
+  // DashboardToolbar's own test mounts it one level deep
+  // (`/dashboard/health/:view`), which doesn't match production: the real
+  // tree is `health` (AreaLayout) -> a pathless container route -> the view
+  // route. Only this shape — the real route tree, via `renderHealthAt` —
+  // catches a toolbar link that resolves against the wrong ancestor.
+  it('links every sub-view to its own area path through the real route tree', () => {
+    renderHealthAt('/dashboard/health/triage', { rows: BOOK });
 
-    await user.click(screen.getByRole('link', { name: 'Controls' }));
-    expect(screen.getByText('Controls stub')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /accounts by risk score/i })).not.toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: /views/i });
+    expect(within(nav).getByRole('link', { name: 'Triage' })).toHaveAttribute(
+      'href',
+      '/dashboard/health/triage',
+    );
+    expect(within(nav).getByRole('link', { name: 'Triage' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    expect(within(nav).getByRole('link', { name: 'Divergence' })).toHaveAttribute(
+      'href',
+      '/dashboard/health/divergence',
+    );
+    expect(within(nav).getByRole('link', { name: 'Divergence' })).not.toHaveAttribute(
+      'aria-current',
+    );
+    expect(within(nav).getByRole('link', { name: 'Distribution' })).toHaveAttribute(
+      'href',
+      '/dashboard/health/distribution',
+    );
   });
 });
 

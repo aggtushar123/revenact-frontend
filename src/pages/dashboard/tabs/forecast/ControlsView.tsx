@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../../../hooks';
 import { fetchForecast } from '../../../../features/forecast/forecastSlice';
 import { formatCompactMoney } from '../../../../features/customers/formatters';
+import { Kpi, KpiStrip } from '../../shared/Kpi';
 import { ArrBridgeChart } from './charts/ArrBridgeChart';
 import { ScenarioRange } from './charts/ScenarioRange';
 import { PipelineByStage } from './charts/PipelineByStage';
@@ -11,36 +12,6 @@ import { SwingTable } from './charts/SwingTable';
 /** The filter query string, handed down by ForecastContainer's own bar. */
 export interface ForecastContext {
   query: string;
-}
-
-interface TileProps {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: 'neutral' | 'danger' | 'success';
-}
-
-function Tile({ label, value, detail, tone = 'neutral' }: TileProps) {
-  const accent = {
-    neutral: 'border-l-info',
-    danger: 'border-l-danger',
-    success: 'border-l-success',
-  }[tone];
-  const figure = { neutral: 'text-ink', danger: 'text-danger', success: 'text-success' }[tone];
-
-  return (
-    <div
-      className={`bg-surface border border-line-subtle rounded-lg shadow-sm px-[13px] py-[11px] border-l-[3px] ${accent}`}
-    >
-      <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">{label}</div>
-      <div
-        className={`text-[25px] font-semibold leading-tight tracking-tight mt-[3px] tabular-nums ${figure}`}
-      >
-        {value}
-      </div>
-      <div className="text-[11px] text-ink-muted mt-[1px]">{detail}</div>
-    </div>
-  );
 }
 
 /**
@@ -94,8 +65,8 @@ export function ControlsView() {
           isLoading && stats ? 'opacity-60' : ''
         }`}
       >
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-          <Tile
+        <KpiStrip>
+          <Kpi
             label="ARR today"
             value={bridge ? money(bridge.opening_arr) : '—'}
             detail={
@@ -104,7 +75,7 @@ export function ControlsView() {
                 : 'loading'
             }
           />
-          <Tile
+          <Kpi
             label="Forecast ARR"
             value={bridge ? money(bridge.forecast_arr) : '—'}
             detail={
@@ -112,21 +83,19 @@ export function ControlsView() {
                 ? `${bridge.net_change >= 0 ? '+' : ''}${money(bridge.net_change)} against today`
                 : 'loading'
             }
-            tone={bridge && bridge.net_change < 0 ? 'danger' : 'success'}
           />
-          <Tile
+          <Kpi
             label="Net revenue retention"
             value={bridge?.nrr === null || bridge === undefined ? '—' : `${bridge.nrr}%`}
             detail="before any new logos"
-            tone={bridge && bridge.nrr !== null && bridge.nrr < 100 ? 'danger' : 'success'}
           />
-          <Tile
+          <Kpi
             label="At risk"
             value={bridge ? money(bridge.churn + bridge.contraction) : '—'}
             detail="weighted churn and contraction"
-            tone="danger"
+            tone="loss"
           />
-        </div>
+        </KpiStrip>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           <div className="xl:col-span-2 bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">

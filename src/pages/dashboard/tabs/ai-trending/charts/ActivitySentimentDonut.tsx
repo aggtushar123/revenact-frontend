@@ -2,6 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { InteractionBucket } from '../../../../../features/interactions/interactionsSlice';
 import { SENTIMENT_COLORS, FALLBACK_COLOR, compact, percentOf } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 /** Interactions by sentiment, across all three sources. */
 export function ActivitySentimentDonut({ data }: { data: InteractionBucket[] }) {
@@ -54,11 +55,7 @@ export function ActivitySentimentDonut({ data }: { data: InteractionBucket[] }) 
               ))}
             </Pie>
             <Tooltip
-              contentStyle={{
-                borderRadius: '8px',
-                border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-              }}
+              contentStyle={TOOLTIP_STYLE}
               itemStyle={{ fontSize: '13px', fontWeight: 500 }}
             />
           </PieChart>

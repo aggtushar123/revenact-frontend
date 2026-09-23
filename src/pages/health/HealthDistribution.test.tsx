@@ -5,7 +5,8 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
-import { HealthPage } from './HealthPage';
+import { MemoryRouter } from 'react-router-dom';
+import { HealthDistribution } from './HealthDistribution';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): a real Redux store (this
@@ -123,7 +124,7 @@ const ACCOUNT_STATS = {
   ),
 };
 
-function renderPage() {
+function renderPage(url = '/dashboard/health/distribution') {
   const store = configureStore({
     reducer: { customers: customersReducer, auth: authReducer },
     preloadedState: {
@@ -161,7 +162,9 @@ function renderPage() {
   });
   render(
     <Provider store={store}>
-      <HealthPage />
+      <MemoryRouter initialEntries={[url]}>
+        <HealthDistribution />
+      </MemoryRouter>
     </Provider>
   );
 }
@@ -180,7 +183,7 @@ function fetchMockWith(customers: unknown[], accounts: unknown[] = []) {
   });
 }
 
-describe('HealthPage', () => {
+describe('HealthDistribution', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
   });
@@ -304,5 +307,24 @@ describe('HealthPage', () => {
     renderPage();
 
     expect(await screen.findByText('Server error.')).toBeInTheDocument();
+  });
+
+  it('warns that a shared filter is on, since /customers/stats/ and /accounts/stats/ can\'t honour it', async () => {
+    vi.stubGlobal('fetch', fetchMockWith([]));
+    renderPage('/dashboard/health/distribution?owner=1');
+
+    expect(await screen.findByText(
+      'Covers the whole book; the filters above do not apply to this section.'
+    )).toBeInTheDocument();
+  });
+
+  it('says nothing when no shared filter is on', async () => {
+    vi.stubGlobal('fetch', fetchMockWith([]));
+    renderPage('/dashboard/health/distribution');
+
+    await screen.findByText('Good'); // wait for the section to render
+    expect(
+      screen.queryByText('Covers the whole book; the filters above do not apply to this section.')
+    ).not.toBeInTheDocument();
   });
 });

@@ -13,11 +13,12 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { Concentration } from '../../../../../features/portfolio/portfolioSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
 
 const HEALTH_COLORS: Record<string, string> = {
-  good: 'var(--success)',
-  average: 'var(--warning)',
-  poor: 'var(--danger)',
+  good: ROLE.gain,
+  average: ROLE.caution,
+  poor: ROLE.loss,
 };
 
 export interface ConcentrationChartProps {
@@ -107,12 +108,8 @@ export function ConcentrationChart({ concentration, currency }: ConcentrationCha
                 tickFormatter={(value: number) => `${value}%`}
               />
               <Tooltip
-                cursor={{ fill: 'var(--bg-subtle)' }}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
-                }}
+                cursor={{ fill: CURSOR_FILL }}
+                contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
                 formatter={(value, name, item) =>
                   name === 'cumulative'
                     ? [`${value}% of the book cumulatively`, item?.payload?.name ?? '']
@@ -124,7 +121,7 @@ export function ConcentrationChart({ concentration, currency }: ConcentrationCha
               />
               <Bar {...STATIC_SERIES} yAxisId="arr" dataKey="arr" radius={[3, 3, 0, 0]}>
                 {data.map((row) => (
-                  <Cell key={row.name} fill={HEALTH_COLORS[row.health] ?? 'var(--info)'} />
+                  <Cell key={row.name} fill={HEALTH_COLORS[row.health] ?? ROLE.faint} />
                 ))}
               </Bar>
               <Line
@@ -132,7 +129,7 @@ export function ConcentrationChart({ concentration, currency }: ConcentrationCha
                 yAxisId="share"
                 type="monotone"
                 dataKey="cumulative"
-                stroke="var(--ink, #111827)"
+                stroke={ROLE.ink}
                 strokeWidth={2}
                 dot={{ r: 2 }}
               />

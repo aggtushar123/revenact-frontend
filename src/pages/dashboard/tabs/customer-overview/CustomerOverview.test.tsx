@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import portfolioReducer from '../../../../features/portfolio/portfolioSlice';
+import { AreaLayout } from '../../AreaLayout';
 import { CustomerOverviewContainer } from '../CustomerOverviewContainer';
 import { ControlsView } from './ControlsView';
 
@@ -112,18 +113,20 @@ function mockFetch(body: unknown = stats, status = 200) {
   return spy;
 }
 
-function renderDashboard() {
+function renderCustomerOverview(url = '/dashboard/revenue/customers') {
   const store = configureStore({ reducer: { portfolio: portfolioReducer } });
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/customer/controls']}>
+      <MemoryRouter initialEntries={[url]}>
         <Routes>
-          <Route path="/customer" element={<CustomerOverviewContainer />}>
-            <Route path="controls" element={<ControlsView />} />
+          <Route path="/dashboard/revenue" element={<AreaLayout area="revenue" />}>
+            <Route element={<CustomerOverviewContainer />}>
+              <Route path="customers" element={<ControlsView />} />
+            </Route>
           </Route>
         </Routes>
       </MemoryRouter>
-    </Provider>
+    </Provider>,
   );
   return store;
 }
@@ -131,7 +134,10 @@ function renderDashboard() {
 const lastUrl = (spy: ReturnType<typeof mockFetch>) =>
   spy.mock.calls[spy.mock.calls.length - 1][0];
 
-const tile = (label: string) => screen.getByText(label).parentElement as HTMLElement;
+// getByText would be ambiguous for "Customers": the sub-view switch in the
+// bar reads the same word as the KPI tile it sits above.
+const tile = (label: string) =>
+  screen.getAllByText(label).find((el) => el.tagName !== 'A')!.parentElement as HTMLElement;
 
 describe('Customer Overview', () => {
   beforeEach(() => {
@@ -140,16 +146,16 @@ describe('Customer Overview', () => {
 
   it('fetches the portfolio on mount', async () => {
     const fetchMock = mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     await waitFor(() => expect(lastUrl(fetchMock)).toContain('/customers/overview/'));
   });
 
   it('leads with how many customers there are and what they average', async () => {
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
-    await screen.findByText('Customers');
+    await screen.findAllByText('Customers');
     expect(within(tile('Customers')).getByText('9')).toBeInTheDocument();
     expect(within(tile('Customers')).getByText(/\$688\.6K · \$76\.5K average/)).toBeInTheDocument();
   });
@@ -158,7 +164,7 @@ describe('Customer Overview', () => {
     // The figure only means something because churned customers are counted;
     // over survivors alone it would always be 100%.
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     await screen.findByText('Logo retention');
     expect(within(tile('Logo retention')).getByText('69.2%')).toBeInTheDocument();
@@ -169,7 +175,7 @@ describe('Customer Overview', () => {
 
   it('separates churn in the last year from churn all time', async () => {
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     await screen.findByText('Churned in 12 months');
     expect(within(tile('Churned in 12 months')).getByText('3')).toBeInTheDocument();
@@ -180,7 +186,7 @@ describe('Customer Overview', () => {
 
   it('puts concentration on its own tile and flags it when it is high', async () => {
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     await screen.findByText('Top 3 concentration');
     const card = tile('Top 3 concentration');
@@ -194,7 +200,7 @@ describe('Customer Overview', () => {
       kpis: { ...stats.kpis, active: 0, churned: 0, logo_retention: null, average_arr: null },
       concentration: { ...stats.concentration, rows: [], top_three_share: null },
     });
-    renderDashboard();
+    renderCustomerOverview();
 
     await screen.findByText('Logo retention');
     expect(within(tile('Logo retention')).getByText('—')).toBeInTheDocument();
@@ -204,7 +210,7 @@ describe('Customer Overview', () => {
 
   it('draws the concentration Pareto and names the folded tail', async () => {
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     expect(await screen.findByText('Revenue concentration')).toBeInTheDocument();
     expect(screen.getByText('top 3 = 55.5% of ARR')).toBeInTheDocument();
@@ -215,7 +221,7 @@ describe('Customer Overview', () => {
 
   it('draws cohorts and counts the undated apart', async () => {
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     expect(await screen.findByText('Cohort survival')).toBeInTheDocument();
     expect(
@@ -225,7 +231,7 @@ describe('Customer Overview', () => {
 
   it('ranks churn reasons by the money that left', async () => {
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     await screen.findByText('Why they left');
     expect(screen.getByText('Other')).toBeInTheDocument();
@@ -238,7 +244,7 @@ describe('Customer Overview', () => {
     // typed. It is one line, though: an empty reason is worth knowing and is
     // not worth a bar of its own.
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     await screen.findByText('Why they left');
     expect(screen.getByText('Nothing lost to: Price, Missing capability.')).toBeInTheDocument();
@@ -250,7 +256,7 @@ describe('Customer Overview', () => {
       ...stats,
       churn_reasons: [{ value: 'price', reason: 'Price', customers: 0, arr: 0 }],
     });
-    renderDashboard();
+    renderCustomerOverview();
 
     expect(
       await screen.findByText('No customers in this selection have churned.')
@@ -259,7 +265,7 @@ describe('Customer Overview', () => {
 
   it('says so when nothing has churned', async () => {
     mockFetch({ ...stats, churn_reasons: [] });
-    renderDashboard();
+    renderCustomerOverview();
 
     expect(
       await screen.findByText('No customers in this selection have churned.')
@@ -268,7 +274,7 @@ describe('Customer Overview', () => {
 
   it('shows composition by size and by lifecycle, with counts and money', async () => {
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     await screen.findByText('By size');
     expect(screen.getByText(/\$321\.2K · 4 customers/)).toBeInTheDocument();
@@ -278,7 +284,7 @@ describe('Customer Overview', () => {
 
   it('names customers left out of the money figures', async () => {
     mockFetch({ ...stats, kpis: { ...stats.kpis, unpriced: 2 } });
-    renderDashboard();
+    renderCustomerOverview();
 
     expect(
       await screen.findByText(/2 customers counted in the logo figures and in none of the money/)
@@ -289,7 +295,7 @@ describe('Customer Overview', () => {
 
   it('offers churned customers in the Account filter, unlike the other dashboards', async () => {
     mockFetch();
-    renderDashboard();
+    renderCustomerOverview();
 
     const accounts = await screen.findByLabelText('Account');
     // WeWork is churned on the real book; this screen is about it.
@@ -299,7 +305,7 @@ describe('Customer Overview', () => {
   it('refetches with a query string when a filter changes', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderCustomerOverview();
 
     await screen.findByLabelText('Primary Owner');
     await user.selectOptions(screen.getByLabelText('Primary Owner'), '5');
@@ -310,7 +316,7 @@ describe('Customer Overview', () => {
   it('clears the filters', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderCustomerOverview();
 
     await screen.findByLabelText('Primary Owner');
     await user.selectOptions(screen.getByLabelText('Primary Owner'), '5');
@@ -319,9 +325,19 @@ describe('Customer Overview', () => {
     await waitFor(() => expect(lastUrl(fetchMock)).toMatch(/\/customers\/overview\/$/));
   });
 
+  it('sends the URL filters to the API', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => stats });
+    vi.stubGlobal('fetch', fetchMock);
+    renderCustomerOverview('/dashboard/revenue/customers?owner=5&lifecycle=live');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('owner=5');
+    expect(url).toContain('lifecycle=live');
+  });
+
   it('surfaces a failed fetch', async () => {
     mockFetch({ detail: 'Server exploded' }, 500);
-    renderDashboard();
+    renderCustomerOverview();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Server exploded|Could not load/);
   });

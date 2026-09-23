@@ -5,7 +5,11 @@
 
 export interface FilterOption {
   value: string;
+  /** What the dropdown lists — may carry detail such as a count. */
   label: string;
+  /** Shorter text for the chip once picked, e.g. the name without the
+   *  count the dropdown shows. Defaults to `label`. */
+  display?: string;
 }
 
 /** A labelled group of options, rendered as an `<optgroup>`. */
@@ -24,6 +28,7 @@ export function FilterSelect({
   selected,
   onChange,
   options,
+  isActive,
 }: {
   label: string;
   value: string;
@@ -32,14 +37,18 @@ export function FilterSelect({
   /** Flat options, or groups of them — a grouped list renders `<optgroup>`s,
    *  which is how one chip can offer organisations and accounts at once. */
   options: (FilterOption | FilterGroup)[];
+  /** Whether the chip shows as narrowing the view — decided by the caller,
+   *  who knows the filter's default (a period sitting on its default is
+   *  not a filter someone applied, even though its value isn't "All"). */
+  isActive: boolean;
 }) {
-  const isActive = value !== 'All';
 
   return (
-    <label className="relative flex items-center h-full group cursor-pointer">
+    <label className="relative flex items-center h-9 group cursor-pointer">
       <span className="sr-only">{label}</span>
       <span
-        className={`flex items-center gap-1 px-2 text-[12.5px] font-bold whitespace-nowrap border-b-[2px] h-full transition-all ${
+        // The focusable <select> is invisible, so its focus shows here.
+        className={`flex items-center gap-1 px-2 text-[12.5px] font-bold whitespace-nowrap border-b-[2px] h-full transition-all group-focus-within:outline group-focus-within:outline-2 group-focus-within:outline-accent ${
           isActive
             ? 'border-accent text-accent bg-accent-dim/20'
             : 'border-transparent text-ink-muted group-hover:text-ink group-hover:bg-subtle/50'

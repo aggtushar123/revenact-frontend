@@ -58,7 +58,7 @@ export function CompositionSplit({
               </div>
               <div className="mt-[3px] h-[10px] rounded-[3px] bg-subtle overflow-hidden">
                 <div
-                  className="h-full rounded-[3px] bg-info/70"
+                  className="h-full rounded-[3px] bg-ink-faint"
                   style={{ width: `${(row.arr / widest) * 100}%` }}
                 />
               </div>

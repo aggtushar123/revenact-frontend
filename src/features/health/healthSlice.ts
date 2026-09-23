@@ -170,6 +170,14 @@ export const healthSlice = createSlice({
       // the dashboard with both chips looking perfectly reasonable.
       state.filters = pruneFilters(state.rows, next);
     },
+    /** Set all three filters exactly as given — no pruning. The Health
+     *  container copies the URL in with this: pruning here against rows that
+     *  may not have loaded yet (a deep link on a cold load) dropped every
+     *  filter to null while the URL still carried it. Contradictions are
+     *  resolved in the URL instead, once rows exist (see the container). */
+    replaceHealthFilters(state, action: PayloadAction<HealthFilters>) {
+      state.filters = { ...action.payload };
+    },
     clearHealthFilters(state) {
       state.filters = NO_FILTERS;
     },
@@ -199,6 +207,6 @@ export const healthSlice = createSlice({
   },
 });
 
-export const { setHealthFilter, clearHealthFilters } = healthSlice.actions;
+export const { setHealthFilter, replaceHealthFilters, clearHealthFilters } = healthSlice.actions;
 
 export default healthSlice.reducer;

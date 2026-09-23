@@ -2,6 +2,7 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { TicketBucket } from '../../../../../features/tickets/ticketsSlice';
 import { STATUS_COLORS, FALLBACK_COLOR } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 export function StatusDonut({ data }: { data: TicketBucket[] }) {
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
@@ -58,8 +59,8 @@ export function StatusDonut({ data }: { data: TicketBucket[] }) {
                 <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] ?? FALLBACK_COLOR} />
               ))}
             </Pie>
-            <Tooltip 
-               contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+            <Tooltip
+               contentStyle={TOOLTIP_STYLE}
                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                formatter={(value: any) => [value, 'Count']}
             />

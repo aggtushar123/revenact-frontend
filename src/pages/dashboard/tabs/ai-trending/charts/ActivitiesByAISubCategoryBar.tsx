@@ -3,6 +3,7 @@ import type { InteractionBucket } from '../../../../../features/interactions/int
 import { niceMax } from '../chartTheme';
 import { UnclassifiedNote } from './UnclassifiedNote';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
 
 /** Subcategories are finer-grained than categories, so a couple more bars earn
  *  their place here — but the same readability ceiling applies. */
@@ -59,14 +60,10 @@ export function ActivitiesByAISubCategoryBar({
               width={140}
             />
             <Tooltip
-              cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-              contentStyle={{
-                borderRadius: '8px',
-                border: 'none',
-                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-              }}
+              cursor={{ fill: CURSOR_FILL }}
+              contentStyle={TOOLTIP_STYLE}
             />
-            <Bar {...STATIC_SERIES} dataKey="value" fill="var(--info)" radius={[0, 4, 4, 0]} barSize={16}>
+            <Bar {...STATIC_SERIES} dataKey="value" fill={ROLE.ink} radius={[0, 4, 4, 0]} barSize={16}>
               <LabelList
                 dataKey="value"
                 position="right"

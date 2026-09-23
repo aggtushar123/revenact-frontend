@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { HealthDataRow, HealthStatus } from '../mockData';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 interface CurrentHealthDonutProps {
   data: HealthDataRow[];
@@ -105,8 +106,8 @@ export function CurrentHealthDonut({ data, activeFilter, onSegmentClick }: Curre
                 );
               })}
             </Pie>
-            <Tooltip 
-              contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-default)', boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
               itemStyle={{ fontSize: '13px', fontWeight: 500 }}
               formatter={(value, name) => [`${value}`, name]}
             />

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { act, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { healthRow, renderWithHealth } from './testUtils';
+import { healthRow, renderHealthAt, renderWithHealth } from './testUtils';
 import { filterOptions } from './useHealthOverview';
 import { HealthOverviewContainer } from '../HealthOverviewContainer';
 import { TriageView } from './TriageView';
@@ -57,12 +57,15 @@ function renewalIn(days: number) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** The container plus one tab, through the real router. */
-function renderTab(element: React.ReactElement, path: string, options = {}) {
+/** The container plus one tab, through the real router. `search` is the
+ *  URL's own query string — the container now syncs URL -> Redux, so a
+ *  filter that needs to be "on" when the tab mounts has to arrive that way,
+ *  not through a preloaded store. */
+function renderTab(element: React.ReactElement, path: string, options = {}, search = '') {
   return renderWithHealth(
-    <MemoryRouter initialEntries={[`/dashboard/advance/health/${path}`]}>
+    <MemoryRouter initialEntries={[`/dashboard/health/${path}${search}`]}>
       <Routes>
-        <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
+        <Route path="/dashboard/health" element={<HealthOverviewContainer />}>
           <Route index element={<Navigate to="triage" replace />} />
           <Route path={path} element={element} />
         </Route>
@@ -167,7 +170,7 @@ describe('Primary Owner filter', () => {
 
   it('narrows the money on the Renewal tab too, from the same chip', async () => {
     const user = userEvent.setup();
-    renderTab(<RenewalView />, 'renewal-date');
+    renderTab(<RenewalView />, 'renewals');
 
     // $260K across all three accounts renewing inside 90 days.
     expect(within(tile('Up for renewal')).getByText('$260.0K')).toBeInTheDocument();
@@ -220,21 +223,22 @@ describe('Primary Owner filter', () => {
 
     await user.selectOptions(screen.getByLabelText('Primary Owner'), '7');
 
-    // Scoped to the chip: the name also appears in the triage queue's own
-    // owner column, which is the point — both are reading the same row.
+    // The chip reads the name alone; the count belongs to the dropdown,
+    // where it helps choose (see the container's `choices` helper).
     const chip = screen.getByLabelText('Primary Owner').parentElement as HTMLElement;
-    expect(within(chip).getByText('Gerry Hill')).toBeInTheDocument();
+    expect(within(chip).getByText('Gerry Hill', { selector: '.ml-1' })).toBeInTheDocument();
+    expect(within(chip).queryByText('Gerry Hill (1)', { selector: '.ml-1' })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Gerry Hill (1)' })).toBeInTheDocument();
   });
 
-  it('survives moving between tabs', () => {
-    // Narrowing to one CSM and then moving from Triage to Renewal Date is one
-    // thought, not two — so the filter lives in the store, not in the view.
-    const { store } = renderTab(<RenewalView />, 'renewal-date', {
-      filters: { ...NO_FILTERS, owner: '3' },
-    });
+  it('survives moving between tabs', async () => {
+    // Narrowing to one CSM and then moving from Triage to Renewals is one
+    // thought, not two — so the filter lives in the URL, not in a view's own
+    // state, and the container reads it into the store on mount.
+    const { store } = renderTab(<RenewalView />, 'renewals', {}, '?owner=3');
 
+    expect(await within(tile('Up for renewal')).findByText('$50.0K')).toBeInTheDocument();
     expect(store.getState().health.filters.owner).toBe('3');
-    expect(within(tile('Up for renewal')).getByText('$50.0K')).toBeInTheDocument();
   });
 });
 
@@ -260,7 +264,7 @@ describe('Lifecycle Stage filter', () => {
 
     await user.selectOptions(select, 'pilot');
     const chip = select.parentElement as HTMLElement;
-    expect(within(chip).getByText('Pilot')).toBeInTheDocument();
+    expect(within(chip).getByText('Pilot', { selector: '.ml-1' })).toBeInTheDocument();
   });
 });
 
@@ -381,6 +385,49 @@ describe('healthSlice filters', () => {
     expect(
       healthReducer(set, setHealthFilter({ key: 'owner', value: null })).filters.owner
     ).toBeNull();
+  });
+});
+
+describe('URL filters', () => {
+  it('applies URL filters to the book', async () => {
+    renderHealthAt('/dashboard/health/triage?owner=1', {
+      rows: [healthRow({ id: '1', ownerKey: '1' }), healthRow({ id: '2', ownerKey: '2', account: 'Beta' })],
+    });
+
+    expect(await screen.findByText('1 of 2 accounts')).toBeInTheDocument();
+  });
+
+  it('applies a deep-linked filter once the book arrives after mount', async () => {
+    // Cold load: nothing in the store yet, the fetch still in flight. The
+    // URL filter must survive until the rows land rather than being pruned
+    // against an empty book.
+    const { store } = renderHealthAt('/dashboard/health/triage?owner=7', {
+      rows: [],
+      loaded: false,
+      isLoading: true,
+    });
+
+    act(() => {
+      store.dispatch({
+        type: 'health/fetchHealthOverview/fulfilled',
+        payload: { rows: BOOK, historyMonths: 12, truncated: false, currency: 'USD', unconvertedCount: 0 },
+      });
+    });
+
+    expect(await screen.findByText('1 of 3 accounts')).toBeInTheDocument();
+    expect(screen.getByText('Nova Enterprises')).toBeInTheDocument();
+    expect(screen.queryByText('Hyatt Hotels')).not.toBeInTheDocument();
+  });
+
+  it('clears a filter the loaded book cannot honour from the URL, not just from Redux', async () => {
+    // Owner 3 does not hold account 1: the narrower key gives way, and it
+    // goes from the URL so the chip, the Clear count and other areas agree.
+    renderHealthAt('/dashboard/health/triage?owner=3&customer=1', { rows: BOOK });
+
+    expect(await screen.findByText('1 of 3 accounts')).toBeInTheDocument();
+    expect(screen.getByText('Hyatt Hotels')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Clear 1' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Account')).toHaveValue('');
   });
 });
 

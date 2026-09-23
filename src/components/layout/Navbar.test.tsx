@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
@@ -512,5 +512,38 @@ describe('Navbar notification bell', () => {
 
     expect(notificationApi.markAllNotificationsRead).toHaveBeenCalled();
     expect(screen.queryByText('1')).not.toBeInTheDocument();
+  });
+});
+
+describe('Navbar dashboard area tabs', () => {
+  it('carries only the shared filters into every area link', () => {
+    // owner/lifecycle/customer mean the same thing in every area; a period
+    // key like `days` belongs to one view and must not leak into another.
+    renderNavbar('/dashboard/health/usage?owner=7&lifecycle=pilot&customer=3&days=30');
+    const nav = screen.getByRole('navigation', { name: 'Dashboard areas' });
+    for (const name of ['Overview', 'Revenue', 'Health', 'Support']) {
+      const href = within(nav).getByRole('link', { name }).getAttribute('href')!;
+      const params = new URLSearchParams(href.split('?')[1] ?? '');
+      expect(params.get('owner')).toBe('7');
+      expect(params.get('lifecycle')).toBe('pilot');
+      expect(params.get('customer')).toBe('3');
+      expect(params.has('days')).toBe(false);
+    }
+  });
+
+  it('links to the bare area when no shared filter is set', () => {
+    renderNavbar('/dashboard/health/usage?days=30');
+    const nav = screen.getByRole('navigation', { name: 'Dashboard areas' });
+    expect(within(nav).getByRole('link', { name: 'Revenue' })).toHaveAttribute('href', '/dashboard/revenue');
+  });
+
+  it('shows keyboard focus on the area tabs', () => {
+    renderNavbar('/dashboard/health/usage');
+    const nav = screen.getByRole('navigation', { name: 'Dashboard areas' });
+    expect(within(nav).getByRole('link', { name: 'Revenue' })).toHaveClass(
+      'focus-visible:outline',
+      'focus-visible:outline-2',
+      'focus-visible:outline-accent',
+    );
   });
 });

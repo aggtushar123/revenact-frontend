@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import metricsReducer from '../../features/metrics/metricsSlice';
@@ -92,9 +93,11 @@ function renderAll(role: 'admin' | 'csm' = 'admin') {
   });
   render(
     <Provider store={store}>
-      <SignalsPanel />
-      <MetricLayerPanel />
-      <DriversPanel />
+      <MemoryRouter>
+        <SignalsPanel />
+        <MetricLayerPanel />
+        <DriversPanel />
+      </MemoryRouter>
     </Provider>
   );
 }

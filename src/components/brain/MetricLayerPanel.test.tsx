@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
+import { MemoryRouter } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import metricsReducer from '../../features/metrics/metricsSlice';
@@ -53,7 +54,9 @@ function renderPanel(role: 'admin' | 'csm' = 'admin') {
   });
   render(
     <Provider store={store}>
-      <MetricLayerPanel />
+      <MemoryRouter>
+        <MetricLayerPanel />
+      </MemoryRouter>
     </Provider>
   );
 }
@@ -132,5 +135,15 @@ describe('MetricLayerPanel', () => {
     renderPanel();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Server exploded|Could not load/);
+  });
+
+  it('links each group to its dashboard home', async () => {
+    mockFetch();
+    renderPanel();
+
+    expect(await screen.findByRole('link', { name: 'Open Revenue in dashboard' })).toHaveAttribute(
+      'href',
+      '/dashboard/revenue/forecast',
+    );
   });
 });

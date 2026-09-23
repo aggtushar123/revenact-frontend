@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'recharts';
 import type { HealthDataRow } from '../mockData';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { ROLE, TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 export function AccountsLastTouchLine({ data }: { data: HealthDataRow[] }) {
   const chartData = useMemo(() => {
@@ -38,17 +39,17 @@ export function AccountsLastTouchLine({ data }: { data: HealthDataRow[] }) {
               dy={15}
             />
             <YAxis hide />
-            <Tooltip 
-              contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-default)', boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
             />
-            
+
             <Line {...STATIC_SERIES}
-              type="monotone" 
-              dataKey="accounts" 
-              stroke="var(--accent)" 
-              strokeWidth={2} 
+              type="monotone"
+              dataKey="accounts"
+              stroke={ROLE.ink}
+              strokeWidth={2}
               dot={false}
-              activeDot={{ r: 6, fill: 'var(--accent)', strokeWidth: 0 }}
+              activeDot={{ r: 6, fill: ROLE.ink, strokeWidth: 0 }}
               label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10, dy: -5 }}
             />
           </LineChart>

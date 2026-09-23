@@ -1,7 +1,9 @@
-import { useMemo, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useAppSelector } from '../../../../hooks';
-import { FilterSelect } from '../../../../components/shared/FilterSelect';
+import { DashboardToolbar } from '../../shared/DashboardToolbar';
+import type { ToolbarFilter } from '../../shared/DashboardToolbar';
+import { toQuery, useDashboardFilters } from '../../shared/useDashboardFilters';
+import { useSubViews } from '../../useSubViews';
 import type { TicketOverviewContext } from './ControlsView';
 
 /** The date presets the "Ticket Date" filter offers. Relative to today
@@ -22,119 +24,79 @@ function isoDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-interface FilterState {
-  days: number | null;
-  owner: string;
-  priority: string;
-  account: string;
-}
+/** The `days` values a preset actually offers — anything else in the URL
+ *  (a hand-edited link, `?days=abc`) is nonsense rather than a filter, and
+ *  is treated the same as no `days` key at all rather than crashing
+ *  `isoDaysAgo` with `NaN`. */
+const DATE_PRESET_DAYS = DATE_PRESETS.map((p) => String(p.days ?? ''));
 
-const EMPTY: FilterState = { days: null, owner: '', priority: '', account: '' };
+// `days` is also Activity's key (Health area); safe because area links carry only SHARED_KEYS.
+const KEYS = ['days', 'owner', 'priority', 'customer'];
 
 /**
  * The Ticket Overview shell, and its filter bar.
  *
- * These four controls used to be `NavLink`s to routes that fell
- * through to a "Sub-tab under development" placeholder — so clicking
- * "Ticket Priority", a control that renders as a filter chip reading
- * "All", unmounted the entire dashboard. They are now the filters they
- * always looked like.
+ * The filters live in the URL rather than component state, the same move
+ * Health > Activity already made: switching tabs no longer resets them, and a
+ * filtered view can be linked. "Ticket Date" carries `clearable: false` — like
+ * Activity's window, it's the question being asked rather than a narrowing of
+ * the book, so Clear leaves it alone, and with no `days` param at all the
+ * chip reads "All" rather than assuming a default window.
  *
- * The selected value is passed to the Controls view as a query string
- * through `Outlet` context, built with `URLSearchParams` the same way
- * the Accounts list builds its own — rather than each chart filtering
- * client-side, which would mean fetching every ticket to the browser
- * and letting six charts disagree about what "filtered" means.
+ * The backend's `TicketStatsView` reads `from` (an ISO date), not `days`, so
+ * the URL's preset is translated at the query-building boundary rather than
+ * carried through as-is.
  */
 export function TicketOverviewContainer() {
-  const [filters, setFilters] = useState<FilterState>(EMPTY);
-
-  // The options come back alongside the numbers, so the bar has no
-  // fetch of its own — and its choices are scoped exactly like the
-  // stats are.
+  const subViews = useSubViews();
   const options = useAppSelector((state) => state.tickets.stats?.filters);
+  const { values } = useDashboardFilters(KEYS);
 
-  const query = useMemo(() => {
-    const params = new URLSearchParams();
-    if (filters.days !== null) params.set('from', isoDaysAgo(filters.days));
-    if (filters.owner) params.set('owner', filters.owner);
-    if (filters.priority) params.set('priority', filters.priority);
-    if (filters.account) params.set('account', filters.account);
-    return params.toString();
-  }, [filters]);
-
+  const base = toQuery({ owner: values.owner, priority: values.priority, customer: values.customer });
+  let query = base;
+  if (values.days && DATE_PRESET_DAYS.includes(values.days)) {
+    const params = new URLSearchParams(base);
+    params.set('from', isoDaysAgo(Number(values.days)));
+    query = params.toString();
+  }
   const context: TicketOverviewContext = { query };
-  const activeCount = [
-    filters.days !== null,
-    !!filters.owner,
-    !!filters.priority,
-    !!filters.account,
-  ].filter(Boolean).length;
 
-  const selectedDate = DATE_PRESETS.find((p) => p.days === filters.days) ?? DATE_PRESETS[0];
-  const selectedName = (list: { id: number; name: string }[] | undefined, id: string) =>
-    list?.find((o) => String(o.id) === id)?.name ?? 'All';
+  const filters: ToolbarFilter[] = [
+    {
+      key: 'days',
+      label: 'Ticket Date',
+      clearable: false,
+      options: DATE_PRESETS.map((p) => ({ value: String(p.days ?? ''), label: p.label })),
+    },
+    {
+      key: 'owner',
+      label: 'Primary Owner',
+      options: [
+        { value: '', label: 'All' },
+        ...(options?.owners ?? []).map((o) => ({ value: String(o.id), label: o.name })),
+      ],
+    },
+    {
+      key: 'priority',
+      label: 'Ticket Priority',
+      options: [
+        { value: '', label: 'All' },
+        ...(options?.priorities ?? []).map((p) => ({ value: p.value, label: p.name })),
+      ],
+    },
+    {
+      key: 'customer',
+      label: 'Account',
+      options: [
+        { value: '', label: 'All' },
+        ...(options?.customers ?? []).map((c) => ({ value: String(c.id), label: c.name })),
+      ],
+    },
+  ];
 
   return (
     <div className="flex flex-col h-full w-full">
-      <div className="flex items-center px-4 bg-surface border-b border-line-subtle shrink-0 overflow-x-auto scrollbar-none shadow-[0_2px_4px_rgba(0,0,0,0.01)] mb-4 rounded-lg mt-1">
-        <div className="flex items-center min-w-max h-[40px] gap-2">
-          <span className="text-[12.5px] font-bold text-ink px-2">Controls</span>
-
-          <FilterSelect
-            label="Ticket Date"
-            value={selectedDate.label}
-            selected={String(filters.days ?? '')}
-            onChange={(v) => setFilters((f) => ({ ...f, days: v === '' ? null : Number(v) }))}
-            options={DATE_PRESETS.map((p) => ({ value: String(p.days ?? ''), label: p.label }))}
-          />
-
-          <FilterSelect
-            label="Primary Owner"
-            value={selectedName(options?.owners, filters.owner)}
-            selected={filters.owner}
-            onChange={(v) => setFilters((f) => ({ ...f, owner: v }))}
-            options={[
-              { value: '', label: 'All' },
-              ...(options?.owners ?? []).map((o) => ({ value: String(o.id), label: o.name })),
-            ]}
-          />
-
-          <FilterSelect
-            label="Ticket Priority"
-            value={
-              options?.priorities.find((p) => p.value === filters.priority)?.name ?? 'All'
-            }
-            selected={filters.priority}
-            onChange={(v) => setFilters((f) => ({ ...f, priority: v }))}
-            options={[
-              { value: '', label: 'All' },
-              ...(options?.priorities ?? []).map((p) => ({ value: p.value, label: p.name })),
-            ]}
-          />
-
-          <FilterSelect
-            label="Account"
-            value={selectedName(options?.accounts, filters.account)}
-            selected={filters.account}
-            onChange={(v) => setFilters((f) => ({ ...f, account: v }))}
-            options={[
-              { value: '', label: 'All' },
-              ...(options?.accounts ?? []).map((a) => ({ value: String(a.id), label: a.name })),
-            ]}
-          />
-
-          {activeCount > 0 && (
-            <button
-              onClick={() => setFilters(EMPTY)}
-              className="text-[12px] font-bold text-accent hover:text-accent-hover transition-colors px-2 whitespace-nowrap"
-            >
-              Clear {activeCount}
-            </button>
-          )}
-        </div>
-      </div>
-
+      <DashboardToolbar subViews={subViews} filters={filters} />
       <div className="flex-1 w-full h-full">
         <Outlet context={context} />
       </div>

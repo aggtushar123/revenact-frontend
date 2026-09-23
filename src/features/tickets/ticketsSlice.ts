@@ -6,7 +6,7 @@ import { apiFetch, ApiError } from '../../lib/apiClient';
 //
 // Note there are no colours in here. The backend returns names and
 // numbers; each chart maps a name to a CSS variable itself, the same
-// way SurveyTrendChart and HealthPage already do. Only the mock this
+// way SurveyTrendChart and HealthDistribution already do. Only the mock this
 // replaced carried `fill` in its data.
 
 /** A `{name, value}` pair — what the two donuts and the origin bar eat. */

@@ -5,22 +5,29 @@
 // Overview dashboard uses — see its own chartTheme.ts. Only the mock this
 // replaced shipped colours alongside its numbers, which gave the backend an
 // opinion about the theme.
+//
+// The actual colours and axis helpers live in the dashboard-wide
+// `shared/chartPalette.ts` now — re-exported here so every chart in this tab
+// keeps importing from `./chartTheme` rather than reaching across tabs.
+import { ROLE, CATEGORICAL, niceMax, compact, percentOf } from '../../shared/chartPalette';
 
-/** Interaction types — the source donut. Three systems, three hues, none of
+export { niceMax, compact, percentOf };
+
+/** Interaction types — the source donut. Three systems, three tones, none of
  *  them semantic: an email isn't better or worse than a ticket, so these
- *  deliberately avoid success/danger. */
+ *  deliberately avoid success/danger and use the monochrome scale instead. */
 export const SOURCE_COLORS: Record<string, string> = {
-  Email: 'var(--info)',
-  Call: 'var(--warning)',
-  Ticket: 'var(--accent)',
+  Email: ROLE.ink,
+  Call: ROLE.muted,
+  Ticket: ROLE.faint,
 };
 
 /** Sentiment, which *is* semantic. Shared by the donut and the trend line, so
  *  "negative" is the same red in both. */
 export const SENTIMENT_COLORS: Record<string, string> = {
-  Positive: 'var(--success)',
-  Neutral: 'var(--warning)',
-  Negative: 'var(--danger)',
+  Positive: ROLE.gain,
+  Neutral: ROLE.faint,
+  Negative: ROLE.loss,
 };
 
 /** The order the trend line stacks its three series in, and the keys it reads
@@ -32,42 +39,15 @@ export const SENTIMENT_SERIES = [
   { key: 'negative', label: 'Negative', color: SENTIMENT_COLORS.Negative },
 ] as const;
 
-/** AI Area. Three areas, so three distinct hues rather than a scale — they are
+/** AI Area. Three areas, so three distinct tones rather than a scale — they are
  *  categories, not degrees of anything. */
 export const AREA_COLORS: Record<string, string> = {
-  'Product & Growth': 'var(--accent)',
-  'Support & Operations': 'var(--warning)',
-  'Customer Success': 'var(--info)',
+  'Product & Growth': CATEGORICAL[0],
+  'Support & Operations': CATEGORICAL[1],
+  'Customer Success': CATEGORICAL[2],
 };
 
 /** A neutral for anything the maps above don't recognise — a value added to the
  *  backend's taxonomy before this file catches up should render in grey rather
  *  than vanish. */
-export const FALLBACK_COLOR = 'var(--text-tertiary)';
-
-/** Recharts needs a numeric domain to render axis ticks, and a hard-coded
- *  maximum silently clips real data. Same helper the Ticket Overview charts
- *  use; duplicated rather than imported across dashboards on purpose — these
- *  two screens don't otherwise share code, and an import between sibling tabs
- *  is the start of a shared "charts" grab-bag. */
-export function niceMax(values: number[], fallback = 10): number {
-  const peak = Math.max(0, ...values);
-  if (peak <= 0) return fallback;
-  const magnitude = 10 ** Math.floor(Math.log10(peak));
-  return Math.ceil(peak / magnitude) * magnitude;
-}
-
-/** Compact counts, e.g. 2090 → "2.09K".
- *
- * The mock divided by 1000 unconditionally, so 300 rendered as "0.3K" — a
- * longer, less readable way of writing 300. Under a thousand stays plain. */
-export function compact(value: number): string {
-  return value >= 1000 ? `${(value / 1000).toFixed(2)}K` : String(value);
-}
-
-/** A percentage of a total, as a rounded string. Returns "0" for an empty
- *  total rather than "NaN", which is what a donut of nothing used to render. */
-export function percentOf(value: number, total: number): string {
-  if (!total) return '0';
-  return ((value / total) * 100).toFixed(0);
-}
+export const FALLBACK_COLOR = ROLE.faint;

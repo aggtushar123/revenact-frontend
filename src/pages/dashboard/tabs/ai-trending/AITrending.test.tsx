@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import interactionsReducer from '../../../../features/interactions/interactionsSlice';
+import { AreaLayout } from '../../AreaLayout';
 import { AITrendingTopics } from '../AITrendingTopics';
 import { ControlsView } from './ControlsView';
 import { compact, niceMax, percentOf } from './chartTheme';
@@ -108,14 +109,16 @@ function mockFetch(body: unknown = stats, status = 200) {
   return spy;
 }
 
-function renderDashboard() {
+function renderTopics(url = '/dashboard/support/topics') {
   const store = configureStore({ reducer: { interactions: interactionsReducer } });
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/ai-trending/controls']}>
+      <MemoryRouter initialEntries={[url]}>
         <Routes>
-          <Route path="/ai-trending" element={<AITrendingTopics />}>
-            <Route path="controls" element={<ControlsView />} />
+          <Route path="/dashboard/support" element={<AreaLayout area="support" />}>
+            <Route element={<AITrendingTopics />}>
+              <Route path="topics" element={<ControlsView />} />
+            </Route>
           </Route>
         </Routes>
       </MemoryRouter>
@@ -136,7 +139,7 @@ describe('AI Trending Topics', () => {
 
   it('fetches real stats on mount instead of reading a fixture', async () => {
     const fetchMock = mockFetch();
-    renderDashboard();
+    renderTopics();
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -148,7 +151,7 @@ describe('AI Trending Topics', () => {
 
   it('renders the real source counts', async () => {
     mockFetch();
-    renderDashboard();
+    renderTopics();
 
     // Three donut centres legitimately read 981: source and sentiment each
     // partition every interaction, and area does too when all of them are
@@ -160,7 +163,7 @@ describe('AI Trending Topics', () => {
 
   it('renders the detail table from the API, including a classified row', async () => {
     mockFetch();
-    renderDashboard();
+    renderTopics();
 
     const row = (await screen.findByText('Expansion Discovery Call')).closest('tr')!;
 
@@ -172,7 +175,7 @@ describe('AI Trending Topics', () => {
 
   it('shows a dash rather than a blank for an unclassified row', async () => {
     mockFetch();
-    renderDashboard();
+    renderTopics();
 
     const row = (await screen.findByText('Export to CSV is missing columns')).closest('tr')!;
 
@@ -182,7 +185,7 @@ describe('AI Trending Topics', () => {
 
   it('says how much of the book is classified when some of it is not', async () => {
     mockFetch({ ...stats, classified: 600 });
-    renderDashboard();
+    renderTopics();
 
     // Three taxonomy charts, each carrying the same note.
     const notes = await screen.findAllByText(/600 of 981 classified/);
@@ -192,7 +195,7 @@ describe('AI Trending Topics', () => {
 
   it('says nothing about classification when everything is classified', async () => {
     mockFetch();
-    renderDashboard();
+    renderTopics();
 
     await screen.findByText('Expansion Discovery Call');
     expect(screen.queryByText(/classified/)).not.toBeInTheDocument();
@@ -202,7 +205,7 @@ describe('AI Trending Topics', () => {
 
   it('offers the real filter options rather than a hardcoded list', async () => {
     mockFetch();
-    renderDashboard();
+    renderTopics();
 
     const sentiment = await screen.findByLabelText('Sentiment');
     expect(within(sentiment).getByRole('option', { name: 'Positive' })).toBeInTheDocument();
@@ -215,7 +218,7 @@ describe('AI Trending Topics', () => {
   it('refetches with a query string when a filter changes', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderTopics();
 
     await screen.findByLabelText('Sentiment');
     await user.selectOptions(screen.getByLabelText('Sentiment'), 'negative');
@@ -226,7 +229,7 @@ describe('AI Trending Topics', () => {
   it('sends the right param for an organisation and for an account', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderTopics();
 
     await screen.findByLabelText('Account Name');
     await user.selectOptions(screen.getByLabelText('Account Name'), 'customer:7');
@@ -236,10 +239,20 @@ describe('AI Trending Topics', () => {
     await waitFor(() => expect(lastUrl(fetchMock)).toContain('account=2'));
   });
 
+  it('sends the Account Name scope as customer or account', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => stats });
+    vi.stubGlobal('fetch', fetchMock);
+    renderTopics('/dashboard/support/topics?scope=account:4&sentiment=negative');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('account=4');
+    expect(url).toContain('sentiment=negative');
+  });
+
   it('narrows the subcategory options to the chosen category', async () => {
     mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderTopics();
 
     await screen.findByLabelText('AI Category');
     await user.selectOptions(screen.getByLabelText('AI Category'), 'bug_report');
@@ -254,7 +267,7 @@ describe('AI Trending Topics', () => {
   it('clears a subcategory that no longer belongs to the chosen category', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderTopics();
 
     await screen.findByLabelText('AI Subcategory');
     await user.selectOptions(screen.getByLabelText('AI Subcategory'), 'ui_bug');
@@ -268,10 +281,56 @@ describe('AI Trending Topics', () => {
     expect(lastUrl(fetchMock)).not.toContain('subcategory=');
   });
 
+  it('keeps a valid deep-linked category+subcategory through the first fetch and after options load', async () => {
+    // Before the stats response lands, `options` (and so `subcategories`) is
+    // undefined — there is no way yet to know whether the URL's subcategory
+    // belongs to the URL's category, so a good deep link must not be judged
+    // invalid and thrown away before it gets the chance to be confirmed.
+    const fetchMock = mockFetch();
+    renderTopics('/dashboard/support/topics?category=bug_report&subcategory=ui_bug');
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(String(fetchMock.mock.calls[0][0])).toContain('subcategory=ui_bug');
+
+    await screen.findByLabelText('AI Subcategory');
+    await waitFor(() =>
+      expect(screen.getByLabelText('AI Subcategory')).toHaveValue('ui_bug')
+    );
+
+    // Confirmed valid once options load — it never drops out afterwards.
+    for (const call of fetchMock.mock.calls) {
+      expect(String(call[0])).toContain('subcategory=ui_bug');
+    }
+  });
+
+  it('drops a deep-linked subcategory that turns out to belong to a different category, once options load', async () => {
+    // ui_bug belongs to bug_report, not onboarding, in this fixture. Before
+    // options load that can't be known, so the very first fetch is allowed to
+    // still carry the URL's value through unfiltered; once the stats response
+    // proves it stale, the URL is cleaned up and nothing fetched afterwards
+    // may carry it.
+    const fetchMock = mockFetch();
+    renderTopics('/dashboard/support/topics?category=onboarding&subcategory=ui_bug');
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(String(fetchMock.mock.calls[0][0])).toContain('subcategory=ui_bug');
+
+    await screen.findByLabelText('AI Subcategory');
+    await waitFor(() =>
+      expect(screen.getByLabelText('AI Subcategory')).toHaveValue('')
+    );
+
+    const afterLoad = fetchMock.mock.calls.slice(1);
+    expect(afterLoad.length).toBeGreaterThan(0);
+    for (const call of afterLoad) {
+      expect(String(call[0])).not.toContain('subcategory=');
+    }
+  });
+
   it('counts the active filters and clears them all', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderTopics();
 
     await screen.findByLabelText('Sentiment');
     await user.selectOptions(screen.getByLabelText('Sentiment'), 'negative');
@@ -286,7 +345,7 @@ describe('AI Trending Topics', () => {
 
   it('surfaces a failed fetch rather than rendering empty charts silently', async () => {
     mockFetch({ detail: 'Server exploded' }, 500);
-    renderDashboard();
+    renderTopics();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Server exploded|Could not load/);
   });
@@ -304,7 +363,7 @@ describe('AI Trending Topics', () => {
       sentiment_timeline: [],
       recent: [],
     });
-    renderDashboard();
+    renderTopics();
 
     expect(
       await screen.findByText('No emails, calls or tickets match these filters.')
@@ -316,7 +375,7 @@ describe('AI Trending Topics', () => {
   it('keeps the previous numbers on screen when a refetch fails', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderTopics();
 
     await screen.findByText('Expansion Discovery Call');
 

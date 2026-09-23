@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { renderWithHealth } from './testUtils';
-import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DivergenceView } from './DivergenceView';
 import { DivergenceList } from './charts/DivergenceList';
@@ -103,37 +102,24 @@ describe('Health Overview routing with Divergence', () => {
     renderWithHealth(
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
+          <Route path="/dashboard/health" element={<HealthOverviewContainer />}>
             <Route index element={<Navigate to="triage" replace />} />
             <Route path="triage" element={<p>Triage stub</p>} />
             <Route path="divergence" element={<DivergenceView />} />
-            <Route path="controls" element={<p>Controls stub</p>} />
+            <Route path="distribution" element={<p>Distribution stub</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
       { rows: BOOK },
     );
 
-  it('offers Divergence second, straight after Triage', () => {
-    // The full tab order is pinned in MovementView.test.tsx; this only claims
-    // Divergence's own position, so adding a later tab doesn't fail it.
-    renderAt('/dashboard/advance/health/triage');
-    const tabs = screen.getAllByRole('link').map((a) => a.textContent?.trim());
-    expect(tabs.slice(0, 2)).toEqual(['Triage', 'Divergence']);
-    expect(tabs).toContain('Controls');
-  });
-
-  it('routes into the divergence view', async () => {
-    const user = userEvent.setup();
-    renderAt('/dashboard/advance/health/triage');
-
-    await user.click(screen.getByRole('link', { name: 'Divergence' }));
-    expect(screen.getByRole('heading', { name: /AI sees risk the CSM/i })).toBeInTheDocument();
-    expect(screen.queryByText('Triage stub')).not.toBeInTheDocument();
-  });
+  // Tab order and cross-tab navigation now live in the shared sub-view nav
+  // (`DashboardToolbar`, fed by `AREAS` in `areas.ts`), which has its own
+  // tests — the container no longer renders a tab bar of its own for this
+  // to reach through.
 
   it('still lands on Triage by default', () => {
-    renderAt('/dashboard/advance/health');
+    renderAt('/dashboard/health');
     expect(screen.getByText('Triage stub')).toBeInTheDocument();
   });
 });

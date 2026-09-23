@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useHealthOverview } from './useHealthOverview';
 import { HealthEmpty, HealthError, HealthLoading, HealthTruncatedNotice } from './HealthDataState';
 import { formatCompactMoney } from '../../../../features/customers/formatters';
+import { Kpi, KpiStrip } from '../../shared/Kpi';
 import {
   HEADLINE_HORIZON_DAYS,
   coverageBands,
@@ -19,40 +20,6 @@ import { RenewalQueueTable } from './charts/RenewalQueueTable';
 /** The window the owner-load chart covers — two quarters, which is as far
  *  ahead as a staffing decision is worth making. */
 const OWNER_HORIZON_DAYS = 180;
-
-interface TileProps {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: 'neutral' | 'danger' | 'warning';
-}
-
-function Tile({ label, value, detail, tone = 'neutral' }: TileProps) {
-  const accent = {
-    neutral: 'border-l-info',
-    warning: 'border-l-warning',
-    danger: 'border-l-danger',
-  }[tone];
-  const figure = {
-    neutral: 'text-ink',
-    warning: 'text-warning',
-    danger: 'text-danger',
-  }[tone];
-
-  return (
-    <div
-      className={`bg-surface border border-line-subtle rounded-lg shadow-sm px-[13px] py-[11px] border-l-[3px] ${accent}`}
-    >
-      <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">{label}</div>
-      <div
-        className={`text-[25px] font-semibold leading-tight tracking-tight mt-[3px] tabular-nums ${figure}`}
-      >
-        {value}
-      </div>
-      <div className="text-[11px] text-ink-muted mt-[1px]">{detail}</div>
-    </div>
-  );
-}
 
 /**
  * Health Overview read as a renewal forecast.
@@ -117,27 +84,27 @@ export function RenewalView() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
-        <Tile
+      <KpiStrip>
+        <Kpi
           label="Up for renewal"
           value={money(summary.arr)}
           detail={`${summary.count} ${summary.count === 1 ? 'account' : 'accounts'}${
             summary.unpriced > 0 ? ` · ${summary.unpriced} unpriced` : ''
           }`}
         />
-        <Tile
+        <Kpi
           label="Forecast at risk"
           value={money(summary.exposure)}
           detail={`${atRiskShare}% of the window, weighted by risk`}
-          tone={atRiskShare >= 20 ? 'danger' : 'warning'}
+          tone={atRiskShare >= 20 ? 'loss' : 'neutral'}
         />
-        <Tile
+        <Kpi
           label="No recent contact"
           value={money(summary.coldArr)}
           detail={`${summary.coldCount} renewing with nothing logged in 60 days`}
-          tone={summary.coldCount > 0 ? 'danger' : 'neutral'}
+          tone={summary.coldCount > 0 ? 'loss' : 'neutral'}
         />
-        <Tile
+        <Kpi
           label="Past due"
           value={String(summary.overdueCount)}
           detail={
@@ -145,9 +112,9 @@ export function RenewalView() {
               ? `${money(summary.overdueArr)} past its renewal date`
               : 'every renewal date is still ahead'
           }
-          tone={summary.overdueCount > 0 ? 'warning' : 'neutral'}
+          tone={summary.overdueCount > 0 ? 'loss' : 'neutral'}
         />
-      </div>
+      </KpiStrip>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">

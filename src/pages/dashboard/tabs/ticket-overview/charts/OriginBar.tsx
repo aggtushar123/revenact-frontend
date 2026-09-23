@@ -3,6 +3,7 @@ import { BarChart, Bar, LabelList, XAxis, YAxis, Tooltip, ResponsiveContainer } 
 import type { TicketOrigin } from '../../../../../features/tickets/ticketsSlice';
 import { niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
 
 /**
  * Where the tickets come from, ranked.
@@ -55,18 +56,14 @@ export function OriginBar({ data }: { data: TicketOrigin[] }) {
                 tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 500 }}
               />
               <Tooltip
-                cursor={{ fill: 'rgba(0,0,0,0.02)' }}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: 'none',
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)',
-                }}
+                cursor={{ fill: CURSOR_FILL }}
+                contentStyle={TOOLTIP_STYLE}
                 formatter={(value) => [
                   `${value} ${Number(value) === 1 ? 'ticket' : 'tickets'}`,
                   'Origin',
                 ]}
               />
-              <Bar {...STATIC_SERIES} dataKey="value" fill="var(--accent)" radius={[0, 2, 2, 0]}>
+              <Bar {...STATIC_SERIES} dataKey="value" fill={ROLE.ink} radius={[0, 2, 2, 0]}>
                 <LabelList
                   dataKey="value"
                   position="right"

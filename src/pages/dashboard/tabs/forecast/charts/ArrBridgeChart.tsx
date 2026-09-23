@@ -4,6 +4,7 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { ForecastBridge } from '../../../../../features/forecast/forecastSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
 
 export interface ArrBridgeChartProps {
   bridge: ForecastBridge;
@@ -56,7 +57,11 @@ export function ArrBridgeChart({ bridge, currency, horizonDays }: ArrBridgeChart
     ];
   }, [bridge]);
 
-  const colour = { total: 'var(--info)', down: 'var(--danger)', up: 'var(--success)' };
+  // Opening and Forecast are both "total" bars, but Forecast is drawn as an
+  // outline rather than filled ink — the two are the same tone, and without a
+  // visual difference the chart reads as opening-then-closing rather than
+  // where-we-are-headed.
+  const colour = { total: ROLE.ink, down: ROLE.loss, up: ROLE.gain };
   const max = Math.max(bridge.opening_arr, bridge.forecast_arr, 1) * 1.15;
 
   return (
@@ -101,12 +106,8 @@ export function ArrBridgeChart({ bridge, currency, horizonDays }: ArrBridgeChart
               tickFormatter={(value: number) => formatCompactMoney(value, currency)}
             />
             <Tooltip
-              cursor={{ fill: 'var(--bg-subtle)' }}
-              contentStyle={{
-                borderRadius: '8px',
-                border: '1px solid var(--border-default)',
-                fontSize: '12px',
-              }}
+              cursor={{ fill: CURSOR_FILL }}
+              contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               formatter={(_value, name, item) => {
                 if (name === 'base') return [];
                 const row = item?.payload;
@@ -121,9 +122,13 @@ export function ArrBridgeChart({ bridge, currency, horizonDays }: ArrBridgeChart
                 where the running total sits. */}
             <Bar {...STATIC_SERIES} dataKey="base" stackId="bridge" fill="transparent" />
             <Bar {...STATIC_SERIES} dataKey="value" stackId="bridge" radius={[3, 3, 0, 0]}>
-              {data.map((row) => (
-                <Cell key={row.name} fill={colour[row.kind]} />
-              ))}
+              {data.map((row) =>
+                row.name === 'Forecast' ? (
+                  <Cell key={row.name} fill="transparent" stroke={ROLE.ink} strokeWidth={2} />
+                ) : (
+                  <Cell key={row.name} fill={colour[row.kind]} />
+                )
+              )}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

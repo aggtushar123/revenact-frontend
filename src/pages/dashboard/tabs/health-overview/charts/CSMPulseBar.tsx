@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { HealthDataRow } from '../mockData';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
 
 export function CSMPulseBar({ data }: { data: HealthDataRow[] }) {
   const chartData = useMemo(() => {
@@ -54,9 +55,9 @@ export function CSMPulseBar({ data }: { data: HealthDataRow[] }) {
               dy={5}
             />
             <YAxis hide />
-            <Tooltip 
-              cursor={{ fill: 'rgba(255,255,255,0.04)' }}
-              contentStyle={{ borderRadius: '8px', border: '1px solid var(--border-default)', boxShadow: '0 8px 24px rgb(0 0 0 / 0.4)', backgroundColor: 'var(--bg-elevated)', color: 'var(--text-primary)' }}
+            <Tooltip
+              cursor={{ fill: CURSOR_FILL }}
+              contentStyle={TOOLTIP_STYLE}
             />
             
             {/* 
