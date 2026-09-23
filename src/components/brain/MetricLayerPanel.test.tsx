@@ -141,7 +141,7 @@ describe('MetricLayerPanel', () => {
     mockFetch();
     renderPanel();
 
-    expect(await screen.findByRole('link', { name: /Revenue in the dashboard/i })).toHaveAttribute(
+    expect(await screen.findByRole('link', { name: 'Open Revenue in dashboard' })).toHaveAttribute(
       'href',
       '/dashboard/revenue/forecast',
     );

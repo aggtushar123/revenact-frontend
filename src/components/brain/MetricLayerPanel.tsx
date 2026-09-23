@@ -197,10 +197,9 @@ export function MetricLayerPanel() {
             {group.href && (
               <Link
                 to={group.href}
-                className="text-[11px] text-ink-muted hover:text-ink"
-                aria-label={`${group.title} in the dashboard`}
+                className="text-[11px] text-ink-muted hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent rounded"
               >
-                Open in dashboard →
+                Open {group.title} in dashboard <span aria-hidden="true">→</span>
               </Link>
             )}
           </div>
