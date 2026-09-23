@@ -10,7 +10,9 @@ const getSentimentColor = (sentiment: string) => {
     case 'Negative':
       return 'bg-danger text-white';
     case 'Neutral':
-      return 'bg-warning text-white';
+      // Not a caution — a neutral interaction is neither a win nor a
+      // concern, so it stays the same muted tone as an unclassified row.
+      return 'bg-subtle text-ink-muted';
     default:
       return 'bg-line text-ink-muted';
   }

@@ -77,6 +77,23 @@ function renderTable() {
   return store;
 }
 
+describe('ActivityDetailedTable sentiment pill', () => {
+  beforeEach(() => vi.unstubAllGlobals());
+
+  // Neutral used to render in amber (bg-warning), the same treatment as a
+  // caution — but a neutral interaction is not a concern, so it shouldn't
+  // draw the eye the way Negative does. Positive stays success, Negative
+  // stays danger.
+  it('renders Neutral muted rather than amber', () => {
+    renderTable();
+    const tableRow = screen.getByText('Slow page load for large accounts').closest('tr')!;
+    const pill = within(tableRow).getByText('Neutral');
+    expect(pill.className).not.toMatch(/bg-warning/);
+    expect(pill.className).toContain('bg-subtle');
+    expect(pill.className).toContain('text-ink-muted');
+  });
+});
+
 describe('ActivityDetailedTable corrections', () => {
   beforeEach(() => vi.unstubAllGlobals());
 
