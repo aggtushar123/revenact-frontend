@@ -18,7 +18,7 @@ const n = (v: number | null | undefined, suffix = '') =>
  */
 export function KPIGrid({ kpis }: { kpis: TicketKpis | null }) {
   return (
-    <KpiStrip columns={3}>
+    <KpiStrip columns={2} stackFromLg>
       <Kpi label="Total Ticket Volume" value={n(kpis?.total)} />
       <Kpi label="Tickets On Hold" value={n(kpis?.on_hold)} />
       <Kpi label="Avg. Ticket Lifetime (Days)" value={n(kpis?.avg_lifetime_days)} />

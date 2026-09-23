@@ -41,3 +41,15 @@ describe('KPIGrid', () => {
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
 });
+
+describe('KPIGrid layout', () => {
+  // The card is a quarter of the row from lg (~200px). Three — or even two —
+  // columns there wrapped labels onto three or four lines (measured in
+  // Chrome); two from md and one from lg keeps every label to two at most.
+  it('is two across from md and one across from lg', () => {
+    const { container } = render(<KPIGrid kpis={KPIS} />);
+    const strip = container.querySelector('ul') as HTMLElement;
+    expect(strip).toHaveClass('md:grid-cols-2', 'lg:grid-cols-1');
+    expect(strip).not.toHaveClass('md:grid-cols-3');
+  });
+});

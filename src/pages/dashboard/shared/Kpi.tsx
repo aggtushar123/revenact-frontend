@@ -32,29 +32,40 @@ export function Kpi({
 }
 
 const STRIP_COLUMNS = {
+  2: 'md:grid-cols-2',
   3: 'md:grid-cols-3',
   4: 'md:grid-cols-4',
 } as const;
 
 /** Four across from `md` by default, two below, separated by hairlines rather
  *  than boxes. Pass `columns={3}` for a strip that shouldn't leave an empty
- *  fourth slot (e.g. a three-figure summary like `TriageTiles`). */
+ *  fourth slot (e.g. a three-figure summary like `TriageTiles`), or
+ *  `columns={2}` for a strip inside a card rather than across the page.
+ *
+ *  `stackFromLg` is for a strip in a quarter-width card (Tickets' KPI card):
+ *  from `lg` that card is ~200px wide, where even two columns wrap an
+ *  uppercase label onto three or four lines. One per row keeps every label
+ *  to two lines at most (measured at 1024–1920px). */
 export function KpiStrip({
   children,
   columns = 4,
+  stackFromLg = false,
 }: {
   children: ReactNode;
   columns?: keyof typeof STRIP_COLUMNS;
+  stackFromLg?: boolean;
 }) {
   // `Children.toArray` (rather than `Array.isArray`) drops `null`/`false`, so
   // a conditionally-rendered `cond && <Kpi/>` never leaves an empty `<li>`.
   const items = Children.toArray(children);
   return (
     <ul
-      className={`grid grid-cols-2 ${STRIP_COLUMNS[columns]} gap-y-4 bg-surface border border-line rounded-xl p-4 md:divide-x md:divide-line`}
+      className={`grid grid-cols-2 ${STRIP_COLUMNS[columns]} gap-y-4 bg-surface border border-line rounded-xl p-4 md:divide-x md:divide-line ${
+        stackFromLg ? 'lg:grid-cols-1 lg:divide-x-0' : ''
+      }`}
     >
       {items.map((child, i) => (
-        <li key={i} className="md:px-4 md:first:pl-0">
+        <li key={i} className={`md:px-4 md:first:pl-0 ${stackFromLg ? 'lg:px-0' : ''}`}>
           {child}
         </li>
       ))}
