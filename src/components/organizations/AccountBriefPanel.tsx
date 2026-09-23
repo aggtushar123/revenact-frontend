@@ -9,7 +9,7 @@
 // answer from, and routed questions nobody answered. Writing the answer
 // here records it as an ordinary contribution and closes the loop.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { HelpCircle, Sparkles, X } from 'lucide-react';
 import { answerGap, dismissGap, fetchBrief, generateBrief } from '../../features/knowledge/briefApi';
@@ -39,6 +39,12 @@ export function AccountBriefPanel({ customerId, customerName }: { customerId: nu
   const [actionError, setActionError] = useState<string | null>(null);
 
   const key = `${customerId}#${attempt}`;
+  // Which company the panel is on *now*, for the in-flight write below to
+  // check against. Written in an effect, never during render.
+  const keyRef = useRef(key);
+  useEffect(() => {
+    keyRef.current = key;
+  }, [key]);
   const brief = loaded?.key === key ? loaded.brief : null;
   const error = failed?.key === key ? failed.message : null;
 
@@ -62,16 +68,29 @@ export function AccountBriefPanel({ customerId, customerName }: { customerId: nu
   async function write() {
     setWriting(true);
     setActionError(null);
+    const mine = key;
     try {
-      setLoaded({ key, brief: await generateBrief(customerId) });
+      const next = await generateBrief(customerId);
+      // The panel may have moved to another company while this was in
+      // flight; a brief is only ever shown under the company it is about.
+      if (mine === keyRef.current) setLoaded({ key: mine, brief: next });
     } catch (err) {
-      setActionError(errorText(err, 'Could not write the brief.'));
+      if (mine === keyRef.current) setActionError(errorText(err, 'Could not write the brief.'));
     } finally {
-      setWriting(false);
+      if (mine === keyRef.current) setWriting(false);
     }
   }
 
-  const written = brief?.generated_at !== null && brief !== null;
+  const written = brief !== null && brief.generated_at !== null;
+  // The backend withholds the brief's own words along with the citations
+  // they were written from, so a written brief with nothing in it and
+  // something hidden is not empty: it is not this reader's to read.
+  const withheld =
+    written &&
+    brief.hidden_sources > 0 &&
+    brief.use_cases.length === 0 &&
+    brief.stakeholders.length === 0 &&
+    brief.open_threads.length === 0;
 
   return (
     <section
@@ -118,7 +137,12 @@ export function AccountBriefPanel({ customerId, customerName }: { customerId: nu
         </div>
       ) : (
         <>
-          {written ? (
+          {withheld ? (
+            <p className="text-[12.5px] text-ink-faint">
+              This brief was written from {brief.hidden_sources === 1 ? '1 record' : `${brief.hidden_sources} records`} you
+              cannot see, so its words are withheld too. Rewriting it reads only what you can read.
+            </p>
+          ) : written ? (
             <div className="flex flex-col gap-4">
               <Lines title="Use cases" items={brief.use_cases} empty="Nothing on record says what they use it for." />
               <div className="flex flex-col gap-1.5">
@@ -127,8 +151,8 @@ export function AccountBriefPanel({ customerId, customerName }: { customerId: nu
                   <p className="text-[12.5px] text-ink-faint">Nobody named yet.</p>
                 ) : (
                   <ul aria-label="Stakeholders" className="flex flex-col gap-1">
-                    {brief.stakeholders.map((person) => (
-                      <li key={person.name} className="text-[13px] text-ink">
+                    {brief.stakeholders.map((person, index) => (
+                      <li key={`${person.name}-${index}`} className="text-[13px] text-ink">
                         <span className="font-semibold">{person.name}</span>
                         {person.cares_about ? <span className="text-ink-muted"> — {person.cares_about}</span> : null}
                       </li>
@@ -188,8 +212,8 @@ function Lines({ title, items, empty }: { title: string; items: string[]; empty:
         <p className="text-[12.5px] text-ink-faint">{empty}</p>
       ) : (
         <ul className="flex flex-col gap-1 list-disc pl-4">
-          {items.map((item) => (
-            <li key={item} className="text-[13px] text-ink leading-relaxed">{item}</li>
+          {items.map((item, index) => (
+            <li key={`${item}-${index}`} className="text-[13px] text-ink leading-relaxed">{item}</li>
           ))}
         </ul>
       )}
@@ -257,6 +281,7 @@ function Gaps({ gaps, onChanged, onError }: { gaps: BriefGap[]; onChanged: () =>
                       setDraft('');
                     }}
                     disabled={busy}
+                    aria-expanded={answering === gap.id}
                     aria-label={`Answer ${gap.subject}`}
                     className={`px-2.5 py-1 rounded-md text-[12px] font-semibold text-ink-muted hover:text-ink hover:bg-subtle disabled:opacity-50 ${FOCUS}`}
                   >

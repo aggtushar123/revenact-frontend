@@ -70,11 +70,23 @@ describe('AccountBriefPanel', () => {
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: 'POST' });
   });
 
-  it('says how many citations are withheld from this reader', { timeout: 15000 }, async () => {
-    fetchMock.mockResolvedValue(jsonResponse(200, brief({ sources: [], hidden_sources: 2 })));
+  it('says the brief is withheld when its records are', { timeout: 15000 }, async () => {
+    // The backend withholds the words with the citations they came from,
+    // so an empty brief with a written date means "not yours to read".
+    fetchMock.mockResolvedValue(
+      jsonResponse(200, brief({ use_cases: [], stakeholders: [], open_threads: [], sources: [], hidden_sources: 2 }))
+    );
+    renderPanel();
+    expect(await screen.findByText(/written from 2 records you cannot see/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Rewrite' })).toBeInTheDocument();
+  });
+
+  it('shows the citations it can, and counts the rest', { timeout: 15000 }, async () => {
+    fetchMock.mockResolvedValue(jsonResponse(200, brief({ hidden_sources: 1 })));
     renderPanel();
     await screen.findByText('Dispatching field crews');
-    expect(screen.getByText(/2 records you cannot see/)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Product usage/ })).toBeInTheDocument();
+    expect(screen.getByText(/1 record you cannot see/)).toBeInTheDocument();
   });
 
   it('reports a refusal without losing the brief', { timeout: 15000 }, async () => {
