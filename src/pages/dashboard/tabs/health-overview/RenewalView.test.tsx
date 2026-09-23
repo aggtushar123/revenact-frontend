@@ -1,9 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { healthRow, renderWithHealth } from './testUtils';
 import { RenewalView } from './RenewalView';
-import { HealthOverviewContainer } from '../HealthOverviewContainer';
 
 // Integration tier. The two Recharts charts need a sized container jsdom won't
 // give them, so they're asserted on by their headings and their own summary
@@ -197,22 +195,8 @@ describe('RenewalView', () => {
     expect(screen.getByText('Could not load account health.')).toBeInTheDocument();
   });
 
-  it('is reachable from the tab bar as a tab, not as a filter chip', () => {
-    // It used to render as a chip reading "All" and route to a placeholder.
-    renderWithHealth(
-      <MemoryRouter initialEntries={['/dashboard/advance/health/renewal-date']}>
-        <Routes>
-          <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
-            <Route index element={<Navigate to="triage" replace />} />
-            <Route path="renewal-date" element={<RenewalView />} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-      { rows: BOOK }
-    );
-
-    const link = screen.getByRole('link', { name: 'Renewal Date' });
-    expect(link).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByText('Renewal calendar')).toBeInTheDocument();
-  });
+  // Reachability as a tab (not a filter chip) is now the shared sub-view
+  // nav's job — `DashboardToolbar`, fed by `AREAS` in `areas.ts` — which has
+  // its own tests; the container no longer renders a tab bar of its own for
+  // this suite to reach through.
 });

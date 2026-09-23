@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { Bot, Box, Boxes, Brain, CheckSquare, CircleDot, Columns, Flag, GitBranch, GitCommit, Globe, HeartPulse, Layers, LayoutGrid, Lightbulb, List, LogOut, MessageSquareWarning, Network, PenTool, PieChart, Plug, Radar, Sliders, Sparkles, Target, UserCog, Users, Wand2 } from 'lucide-react';
+import { Bot, Box, Boxes, Brain, CheckSquare, CircleDot, Columns, Flag, GitBranch, GitCommit, Globe, Layers, LayoutGrid, Lightbulb, List, LogOut, MessageSquareWarning, Network, PenTool, PieChart, Plug, Radar, Sliders, Sparkles, Target, UserCog, Users, Wand2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchProposals } from '../../features/proposals/proposalsSlice';
 import { fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
@@ -142,7 +142,6 @@ export function Sidebar() {
 
         <NavItem to="/settings" icon={<Box className="w-5 h-5" />} label="Settings" isActiveOverride={isSettingsActive} />
         <NavItem to="/lifecycle" icon={<CircleDot className="w-5 h-5" />} label="Lifecycle" />
-        <NavItem to="/health" icon={<HeartPulse className="w-5 h-5" />} label="Health" />
         {canManageUsers && (
           <NavItem to="/users" icon={<UserCog className="w-5 h-5" />} label="Users" />
         )}

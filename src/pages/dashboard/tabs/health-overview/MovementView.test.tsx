@@ -2,10 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import { renderWithHealth } from './testUtils';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { MovementView } from './MovementView';
 import { HealthFlowChart } from './charts/HealthFlowChart';
-import { HealthOverviewContainer } from '../HealthOverviewContainer';
 import { MOCK_HEALTH_DATA, HISTORY_MONTHS } from './mockData';
 
 /** The generated mock, used here purely as a fixture book — the tab itself
@@ -106,38 +104,10 @@ describe('HealthFlowChart', () => {
   });
 });
 
-describe('Health Overview routing with Movement', () => {
-  const renderAt = (path: string) =>
-    renderWithHealth(
-      <MemoryRouter initialEntries={[path]}>
-        <Routes>
-          <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
-            <Route index element={<Navigate to="triage" replace />} />
-            <Route path="triage" element={<p>Triage stub</p>} />
-            <Route path="divergence" element={<p>Divergence stub</p>} />
-            <Route path="movement" element={<MovementView />} />
-            <Route path="controls" element={<p>Controls stub</p>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-      { rows: BOOK },
-    );
-
-  it('lists all four tabs in order', () => {
-    renderAt('/dashboard/advance/health/triage');
-    const tabs = screen.getAllByRole('link').map((a) => a.textContent?.trim());
-    expect(tabs.slice(0, 4)).toEqual(['Triage', 'Divergence', 'Movement', 'Controls']);
-  });
-
-  it('routes into the movement view', async () => {
-    const user = userEvent.setup();
-    renderAt('/dashboard/advance/health/triage');
-
-    await user.click(screen.getByRole('link', { name: 'Movement' }));
-    expect(screen.getByRole('heading', { name: /health transitions/i })).toBeInTheDocument();
-    expect(screen.queryByText('Triage stub')).not.toBeInTheDocument();
-  });
-});
+// Tab order and cross-tab navigation now live in the shared sub-view nav
+// (`DashboardToolbar`, fed by `AREAS` in `areas.ts`), which has its own
+// tests — the container no longer renders a tab bar of its own for a
+// "Health Overview routing" suite to reach through.
 
 describe('mock history', () => {
   it('carries enough months for a flow diagram to be worth drawing', () => {

@@ -5,7 +5,8 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
-import { HealthPage } from './HealthPage';
+import { MemoryRouter } from 'react-router-dom';
+import { HealthDistribution } from './HealthDistribution';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // Integration tier (see the `testing` skill): a real Redux store (this
@@ -161,7 +162,9 @@ function renderPage() {
   });
   render(
     <Provider store={store}>
-      <HealthPage />
+      <MemoryRouter>
+        <HealthDistribution />
+      </MemoryRouter>
     </Provider>
   );
 }
@@ -180,7 +183,7 @@ function fetchMockWith(customers: unknown[], accounts: unknown[] = []) {
   });
 }
 
-describe('HealthPage', () => {
+describe('HealthDistribution', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
   });

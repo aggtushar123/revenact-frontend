@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { healthRow, renderWithHealth } from './testUtils';
+import { healthRow, renderHealthAt, renderWithHealth } from './testUtils';
 import { filterOptions } from './useHealthOverview';
 import { HealthOverviewContainer } from '../HealthOverviewContainer';
 import { TriageView } from './TriageView';
@@ -57,10 +57,13 @@ function renewalIn(days: number) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-/** The container plus one tab, through the real router. */
-function renderTab(element: React.ReactElement, path: string, options = {}) {
+/** The container plus one tab, through the real router. `search` is the
+ *  URL's own query string — the container now syncs URL -> Redux, so a
+ *  filter that needs to be "on" when the tab mounts has to arrive that way,
+ *  not through a preloaded store. */
+function renderTab(element: React.ReactElement, path: string, options = {}, search = '') {
   return renderWithHealth(
-    <MemoryRouter initialEntries={[`/dashboard/advance/health/${path}`]}>
+    <MemoryRouter initialEntries={[`/dashboard/advance/health/${path}${search}`]}>
       <Routes>
         <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
           <Route index element={<Navigate to="triage" replace />} />
@@ -220,21 +223,22 @@ describe('Primary Owner filter', () => {
 
     await user.selectOptions(screen.getByLabelText('Primary Owner'), '7');
 
-    // Scoped to the chip: the name also appears in the triage queue's own
-    // owner column, which is the point — both are reading the same row.
+    // Scoped to the chip's own displayed value (`.ml-1`), not its hidden
+    // `<option>` of the same text — both read "Gerry Hill (1)" once an
+    // owner with one account is picked, the count being the shared
+    // toolbar's own choice (see the container's `choices` helper).
     const chip = screen.getByLabelText('Primary Owner').parentElement as HTMLElement;
-    expect(within(chip).getByText('Gerry Hill')).toBeInTheDocument();
+    expect(within(chip).getByText('Gerry Hill (1)', { selector: '.ml-1' })).toBeInTheDocument();
   });
 
-  it('survives moving between tabs', () => {
+  it('survives moving between tabs', async () => {
     // Narrowing to one CSM and then moving from Triage to Renewal Date is one
-    // thought, not two — so the filter lives in the store, not in the view.
-    const { store } = renderTab(<RenewalView />, 'renewal-date', {
-      filters: { ...NO_FILTERS, owner: '3' },
-    });
+    // thought, not two — so the filter lives in the URL, not in a view's own
+    // state, and the container reads it into the store on mount.
+    const { store } = renderTab(<RenewalView />, 'renewal-date', {}, '?owner=3');
 
+    expect(await within(tile('Up for renewal')).findByText('$50.0K')).toBeInTheDocument();
     expect(store.getState().health.filters.owner).toBe('3');
-    expect(within(tile('Up for renewal')).getByText('$50.0K')).toBeInTheDocument();
   });
 });
 
@@ -260,7 +264,7 @@ describe('Lifecycle Stage filter', () => {
 
     await user.selectOptions(select, 'pilot');
     const chip = select.parentElement as HTMLElement;
-    expect(within(chip).getByText('Pilot')).toBeInTheDocument();
+    expect(within(chip).getByText('Pilot (1)', { selector: '.ml-1' })).toBeInTheDocument();
   });
 });
 
@@ -381,6 +385,16 @@ describe('healthSlice filters', () => {
     expect(
       healthReducer(set, setHealthFilter({ key: 'owner', value: null })).filters.owner
     ).toBeNull();
+  });
+});
+
+describe('URL filters', () => {
+  it('applies URL filters to the book', async () => {
+    renderHealthAt('/dashboard/health/triage?owner=1', {
+      rows: [healthRow({ id: '1', ownerKey: '1' }), healthRow({ id: '2', ownerKey: '2', account: 'Beta' })],
+    });
+
+    expect(await screen.findByText('1 of 2 accounts')).toBeInTheDocument();
   });
 });
 

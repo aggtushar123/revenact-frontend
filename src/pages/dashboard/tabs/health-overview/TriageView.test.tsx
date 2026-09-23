@@ -131,21 +131,10 @@ describe('Health Overview routing', () => {
     expect(screen.getByRole('heading', { name: /accounts by risk score/i })).toBeInTheDocument();
   });
 
-  it('offers Triage first in the sub-tab bar, ahead of the rest', () => {
-    renderAt('/dashboard/advance/health/triage');
-    const tabs = screen.getAllByRole('link').map((a) => a.textContent?.trim());
-    expect(tabs[0]).toBe('Triage');
-    expect(tabs).toContain('Controls');
-  });
-
-  it('still routes through to Controls', async () => {
-    const user = userEvent.setup();
-    renderAt('/dashboard/advance/health/triage');
-
-    await user.click(screen.getByRole('link', { name: 'Controls' }));
-    expect(screen.getByText('Controls stub')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: /accounts by risk score/i })).not.toBeInTheDocument();
-  });
+  // Tab order and cross-tab navigation now live in the shared sub-view nav
+  // (`DashboardToolbar`, fed by `AREAS` in `areas.ts`), which has its own
+  // tests — the container no longer renders a tab bar of its own for this
+  // to reach through.
 });
 
 describe('TriageView data states', () => {

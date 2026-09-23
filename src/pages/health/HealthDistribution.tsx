@@ -16,6 +16,7 @@ import {
 import { EntityAvatar } from '../../components/shared';
 import type { Account, Customer } from '../../features/customers/customersSlice';
 import type { HealthCategory } from '../../components/organizations/tableData';
+import { SHARED_KEYS, useDashboardFilters } from '../dashboard/shared/useDashboardFilters';
 
 // Real health signals already live on both Customer and Account (see
 // revenact-backend's Account model docstring: its health/AI Pulse/NPS
@@ -27,6 +28,13 @@ import type { HealthCategory } from '../../components/organizations/tableData';
 // This page is the one place all three roll up together into a single,
 // whole-tenant health view — for Organizations or Accounts — with a
 // drill-down into who's actually behind each number.
+//
+// Lives at Dashboard > Health > Distribution now (it used to be its own
+// page at /health). It reads `/customers/stats/` and `/accounts/stats/`,
+// neither of which accepts the dashboard's owner/lifecycle/account
+// filters, so it ignores the bar above it rather than silently pretending
+// to honour it — see the notice this renders whenever one of those
+// filters is on.
 type MetricTab = 'count' | 'mrr';
 type EntityTab = 'organizations' | 'accounts';
 
@@ -102,7 +110,11 @@ function accountToRow(a: Account): HealthRow {
   };
 }
 
-export function HealthPage() {
+/**
+ * Health › Distribution's lower half: the whole-tenant Organizations/Accounts
+ * × count/MRR rollup that used to be its own page at /health.
+ */
+export function HealthDistribution() {
   const dispatch = useAppDispatch();
   const { stats, statsLoading, statsError, accountStats, accountStatsLoading, accountStatsError } = useAppSelector(
     (state) => state.customers
@@ -111,6 +123,12 @@ export function HealthPage() {
   const [entityTab, setEntityTab] = useState<EntityTab>('organizations');
   const [metricTab, setMetricTab] = useState<MetricTab>('count');
   const [selectedCategory, setSelectedCategory] = useState<HealthCategory | null>(null);
+
+  // The dashboard's shared owner/lifecycle/account filters — read only to
+  // decide whether the notice below should show, never to narrow this
+  // section's own /stats/ reads (see the file header).
+  const { activeCount } = useDashboardFilters(SHARED_KEYS);
+  const filtersIgnored = activeCount(SHARED_KEYS) > 0;
 
   useEffect(() => {
     dispatch(fetchCustomerStats());
@@ -172,48 +190,46 @@ export function HealthPage() {
   const entityLabelSingular = entityTab === 'organizations' ? 'organization' : 'account';
 
   return (
-    <div className="flex flex-col h-full w-full overflow-y-auto p-6 gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-[20px] font-bold text-ink tracking-tight">Customer Health</h1>
-          <p className="text-[13px] text-ink-faint font-medium mt-0.5">
-            Health score, AI Pulse, and NPS across every {entityLabelSingular}, in one place.
-          </p>
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center gap-0.5 bg-surface border border-line-subtle rounded-lg p-0.5">
+          {(['organizations', 'accounts'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => {
+                setEntityTab(tab);
+                setSelectedCategory(null);
+              }}
+              aria-pressed={entityTab === tab}
+              className={`text-[12px] font-bold px-3 py-1.5 rounded-md transition-colors capitalize ${
+                entityTab === tab ? 'bg-accent-dim text-accent' : 'text-ink-faint hover:text-ink-muted'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-0.5 bg-surface border border-line-subtle rounded-lg p-0.5">
-            {(['organizations', 'accounts'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => {
-                  setEntityTab(tab);
-                  setSelectedCategory(null);
-                }}
-                aria-pressed={entityTab === tab}
-                className={`text-[12px] font-bold px-3 py-1.5 rounded-md transition-colors capitalize ${
-                  entityTab === tab ? 'bg-accent-dim text-accent' : 'text-ink-faint hover:text-ink-muted'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-0.5 bg-surface border border-line-subtle rounded-lg p-0.5">
-            {(['count', 'mrr'] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setMetricTab(tab)}
-                aria-pressed={metricTab === tab}
-                className={`text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-md transition-colors ${
-                  metricTab === tab ? 'bg-accent-dim text-accent' : 'text-ink-faint hover:text-ink-muted'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+        <div className="flex items-center gap-0.5 bg-surface border border-line-subtle rounded-lg p-0.5">
+          {(['count', 'mrr'] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setMetricTab(tab)}
+              aria-pressed={metricTab === tab}
+              className={`text-[11px] font-bold uppercase tracking-wide px-3 py-1.5 rounded-md transition-colors ${
+                metricTab === tab ? 'bg-accent-dim text-accent' : 'text-ink-faint hover:text-ink-muted'
+              }`}
+            >
+              {tab}
+            </button>
+          ))}
         </div>
       </div>
+
+      {filtersIgnored && (
+        <p className="text-[11px] text-ink-muted">
+          Covers the whole book; the filters above do not apply to this section.
+        </p>
+      )}
 
       {activeStatsError && <p className="text-[12.5px] text-danger">{activeStatsError}</p>}
       {metricTab !== 'count' && !!activeStats?.unconverted_count && (
