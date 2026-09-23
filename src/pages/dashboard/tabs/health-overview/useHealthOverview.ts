@@ -112,12 +112,6 @@ export function useHealthOverview() {
     [rows, filters]
   );
 
-  /** What each chip shows: the chosen option's label, or "All". Falls back to
-   *  the stored key rather than "All" if an option somehow isn't listed — a
-   *  chip reading "All" over a filtered dashboard would be a lie. */
-  const labelFor = (options: FilterOption[], value: string | null) =>
-    value === null ? 'All' : (options.find((option) => option.key === value)?.name ?? value);
-
   return {
     rows: visible,
     error,
@@ -128,17 +122,10 @@ export function useHealthOverview() {
     /** True only on the first load — a refresh keeps the old rows on screen. */
     isInitialLoad: isLoading && loadedAt === null,
     hasLoaded: loadedAt !== null,
-    /** The filter bar's own state and options, so it needs no second source. */
-    filters,
+    /** Each filter's options (with counts), for the bar's dropdowns. */
     owners,
     lifecycles,
     accounts,
-    labels: {
-      owner: labelFor(owners, filters.owner),
-      lifecycle: labelFor(lifecycles, filters.lifecycle),
-      account: labelFor(accounts, filters.account),
-    },
-    activeCount: Object.values(filters).filter((value) => value !== null).length,
     /** The whole book, before any filter. */
     totalCount: rows.length,
   };
