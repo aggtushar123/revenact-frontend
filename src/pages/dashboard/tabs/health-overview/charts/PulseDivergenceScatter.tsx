@@ -50,7 +50,7 @@ function DivergenceTooltip({ active, payload }: { active?: boolean; payload?: To
       <p className="text-[11px] text-ink-muted tabular-nums">
         CSM {row.csmPulseScore ?? '—'} · AI {row.aiPulseScore ?? '—'}
         {aiOffset !== null && aiOffset !== 0 && (
-          <span className={aiOffset < 0 ? 'text-danger font-bold' : 'text-info font-bold'}>
+          <span className={aiOffset < 0 ? 'text-danger font-bold' : 'text-ink font-bold'}>
             {' '}(AI {aiOffset > 0 ? '+' : '−'}{Math.abs(aiOffset)})
           </span>
         )}
@@ -142,12 +142,14 @@ export function PulseDivergenceScatter({ laid }: PulseDivergenceScatterProps) {
               fill="var(--danger)"
               fillOpacity={0.06}
             />
+            {/* Same category as the legend line below it: ink, not the
+                (unused, meaningless-here) info blue this used to draw in. */}
             <ReferenceArea
               x1={AXIS_MIN}
               x2={PULSE_MIDPOINT}
               y1={PULSE_MIDPOINT}
               y2={AXIS_MAX}
-              fill="var(--info)"
+              fill="var(--text-primary)"
               fillOpacity={0.06}
             />
 
@@ -224,7 +226,7 @@ export function PulseDivergenceScatter({ laid }: PulseDivergenceScatterProps) {
       <div className="flex flex-wrap gap-x-4 gap-y-1 px-4 pb-3 text-[10.5px] text-ink-faint">
         <span>Dashed diagonal = the two pulses agree</span>
         <span className="text-danger font-semibold">Lower-right wash = AI colder than the CSM</span>
-        <span className="text-info font-semibold">Upper-left wash = CSM colder than the AI</span>
+        <span className="text-ink font-semibold">Upper-left wash = CSM colder than the AI</span>
       </div>
     </div>
   );

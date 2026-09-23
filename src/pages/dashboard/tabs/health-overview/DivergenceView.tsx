@@ -69,7 +69,7 @@ export function DivergenceView() {
             emptyMessage="No account currently has an AI Pulse that far below its CSM Pulse."
           />
           <DivergenceList
-            tone="info"
+            tone="ink"
             title="CSM sees risk the AI doesn’t"
             caption="The owner is reading these colder than the model. Usually something the CSM knows that hasn’t reached the data yet."
             rows={csmColder}

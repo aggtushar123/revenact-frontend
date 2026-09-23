@@ -99,7 +99,7 @@ export function ProductScorecard({ rows, currency }: ProductScorecardProps) {
                                 ? 'bg-warning'
                                 : row.utilisation < 50
                                   ? 'bg-danger/70'
-                                  : 'bg-info/70'
+                                  : 'bg-ink-faint'
                             }`}
                             style={{ width: `${Math.min(100, row.utilisation)}%` }}
                           />

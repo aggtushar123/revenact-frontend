@@ -18,8 +18,11 @@ export interface DivergenceListProps {
   /** One line on what a disagreement in this direction means. */
   caption: string;
   rows: DivergenceRow[];
-  /** Which side is reading colder — sets the arrow's colour. */
-  tone: 'danger' | 'info';
+  /** Which side is reading colder — sets the arrow's colour. Only the
+   *  danger direction (the model seeing risk the CSM doesn't) is a status;
+   *  the other direction is a category with no loss/gain of its own, so it
+   *  stays ink rather than reaching for a colour that isn't in the rubric. */
+  tone: 'danger' | 'ink';
   emptyMessage: string;
 }
 
@@ -32,7 +35,7 @@ export interface DivergenceListProps {
  * gap with a year of runway.
  */
 export function DivergenceList({ title, caption, rows, tone, emptyMessage }: DivergenceListProps) {
-  const arrow = tone === 'danger' ? 'text-danger' : 'text-info';
+  const arrow = tone === 'danger' ? 'text-danger' : 'text-ink';
 
   return (
     <section className="flex flex-col">

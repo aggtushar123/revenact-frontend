@@ -29,7 +29,7 @@ export function ScenarioRange({ scenarios, opening, currency }: ScenarioRangePro
 
   const points = [
     { key: 'worst', label: 'Worst', value: scenarios.worst, tone: 'bg-danger' },
-    { key: 'likely', label: 'Likely', value: scenarios.likely, tone: 'bg-info' },
+    { key: 'likely', label: 'Likely', value: scenarios.likely, tone: 'bg-ink' },
     { key: 'best', label: 'Best', value: scenarios.best, tone: 'bg-success' },
   ];
 
@@ -46,7 +46,7 @@ export function ScenarioRange({ scenarios, opening, currency }: ScenarioRangePro
       <div className="px-4 pt-4 pb-3">
         <div className="relative h-[26px] rounded-[4px] bg-subtle overflow-hidden">
           <div
-            className="absolute inset-y-0 left-0 bg-info/25"
+            className="absolute inset-y-0 left-0 bg-ink/10"
             style={{ left: pct(scenarios.worst), right: `calc(100% - ${pct(scenarios.best)})` }}
           />
           {/* Where the book stands today, on the same scale — so growth and
@@ -58,7 +58,7 @@ export function ScenarioRange({ scenarios, opening, currency }: ScenarioRangePro
             aria-label={`Opening ARR ${formatMoney(opening, currency)}`}
           />
           <div
-            className="absolute inset-y-0 w-[3px] bg-info"
+            className="absolute inset-y-0 w-[3px] bg-ink"
             style={{ left: pct(scenarios.likely) }}
           />
         </div>

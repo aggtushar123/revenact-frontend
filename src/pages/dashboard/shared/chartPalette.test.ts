@@ -83,3 +83,29 @@ describe('tokens only, everywhere', () => {
     expect(offenders).toEqual([]);
   });
 });
+
+// `ROLE` has no `info` entry — only a monochrome scale plus the three
+// semantic tokens (loss/gain/caution). `info` (blue) is a leftover Tailwind
+// colour with no meaning in this app's rubric, so anywhere it shows up in the
+// dashboard it can only be decoration wearing a semantic-looking class —
+// exactly finding 5's bug (the forecast range bar and its Likely marker) and
+// the shape a regression would take. Scoped to `src/pages/dashboard` only:
+// `src/pages/health` is a different, unrelated page that still uses `info`
+// on its own terms.
+describe('no info role in the dashboard', () => {
+  it('no dashboard source file reaches for bg/text/border-info or var(--info)', () => {
+    const NO_INFO = /\b(?:bg|text|border|ring|fill|stroke)-info\b|var\(--(?:color-)?info\)/;
+
+    const modules = {
+      ...import.meta.glob('../**/*.ts', { query: '?raw', eager: true, import: 'default' }),
+      ...import.meta.glob('../**/*.tsx', { query: '?raw', eager: true, import: 'default' }),
+    } as Record<string, string>;
+
+    const offenders = Object.entries(modules)
+      .filter(([file]) => !file.includes('.test.'))
+      .filter(([, source]) => NO_INFO.test(source))
+      .map(([file]) => file);
+
+    expect(offenders).toEqual([]);
+  });
+});
