@@ -298,6 +298,17 @@ scoped server-side by department.
    French" (or whichever): it puts the draft into their language in place.
    The person still reads it and still presses send.
 
+### 4.5g Agent access (Settings > Agent Access)
+
+1. `/settings/agent-access`. Anyone can make a key for an agent that reads
+   Revenact as them over MCP: it sees their book, their mail and their
+   department's tickets, and cannot change anything.
+2. The secret is shown once, on the screen that made it, with a copy
+   button and a plain warning that nobody can recover it afterwards.
+3. The list shows each key by name, its last four characters, when it was
+   made and when it was last used. Revoking asks first and takes effect
+   immediately.
+
 ### 4.6 Copilot and multiplayer sessions
 
 1. `/copilot`. `HomeView` offers skill cards that prefill a prompt, and a
