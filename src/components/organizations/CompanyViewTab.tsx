@@ -14,6 +14,7 @@ import type { User, UserFunction } from '../../features/auth/authSlice';
 import { apiFetch } from '../../lib/apiClient';
 import { formatDate } from '../../features/customers/formatters';
 import { QuestionsPanel } from './QuestionsPanel';
+import { AccountBriefPanel } from './AccountBriefPanel';
 import { OwnerTile } from '../shared/OwnerTile';
 
 const FUNCTION_TONE: Record<UserFunction, string> = {
@@ -83,6 +84,9 @@ export function CompanyViewTab({
 
   return (
     <div className="flex flex-col gap-4 max-w-5xl mx-auto w-full">
+      {/* The standing brief first: what they use us for, and what nobody
+          here can answer about them yet. */}
+      <AccountBriefPanel customerId={customerId} customerName={customerName} />
       <section className="bg-surface rounded-xl border border-line-subtle shadow-sm px-5 py-4">
         <div className="flex items-center gap-2 mb-2">
           <Users className="w-4 h-4 text-accent" />

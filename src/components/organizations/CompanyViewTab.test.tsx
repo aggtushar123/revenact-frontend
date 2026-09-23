@@ -31,6 +31,10 @@ function mockApi() {
     }
     if (url.includes('/responsible/')) return ok({ responsible });
     if (url.includes('/questions/')) return ok([]);
+    // The brief panel sits above this view (AccountBriefPanel): an empty
+    // brief with no gaps keeps these tests about what they are about.
+    if (url.includes('/brief/'))
+      return ok({ use_cases: [], stakeholders: [], open_threads: [], sources: [], hidden_sources: 0, generated_at: null, generated_by: null, gaps: [] });
     if (init?.method === 'POST') {
       const body = JSON.parse(String(init.body));
       return ok({ ...contributions[0], id: 9, author: { id: 1, name: 'Alice' }, function: 'leadership', function_display: 'Leadership', body: body.body }, 201);

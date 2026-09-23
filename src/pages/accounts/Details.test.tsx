@@ -1048,6 +1048,8 @@ describe('AccountDetails Company View', () => {
             ],
           });
         }
+        if (u.includes('/brief/'))
+          return ok({ use_cases: [], stakeholders: [], open_threads: [], sources: [], hidden_sources: 0, generated_at: null, generated_by: null, gaps: [] });
         if (u.includes('/customers/9/contributions/')) {
           return ok([{ id: 1, customer_id: 9, customer_name: 'Kraft Heinz', author: { id: 5, name: 'Priya Nair' }, function: 'engineering', function_display: 'Engineering', body: 'SSO drops sessions on token refresh.', created_at: '2026-09-13T08:00:00Z', updated_at: '2026-09-13T08:00:00Z' }]);
         }
