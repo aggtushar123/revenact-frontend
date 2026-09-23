@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import activityReducer from '../../../../features/activity/activitySlice';
+import { AreaLayout } from '../../AreaLayout';
 import { ActivityContainer } from '../ActivityContainer';
 import { ControlsView } from './ControlsView';
 
@@ -94,18 +95,20 @@ function mockFetch(body: unknown = stats, status = 200) {
   return spy;
 }
 
-function renderDashboard() {
+function renderActivity(url = '/dashboard/health/activity') {
   const store = configureStore({ reducer: { activity: activityReducer } });
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/activity/controls']}>
+      <MemoryRouter initialEntries={[url]}>
         <Routes>
-          <Route path="/activity" element={<ActivityContainer />}>
-            <Route path="controls" element={<ControlsView />} />
+          <Route path="/dashboard/health" element={<AreaLayout area="health" />}>
+            <Route element={<ActivityContainer />}>
+              <Route path="activity" element={<ControlsView />} />
+            </Route>
           </Route>
         </Routes>
       </MemoryRouter>
-    </Provider>
+    </Provider>,
   );
   return store;
 }
@@ -122,7 +125,7 @@ describe('Activity Tracking', () => {
 
   it('fetches on mount with an explicit window', async () => {
     const fetchMock = mockFetch();
-    renderDashboard();
+    renderActivity();
 
     await waitFor(() => expect(lastUrl(fetchMock)).toContain('/customers/activity/'));
     expect(lastUrl(fetchMock)).toContain('days=90');
@@ -131,7 +134,7 @@ describe('Activity Tracking', () => {
   it('counts touches and shows inbound tickets beside them, not inside them', async () => {
     // A screen full of complaints must not read as a screen full of coverage.
     mockFetch();
-    renderDashboard();
+    renderActivity();
 
     await screen.findByText('Touches logged');
     expect(within(tile('Touches logged')).getByText('144')).toBeInTheDocument();
@@ -142,7 +145,7 @@ describe('Activity Tracking', () => {
 
   it('reports coverage against the whole book', async () => {
     mockFetch();
-    renderDashboard();
+    renderActivity();
 
     await screen.findByText('Coverage');
     expect(within(tile('Coverage')).getByText('75%')).toBeInTheDocument();
@@ -156,7 +159,7 @@ describe('Activity Tracking', () => {
       ...stats,
       kpis: { ...stats.kpis, accounts: 0, coverage: null, touched_accounts: 0 },
     });
-    renderDashboard();
+    renderActivity();
 
     await screen.findByText('Coverage');
     expect(within(tile('Coverage')).getByText('—')).toBeInTheDocument();
@@ -164,7 +167,7 @@ describe('Activity Tracking', () => {
 
   it('puts money on the accounts that have gone quiet', async () => {
     mockFetch();
-    renderDashboard();
+    renderActivity();
 
     await screen.findByText('Gone quiet');
     expect(within(tile('Gone quiet')).getByText('2')).toBeInTheDocument();
@@ -175,7 +178,7 @@ describe('Activity Tracking', () => {
 
   it('says so when nothing has gone quiet', async () => {
     mockFetch({ ...stats, kpis: { ...stats.kpis, dark_accounts: 0, dark_arr: 0 }, going_dark: [] });
-    renderDashboard();
+    renderActivity();
 
     await screen.findByText('Gone quiet');
     expect(
@@ -188,7 +191,7 @@ describe('Activity Tracking', () => {
 
   it('leads the task tile with what is overdue', async () => {
     mockFetch();
-    renderDashboard();
+    renderActivity();
 
     await screen.findByText('Overdue tasks');
     expect(within(tile('Overdue tasks')).getByText('25')).toBeInTheDocument();
@@ -201,7 +204,7 @@ describe('Activity Tracking', () => {
     // An account with no contact on record is a different fact from one last
     // called in March, and the worse one.
     mockFetch();
-    renderDashboard();
+    renderActivity();
 
     const rows = (await screen.findAllByRole('row')).slice(1);
 
@@ -212,7 +215,7 @@ describe('Activity Tracking', () => {
 
   it('shows coverage per book and says it is not a productivity score', async () => {
     mockFetch();
-    renderDashboard();
+    renderActivity();
 
     expect(await screen.findByText('Coverage by book')).toBeInTheDocument();
     expect(screen.getByText(/not by who logged the work/)).toBeInTheDocument();
@@ -223,7 +226,7 @@ describe('Activity Tracking', () => {
 
   it('names the two definitions of contact under the cadence chart', async () => {
     mockFetch();
-    renderDashboard();
+    renderActivity();
 
     expect(await screen.findByText('Contact cadence')).toBeInTheDocument();
     expect(screen.getByText(/The same rule the health score's Customer Touch component reads/)).toBeInTheDocument();
@@ -231,7 +234,7 @@ describe('Activity Tracking', () => {
 
   it('draws the timeline with its own totals', async () => {
     mockFetch();
-    renderDashboard();
+    renderActivity();
 
     expect(await screen.findByText('Logged work')).toBeInTheDocument();
     expect(screen.getByText('144 touches')).toBeInTheDocument();
@@ -240,7 +243,7 @@ describe('Activity Tracking', () => {
 
   it('says so when nothing was logged in the window', async () => {
     mockFetch({ ...stats, timeline: [], sources: [], questions: [] });
-    renderDashboard();
+    renderActivity();
 
     expect(
       await screen.findByText('Nothing logged against these accounts in this window.')
@@ -252,7 +255,7 @@ describe('Activity Tracking', () => {
   it('refetches when the window changes', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderActivity();
 
     await screen.findByLabelText('Window');
     await user.selectOptions(screen.getByLabelText('Window'), '30');
@@ -264,7 +267,7 @@ describe('Activity Tracking', () => {
     // The window is the question being asked, not a filter on the book.
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderActivity();
 
     await screen.findByLabelText('Window');
     await user.selectOptions(screen.getByLabelText('Window'), '365');
@@ -275,11 +278,21 @@ describe('Activity Tracking', () => {
     expect(lastUrl(fetchMock)).toContain('days=365');
   });
 
+  it('sends the URL filters and the window to the API', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => stats });
+    vi.stubGlobal('fetch', fetchMock);
+    renderActivity('/dashboard/health/activity?owner=7&days=30');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('owner=7');
+    expect(url).toContain('days=30');
+  });
+
   // ── failure states ────────────────────────────────────────────────
 
   it('surfaces a failed fetch', async () => {
     mockFetch({ detail: 'Server exploded' }, 500);
-    renderDashboard();
+    renderActivity();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Server exploded|Could not load/);
   });
@@ -287,7 +300,7 @@ describe('Activity Tracking', () => {
   it('keeps the previous numbers when a refetch fails', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderActivity();
 
     await screen.findByText('75%');
 

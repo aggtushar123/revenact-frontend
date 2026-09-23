@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import forecastReducer from '../../../../features/forecast/forecastSlice';
+import { AreaLayout } from '../../AreaLayout';
 import { ForecastContainer } from '../ForecastContainer';
 import { ControlsView } from './ControlsView';
 
@@ -89,18 +90,20 @@ function mockFetch(body: unknown = stats, status = 200) {
   return spy;
 }
 
-function renderDashboard() {
+function renderForecast(url = '/dashboard/revenue/forecast') {
   const store = configureStore({ reducer: { forecast: forecastReducer } });
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/revenue/controls']}>
+      <MemoryRouter initialEntries={[url]}>
         <Routes>
-          <Route path="/revenue" element={<ForecastContainer />}>
-            <Route path="controls" element={<ControlsView />} />
+          <Route path="/dashboard/revenue" element={<AreaLayout area="revenue" />}>
+            <Route element={<ForecastContainer />}>
+              <Route path="forecast" element={<ControlsView />} />
+            </Route>
           </Route>
         </Routes>
       </MemoryRouter>
-    </Provider>
+    </Provider>,
   );
   return store;
 }
@@ -119,7 +122,7 @@ describe('Revenue Forecast', () => {
     // Always sent, so the number on screen and the window it covers can never
     // come from different requests.
     const fetchMock = mockFetch();
-    renderDashboard();
+    renderForecast();
 
     await waitFor(() => expect(lastUrl(fetchMock)).toContain('/customers/forecast/'));
     expect(lastUrl(fetchMock)).toContain('horizon_days=365');
@@ -127,7 +130,7 @@ describe('Revenue Forecast', () => {
 
   it('leads with today, the forecast, and the gap between them', async () => {
     mockFetch();
-    renderDashboard();
+    renderForecast();
 
     await screen.findByText('ARR today');
     expect(within(tile('ARR today')).getByText('$924.7K')).toBeInTheDocument();
@@ -137,7 +140,7 @@ describe('Revenue Forecast', () => {
 
   it('puts net revenue retention on the screen as its own number', async () => {
     mockFetch();
-    renderDashboard();
+    renderForecast();
 
     await screen.findByText('Net revenue retention');
     expect(within(tile('Net revenue retention')).getByText('91.7%')).toBeInTheDocument();
@@ -149,7 +152,7 @@ describe('Revenue Forecast', () => {
       accounts: 0,
       bridge: { ...stats.bridge, opening_arr: 0, forecast_arr: 0, net_change: 0, nrr: null },
     });
-    renderDashboard();
+    renderForecast();
 
     await screen.findByText('Net revenue retention');
     expect(within(tile('Net revenue retention')).getByText('—')).toBeInTheDocument();
@@ -157,7 +160,7 @@ describe('Revenue Forecast', () => {
 
   it('draws the bridge with the net change and NRR on it', async () => {
     mockFetch();
-    renderDashboard();
+    renderForecast();
 
     expect(await screen.findByText('ARR bridge')).toBeInTheDocument();
     expect(screen.getByText('-$76.7K')).toBeInTheDocument();
@@ -166,7 +169,7 @@ describe('Revenue Forecast', () => {
 
   it('presents the forecast as a range, not a single number', async () => {
     mockFetch();
-    renderDashboard();
+    renderForecast();
 
     await screen.findByText('Forecast range');
     expect(screen.getByText('$150.2K')).toBeInTheDocument();
@@ -177,7 +180,7 @@ describe('Revenue Forecast', () => {
 
   it('ranks the swing list by how far each account moves the number', async () => {
     mockFetch();
-    renderDashboard();
+    renderForecast();
 
     const rows = (await screen.findAllByRole('row')).slice(1);
 
@@ -188,7 +191,7 @@ describe('Revenue Forecast', () => {
 
   it('shows the reasons behind each risk, the same ones the Renewal tab prints', async () => {
     mockFetch();
-    renderDashboard();
+    renderForecast();
 
     // "Uber" is also an option in the Account dropdown, so this takes the
     // table's own first row.
@@ -200,7 +203,7 @@ describe('Revenue Forecast', () => {
 
   it('shows weighted pipeline against what is actually open', async () => {
     mockFetch();
-    renderDashboard();
+    renderForecast();
 
     await screen.findByText('Expansion pipeline');
     expect(screen.getByText('Negotiation')).toBeInTheDocument();
@@ -211,7 +214,7 @@ describe('Revenue Forecast', () => {
 
   it('names accounts it had to leave out of the money', async () => {
     mockFetch({ ...stats, unpriced_count: 2 });
-    renderDashboard();
+    renderForecast();
 
     expect(
       await screen.findByText(/2 accounts excluded from every figure below/)
@@ -223,7 +226,7 @@ describe('Revenue Forecast', () => {
   it('refetches when the horizon changes', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderForecast();
 
     await screen.findByLabelText('Horizon');
     await user.selectOptions(screen.getByLabelText('Horizon'), '90');
@@ -234,7 +237,7 @@ describe('Revenue Forecast', () => {
   it('refetches when a filter changes, keeping the horizon', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderForecast();
 
     await screen.findByLabelText('Primary Owner');
     await user.selectOptions(screen.getByLabelText('Primary Owner'), '5');
@@ -247,7 +250,7 @@ describe('Revenue Forecast', () => {
     // The horizon is the window being asked about, not a filter on the book.
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderForecast();
 
     await screen.findByLabelText('Horizon');
     await user.selectOptions(screen.getByLabelText('Horizon'), '730');
@@ -258,11 +261,21 @@ describe('Revenue Forecast', () => {
     expect(lastUrl(fetchMock)).toContain('horizon_days=730');
   });
 
+  it('sends the URL filters and the horizon to the API', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => stats });
+    vi.stubGlobal('fetch', fetchMock);
+    renderForecast('/dashboard/revenue/forecast?owner=5&horizon_days=90');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('owner=5');
+    expect(url).toContain('horizon_days=90');
+  });
+
   // ── failure and empty states ──────────────────────────────────────
 
   it('surfaces a failed fetch', async () => {
     mockFetch({ detail: 'Server exploded' }, 500);
-    renderDashboard();
+    renderForecast();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Server exploded|Could not load/);
   });
@@ -270,7 +283,7 @@ describe('Revenue Forecast', () => {
   it('keeps the previous numbers when a refetch fails', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderForecast();
 
     await screen.findByText('$924.7K');
 
@@ -291,7 +304,7 @@ describe('Revenue Forecast', () => {
       pipeline: [],
       bridge: { ...stats.bridge, opening_arr: 0, forecast_arr: 0, net_change: 0, nrr: null },
     });
-    renderDashboard();
+    renderForecast();
 
     expect(await screen.findByText('No accounts match these filters.')).toBeInTheDocument();
     expect(

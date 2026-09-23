@@ -5,6 +5,7 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import usageReducer from '../../../../features/usage/usageSlice';
+import { AreaLayout } from '../../AreaLayout';
 import { UsageOverviewContainer } from '../UsageOverviewContainer';
 import { ControlsView } from './ControlsView';
 import { niceMax } from './chartTheme';
@@ -96,18 +97,20 @@ function mockFetch(body: unknown = stats, status = 200) {
   return spy;
 }
 
-function renderDashboard() {
+function renderUsageOverview(url = '/dashboard/health/usage') {
   const store = configureStore({ reducer: { usage: usageReducer } });
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/usage/controls']}>
+      <MemoryRouter initialEntries={[url]}>
         <Routes>
-          <Route path="/usage" element={<UsageOverviewContainer />}>
-            <Route path="controls" element={<ControlsView />} />
+          <Route path="/dashboard/health" element={<AreaLayout area="health" />}>
+            <Route element={<UsageOverviewContainer />}>
+              <Route path="usage" element={<ControlsView />} />
+            </Route>
           </Route>
         </Routes>
       </MemoryRouter>
-    </Provider>
+    </Provider>,
   );
   return store;
 }
@@ -125,7 +128,7 @@ describe('Usage Overview', () => {
 
   it('fetches real usage on mount instead of reading a fixture', async () => {
     const fetchMock = mockFetch();
-    renderDashboard();
+    renderUsageOverview();
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -137,7 +140,7 @@ describe('Usage Overview', () => {
 
   it('leads with the book-wide utilisation and the seats behind it', async () => {
     mockFetch();
-    renderDashboard();
+    renderUsageOverview();
 
     const card = await screen.findByText('Seat utilisation');
     expect(within(card.parentElement!).getByText('64.9%')).toBeInTheDocument();
@@ -148,7 +151,7 @@ describe('Usage Overview', () => {
 
   it('puts a number on the shelfware and on the capacity', async () => {
     mockFetch();
-    renderDashboard();
+    renderUsageOverview();
 
     await screen.findByText('Shelfware');
     expect(within(tile('Shelfware')).getByText('$275.0K')).toBeInTheDocument();
@@ -160,7 +163,7 @@ describe('Usage Overview', () => {
   it('says how many accounts it cannot speak for at all', async () => {
     // The whole screen is silent about these; the tile is where that is said.
     mockFetch();
-    renderDashboard();
+    renderUsageOverview();
 
     await screen.findByText('No seat data');
     expect(within(tile('No seat data')).getByText('1')).toBeInTheDocument();
@@ -174,7 +177,7 @@ describe('Usage Overview', () => {
 
   it('shows the shelfware work list ranked by money', async () => {
     mockFetch();
-    renderDashboard();
+    renderUsageOverview();
 
     // "Uber" is also an option in the Account dropdown, so this finds the
     // one inside the work list.
@@ -189,7 +192,7 @@ describe('Usage Overview', () => {
 
   it('shows the capacity list with what the account already pays', async () => {
     mockFetch();
-    renderDashboard();
+    renderUsageOverview();
 
     const row = (await screen.findByText('Shopify')).closest('tr')!;
 
@@ -199,7 +202,7 @@ describe('Usage Overview', () => {
 
   it('says so rather than drawing an empty list when there is no shelfware', async () => {
     mockFetch({ ...stats, shelfware: [], at_capacity: [] });
-    renderDashboard();
+    renderUsageOverview();
 
     expect(
       await screen.findByText('Nothing in this selection is below 75% used.')
@@ -211,7 +214,7 @@ describe('Usage Overview', () => {
 
   it('renders adoption breadth by ARR', async () => {
     mockFetch();
-    renderDashboard();
+    renderUsageOverview();
 
     await screen.findByText('Adoption breadth');
     expect(screen.getByText('1 product')).toBeInTheDocument();
@@ -222,7 +225,7 @@ describe('Usage Overview', () => {
 
   it('offers the real filter options rather than a hardcoded list', async () => {
     mockFetch();
-    renderDashboard();
+    renderUsageOverview();
 
     const owner = await screen.findByLabelText('Primary Owner');
     expect(within(owner).getByRole('option', { name: 'Carl CSM' })).toBeInTheDocument();
@@ -235,7 +238,7 @@ describe('Usage Overview', () => {
   it('refetches with a query string when a filter changes', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderUsageOverview();
 
     await screen.findByLabelText('Primary Owner');
     await user.selectOptions(screen.getByLabelText('Primary Owner'), '5');
@@ -246,7 +249,7 @@ describe('Usage Overview', () => {
   it('sends unassigned as its own owner value', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderUsageOverview();
 
     await screen.findByLabelText('Primary Owner');
     await user.selectOptions(screen.getByLabelText('Primary Owner'), 'unassigned');
@@ -257,7 +260,7 @@ describe('Usage Overview', () => {
   it('counts the active filters and clears them', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderUsageOverview();
 
     await screen.findByLabelText('Primary Owner');
     await user.selectOptions(screen.getByLabelText('Primary Owner'), '5');
@@ -268,11 +271,21 @@ describe('Usage Overview', () => {
     await waitFor(() => expect(lastUrl(fetchMock)).toMatch(/\/customers\/usage\/$/));
   });
 
+  it('sends the URL filters to the API', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => stats });
+    vi.stubGlobal('fetch', fetchMock);
+    renderUsageOverview('/dashboard/health/usage?owner=5&lifecycle=live');
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const url = String(fetchMock.mock.calls[0][0]);
+    expect(url).toContain('owner=5');
+    expect(url).toContain('lifecycle=live');
+  });
+
   // ── failure and empty states ──────────────────────────────────────
 
   it('surfaces a failed fetch rather than rendering empty charts silently', async () => {
     mockFetch({ detail: 'Server exploded' }, 500);
-    renderDashboard();
+    renderUsageOverview();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Server exploded|Could not load/);
   });
@@ -280,7 +293,7 @@ describe('Usage Overview', () => {
   it('keeps the previous numbers when a refetch fails', async () => {
     const fetchMock = mockFetch();
     const user = userEvent.setup();
-    renderDashboard();
+    renderUsageOverview();
 
     await screen.findByText('64.9%');
 
@@ -297,7 +310,7 @@ describe('Usage Overview', () => {
     // "0% used" is a claim about the book; "—" is an admission that nothing
     // has loaded yet.
     mockFetch();
-    renderDashboard();
+    renderUsageOverview();
 
     expect(screen.getAllByText('—').length).toBeGreaterThan(0);
   });
@@ -310,7 +323,7 @@ describe('Usage Overview', () => {
       shelfware: [],
       at_capacity: [],
     });
-    renderDashboard();
+    renderUsageOverview();
 
     expect(await screen.findByText('No accounts match these filters.')).toBeInTheDocument();
     expect(
