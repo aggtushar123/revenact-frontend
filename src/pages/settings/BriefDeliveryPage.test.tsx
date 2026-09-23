@@ -17,8 +17,8 @@ function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body, text: async () => JSON.stringify(body) };
 }
 
-const nothing = { cadence: null, destination_hint: '', weekday: null, day: null, hour: null, is_active: false, last_sent_at: null };
-const weekly = { cadence: 'weekly', destination_hint: '…abcd', weekday: 1, day: 1, hour: 8, is_active: true, last_sent_at: '2026-09-22T08:00:00Z' };
+const nothing = { cadence: null, destination_hint: '', weekday: null, day: null, is_active: false, last_sent_at: null };
+const weekly = { cadence: 'weekly', destination_hint: '…abcd', weekday: 1, day: 1, is_active: true, last_sent_at: '2026-09-22T08:00:00Z' };
 
 function makeStore(role: 'admin' | 'csm' = 'admin') {
   return configureStore({
@@ -68,8 +68,6 @@ describe('BriefDeliveryPage', () => {
     expect(await screen.findByText(/Nothing is scheduled/)).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText('Slack webhook URL'), 'https://hooks.slack.com/services/T/B/abcd');
     await userEvent.selectOptions(screen.getByLabelText('Day'), '1');
-    await userEvent.clear(screen.getByLabelText('Not before'));
-    await userEvent.type(screen.getByLabelText('Not before'), '8');
     await userEvent.click(screen.getByRole('button', { name: 'Schedule it' }));
     expect(await screen.findByText(/Every Tuesday/)).toBeInTheDocument();
     const [, init] = fetchMock.mock.calls[1];
@@ -77,7 +75,6 @@ describe('BriefDeliveryPage', () => {
       destination: 'https://hooks.slack.com/services/T/B/abcd',
       cadence: 'weekly',
       weekday: 1,
-      hour: 8,
     });
   });
 

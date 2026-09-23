@@ -11,7 +11,6 @@ export interface BriefSchedule {
   destination_hint: string;
   weekday: number | null;
   day: number | null;
-  hour: number | null;
   is_active: boolean;
   last_sent_at: string | null;
 }
@@ -21,7 +20,6 @@ export interface ScheduleWrite {
   cadence?: Cadence;
   weekday?: number;
   day?: number;
-  hour?: number;
   is_active?: boolean;
 }
 

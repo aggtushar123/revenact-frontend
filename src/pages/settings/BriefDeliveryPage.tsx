@@ -36,9 +36,8 @@ function ordinal(day: number): string {
 }
 
 function describe(schedule: BriefSchedule): string {
-  const hour = `${String(schedule.hour ?? 8).padStart(2, '0')}:00`;
-  if (schedule.cadence === 'weekly') return `Every ${WEEKDAYS[schedule.weekday ?? 0]} from ${hour}`;
-  return `The ${ordinal(schedule.day ?? 1)} of each month, from ${hour}`;
+  if (schedule.cadence === 'weekly') return `Every ${WEEKDAYS[schedule.weekday ?? 0]}`;
+  return `The ${ordinal(schedule.day ?? 1)} of each month`;
 }
 
 function errorText(err: unknown, fallback: string): string {
@@ -48,6 +47,7 @@ function errorText(err: unknown, fallback: string): string {
 export function BriefDeliveryPage() {
   const isAdmin = useCapability('manage_org_settings');
   const [schedule, setSchedule] = useState<BriefSchedule | null>(null);
+  const [loaded, setLoaded] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -58,7 +58,6 @@ export function BriefDeliveryPage() {
   const [cadence, setCadence] = useState<Cadence>('weekly');
   const [weekday, setWeekday] = useState('0');
   const [day, setDay] = useState('1');
-  const [hour, setHour] = useState('8');
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -71,11 +70,13 @@ export function BriefDeliveryPage() {
           setCadence(next.cadence);
           setWeekday(String(next.weekday ?? 0));
           setDay(String(next.day ?? 1));
-          setHour(String(next.hour ?? 8));
         }
       })
       .catch((err) => {
         if (!cancelled) setLoadError(errorText(err, 'Could not load the schedule.'));
+      })
+      .finally(() => {
+        if (!cancelled) setLoaded(true);
       });
     return () => {
       cancelled = true;
@@ -92,7 +93,6 @@ export function BriefDeliveryPage() {
       cadence,
       weekday: Number(weekday),
       day: Number(day),
-      hour: Number(hour),
       ...(destination.trim() ? { destination: destination.trim() } : {}),
     };
     try {
@@ -166,6 +166,11 @@ export function BriefDeliveryPage() {
       {actionError && <p className="text-[12.5px] text-danger" role="alert">{actionError}</p>}
       {note && <p className="text-[12.5px] text-ink-muted" role="status">{note}</p>}
 
+      {!loaded && !loadError ? (
+        <div className="flex flex-col gap-2" role="status" aria-label="Loading the schedule">
+          <div className="h-20 rounded-xl bg-subtle animate-pulse" />
+        </div>
+      ) : (
       <div className="bg-surface rounded-xl border border-line-subtle shadow-sm p-5 flex flex-col gap-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-2">
@@ -241,7 +246,7 @@ export function BriefDeliveryPage() {
             </button>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="brief-cadence" className={LABEL}>How often</label>
               <select id="brief-cadence" value={cadence} onChange={(e) => setCadence(e.target.value as Cadence)} className={FIELD}>
@@ -260,10 +265,6 @@ export function BriefDeliveryPage() {
               ) : (
                 <input id="brief-day" type="number" min="1" max="31" value={day} onChange={(e) => setDay(e.target.value)} className={FIELD} />
               )}
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="brief-hour" className={LABEL}>Not before</label>
-              <input id="brief-hour" type="number" min="0" max="23" value={hour} onChange={(e) => setHour(e.target.value)} className={FIELD} />
             </div>
           </div>
 
@@ -290,10 +291,10 @@ export function BriefDeliveryPage() {
           </div>
         </form>
       </div>
+      )}
 
       <p className="text-[12px] text-ink-faint">
-        A month with no such day sends on its last day instead. The hour is the earliest it will go: the job runs
-        overnight and posts once that hour has passed.
+        It goes out on its day, when the overnight job runs. A month with no such day sends on its last day instead.
       </p>
     </div>
   );

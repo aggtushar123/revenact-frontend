@@ -288,8 +288,8 @@ scoped server-side by department.
 ### 4.5f Brief delivery (Settings > Brief Delivery)
 
 1. `/settings/brief-delivery`. An admin pastes a Slack incoming webhook and
-   chooses weekly on a weekday or monthly on a day, from an hour meaning
-   "not before".
+   chooses weekly on a weekday or monthly on a day. There is no hour: the
+   job that posts it runs once a night, so it goes out on its day.
 2. The webhook is written once and never shown again: the page shows the
    last few characters, enough to recognise which hook is set, and when it
    last sent.
