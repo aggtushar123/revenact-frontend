@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { useDashboardFilters, toQuery, SHARED_KEYS } from './useDashboardFilters';
+import { useDashboardFilters, toQuery, sharedSearch, SHARED_KEYS } from './useDashboardFilters';
 
 function Probe() {
   const { values, set, clear, activeCount } = useDashboardFilters([...SHARED_KEYS, 'days'], { days: '90' });
@@ -61,5 +61,14 @@ describe('toQuery', () => {
     expect(toQuery({ owner: '7', lifecycle: '', customer: '3' }, { customer: 'account' })).toBe(
       'owner=7&account=3',
     );
+  });
+});
+
+describe('sharedSearch', () => {
+  it('keeps only the shared book filters', () => {
+    expect(sharedSearch('?owner=7&days=30&customer=3&scope=x')).toBe('?owner=7&customer=3');
+  });
+  it('is empty when none are set', () => {
+    expect(sharedSearch('?days=30')).toBe('');
   });
 });

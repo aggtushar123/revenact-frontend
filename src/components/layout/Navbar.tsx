@@ -26,6 +26,7 @@ import {
 } from '../../features/notifications/notificationApi';
 import { notificationRead, allRead } from '../../features/notifications/notificationsSlice';
 import { AREAS } from '../../pages/dashboard/areas';
+import { sharedSearch } from '../../pages/dashboard/shared/useDashboardFilters';
 
 export function Navbar() {
   const location = useLocation();
@@ -120,6 +121,7 @@ export function Navbar() {
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
   const isDashboard = location.pathname.startsWith('/dashboard');
+  const dashboardSharedSearch = sharedSearch(location.search);
 
 
   if (isAccountSettings) {
@@ -372,9 +374,10 @@ export function Navbar() {
               {[{ key: 'overview', label: 'Overview' }, ...AREAS].map((area) => (
                 <NavLink
                   key={area.key}
-                  to={`/dashboard/${area.key}`}
+                  // Only the shared book filters travel between areas.
+                  to={{ pathname: `/dashboard/${area.key}`, search: dashboardSharedSearch }}
                   className={({ isActive }) =>
-                    `h-full inline-flex items-center text-[13px] font-semibold border-b-2 transition-colors duration-[var(--dur-fast)] ${
+                    `h-full inline-flex items-center text-[13px] font-semibold border-b-2 transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                       isActive ? 'border-accent text-ink' : 'border-transparent text-ink-muted hover:text-ink'
                     }`
                   }

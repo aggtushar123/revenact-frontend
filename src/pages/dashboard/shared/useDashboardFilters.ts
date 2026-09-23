@@ -10,6 +10,20 @@ import { useSearchParams } from 'react-router-dom';
  */
 export const SHARED_KEYS = ['owner', 'lifecycle', 'customer'] as const;
 
+/** The part of a query string that travels between dashboard areas: the
+ *  shared book filters only. A view's own keys (a period, a scope) mean
+ *  nothing in another area, so they are left behind. Returns '' or '?…'. */
+export function sharedSearch(search: string): string {
+  const current = new URLSearchParams(search);
+  const shared = new URLSearchParams();
+  for (const key of SHARED_KEYS) {
+    const value = current.get(key);
+    if (value) shared.set(key, value);
+  }
+  const query = shared.toString();
+  return query ? `?${query}` : '';
+}
+
 export function useDashboardFilters(keys: readonly string[], defaults: Record<string, string> = {}) {
   const [params, setParams] = useSearchParams();
 
