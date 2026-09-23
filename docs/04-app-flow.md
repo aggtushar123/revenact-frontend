@@ -121,12 +121,15 @@ Profile and Sign out.
 - **Dashboard filters.** `useDashboardFilters` (`src/pages/dashboard/shared/useDashboardFilters.ts`)
   reads and writes `useSearchParams` directly, so a filtered view is always a
   linkable URL. `SHARED_KEYS` (`owner`, `lifecycle`, `customer`) are the three
-  every stats endpoint already reads, rendered by `DashboardToolbar`; each
-  view adds its own period key on top: Forecast's `horizon_days` (default
-  `365`), Activity's `days` (default `90`), Tickets' `days` validated against
-  its `DATE_PRESETS`, Topics' `scope` (`customer:<id>` or `account:<id>`),
-  Product's `product`. `toQuery` turns the current values into the API's
-  query string, renaming a key where the backend spells it differently.
+  every stats endpoint already reads, rendered by `DashboardToolbar`, and the
+  only keys the Navbar's area tabs and Overview's links carry from one area to
+  another (`sharedSearch`). Views add their own keys on top. Period keys:
+  Forecast's `horizon_days` (default `365`), Activity's `days` (default `90`),
+  Tickets' `days` validated against its `DATE_PRESETS`. Other view keys:
+  Topics' `scope` (`customer:<id>` or `account:<id>`, which organisation or
+  account to read — not a period), Product's `product`, Tickets' `priority`.
+  `toQuery` turns the current values into the API's query string, renaming a
+  key where the backend spells it differently.
 
 ---
 
@@ -374,11 +377,15 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
 ```
 
 - **Overview** (`Overview.tsx`) is a placeholder — a card per area linking to
-  its first view — until the attention list lands.
+  the area (`/dashboard/<area>`, which redirects to its first view) — until
+  the attention list lands.
+- **`DashboardFrame`** is the `dashboard` route's element: the scroll
+  container (`overflow-y-auto`, `p-4`) for Overview and every area, since
+  `DashboardLayout`'s `<main>` is `overflow-hidden`.
 - **`AreaLayout`** hands each area's sub-view list down through `Outlet`
   context (`useSubViews`); each container renders `DashboardToolbar` (the
   sub-view switch plus the filter row) and dispatches its own fetch.
-- **Health** carries seven views under one container split in two:
+- **Health** carries seven views from three containers:
   `HealthOverviewContainer` renders Triage, Divergence, Movement, Renewals and
   Distribution off one `/customers/health/` request (`useHealthOverview`
   applies the shared owner/lifecycle/account filters to all five, mapped by
@@ -393,7 +400,11 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
   (`"Covers the whole book; the filters above do not apply to this section."`)
   whenever `owner`, `lifecycle` or `customer` is set.
 - **Filters** live in the URL — see "Dashboard filters" in §3 — so a filtered
-  view is a link, not a session-local state.
+  view is a link, not a session-local state. Health mirrors the URL into
+  `state.health.filters` exactly (`replaceHealthFilters`, no pruning), so a
+  deep link applies even when the book loads after it; once rows exist, a
+  filter the book cannot honour (an owner who left, an account the chosen
+  owner doesn't hold) is removed from the URL itself, narrowest first.
 - **Redirects.** `/health` and every `/dashboard/advance/*` path redirect to
   their new home with the query string kept (`Keep`, `LegacyRedirect`); the
   mapping from an old path to its new one is `LEGACY` in `areas.ts`. `/dashboard`

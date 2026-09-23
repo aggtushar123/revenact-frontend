@@ -166,8 +166,9 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 | Sidebar collapsed / hover-expanded | 68px / 240px, 300ms transition, overlays below the `md` breakpoint |
 | Navbar | 64px, bottom hairline, `shadow-sm` |
 | Copilot tab bar | 56px |
-| Dashboard tab bar (Navbar's Overview/Revenue/Health/Support tabs) | 44px |
-| Dashboard toolbar (`DashboardToolbar`'s sub-view switch, shared by all three areas) | 40px |
+| Dashboard area tabs (Overview/Revenue/Health/Support) | Inside the 64px Navbar, not a bar of their own: full-height links with a 2px bottom border on the active one; they carry only `owner`/`lifecycle`/`customer` across areas |
+| Dashboard toolbar (`DashboardToolbar`, shared by all three areas) | Sub-view links `min-h-8` (32px) in a `p-0.5` bordered group; filter chips a fixed `h-9` (36px); the filter row is `min-h-9` and grows when it wraps rather than overlapping the content below |
+| Dashboard page | `DashboardFrame` owns the scroll (`overflow-y-auto`) and adds `p-4` inside `<main>`'s own padding |
 
 ---
 
@@ -193,8 +194,8 @@ used to be copied into every dashboard tab.
 
 | Component | Rule |
 |---|---|
-| `DashboardToolbar` | The one row under the area tabs: a sub-view switch (`NavLink`s, hidden when there is only one view) on the left, `FilterSelect`s on the right, reading and writing the URL through `useDashboardFilters`. A period control (e.g. Forecast's horizon) is marked `clearable: false` and survives "Clear n"; the rest of the active filters do not |
-| `Kpi` / `KpiStrip` | `Kpi` is one label/value/detail figure; colour is reserved for `tone="loss"`/`"gain"`, never decorative. `KpiStrip` lays a row of them out four across from `md` (`columns={3}` for a three-figure summary), divided by hairlines rather than boxed — replaced six local `Tile`s that tinted a border by tone and coloured numbers that meant nothing |
+| `DashboardToolbar` | The one row under the area tabs: a sub-view switch (`NavLink`s, hidden when there is only one view) on the left, `FilterSelect`s on the right, reading and writing the URL through `useDashboardFilters`. A period control (e.g. Forecast's horizon) is marked `clearable: false` and survives "Clear n"; the rest of the active filters do not. A chip shows as active only when its value differs from that filter's default, so a period on its default does not look filtered. An option may carry a short `display` label for the chip (Health's chips show the name; the count stays in the dropdown). The visible chip shows the focus ring of the invisible native `<select>` over it |
+| `Kpi` / `KpiStrip` | `Kpi` is one label/value/detail figure; colour is reserved for `tone="loss"`/`"gain"`, never decorative. `KpiStrip` lays a row of them out four across from `md` (`columns={3}` for a three-figure summary, `columns={2}` inside a card; `stackFromLg` for a quarter-width card such as Tickets' KPIs, keeping every label to two lines), divided by hairlines rather than boxed — replaced six local `Tile`s that tinted a border by tone and coloured numbers that meant nothing |
 | `Panel` | The one container on the dashboard: `bg-surface border border-line rounded-xl p-4`, an optional title/action header. Never nest one inside another — group inside with `divide-y` or whitespace instead |
 | `DataState` (`Loading`, `ErrorState`, `Empty`, `TruncatedNotice`) | One wording for loading, error, empty and truncated, generalised from Health's own set so eight views stop describing the same outage eight different ways |
 
