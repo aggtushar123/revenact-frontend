@@ -54,3 +54,21 @@ describe('dashboard routes', () => {
     expect(screen.getByTestId('where').textContent).toBe('/dashboard/revenue/forecast?owner=7');
   });
 });
+
+describe('dashboard frame', () => {
+  // The layout's <main> is overflow-hidden, so the dashboard has to own its
+  // own scroll — without it a long view is simply cut off.
+  it.each(['/dashboard/overview', '/dashboard/health/triage', '/dashboard/support/tickets'])(
+    '%s renders inside a scroll container with page padding',
+    (url) => {
+      render(
+        <MemoryRouter initialEntries={[url]}>
+          <Routes>{dashboardRoutes(stub)}</Routes>
+        </MemoryRouter>,
+      );
+      const scroller = screen.getByTestId('where').closest('.overflow-y-auto');
+      expect(scroller).not.toBeNull();
+      expect(scroller).toHaveClass('p-4', 'min-h-0');
+    },
+  );
+});

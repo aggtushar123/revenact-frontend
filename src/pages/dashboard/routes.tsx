@@ -2,6 +2,7 @@ import type { ReactElement } from 'react';
 import { Route } from 'react-router-dom';
 import { AREAS } from './areas';
 import { AreaLayout } from './AreaLayout';
+import { DashboardFrame } from './DashboardFrame';
 import { Keep, LegacyRedirect } from './redirects';
 import { Overview } from './Overview';
 import { AITrendingTopics } from './tabs/AITrendingTopics';
@@ -36,7 +37,7 @@ export function dashboardRoutes(stub?: () => ReactElement) {
   const shell = (real: ReactElement) => (stub ? undefined : real);
   return (
     <>
-      <Route path="dashboard">
+      <Route path="dashboard" element={<DashboardFrame />}>
         <Route index element={<Keep to="/dashboard/overview" />} />
         <Route path="overview" element={el(<Overview />)} />
         <Route path="advance" element={<Keep to="/dashboard/overview" />} />
