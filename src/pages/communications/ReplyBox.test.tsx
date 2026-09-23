@@ -98,3 +98,30 @@ describe('ReplyBox in their language', () => {
     expect(screen.getByDisplayValue('Hello there')).toBeInTheDocument();
   });
 });
+
+describe('ReplyBox protects what the person typed', () => {
+  it('keeps their words when a translation lands after they kept typing', { timeout: 15000 }, async () => {
+    let release: ((value: unknown) => void) | null = null;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ ok: true, status: 201, json: async () => ({ text: 'Bonjour.', to: 'fr', detected_language: 'en', made_now: true }) });
+        })
+      )
+    );
+    render(
+      <MemoryRouter>
+        <ReplyBox label="Reply" placeholder="Write." hint="" sendLabel="Send" theirLanguage="fr" onSend={vi.fn()} />
+      </MemoryRouter>
+    );
+    const box = screen.getByRole('textbox');
+    await userEvent.type(box, 'Hello');
+    await userEvent.click(screen.getByRole('button', { name: /Write in French/ }));
+    await userEvent.type(box, ' again');
+    release!(undefined);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.getByDisplayValue('Hello again')).toBeInTheDocument();
+  });
+});

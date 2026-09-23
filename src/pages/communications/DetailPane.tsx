@@ -192,7 +192,14 @@ export function DetailPane({
 
       <div className="grow overflow-y-auto px-4.5 py-3.5">
         {TRANSLATABLE[row.kind] ? (
-          <TranslateBlock kind={TRANSLATABLE[row.kind]!} id={recordId(row)} text={row.preview} />
+          // Keyed by the record: switching rows must not leave the last
+          // one's translation on screen under this one's name.
+          <TranslateBlock
+            key={row.id}
+            kind={TRANSLATABLE[row.kind]!}
+            id={recordId(row)}
+            text={row.preview}
+          />
         ) : (
           <p className="text-[13px] leading-relaxed text-ink max-w-[68ch] whitespace-pre-line">
             {row.preview}
@@ -208,6 +215,7 @@ export function DetailPane({
           hint={composer.hint}
           sendLabel={composer.send}
           draftSource={row.kind === 'email' ? { kind: 'email', id: recordId(row) } : undefined}
+          theirLanguage={row.writer_language || undefined}
           onSend={row.action === 'reply' ? onReply : undefined}
           sending={replying}
           sent={replied}
