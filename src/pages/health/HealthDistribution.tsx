@@ -52,10 +52,15 @@ const AI_PULSE_ORDER: Customer['ai_pulse_score'][] = ['very_satisfied', 'satisfi
 
 const AI_PULSE_COLORS: Record<string, { text: string; bg: string }> = {
   very_satisfied: { text: 'text-success', bg: 'bg-success-dim' },
-  satisfied: { text: 'text-info', bg: 'bg-info-dim' },
+  // Positive but not the top band: neutral ink, not a fourth hue. The pill's
+  // own label ("Satisfied") carries the meaning, not the colour.
+  satisfied: { text: 'text-ink', bg: 'bg-subtle' },
   moderate: { text: 'text-warning', bg: 'bg-warning-dim' },
   high_risk: { text: 'text-danger', bg: 'bg-danger-dim' },
 };
+
+/** Owned vs unowned avatars: two monochrome steps, no hue. */
+const OWNED_AVATAR_BG = 'bg-ink-muted';
 
 // One row shape both Customer and Account map into — `company` is only
 // ever set for an Account (which org(s) it belongs to).
@@ -80,7 +85,9 @@ function customerToRow(c: Customer): HealthRow {
     id: `c${r.id}`,
     name: r.org,
     logo: r.logo,
-    avatarBg: r.bg,
+    // Not `r.bg`: mapCustomerToOrgRow paints owned rows in the blue info role,
+    // the dashboard doesn't have (see chartPalette.test.ts).
+    avatarBg: c.owner ? OWNED_AVATAR_BG : 'bg-line-strong',
     company: null,
     owner: r.owner,
     health: r.health,
@@ -98,7 +105,7 @@ function accountToRow(a: Account): HealthRow {
     id: `a${a.id}`,
     name: a.name,
     logo: a.domain ? `https://logo.clearbit.com/${a.domain}` : '',
-    avatarBg: a.owner ? 'bg-info' : 'bg-line-strong',
+    avatarBg: a.owner ? OWNED_AVATAR_BG : 'bg-line-strong',
     company: companyLabel(a.customers),
     owner: a.owner?.name ?? 'Unassigned',
     health: { val: Number(a.health_score), clr: HEALTH_DOT_COLORS[a.health_category] },

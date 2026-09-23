@@ -89,16 +89,17 @@ describe('tokens only, everywhere', () => {
 // colour with no meaning in this app's rubric, so anywhere it shows up in the
 // dashboard it can only be decoration wearing a semantic-looking class —
 // exactly finding 5's bug (the forecast range bar and its Likely marker) and
-// the shape a regression would take. Scoped to `src/pages/dashboard` only:
-// `src/pages/health` is a different, unrelated page that still uses `info`
-// on its own terms.
+// the shape a regression would take. Covers `src/pages/health` too: its
+// Distribution page is now Health's Distribution view inside the dashboard.
 describe('no info role in the dashboard', () => {
-  it('no dashboard source file reaches for bg/text/border-info or var(--info)', () => {
-    const NO_INFO = /\b(?:bg|text|border|ring|fill|stroke)-info\b|var\(--(?:color-)?info\)/;
+  it('no dashboard or health source file reaches for bg/text/border-info or var(--info)', () => {
+    const NO_INFO = /\b(?:bg|text|border|ring|fill|stroke)-info(?:-dim)?\b|var\(--(?:color-)?info\)/;
 
     const modules = {
       ...import.meta.glob('../**/*.ts', { query: '?raw', eager: true, import: 'default' }),
       ...import.meta.glob('../**/*.tsx', { query: '?raw', eager: true, import: 'default' }),
+      ...import.meta.glob('../../health/**/*.ts', { query: '?raw', eager: true, import: 'default' }),
+      ...import.meta.glob('../../health/**/*.tsx', { query: '?raw', eager: true, import: 'default' }),
     } as Record<string, string>;
 
     const offenders = Object.entries(modules)
