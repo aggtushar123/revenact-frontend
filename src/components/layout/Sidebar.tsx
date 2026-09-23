@@ -1,13 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import {
-  LayoutGrid, Network, Layers, Users,
-  Target, Globe, PieChart, GitBranch, List, GitCommit,
-  Columns, PenTool, Box, Boxes, CircleDot, HeartPulse, UserCog, Plug,
-  Brain, Flag, CheckSquare, MessageSquareWarning, Bot, Wand2, Lightbulb,
-  Sliders, LogOut,
-  Sparkles,
-} from 'lucide-react';
+import { Bot, Box, Boxes, Brain, CheckSquare, CircleDot, Columns, Flag, GitBranch, GitCommit, Globe, HeartPulse, Layers, LayoutGrid, Lightbulb, List, LogOut, MessageSquareWarning, Network, PenTool, PieChart, Plug, Radar, Sliders, Sparkles, Target, UserCog, Users, Wand2 } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchProposals } from '../../features/proposals/proposalsSlice';
 import { fetchCustomObjectDefinitions } from '../../features/customObjects/customObjectsApi';
@@ -135,6 +128,7 @@ export function Sidebar() {
           <NavItem to="/brain/graph" icon={<Network className="w-5 h-5" />} label="Knowledge Graph" />
           <NavItem to="/brain/initiatives" icon={<Flag className="w-5 h-5" />} label="Initiatives" />
           <NavItem to="/brain/requests" icon={<Lightbulb className="w-5 h-5" />} label="Feature Requests" />
+          <NavItem to="/brain/anomalies" icon={<Radar className="w-5 h-5" />} label="Anomalies" />
           <NavItem to="/brain/review" icon={<CheckSquare className="w-5 h-5" />} label="Review Queue" badge={pendingProposals} />
           <NavItem to="/brain/feedback" icon={<MessageSquareWarning className="w-5 h-5" />} label="Feedback Log" />
           <NavItem to="/brain/agents" icon={<Bot className="w-5 h-5" />} label="Agents" />
