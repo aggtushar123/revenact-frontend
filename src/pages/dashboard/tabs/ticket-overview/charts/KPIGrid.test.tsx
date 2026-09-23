@@ -1,0 +1,43 @@
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { KPIGrid } from './KPIGrid';
+import type { TicketKpis } from '../../../../../features/tickets/ticketsSlice';
+
+const KPIS: TicketKpis = {
+  total: 42,
+  on_hold: 5,
+  avg_lifetime_days: 3.2,
+  resolution_rate: 88,
+  positive_sentiment: 19,
+  negative_sentiment: 7,
+};
+
+// On Hold, Avg. Lifetime and Resolution Rate used to carry amber/green with
+// no meaning behind it — a ticket sitting on hold isn't a caution, and a
+// lower lifetime isn't a gain the way an actual loss/gain figure is. Only a
+// negative-sentiment count is unambiguously a loss.
+describe('KPIGrid', () => {
+  it('colours only Negative Sentiment Tickets, everything else stays ink', () => {
+    render(<KPIGrid kpis={KPIS} />);
+
+    expect(screen.getByText('7').className).toContain('text-danger');
+
+    for (const value of ['42', '5', '3.2', '88%', '19']) {
+      const figure = screen.getByText(value);
+      expect(figure.className).not.toContain('text-danger');
+      expect(figure.className).not.toContain('text-warning');
+      expect(figure.className).not.toContain('text-success');
+    }
+  });
+
+  it('renders every figure in the mono numeral face', () => {
+    render(<KPIGrid kpis={KPIS} />);
+    expect(screen.getByText('42').className).toContain('font-mono-brand');
+    expect(screen.getByText('42').className).toContain('tabular-nums');
+  });
+
+  it('shows an em-dash rather than a claimed zero before the first fetch', () => {
+    render(<KPIGrid kpis={null} />);
+    expect(screen.getAllByText('—').length).toBeGreaterThan(0);
+  });
+});
