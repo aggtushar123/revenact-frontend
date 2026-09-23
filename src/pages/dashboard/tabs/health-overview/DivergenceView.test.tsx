@@ -102,11 +102,11 @@ describe('Health Overview routing with Divergence', () => {
     renderWithHealth(
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
+          <Route path="/dashboard/health" element={<HealthOverviewContainer />}>
             <Route index element={<Navigate to="triage" replace />} />
             <Route path="triage" element={<p>Triage stub</p>} />
             <Route path="divergence" element={<DivergenceView />} />
-            <Route path="controls" element={<p>Controls stub</p>} />
+            <Route path="distribution" element={<p>Distribution stub</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
@@ -119,7 +119,7 @@ describe('Health Overview routing with Divergence', () => {
   // to reach through.
 
   it('still lands on Triage by default', () => {
-    renderAt('/dashboard/advance/health');
+    renderAt('/dashboard/health');
     expect(screen.getByText('Triage stub')).toBeInTheDocument();
   });
 });

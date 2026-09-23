@@ -63,9 +63,9 @@ function renewalIn(days: number) {
  *  not through a preloaded store. */
 function renderTab(element: React.ReactElement, path: string, options = {}, search = '') {
   return renderWithHealth(
-    <MemoryRouter initialEntries={[`/dashboard/advance/health/${path}${search}`]}>
+    <MemoryRouter initialEntries={[`/dashboard/health/${path}${search}`]}>
       <Routes>
-        <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
+        <Route path="/dashboard/health" element={<HealthOverviewContainer />}>
           <Route index element={<Navigate to="triage" replace />} />
           <Route path={path} element={element} />
         </Route>
@@ -170,7 +170,7 @@ describe('Primary Owner filter', () => {
 
   it('narrows the money on the Renewal tab too, from the same chip', async () => {
     const user = userEvent.setup();
-    renderTab(<RenewalView />, 'renewal-date');
+    renderTab(<RenewalView />, 'renewals');
 
     // $260K across all three accounts renewing inside 90 days.
     expect(within(tile('Up for renewal')).getByText('$260.0K')).toBeInTheDocument();
@@ -232,10 +232,10 @@ describe('Primary Owner filter', () => {
   });
 
   it('survives moving between tabs', async () => {
-    // Narrowing to one CSM and then moving from Triage to Renewal Date is one
+    // Narrowing to one CSM and then moving from Triage to Renewals is one
     // thought, not two — so the filter lives in the URL, not in a view's own
     // state, and the container reads it into the store on mount.
-    const { store } = renderTab(<RenewalView />, 'renewal-date', {}, '?owner=3');
+    const { store } = renderTab(<RenewalView />, 'renewals', {}, '?owner=3');
 
     expect(await within(tile('Up for renewal')).findByText('$50.0K')).toBeInTheDocument();
     expect(store.getState().health.filters.owner).toBe('3');

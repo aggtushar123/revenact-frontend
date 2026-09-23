@@ -13,9 +13,8 @@ import { DistributionView } from './DistributionView';
 // portfolio mix, reading `state.health`) stacked over `HealthDistribution`
 // (the old /health rollup, reading `state.customers.stats`/`accountStats`).
 // Real stores for both, fetch mocked at the boundary — same convention as
-// HealthPage.test.tsx, whose coverage this repo's HealthDistribution.test.tsx
-// keeps for the rollup itself; this file only proves the two halves render
-// together.
+// HealthDistribution.test.tsx, which covers the rollup itself; this file
+// only proves the two halves render together.
 
 function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };

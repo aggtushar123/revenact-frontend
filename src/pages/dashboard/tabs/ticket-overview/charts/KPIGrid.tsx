@@ -2,7 +2,7 @@ import type { TicketKpis } from '../../../../../features/tickets/ticketsSlice';
 import { Kpi, KpiStrip } from '../../../shared/Kpi';
 
 /** An em-dash rather than a zero while the first fetch is in flight: "0
- * tickets" is a claim, "—" is an admission. Same convention as HealthPage's
+ * tickets" is a claim, "—" is an admission. Same convention as HealthDistribution's
  * own metrics. */
 const n = (v: number | null | undefined, suffix = '') =>
   v === null || v === undefined ? '—' : `${v}${suffix}`;

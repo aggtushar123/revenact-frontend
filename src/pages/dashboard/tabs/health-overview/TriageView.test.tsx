@@ -120,18 +120,18 @@ describe('Health Overview routing', () => {
     renderWithHealth(
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/dashboard/advance/health" element={<HealthOverviewContainer />}>
+          <Route path="/dashboard/health" element={<HealthOverviewContainer />}>
             <Route index element={<Navigate to="triage" replace />} />
             <Route path="triage" element={<TriageView />} />
-            <Route path="controls" element={<p>Controls stub</p>} />
+            <Route path="distribution" element={<p>Distribution stub</p>} />
           </Route>
         </Routes>
       </MemoryRouter>,
       { rows: BOOK },
     );
 
-  it('lands on Triage rather than Controls', () => {
-    renderAt('/dashboard/advance/health');
+  it('lands on Triage rather than Distribution', () => {
+    renderAt('/dashboard/health');
     expect(screen.getByRole('heading', { name: /accounts by risk score/i })).toBeInTheDocument();
   });
 

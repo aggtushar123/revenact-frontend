@@ -3,7 +3,7 @@
 //
 // Colour lives here rather than in the payload because that is what
 // every other real-data chart in this app already does — see
-// SurveyTrendChart's own LINES and HealthPage's category map. Only the
+// SurveyTrendChart's own LINES and HealthDistribution's category map. Only the
 // mock this replaced shipped `fill` alongside its numbers, which meant
 // the backend had an opinion about the theme.
 //
