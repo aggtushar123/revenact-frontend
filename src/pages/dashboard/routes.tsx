@@ -1,7 +1,8 @@
 import type { ReactElement } from 'react';
-import { Navigate, Route, useLocation, useParams } from 'react-router-dom';
-import { AREAS, LEGACY } from './areas';
+import { Route } from 'react-router-dom';
+import { AREAS } from './areas';
 import { AreaLayout } from './AreaLayout';
+import { Keep, LegacyRedirect } from './redirects';
 import { Overview } from './Overview';
 import { AITrendingTopics } from './tabs/AITrendingTopics';
 import { ControlsView as TopicsView } from './tabs/ai-trending/ControlsView';
@@ -23,19 +24,6 @@ import { ProductUsageContainer } from './tabs/ProductUsageContainer';
 import { ControlsView as ProductsView } from './tabs/product-usage/ControlsView';
 import { TicketOverviewContainer } from './tabs/ticket-overview/TicketOverviewContainer';
 import { ControlsView as TicketsView } from './tabs/ticket-overview/ControlsView';
-
-/** Redirect preserving the query string, so a filtered old link stays filtered. */
-function Keep({ to }: { to: string }) {
-  const { search } = useLocation();
-  return <Navigate to={{ pathname: to, search }} replace />;
-}
-
-function LegacyRedirect() {
-  const { '*': rest = '' } = useParams();
-  const [tab, sub] = rest.split('/');
-  const target = LEGACY[`${tab}/${sub}`] ?? LEGACY[tab] ?? '/dashboard/overview';
-  return <Keep to={target} />;
-}
 
 const first = (key: string) => `/dashboard/${key}/${AREAS.find((a) => a.key === key)!.views[0].path}`;
 
