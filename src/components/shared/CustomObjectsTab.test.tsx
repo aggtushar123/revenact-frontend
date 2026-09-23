@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CustomObjectsTab } from './CustomObjectsTab';
 
@@ -134,7 +134,8 @@ describe('CustomObjectsTab', () => {
     render(<CustomObjectsTab accountId={17} onCountChange={onCountChange} />);
     await screen.findAllByText('Seat License');
 
-    expect(onCountChange).toHaveBeenCalledWith(2);
+    // The count is reported from an effect after the rows render, so wait for it.
+    await waitFor(() => expect(onCountChange).toHaveBeenCalledWith(2));
   });
 
   it('adding a row posts real data and shows the new record', async () => {
