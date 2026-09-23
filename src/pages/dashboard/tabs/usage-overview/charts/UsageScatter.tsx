@@ -5,17 +5,31 @@ import {
   XAxis,
   YAxis,
   ZAxis,
-  Cell,
   ReferenceLine,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { UsageAccount } from '../../../../../features/usage/usageSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
-import { BAND_COLORS, FALLBACK_COLOR, niceMax } from '../chartTheme';
+import { BAND_COLORS, BAND_SHORT, FALLBACK_COLOR, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+
+// Recharts (v3) only builds its `<Legend>` from named graphical items it
+// finds mounted in the chart — a `payload` prop passed straight to
+// `<Legend>` is silently ignored (its own type even omits `payload` from
+// the public props). A single `<Scatter>` with per-point `<Cell>` colours
+// has no per-band identity for the legend to read, so every band gets its
+// own `<Scatter>` (each still just a set of dots, positioned by the same
+// x/y/z), named from `BAND_SHORT` and coloured from `BAND_COLORS` — that's
+// what the legend below actually lists. Order matches `BAND_COLORS`' own
+// declaration order (dormant → over), worst-to-best. Not exported — a test
+// exercising the legend imports `BAND_COLORS`/`BAND_SHORT` from
+// `../chartTheme` directly rather than reaching into this component module
+// (react-refresh only allows a component file to export components).
+const BAND_ORDER = Object.keys(BAND_COLORS);
 
 export interface UsageScatterProps {
   points: UsageAccount[];
@@ -61,6 +75,22 @@ export function UsageScatter({
   // to have room for it rather than clipping those accounts off the edge.
   const maxUtil = Math.max(100, ...data.map((row) => row.x));
 
+  // One bucket per known band, in legend order, plus an "other" bucket for
+  // whatever `band` doesn't match — a value the backend adds before this
+  // file catches up, or an unpriced/unmeasured account. `other` still plots
+  // (in `FALLBACK_COLOR`) but doesn't get a `<Scatter>` name, so it doesn't
+  // appear in the legend as an unlabelled entry.
+  const byBand = useMemo(() => {
+    const groups: Record<string, typeof data> = {};
+    for (const band of BAND_ORDER) groups[band] = [];
+    const other: typeof data = [];
+    for (const row of data) {
+      const bucket = row.point.band && groups[row.point.band] ? groups[row.point.band] : other;
+      bucket.push(row);
+    }
+    return { groups, other };
+  }, [data]);
+
   return (
     <div className="w-full h-full flex flex-col">
       <div className="px-4 pt-3">
@@ -79,6 +109,7 @@ export function UsageScatter({
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <ScatterChart margin={{ top: 16, right: 16, left: 4, bottom: 12 }}>
+              <Legend verticalAlign="top" height={24} wrapperStyle={{ fontSize: 11 }} />
               <XAxis
                 type="number"
                 dataKey="x"
@@ -139,14 +170,25 @@ export function UsageScatter({
                   ];
                 }}
               />
-              <Scatter {...STATIC_SERIES} data={data} fillOpacity={0.75}>
-                {data.map((row) => (
-                  <Cell
-                    key={row.point.id}
-                    fill={BAND_COLORS[row.point.band ?? ''] ?? FALLBACK_COLOR}
-                  />
-                ))}
-              </Scatter>
+              {BAND_ORDER.map((band) => (
+                <Scatter
+                  key={band}
+                  {...STATIC_SERIES}
+                  name={BAND_SHORT[band] ?? band}
+                  data={byBand.groups[band]}
+                  fill={BAND_COLORS[band]}
+                  fillOpacity={0.75}
+                />
+              ))}
+              {byBand.other.length > 0 && (
+                <Scatter
+                  {...STATIC_SERIES}
+                  legendType="none"
+                  data={byBand.other}
+                  fill={FALLBACK_COLOR}
+                  fillOpacity={0.75}
+                />
+              )}
             </ScatterChart>
           </ResponsiveContainer>
         )}

@@ -19,13 +19,19 @@ export { niceMax, ticksTo };
 
 /** Ticket.Status display labels. Shared by the status donut and the
  * assignee breakdown, which stack the same five states — a second copy
- * would drift the moment one of them changed. */
+ * would drift the moment one of them changed.
+ *
+ * `Closed` is `ROLE.gainSoft` rather than `ROLE.faint` — a closed ticket is
+ * a mild version of the same good outcome as `Resolved` (`ROLE.gain`), not
+ * a fifth neutral tone, and `On Hold` already owns `ROLE.faint`. Every value
+ * in this map is distinct, which the assignee stacked bar (all five in one
+ * bar, with a legend but no space for five per-segment labels) depends on. */
 export const STATUS_COLORS: Record<string, string> = {
   Open: ROLE.ink,
   'In Progress': ROLE.muted,
   'On Hold': ROLE.faint,
   Resolved: ROLE.gain,
-  Closed: ROLE.faint,
+  Closed: ROLE.gainSoft,
 };
 
 /** The order the assignee chart stacks its segments in — roughly the

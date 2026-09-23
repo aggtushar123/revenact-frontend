@@ -18,6 +18,11 @@ export { niceMax };
  * colour because an account out of room is an *opportunity* with an action
  * attached, not a state to alarm on, and colouring it like a problem would
  * bury the expansion list at the bottom of the screen.
+ *
+ * `over` is `ROLE.inkSoft` rather than the same full `ROLE.ink` as
+ * `at_capacity` — both read as "opportunity", but the scatter that plots
+ * every band in one chart (`UsageScatter`) needs the two tell-apart-able,
+ * and a legend alone isn't enough when dots overlap.
  */
 export const BAND_COLORS: Record<string, string> = {
   dormant: ROLE.loss,
@@ -25,7 +30,7 @@ export const BAND_COLORS: Record<string, string> = {
   fair: ROLE.muted,
   healthy: ROLE.gain,
   at_capacity: ROLE.ink,
-  over: ROLE.ink,
+  over: ROLE.inkSoft,
 };
 
 /** Short axis labels. The API's own names carry their range ("Dormant

@@ -22,6 +22,23 @@ describe('chart colours', () => {
     expect(ai.SENTIMENT_COLORS.Negative).toBe('var(--danger)');
     expect(tickets.PRIORITY_COLORS.Critical).toBe('var(--danger)');
   });
+
+  // AssigneesStackedBar stacks all five statuses in one bar with no room for
+  // a colour that repeats; UsageScatter plots six bands as bare dots with no
+  // shape/pattern to fall back on. Both charts also carry a legend now (see
+  // AssigneesStackedBar.test.tsx / UsageScatter.test.tsx), but the legend
+  // only works if the colours it's keying off are actually distinct.
+  it('no two ticket statuses share a colour', () => {
+    const values = Object.values(tickets.STATUS_COLORS);
+    expect(new Set(values).size).toBe(values.length);
+    expect(tickets.STATUS_COLORS['On Hold']).not.toBe(tickets.STATUS_COLORS.Closed);
+  });
+
+  it('no two usage bands share a colour', () => {
+    const values = Object.values(usage.BAND_COLORS);
+    expect(new Set(values).size).toBe(values.length);
+    expect(usage.BAND_COLORS.at_capacity).not.toBe(usage.BAND_COLORS.over);
+  });
 });
 
 describe('helpers', () => {

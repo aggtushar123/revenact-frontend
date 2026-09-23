@@ -12,13 +12,24 @@
 /** The monochrome/semantic roles every chart in this app draws from. Prefer
  *  `ink`/`muted`/`faint` for anything that is a category rather than a
  *  status — a source, an area, a segment — so danger/success/warning stay
- *  reserved for their one job: loss, gain and caution. */
+ *  reserved for their one job: loss, gain and caution.
+ *
+ *  `inkStrong`/`inkSoft`/`gainSoft` exist because some charts need more
+ *  distinct values than `ink`/`muted`/`faint` (three tones) can cover
+ *  without two categories in the same chart landing on the same colour —
+ *  a stacked bar with five statuses, a scatter with six usage bands. Each
+ *  is a `color-mix()` of a role colour with the surface it sits on, so it
+ *  stays a genuine intermediate step (not a fourth arbitrary hue) and still
+ *  resolves correctly in dark mode, where `--bg-surface` flips too. */
 export const ROLE = {
   ink: 'var(--text-primary)',
+  inkStrong: 'color-mix(in srgb, var(--text-primary) 78%, var(--bg-surface))',
   muted: 'var(--text-secondary)',
+  inkSoft: 'color-mix(in srgb, var(--text-primary) 55%, var(--bg-surface))',
   faint: 'var(--text-tertiary)',
   loss: 'var(--danger)',
   gain: 'var(--success)',
+  gainSoft: 'color-mix(in srgb, var(--success) 45%, var(--bg-surface))',
   caution: 'var(--warning)',
 } as const;
 
