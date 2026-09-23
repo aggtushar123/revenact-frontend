@@ -57,10 +57,13 @@ closing it on unmount or token change.
 | `/account-settings/{account,billing,integrations,personalization,skills,about}` | `SettingsLayout` with its own left nav and the assistant rail | auth |
 | `/platform`, `/platform/organisations`, `/platform/organisations/:id`, `/platform/staff` | `PlatformLayout` (its own shell) with `PlatformOverview`, `PlatformOrganisations`, `PlatformOrganisationDetail`, `PlatformStaff` | auth + `RequirePlatform` |
 | `/platform/account` | `PlatformAccount`: the staff member's password and second factor. Reachable without an MFA session, because it is where MFA is set up | auth + `RequirePlatform` (staff only) |
-| `/dashboard` → `/dashboard/advance` → `/dashboard/advance/health` | `AdvanceDashboard` | auth |
-| `/dashboard/advance/health/{triage,divergence,movement,renewal-date,controls}` | `HealthOverviewContainer` and its five views | auth |
-| `/dashboard/advance/{ai-trending,customer,activity,revenue,usage,product,ticket}/controls` | one container each | auth |
-| `/dashboard/custom` | placeholder | auth |
+| `/dashboard`, `/dashboard/custom` | `Keep` → `/dashboard/overview` | auth |
+| `/dashboard/overview` | `Overview`, a placeholder linking the three areas until the attention list lands | auth |
+| `/dashboard/revenue/{forecast,customers,products}` | `AreaLayout` (area: revenue) wrapping `ForecastContainer`, `CustomerOverviewContainer`, `ProductUsageContainer` | auth |
+| `/dashboard/health/{triage,divergence,movement,renewals,distribution}` | `AreaLayout` (area: health) wrapping `HealthOverviewContainer` and its five views | auth |
+| `/dashboard/health/{usage,activity}` | `AreaLayout` (area: health) wrapping `UsageOverviewContainer`, `ActivityContainer` | auth |
+| `/dashboard/support/{tickets,topics}` | `AreaLayout` (area: support) wrapping `TicketOverviewContainer`, `AITrendingTopics` | auth |
+| `/health`, `/dashboard/advance/*` | `Keep`/`LegacyRedirect` → the equivalent `/dashboard/...` route, query string preserved (`src/pages/dashboard/redirects.tsx`, mapping in `areas.ts`'s `LEGACY`) | auth |
 | `/organizations/{list,board,:id}` | `List`, `Board`, `OrganizationDetails` | auth |
 | `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard`, `AccountDetails` | auth |
 | `/contacts/{list,:id}` | `ContactsList`, `ContactDetails` | auth |
@@ -71,7 +74,7 @@ closing it on unmount or token change.
 | `/canvas`, `/canvas/create`, `/canvas/:id` | `CanvasPage`, `CanvasEditor` | auth |
 | `/campaigns`, `/campaigns/create`, `/campaigns/:id` | `CampaignsList`, `CampaignEditor` | auth |
 | `/surveys` | `SurveysPage` | auth |
-| `/lifecycle`, `/health` | `LifecyclePage`, `HealthPage` | auth |
+| `/lifecycle` | `LifecyclePage` | auth |
 | `/custom-objects/:id` | `CustomObjectRecordsPage` | auth |
 | `/integrations` | `Integrations` | auth |
 | `/profile` | `Profile` | auth |
@@ -115,9 +118,15 @@ Profile and Sign out.
   `toHealthDataRow.ts`, with shared formatting in `formatters.ts`. Purely
   presentational values (pill colours, avatar initials) are derived there rather
   than invented in the component.
-- **Dashboard filters.** Each container builds a `URLSearchParams` and passes it
-  through `Outlet` context; the `ControlsView` dispatches its slice's fetch with
-  that query.
+- **Dashboard filters.** `useDashboardFilters` (`src/pages/dashboard/shared/useDashboardFilters.ts`)
+  reads and writes `useSearchParams` directly, so a filtered view is always a
+  linkable URL. `SHARED_KEYS` (`owner`, `lifecycle`, `customer`) are the three
+  every stats endpoint already reads, rendered by `DashboardToolbar`; each
+  view adds its own period key on top: Forecast's `horizon_days` (default
+  `365`), Activity's `days` (default `90`), Tickets' `days` validated against
+  its `DATE_PRESETS`, Topics' `scope` (`customer:<id>` or `account:<id>`),
+  Product's `product`. `toQuery` turns the current values into the API's
+  query string, renaming a key where the backend spells it differently.
 
 ---
 
@@ -349,13 +358,46 @@ scoped server-side by department.
 The Cockpit tab is a personal view: portfolio summary, a renewals window of 30,
 60 or 90 days, and my tasks.
 
-### 4.7 Health Overview
+### 4.7 Dashboard
 
-One unpaginated request to `/customers/health/` on entry, mapped by
-`toHealthDataRow`. `useHealthOverview` applies the owner, lifecycle and account
-filters to all five tabs, so Triage, Divergence, Movement, Renewal Date and
-Controls always agree. Unrated pulse scores are null and are excluded from the
-divergence scatter, which says how many it left out.
+The old "Advance Dashboards" tab bar is gone; the dashboard is now three areas
+under one route tree, defined once in `src/pages/dashboard/areas.ts` (`AREAS`)
+and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
+
+```
+/dashboard/overview                                  Overview (placeholder)
+/dashboard/revenue/{forecast,customers,products}      Revenue
+/dashboard/health/{triage,divergence,movement,
+                    renewals,usage,activity,
+                    distribution}                     Health
+/dashboard/support/{tickets,topics}                   Support
+```
+
+- **Overview** (`Overview.tsx`) is a placeholder — a card per area linking to
+  its first view — until the attention list lands.
+- **`AreaLayout`** hands each area's sub-view list down through `Outlet`
+  context (`useSubViews`); each container renders `DashboardToolbar` (the
+  sub-view switch plus the filter row) and dispatches its own fetch.
+- **Health** carries seven views under one container split in two:
+  `HealthOverviewContainer` renders Triage, Divergence, Movement, Renewals and
+  Distribution off one `/customers/health/` request (`useHealthOverview`
+  applies the shared owner/lifecycle/account filters to all five, mapped by
+  `toHealthDataRow`; unrated pulse scores are null and excluded from the
+  divergence scatter, which says how many it left out); `UsageOverviewContainer`
+  and `ActivityContainer` are separate containers for Usage and Activity.
+  Distribution is itself two halves: the old Health Controls charts
+  (`ControlsView`) and the old `/health` page's whole-tenant
+  Organizations/Accounts × count/MRR rollup (`HealthDistribution`), which
+  reads `/customers/stats/` and `/accounts/stats/` — neither accepts the
+  dashboard's filters, so that half ignores the bar above it and says so
+  (`"Covers the whole book; the filters above do not apply to this section."`)
+  whenever `owner`, `lifecycle` or `customer` is set.
+- **Filters** live in the URL — see "Dashboard filters" in §3 — so a filtered
+  view is a link, not a session-local state.
+- **Redirects.** `/health` and every `/dashboard/advance/*` path redirect to
+  their new home with the query string kept (`Keep`, `LegacyRedirect`); the
+  mapping from an old path to its new one is `LEGACY` in `areas.ts`. `/dashboard`
+  and `/dashboard/custom` both land on `/dashboard/overview`.
 
 ### 4.8 Knowledge and @mentions
 
@@ -487,7 +529,7 @@ as a query parameter because a WebSocket handshake cannot carry a header.
 | Route or control | What happens |
 |---|---|
 | Sidebar: Product Feedbacks, Segments, Project Management | "Under Construction" |
-| `/dashboard/custom` | "Custom Dashboard (Beta) Coming Soon" |
+| `/dashboard/overview` | A placeholder linking the three areas, until the attention list lands |
 | Settings: Activities, Connect Widget | Placeholder |
 | Success Plans tab on both detail pages | "Coming Soon" |
 | Activity feed: Pulse, Conversations, Revenact Support | "coming soon" |

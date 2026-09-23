@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowDownRight, ArrowUpRight, Minus, ShieldAlert } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../hooks';
 import { fetchMetrics } from '../../features/metrics/metricsSlice';
@@ -13,11 +14,27 @@ import { ExplanationCard } from './ExplanationCard';
  * here lands in "Other" rather than vanishing — the registry is the source
  * of truth, this is only the seating plan.
  */
-const GROUPS: { title: string; keys: string[] }[] = [
-  { title: 'Revenue', keys: ['active_arr', 'forecast_arr', 'nrr', 'at_risk_arr', 'average_arr'] },
-  { title: 'Retention', keys: ['logo_retention', 'churned_arr_12m', 'top_three_share'] },
-  { title: 'Usage', keys: ['seat_utilisation', 'shelfware_arr', 'at_capacity_arr'] },
-  { title: 'Engagement', keys: ['coverage', 'dark_accounts', 'dark_arr'] },
+const GROUPS: { title: string; keys: string[]; href?: string }[] = [
+  {
+    title: 'Revenue',
+    keys: ['active_arr', 'forecast_arr', 'nrr', 'at_risk_arr', 'average_arr'],
+    href: '/dashboard/revenue/forecast',
+  },
+  {
+    title: 'Retention',
+    keys: ['logo_retention', 'churned_arr_12m', 'top_three_share'],
+    href: '/dashboard/revenue/customers',
+  },
+  {
+    title: 'Usage',
+    keys: ['seat_utilisation', 'shelfware_arr', 'at_capacity_arr'],
+    href: '/dashboard/health/usage',
+  },
+  {
+    title: 'Engagement',
+    keys: ['coverage', 'dark_accounts', 'dark_arr'],
+    href: '/dashboard/health/activity',
+  },
   { title: 'Health', keys: ['healthy_share', 'poor_health_count', 'active_customers'] },
   { title: 'Support', keys: ['open_tickets'] },
   { title: 'Knowledge', keys: ['open_questions', 'stale_questions', 'contributions_30d'] },
@@ -143,9 +160,10 @@ export function MetricLayerPanel() {
   const groups = [
     ...GROUPS.map((group) => ({
       title: group.title,
+      href: group.href,
       metrics: group.keys.map((key) => byKey.get(key)).filter((m): m is Metric => Boolean(m)),
     })),
-    ...(other.length ? [{ title: 'Other', metrics: other }] : []),
+    ...(other.length ? [{ title: 'Other', href: undefined, metrics: other }] : []),
   ].filter((group) => group.metrics.length > 0);
 
   return (
@@ -172,9 +190,20 @@ export function MetricLayerPanel() {
 
       {groups.map((group) => (
         <div key={group.title} className={isLoading ? 'opacity-60 transition-opacity' : ''}>
-          <h3 className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted mb-1.5">
-            {group.title}
-          </h3>
+          <div className="flex items-baseline justify-between gap-2 mb-1.5">
+            <h3 className="text-[10.5px] font-bold uppercase tracking-wider text-ink-muted">
+              {group.title}
+            </h3>
+            {group.href && (
+              <Link
+                to={group.href}
+                className="text-[11px] text-ink-muted hover:text-ink"
+                aria-label={`${group.title} in the dashboard`}
+              >
+                Open in dashboard →
+              </Link>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-2.5">
             {group.metrics.map((metric) => (
               <MetricTile

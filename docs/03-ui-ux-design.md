@@ -166,8 +166,8 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 | Sidebar collapsed / hover-expanded | 68px / 240px, 300ms transition, overlays below the `md` breakpoint |
 | Navbar | 64px, bottom hairline, `shadow-sm` |
 | Copilot tab bar | 56px |
-| Dashboard tab bar | 44px |
-| Health sub-tab bar | 40px |
+| Dashboard tab bar (Navbar's Overview/Revenue/Health/Support tabs) | 44px |
+| Dashboard toolbar (`DashboardToolbar`'s sub-view switch, shared by all three areas) | 40px |
 
 ---
 
@@ -185,6 +185,18 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 | `PinnedAttributes` | Label and value pairs typed as text, truncated, dot, owner or pulse |
 | `EntityAvatar` | Company logo, else deterministic initials in one of five semantic hues |
 | `PresenceStrip` | Session participants, maximum five |
+
+### Dashboard primitives
+
+Four small components, in `src/pages/dashboard/shared/`, that replaced what
+used to be copied into every dashboard tab.
+
+| Component | Rule |
+|---|---|
+| `DashboardToolbar` | The one row under the area tabs: a sub-view switch (`NavLink`s, hidden when there is only one view) on the left, `FilterSelect`s on the right, reading and writing the URL through `useDashboardFilters`. A period control (e.g. Forecast's horizon) is marked `clearable: false` and survives "Clear n"; the rest of the active filters do not |
+| `Kpi` / `KpiStrip` | `Kpi` is one label/value/detail figure; colour is reserved for `tone="loss"`/`"gain"`, never decorative. `KpiStrip` lays a row of them out four across from `md` (`columns={3}` for a three-figure summary), divided by hairlines rather than boxed — replaced six local `Tile`s that tinted a border by tone and coloured numbers that meant nothing |
+| `Panel` | The one container on the dashboard: `bg-surface border border-line rounded-xl p-4`, an optional title/action header. Never nest one inside another — group inside with `divide-y` or whitespace instead |
+| `DataState` (`Loading`, `ErrorState`, `Empty`, `TruncatedNotice`) | One wording for loading, error, empty and truncated, generalised from Health's own set so eight views stop describing the same outage eight different ways |
 
 ### Overlays
 
@@ -224,6 +236,27 @@ mentions.
 Roughly 45 Recharts components. Entry animation is disabled globally through
 `STATIC_SERIES` in `src/components/shared/chartAnimation.ts`, because animating
 forty charts on a dashboard tab change is noise, not information.
+
+**Colour roles.** Every dashboard chart draws from `src/pages/dashboard/shared/chartPalette.ts`
+rather than a literal colour — `chartPalette.test.ts` scans the dashboard and
+health tree and fails the build if one shows up. Two roles only:
+
+- `ROLE.ink` / `muted` / `faint` — the monochrome scale (the same three tones
+  as `text-primary`/`text-secondary`/`text-tertiary`) for anything that is a
+  category, not a status: a source, an area, a segment. `ROLE.inkStrong`,
+  `inkSoft` and `gainSoft` are `color-mix()`s of a role colour with the
+  surface it sits on, for a chart that needs more distinct values than three
+  tones cover (a stacked bar with five statuses, a scatter with six usage
+  bands) without inventing a fourth arbitrary hue or breaking dark mode.
+- `ROLE.loss` / `gain` / `caution` — the three semantic tokens, reserved for a
+  value that really is a loss, a gain or a caution.
+- `CATEGORICAL` (`[ink, muted, faint]`) is for categories with no inherent
+  order, always paired with a direct label since three greys alone are not
+  reliably distinguishable.
+- `TOOLTIP_STYLE` and `CURSOR_FILL` are the shared `<Tooltip contentStyle>`
+  and bar-hover cursor fill for every recharts tooltip in the dashboard —
+  replacing the translucent-black rgb literals and one-off hover washes each
+  chart used to invent for itself.
 
 Chart rules, from the `dataviz` and `ui-ux-pro-max` skills:
 
