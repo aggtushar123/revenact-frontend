@@ -54,3 +54,12 @@ export const PRIORITY_COLORS: Record<string, string> = {
  * priority added to the backend before this file catches up should
  * render in grey rather than vanish. */
 export const FALLBACK_COLOR = ROLE.faint;
+
+/** The sentiment line chart's two series. Negative sentiment is a loss and
+ *  positive a gain — the only two things danger/success are for. Each is
+ *  named in text beside the chart too, so the colour never carries the
+ *  meaning alone. */
+export const SENTIMENT_SERIES = {
+  positive: { label: 'Positive', color: ROLE.gain },
+  negative: { label: 'Negative', color: ROLE.loss },
+} as const;
