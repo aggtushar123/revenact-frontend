@@ -8,8 +8,9 @@
 
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, Sparkles } from 'lucide-react';
+import { ChevronDown, Languages, Sparkles } from 'lucide-react';
 import { draftReply } from '../copilot/copilotApi';
+import { languageName, translateText } from '../../features/translation/translationApi';
 import type { MessageSource } from '../copilot/types';
 import { hrefOf } from '../copilot/sourceHref';
 import { ApiError } from '../../lib/apiClient';
@@ -21,6 +22,9 @@ export interface ReplyBoxProps {
   sendLabel: string;
   /** What the Copilot drafts from; omit and the draft button is not shown. */
   draftSource?: { kind: 'email' | 'mail_message'; id: number };
+  /** The language this person writes in, when it is known. Offers to put
+   *  the reply into it before it is sent (see services/translation). */
+  theirLanguage?: string;
   /** Omit when sending is not wired for this kind of item; the button then says so. */
   onSend?: (body: string) => void;
   sending?: boolean;
@@ -28,13 +32,30 @@ export interface ReplyBoxProps {
   error?: string | null;
 }
 
-export function ReplyBox({ label, placeholder, hint, sendLabel, draftSource, onSend, sending = false, sent = false, error = null }: ReplyBoxProps) {
+export function ReplyBox({ label, placeholder, hint, sendLabel, draftSource, theirLanguage, onSend, sending = false, sent = false, error = null }: ReplyBoxProps) {
   const [draft, setDraft] = useState('');
   const [drafting, setDrafting] = useState(false);
   const [draftError, setDraftError] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
   const [sources, setSources] = useState<MessageSource[]>([]);
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const id = `reply-${draftSource?.kind ?? 'box'}-${draftSource?.id ?? 0}`;
+
+  /** The draft, in the language they write in. The person still reads it
+   *  and still presses send: nothing goes out because a model said so. */
+  async function intoTheirLanguage() {
+    if (!theirLanguage || !draft.trim()) return;
+    setTranslating(true);
+    setDraftError(null);
+    try {
+      const result = await translateText(draft, theirLanguage);
+      setDraft(result.text);
+    } catch (err) {
+      setDraftError(err instanceof ApiError ? err.message : 'Could not translate the draft.');
+    } finally {
+      setTranslating(false);
+    }
+  }
 
   async function askCopilot() {
     if (!draftSource) return;
@@ -108,6 +129,12 @@ export function ReplyBox({ label, placeholder, hint, sendLabel, draftSource, onS
             <button type="button" onClick={askCopilot} disabled={drafting} className="h-[30px] px-2.5 rounded-md border border-line bg-surface text-[11.5px] font-bold text-ink flex items-center gap-1.5 hover:border-line-strong disabled:opacity-50 transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
               <Sparkles size={13} aria-hidden="true" />
               {drafting ? 'Drafting…' : 'Draft with Copilot'}
+            </button>
+          ) : null}
+          {theirLanguage ? (
+            <button type="button" onClick={intoTheirLanguage} disabled={translating || draft.trim().length === 0} title={`Put this reply into ${languageName(theirLanguage)}`} className="h-[30px] px-2.5 rounded-md border border-line bg-surface text-[11.5px] font-bold text-ink flex items-center gap-1.5 hover:border-line-strong disabled:opacity-50 transition-colors duration-[var(--dur-fast)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent">
+              <Languages size={13} aria-hidden="true" />
+              {translating ? 'Translating…' : `Write in ${languageName(theirLanguage)}`}
             </button>
           ) : null}
           {status}

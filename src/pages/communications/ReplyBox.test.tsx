@@ -63,3 +63,38 @@ describe('ReplyBox', () => {
     expect(onSend).toHaveBeenCalledWith('Thursday works.');
   });
 });
+
+describe('ReplyBox in their language', () => {
+  function renderIn(language?: string) {
+    render(
+      <MemoryRouter>
+        <ReplyBox label="Reply" placeholder="Write your reply." hint="" sendLabel="Send reply" theirLanguage={language} onSend={vi.fn()} />
+      </MemoryRouter>
+    );
+  }
+
+  it('offers to put the draft into the language they write in', { timeout: 15000 }, async () => {
+    const calls = mockDraft(201, { text: 'Bonjour, voici la facture.', to: 'fr', detected_language: 'en', made_now: true });
+    renderIn('fr');
+    await userEvent.type(screen.getByRole('textbox'), 'Hello, here is the invoice.');
+    await userEvent.click(screen.getByRole('button', { name: /Write in French/ }));
+    expect(await screen.findByDisplayValue('Bonjour, voici la facture.')).toBeInTheDocument();
+    expect(calls[0]).toContain('/translations/');
+    expect(calls[0]).toContain('"to":"fr"');
+  });
+
+  it('says nothing about a language nobody knows', () => {
+    mockDraft();
+    renderIn(undefined);
+    expect(screen.queryByRole('button', { name: /Write in/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps the draft when a translation fails', { timeout: 15000 }, async () => {
+    mockDraft(429, { detail: 'This organisation has spent its monthly model budget.' });
+    renderIn('fr');
+    await userEvent.type(screen.getByRole('textbox'), 'Hello there');
+    await userEvent.click(screen.getByRole('button', { name: /Write in French/ }));
+    expect(await screen.findByText(/monthly model budget/)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Hello there')).toBeInTheDocument();
+  });
+});

@@ -18,6 +18,8 @@ export type { CanvasListTabProps } from './CanvasListTab';
 
 export { CustomObjectsTab } from './CustomObjectsTab';
 export { AIAttributesPanel } from './AIAttributesPanel';
+export { TranslateBlock } from './TranslateBlock';
+export type { TranslateBlockProps } from './TranslateBlock';
 export type { AIAttributesPanelProps } from './AIAttributesPanel';
 export type { CustomObjectsTabProps } from './CustomObjectsTab';
 

@@ -285,6 +285,19 @@ scoped server-side by department.
    one records an ordinary contribution and closes the gap; a gap not worth
    answering can be dismissed.
 
+### 4.5e Reading in your language, writing in theirs (Communications)
+
+1. An email, ticket or call in the queue detail pane carries a Translate
+   control with a language picker. The original shows until somebody asks;
+   the translation then replaces it with a line saying what it was written
+   in, and "Show original" puts it back.
+2. Translating the same message again costs nothing: the backend keeps it
+   per record per language, and the pane keeps what it has already asked
+   for.
+3. When the contact's own language is known, the reply box offers "Write in
+   French" (or whichever): it puts the draft into their language in place.
+   The person still reads it and still presses send.
+
 ### 4.6 Copilot and multiplayer sessions
 
 1. `/copilot`. `HomeView` offers skill cards that prefill a prompt, and a
