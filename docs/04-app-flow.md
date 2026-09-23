@@ -298,6 +298,18 @@ scoped server-side by department.
    French" (or whichever): it puts the draft into their language in place.
    The person still reads it and still presses send.
 
+### 4.5f Brief delivery (Settings > Brief Delivery)
+
+1. `/settings/brief-delivery`. An admin pastes a Slack incoming webhook and
+   chooses weekly on a weekday or monthly on a day. There is no hour: the
+   job that posts it runs once a night, so it goes out on its day.
+2. The webhook is written once and never shown again: the page shows the
+   last few characters, enough to recognise which hook is set, and when it
+   last sent.
+3. "Send one now" proves a new schedule without waiting a week. It reports
+   plainly when no brief has been written yet, because the schedule posts
+   what exists and never writes one itself.
+
 ### 4.5g Agent access (Settings > Agent Access)
 
 1. `/settings/agent-access`. Anyone can make a key for an agent that reads

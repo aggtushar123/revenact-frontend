@@ -350,6 +350,7 @@ export function Navbar() {
                 { name: 'Connect Widget', path: '/settings/connect-widget' },
                 { name: 'AI Agent', path: '/settings/ai-agent' },
                 { name: 'AI Attributes', path: '/settings/ai-attributes' },
+                { name: 'Brief Delivery', path: '/settings/brief-delivery' },
                 { name: 'Agent Access', path: '/settings/agent-access' }
               ].map((tab) => (
                 <NavLink 
