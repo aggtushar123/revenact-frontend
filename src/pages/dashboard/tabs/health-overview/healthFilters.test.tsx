@@ -223,12 +223,12 @@ describe('Primary Owner filter', () => {
 
     await user.selectOptions(screen.getByLabelText('Primary Owner'), '7');
 
-    // Scoped to the chip's own displayed value (`.ml-1`), not its hidden
-    // `<option>` of the same text — both read "Gerry Hill (1)" once an
-    // owner with one account is picked, the count being the shared
-    // toolbar's own choice (see the container's `choices` helper).
+    // The chip reads the name alone; the count belongs to the dropdown,
+    // where it helps choose (see the container's `choices` helper).
     const chip = screen.getByLabelText('Primary Owner').parentElement as HTMLElement;
-    expect(within(chip).getByText('Gerry Hill (1)', { selector: '.ml-1' })).toBeInTheDocument();
+    expect(within(chip).getByText('Gerry Hill', { selector: '.ml-1' })).toBeInTheDocument();
+    expect(within(chip).queryByText('Gerry Hill (1)', { selector: '.ml-1' })).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Gerry Hill (1)' })).toBeInTheDocument();
   });
 
   it('survives moving between tabs', async () => {
@@ -264,7 +264,7 @@ describe('Lifecycle Stage filter', () => {
 
     await user.selectOptions(select, 'pilot');
     const chip = select.parentElement as HTMLElement;
-    expect(within(chip).getByText('Pilot (1)', { selector: '.ml-1' })).toBeInTheDocument();
+    expect(within(chip).getByText('Pilot', { selector: '.ml-1' })).toBeInTheDocument();
   });
 });
 

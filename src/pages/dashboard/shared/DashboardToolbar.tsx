@@ -16,7 +16,7 @@ function labelFor(options: (FilterOption | FilterGroup)[], value: string): strin
   for (const entry of options) {
     const list = 'options' in entry ? entry.options : [entry];
     const hit = list.find((option) => option.value === value);
-    if (hit) return hit.label;
+    if (hit) return hit.display ?? hit.label;
   }
   return 'All';
 }
@@ -67,7 +67,7 @@ export function DashboardToolbar({
         </nav>
       )}
 
-      <div className="flex flex-wrap items-center gap-1 ml-auto h-9">
+      <div className="flex flex-wrap items-center gap-1 ml-auto min-h-9">
         {filters.map((filter) => (
           <FilterSelect
             key={filter.key}
@@ -76,6 +76,9 @@ export function DashboardToolbar({
             selected={values[filter.key]}
             onChange={(value) => set(filter.key, value)}
             options={filter.options}
+            // Active means "moved off its default": a period on its default
+            // is the question being asked, not a narrowing someone applied.
+            isActive={values[filter.key] !== (defaults[filter.key] ?? '')}
           />
         ))}
         {active > 0 && (

@@ -16,12 +16,14 @@ import { useHealthOverview } from './health-overview/useHealthOverview';
 
 /** "All" plus one entry per option, each carrying its own count — picking an
  *  owner with two accounts and one with forty are different decisions, and
- *  the dropdown is where that is worth knowing. */
+ *  the dropdown is where that is worth knowing. Once picked, the chip shows
+ *  the name alone (`display`): the count there is noise, not a choice. */
 const choices = (options: FilterOption[]) => [
   { value: '', label: 'All' },
   ...options.map((option) => ({
     value: option.key,
     label: `${option.name} (${option.count})`,
+    display: option.name,
   })),
 ];
 

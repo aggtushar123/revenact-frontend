@@ -11,7 +11,7 @@ function Where() {
 
 const filters = [
   { key: 'days', label: 'Window', clearable: false, options: [{ value: '30', label: 'Last 30 days' }, { value: '90', label: 'Last 90 days' }] },
-  { key: 'owner', label: 'Primary Owner', options: [{ value: '', label: 'All' }, { value: '7', label: 'Carl CSM' }] },
+  { key: 'owner', label: 'Primary Owner', options: [{ value: '', label: 'All' }, { value: '7', label: 'Carl CSM (9)', display: 'Carl CSM' }] },
 ];
 
 function renderAt(url: string) {
@@ -65,5 +65,49 @@ describe('DashboardToolbar', () => {
     renderAt('/dashboard/health/usage?days=30');
     expect(screen.queryByText('3 of 9 accounts')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Clear/ })).not.toBeInTheDocument();
+  });
+
+  // The chip's visible face (the span the opacity-0 <select> sits over).
+  const chip = (label: string) =>
+    screen.getByLabelText(label).parentElement!.querySelector('span:not(.sr-only)') as HTMLElement;
+
+  it('shows the short display label on the chip, the counted label only in the dropdown', () => {
+    renderAt('/dashboard/health/usage?owner=7');
+    expect(chip('Primary Owner')).toHaveTextContent(/^Primary OwnerCarl CSM$/);
+    expect(screen.getByRole('option', { name: 'Carl CSM (9)' })).toBeInTheDocument();
+  });
+
+  it('styles a period as active only when it differs from its default', () => {
+    const { unmount } = renderAt('/dashboard/health/usage?days=90');
+    expect(chip('Window')).not.toHaveClass('border-accent');
+    unmount();
+    renderAt('/dashboard/health/usage?days=30');
+    expect(chip('Window')).toHaveClass('border-accent');
+  });
+
+  it('styles a clearable filter as active only when set', () => {
+    const { unmount } = renderAt('/dashboard/health/usage');
+    expect(chip('Primary Owner')).not.toHaveClass('border-accent');
+    unmount();
+    renderAt('/dashboard/health/usage?owner=7');
+    expect(chip('Primary Owner')).toHaveClass('border-accent');
+  });
+
+  it('lets the filter row grow when it wraps, with chips a fixed height', () => {
+    renderAt('/dashboard/health/usage');
+    const label = screen.getByLabelText('Primary Owner').parentElement as HTMLElement;
+    expect(label).toHaveClass('h-9');
+    const row = label.parentElement as HTMLElement;
+    expect(row).toHaveClass('min-h-9');
+    expect(row).not.toHaveClass('h-9');
+  });
+
+  it('shows keyboard focus on the visible chip', () => {
+    renderAt('/dashboard/health/usage');
+    expect(chip('Primary Owner')).toHaveClass(
+      'group-focus-within:outline',
+      'group-focus-within:outline-2',
+      'group-focus-within:outline-accent',
+    );
   });
 });
