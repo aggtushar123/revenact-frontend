@@ -288,6 +288,13 @@ describe('DrillPanel', () => {
 
     expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-modal');
   });
+
+  it('offers no "Ask about these" outside the dashboard frame', async () => {
+    renderPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'At risk' }));
+    expect(screen.getByRole('dialog', { name: /At risk/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Ask about these' })).not.toBeInTheDocument();
+  });
 });
 
 // Server drill source (Task 3) — same fetch-stubbing pattern as
