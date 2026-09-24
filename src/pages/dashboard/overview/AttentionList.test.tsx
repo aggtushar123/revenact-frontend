@@ -15,6 +15,7 @@ vi.mock('../../../features/attention/attentionApi', () => ({
 }));
 
 import { snooze, unsnooze } from '../../../features/attention/attentionApi';
+import { ApiError } from '../../../lib/apiClient';
 import type { AttentionItem } from '../../../features/attention/attentionApi';
 import { DrillProvider } from '../drill/DrillContext';
 import { DrillPanel } from '../drill/DrillPanel';
@@ -204,20 +205,103 @@ describe('AttentionList', () => {
     renderList();
 
     await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
-    expect(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' })).toBeDisabled();
+    const undoButton = within(rows()[0]).getByRole('button', { name: 'Undo: Uber' });
+    expect(undoButton).toHaveAttribute('aria-disabled', 'true');
+    // aria-disabled, not disabled, so it can hold focus; a click does nothing.
+    await userEvent.click(undoButton);
+    expect(unsnooze).not.toHaveBeenCalled();
     finishSnooze();
-    await waitFor(() => expect(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' })).toBeEnabled());
+    await waitFor(() => expect(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' })).not.toHaveAttribute('aria-disabled'));
 
     await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' }));
-    expect(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' })).toBeDisabled();
-    expect(within(rows()[0]).getByRole('button', { name: 'Mark Uber done' })).toBeDisabled();
+    expect(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' })).toHaveAttribute('aria-disabled', 'true');
+    expect(within(rows()[0]).getByRole('button', { name: 'Mark Uber done' })).toHaveAttribute('aria-disabled', 'true');
     finishUndo();
-    await waitFor(() => expect(within(rows()[0]).getByRole('button', { name: 'Mark Uber done' })).toBeEnabled());
+    await waitFor(() => expect(within(rows()[0]).getByRole('button', { name: 'Mark Uber done' })).not.toHaveAttribute('aria-disabled'));
   });
 
   it('shows five skeleton rows while loading, never a spinner', () => {
     renderList({ items: null, loading: true });
     expect(screen.getAllByTestId('attention-skeleton-row')).toHaveLength(5);
     expect(screen.getByRole('status')).toHaveTextContent('Loading what needs attention');
+  });
+
+  it.each([
+    ['refetching', { loading: true }],
+    ['showing a failed load', { error: true }],
+  ])('makes stale rows read-only while %s', async (_label, state) => {
+    const { rerenderWith } = renderList();
+    await userEvent.click(within(rows()[2]).getByRole('button', { name: 'Snooze Pizza Hut for 7 days' }));
+    rerenderWith(state);
+    expect(screen.getByRole('list', { name: 'Needs attention' })).toHaveAttribute('aria-busy', 'true');
+    expect(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' })).toBeDisabled();
+    expect(within(rows()[0]).getByRole('button', { name: 'Mark Uber done' })).toBeDisabled();
+    expect(within(rows()[2]).getByRole('button', { name: 'Undo: Pizza Hut' })).toBeDisabled();
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
+    expect(snooze).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not busy on a fresh list', () => {
+    renderList();
+    expect(screen.getByRole('list', { name: 'Needs attention' })).not.toHaveAttribute('aria-busy');
+  });
+
+  it('moves focus to Undo after Snooze, and back to Snooze after Undo', async () => {
+    renderList();
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
+    const undoButton = within(rows()[0]).getByRole('button', { name: 'Undo: Uber' });
+    expect(document.activeElement).toBe(undoButton);
+    expect(rows()[0]).toHaveAttribute('aria-live', 'polite');
+
+    await userEvent.click(undoButton);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' })),
+    );
+  });
+
+  it('moves focus to Undo after Done', async () => {
+    renderList();
+    await userEvent.click(within(rows()[1]).getByRole('button', { name: 'Mark Similar reports across 2 of your companies done' }));
+    expect(document.activeElement).toBe(
+      within(rows()[1]).getByRole('button', { name: 'Undo: Similar reports across 2 of your companies' }),
+    );
+  });
+
+  it('returns focus to the restored row’s Snooze when the action fails', async () => {
+    vi.mocked(snooze).mockRejectedValueOnce(new Error('network'));
+    renderList();
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
+    await screen.findByRole('alert');
+    await waitFor(() =>
+      expect(document.activeElement).toBe(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' })),
+    );
+  });
+
+  it('treats a 404 on Undo as done: the row stays restored, no alert', async () => {
+    vi.mocked(unsnooze).mockRejectedValueOnce(new ApiError(404, { detail: 'Not found.' }, 'Not found.'));
+    renderList();
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' }));
+    await waitFor(() => expect(unsnooze).toHaveBeenCalled());
+    expect(within(rows()[0]).getByRole('link', { name: 'Uber' })).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('restores the Undo line when Undo fails for another reason', async () => {
+    vi.mocked(unsnooze).mockRejectedValueOnce(new ApiError(500, null, 'Server error'));
+    renderList();
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not undo Uber');
+    expect(rows()[0]).toHaveTextContent('Snoozed');
+  });
+
+  it('says "1 company" for an anomaly spanning one', async () => {
+    const single = { ...items[1], key: 'anomaly:9', title: 'One-off report', companies: [{ id: 7, name: 'Pizza Hut' }] };
+    renderList({ items: [single] });
+    await userEvent.click(screen.getByRole('button', { name: 'One-off report' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(dialog).toHaveTextContent('1 company');
+    expect(dialog).not.toHaveTextContent('1 companies');
   });
 });

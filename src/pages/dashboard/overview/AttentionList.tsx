@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ApiError } from '../../../lib/apiClient';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
@@ -22,7 +22,7 @@ type Acted = 'snoozed' | 'done';
 const ACTED_LINE: Record<Acted, string> = { snoozed: 'Snoozed', done: 'Marked done' };
 
 const BUTTON =
-  'min-h-9 px-3 rounded-lg text-[13px] font-semibold transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 disabled:cursor-not-allowed';
+  'min-h-9 px-3 rounded-lg text-[13px] font-semibold transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:cursor-not-allowed';
 const SECONDARY = `${BUTTON} border border-line text-ink bg-surface hover:bg-subtle`;
 const QUIET = `${BUTTON} text-ink-muted hover:text-ink hover:bg-subtle`;
 
@@ -89,8 +89,15 @@ function merge(server: AttentionItem[], local: Record<string, Local>): Entry[] {
  * (score descending); nothing here re-ranks it.
  *
  * Snooze and Done are optimistic: the row gives way to an Undo line at once
- * and comes back if the server says no. The line holds the row's place, and
- * outlives a reload of the list, so Undo restores it exactly where it was.
+ * and comes back if the server says no. The line holds the row's place, so
+ * Undo restores it exactly where it was. It lasts until the filter changes
+ * (the Overview keys this list by its query) or the page is left; the first
+ * fresh list after a filter change is the only reload it has to survive.
+ *
+ * Focus follows the row: Snooze/Done hand it to the Undo that replaces them,
+ * Undo (or a failed action) hands it back to the row's Snooze. A button
+ * whose call is in flight is `aria-disabled`, not `disabled`, so it can
+ * still hold that focus.
  */
 export function AttentionList({
   items,
@@ -101,7 +108,8 @@ export function AttentionList({
   /** Null until the first load. */
   items: AttentionItem[] | null;
   currency: CurrencyCode;
-  /** True only on the first load; a refetch keeps the old list on screen. */
+  /** True while a load is in flight. With `items` already set, those are
+   *  the previous query's rows: shown, but not actionable. */
   loading: boolean;
   error: boolean;
 }) {
@@ -109,6 +117,24 @@ export function AttentionList({
   const [local, setLocal] = useState<Record<string, Local>>({});
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [actionError, setActionError] = useState<string | null>(null);
+  // Where focus goes after the row it was on is swapped out: the key plus
+  // which button. Applied after the swap has rendered.
+  const [focusTo, setFocusTo] = useState<string | null>(null);
+  const buttons = useRef(new Map<string, HTMLButtonElement>());
+  const register = (id: string) => (el: HTMLButtonElement | null) => {
+    if (el) buttons.current.set(id, el);
+    else buttons.current.delete(id);
+  };
+
+  useEffect(() => {
+    if (focusTo === null) return;
+    buttons.current.get(focusTo)?.focus();
+  }, [focusTo, local]);
+
+  // Rows from the previous query (a refetch in flight) or from a failed
+  // load are shown for reading only: an action taken on one would be filed
+  // under a filter it doesn't belong to.
+  const stale = loading || error;
 
   const entries = merge(items ?? [], local);
   const remaining = entries.filter((entry) => !entry.acted).length;
@@ -129,10 +155,12 @@ export function AttentionList({
     setActionError(null);
     put(item.key, { state: choice, item, index });
     busy(item.key, true);
+    setFocusTo(`${item.key}:undo`);
     try {
       await snooze(item.key, choice === 'done' ? { done: true } : { days: 7 });
     } catch (err) {
       put(item.key, before);
+      setFocusTo(`${item.key}:snooze`);
       setActionError(`Could not ${choice === 'done' ? 'mark done' : 'snooze'} ${item.title}.${reason(err)}`);
     } finally {
       busy(item.key, false);
@@ -144,10 +172,15 @@ export function AttentionList({
     setActionError(null);
     put(item.key, { state: 'restored', item, index: was.index });
     busy(item.key, true);
+    setFocusTo(`${item.key}:snooze`);
     try {
       await unsnooze(item.key);
     } catch (err) {
+      // A 404 means there is no snooze to remove (undone elsewhere, or it
+      // expired): the item is already back, which is what Undo wanted.
+      if (err instanceof ApiError && err.status === 404) return;
       put(item.key, was);
+      setFocusTo(`${item.key}:undo`);
       setActionError(`Could not undo ${item.title}.${reason(err)}`);
     } finally {
       busy(item.key, false);
@@ -184,20 +217,22 @@ export function AttentionList({
             Could not load for these filters. Showing the last list.
           </p>
         )}
-        <ol aria-label="Needs attention" className="divide-y divide-line">
+        <ol aria-label="Needs attention" aria-busy={stale || undefined} className="divide-y divide-line">
           {entries.map(({ item, acted: done }, index) => {
             if (done) {
               return (
-                <li key={item.key} className="flex items-center justify-between gap-3 py-3">
+                <li key={item.key} aria-live="polite" className="flex items-center justify-between gap-3 py-3">
                   <p className="text-[13px] text-ink-muted min-w-0 truncate">
                     {ACTED_LINE[done]} · <span className="text-ink">{item.title}</span>
                   </p>
                   <button
                     type="button"
+                    ref={register(`${item.key}:undo`)}
                     aria-label={`Undo: ${item.title}`}
                     className={QUIET}
-                    disabled={pending[item.key]}
-                    onClick={() => undo(item)}
+                    disabled={stale}
+                    aria-disabled={pending[item.key] || undefined}
+                    onClick={() => !pending[item.key] && undo(item)}
                   >
                     Undo
                   </button>
@@ -225,7 +260,7 @@ export function AttentionList({
                           open(
                             {
                               title: item.title,
-                              figure: `${item.companies.length} companies`,
+                              figure: item.companies.length === 1 ? '1 company' : `${item.companies.length} companies`,
                               source: {
                                 kind: 'rows',
                                 rows: item.companies.map((c) => ({ id: String(c.id), name: c.name })),
@@ -252,10 +287,12 @@ export function AttentionList({
                   <span className="flex gap-2">
                     <button
                       type="button"
+                      ref={register(`${item.key}:snooze`)}
                       aria-label={`Snooze ${item.title} for 7 days`}
                       className={SECONDARY}
-                      disabled={pending[item.key]}
-                      onClick={() => act(item, index, 'snoozed')}
+                      disabled={stale}
+                      aria-disabled={pending[item.key] || undefined}
+                      onClick={() => !pending[item.key] && act(item, index, 'snoozed')}
                     >
                       Snooze 7 days
                     </button>
@@ -263,8 +300,9 @@ export function AttentionList({
                       type="button"
                       aria-label={`Mark ${item.title} done`}
                       className={QUIET}
-                      disabled={pending[item.key]}
-                      onClick={() => act(item, index, 'done')}
+                      disabled={stale}
+                      aria-disabled={pending[item.key] || undefined}
+                      onClick={() => !pending[item.key] && act(item, index, 'done')}
                     >
                       Done
                     </button>
