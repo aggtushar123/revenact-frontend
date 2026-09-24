@@ -23,8 +23,9 @@ const ACTED_LINE: Record<Acted, string> = { snoozed: 'Snoozed', done: 'Marked do
 
 const BUTTON =
   'min-h-9 px-3 rounded-lg text-[13px] font-semibold transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 disabled:cursor-not-allowed aria-disabled:opacity-50 aria-disabled:cursor-not-allowed';
-const SECONDARY = `${BUTTON} border border-line text-ink bg-surface hover:bg-subtle`;
-const QUIET = `${BUTTON} text-ink-muted hover:text-ink hover:bg-subtle`;
+// Hover only on a button that can act: a busy or stale row's buttons look inert.
+const SECONDARY = `${BUTTON} border border-line text-ink bg-surface enabled:not-aria-disabled:hover:bg-subtle`;
+const QUIET = `${BUTTON} text-ink-muted enabled:not-aria-disabled:hover:text-ink enabled:not-aria-disabled:hover:bg-subtle`;
 
 function SkeletonRows() {
   return (
