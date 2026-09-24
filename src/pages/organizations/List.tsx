@@ -9,11 +9,12 @@ import { ChurnOrganizationModal } from '../../components/organizations/ChurnOrga
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 import { fetchCustomers, updateCustomer } from '../../features/customers/customersSlice';
 import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
+import { apiFetch } from '../../lib/apiClient';
 import type { AppDispatch, RootState } from '../../store';
 
 export function List() {
   const dispatch = useDispatch<AppDispatch>();
-  const { customers, count, next, previous, isLoading, error } = useSelector(
+  const { customers, count, totalCount, next, previous, isLoading, error } = useSelector(
     (state: RootState) => state.customers
   );
 
@@ -23,6 +24,38 @@ export function List() {
   const [searchParams, setSearchParams] = useSearchParams();
   const rawDrillIds = searchParams.get('ids');
   const drillIds = rawDrillIds && rawDrillIds.trim() !== '' ? rawDrillIds : null;
+
+  // While a drill is active, the table's own fetch is ids=-filtered, so
+  // the slice's `totalCount` (updated only by an unfiltered fetch — see
+  // customersSlice.ts) never gets set from it. Fetch the unfiltered
+  // list's own `count` (page 1, discarding the rows) into local state
+  // instead, so MetricsPanel's "Number of Organizations" still shows the
+  // same population the list itself counts (visible, non-archived,
+  // churned included) rather than GET /customers/stats/'s narrower
+  // `live_customers` scope (excludes churned) or a fabricated 0.
+  const [drillTotalCount, setDrillTotalCount] = useState<number | null>(null);
+  useEffect(() => {
+    // No drill (including "Show all" clearing one) needs no probe — the
+    // ternary below ignores `drillTotalCount` whenever `drillIds` is
+    // falsy anyway, so a stale value left over from an earlier drill is
+    // harmless (and gets overwritten the next time a drill fetch
+    // resolves).
+    if (!drillIds) return;
+    let cancelled = false;
+    apiFetch<{ count: number }>('/customers/')
+      .then((page) => {
+        if (!cancelled) setDrillTotalCount(page.count);
+      })
+      .catch(() => {
+        // Keep whatever we already had (possibly still null, e.g. on a
+        // first load that failed) rather than showing a fabricated 0 for
+        // a real failure.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [drillIds]);
+  const metricsTotalCount = drillIds ? (drillTotalCount ?? totalCount) : totalCount;
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const handleShowAll = () => {
@@ -151,7 +184,7 @@ export function List() {
     <div className="flex flex-col h-full w-full bg-surface text-ink">
       {/* Glass Metrics Banner */}
       <div className="px-6 pt-5 pb-4">
-        <MetricsPanel />
+        <MetricsPanel totalCount={metricsTotalCount} />
       </div>
 
       {/* Search and Table Area */}

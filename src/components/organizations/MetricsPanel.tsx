@@ -81,6 +81,18 @@ function MetricItem({ color, label, value, formatted }: { color: string; label: 
   );
 }
 
+interface MetricsPanelProps {
+  /** Real count of onboarded organisations — the same population the
+   * Organizations list itself shows (visible, non-archived, churned
+   * included), from the caller. Passed in as a prop (unlike the Health/
+   * NPS/Lifecycle sections and Renewal, which fetch their own data via
+   * Redux) rather than derived from GET /customers/stats/'s health
+   * buckets: those are scoped to `live_customers` (excludes churned —
+   * see revenact-backend's CustomerStatsView/scoping.py), a narrower
+   * population than the list's, so summing them would undercount. */
+  totalCount: number;
+}
+
 const ZERO_BUCKET = { count: 0, mrr: 0, arr: 0 };
 
 // Renewal window presets — `days` is what the backend's ?renewal_within=
@@ -91,16 +103,7 @@ const RENEWAL_WINDOWS = [
 ];
 
 // --- Main Component ---
-//
-// "Number of Organizations" (below) is deliberately NOT a prop from the
-// table's own (possibly search- or drill-filtered, via ?ids=) fetch —
-// this panel sums it from the Health buckets instead, the same way
-// components/accounts/MetricsPanel.tsx already does for Accounts. That
-// keeps it correct even when the table never runs an unfiltered fetch at
-// all, e.g. landing straight on /organizations/list?ids=3,7 from a
-// dashboard drill — this component's own fetchCustomerStats() call below
-// is unconditional and always reflects every organisation.
-export function MetricsPanel() {
+export function MetricsPanel({ totalCount }: MetricsPanelProps) {
   const [healthTab, setHealthTab] = useState<MetricTab>('count');
   const [lifecycleTab, setLifecycleTab] = useState<MetricTab>('count');
 
@@ -146,12 +149,6 @@ export function MetricsPanel() {
       typeof ZERO_BUCKET
     >;
   }, [stats]);
-
-  // Every organisation is in exactly one health bucket (see
-  // CustomerStatsView's own docstring — archived excluded, churned
-  // included, same scope as the table's default listing), so this sum is
-  // the book-wide total regardless of what the table itself has fetched.
-  const totalCount = healthMetrics.good.count + healthMetrics.average.count + healthMetrics.poor.count;
 
   // --- NPS (real, from stats.nps) ---
   const npsMetrics = useMemo(() => {

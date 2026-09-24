@@ -137,7 +137,7 @@ function renderPanel() {
     <Provider store={store}>
       <MemoryRouter initialEntries={['/organizations']}>
         <Routes>
-          <Route path="/organizations" element={<MetricsPanel />} />
+          <Route path="/organizations" element={<MetricsPanel totalCount={5} />} />
           <Route path="/organizations/:id" element={<div>Organization Detail Page</div>} />
         </Routes>
       </MemoryRouter>
@@ -219,10 +219,7 @@ describe('MetricsPanel Health/NPS/Lifecycle sections', () => {
         average: { count: 22, mrr: 200, arr: 2400 },
         poor: { count: 33, mrr: 300, arr: 3600 },
       },
-      // Detractors is deliberately not 66 (11+22+33, the Health buckets'
-      // own sum) — the "Number of Organizations" total below is also 66,
-      // and a coincidental match would make getByText('66') ambiguous.
-      nps: { promoters: 44, passives: 55, detractors: 68, score: 77 },
+      nps: { promoters: 44, passives: 55, detractors: 66, score: 77 },
       lifecycle: {
         onboarding: { count: 1, mrr: 0, arr: 0 },
         kickoff: { count: 2, mrr: 0, arr: 0 },
@@ -248,12 +245,9 @@ describe('MetricsPanel Health/NPS/Lifecycle sections', () => {
     expect(screen.getByText('+77')).toBeInTheDocument(); // NPS score
     expect(screen.getByText('44')).toBeInTheDocument(); // NPS: Promoters
     expect(screen.getByText('55')).toBeInTheDocument(); // NPS: Passives
-    expect(screen.getByText('68')).toBeInTheDocument(); // NPS: Detractors
+    expect(screen.getByText('66')).toBeInTheDocument(); // NPS: Detractors
     expect(screen.getByTitle('live: 4')).toBeInTheDocument(); // Lifecycle bar
     expect(screen.getByTitle('churn: 6')).toBeInTheDocument();
-    // "Number of Organizations" — summed from the Health buckets, not a
-    // prop from the table's own (possibly drill-filtered) fetch.
-    expect(screen.getByTitle('Number of organizations')).toHaveTextContent('66');
   });
 
   it('shows an "excluded" caveat on MRR/ARR when some customers have no configured exchange rate', async () => {
@@ -284,10 +278,7 @@ describe('MetricsPanel Health/NPS/Lifecycle sections', () => {
     const user = userEvent.setup();
 
     renderPanel();
-    // Health: Good count (1) and "Number of Organizations" (also 1, since
-    // it's the only non-zero bucket) both render "1" — not ambiguous like
-    // a single getByText('1') would be, before switching tabs.
-    await waitFor(() => expect(screen.getAllByText('1').length).toBeGreaterThan(0));
+    await screen.findByText('1'); // Health: Good count, before switching tabs
 
     // COUNT tab (default) never shows the caveat — every customer is
     // counted regardless of whether its currency converts.
