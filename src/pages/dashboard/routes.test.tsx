@@ -58,8 +58,8 @@ describe('dashboard routes', () => {
 describe('dashboard frame', () => {
   // The layout's <main> is overflow-hidden, so the dashboard has to own its
   // own scroll — without it a long view is simply cut off. The drill panel
-  // sits beside that scroll area (see DashboardFrame's own comment), so the
-  // frame is now two elements deep, but exactly one of them still owns the
+  // and the Ask rail sit beside that scroll area (see DashboardFrame's own
+  // comment), but exactly one element around the view still owns the
   // scroll.
   it.each(['/dashboard/overview', '/dashboard/health/triage', '/dashboard/support/tickets'])(
     '%s renders inside a scroll container that shrinks to fit',
@@ -69,10 +69,17 @@ describe('dashboard frame', () => {
           <Routes>{dashboardRoutes(stub)}</Routes>
         </MemoryRouter>,
       );
-      const scroller = screen.getByTestId('where').closest('.overflow-y-auto');
+      const view = screen.getByTestId('where');
+      const scroller = view.closest('.overflow-y-auto');
       expect(scroller).not.toBeNull();
       expect(scroller).toHaveClass('min-h-0');
-      expect(container.querySelectorAll('.overflow-y-auto')).toHaveLength(1);
+      // Exactly one element above the view owns the scroll. The Ask rail's
+      // own message list scrolls too, but beside the view, not around it.
+      const around: Element[] = [];
+      for (let el = view.parentElement; el && el !== container; el = el.parentElement) {
+        if (el.classList.contains('overflow-y-auto')) around.push(el);
+      }
+      expect(around).toHaveLength(1);
     },
   );
 

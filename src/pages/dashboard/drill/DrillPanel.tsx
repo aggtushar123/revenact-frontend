@@ -12,7 +12,7 @@ const LIST_LIMIT = 500;
 
 // Same breakpoint as the panel's own `lg:` classes below — this is the
 // point where it stops being a full-screen sheet over the page and
-// becomes a side panel next to it.
+// becomes a side panel over the Ask rail from `lg`.
 const LARGE_SCREEN_QUERY = '(min-width: 1024px)';
 
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -36,11 +36,12 @@ function useIsLargeScreen(): boolean {
   return isLarge;
 }
 
-/** The rows behind one number. Beside the scroll area from `lg`, a sheet
+/** The rows behind one number. Over the Ask rail from `lg`, a sheet
  *  over the page below it. Below `lg` it is a full-screen sheet with
  *  nowhere else useful for focus to go, so it is `aria-modal` and traps
- *  Tab/Shift+Tab within itself; at `lg` it sits beside the page as an
- *  ordinary panel, so focus is free to move between the two. */
+ *  Tab/Shift+Tab within itself; at `lg` it sits over the Ask rail as an
+ *  ordinary panel (the figures never narrow), so focus is free to move
+ *  between it and the page. */
 export function DrillPanel() {
   const { current, close } = useDrill();
   const titleId = useId();
@@ -61,9 +62,9 @@ export function DrillPanel() {
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         // The sheet covers the page, so Escape always closes it. At `lg` the
-        // panel sits beside the page, whose own controls (a menu, a combobox)
-        // may want Escape: only close when focus is in the panel and nothing
-        // else has already handled the key.
+        // panel sits over the Ask rail, and the page's own controls (a menu,
+        // a combobox) may want Escape: only close when focus is in the panel
+        // and nothing else has already handled the key.
         if (isSheet) {
           close();
           return;
@@ -99,7 +100,7 @@ export function DrillPanel() {
       role="dialog"
       aria-labelledby={titleId}
       aria-modal={isSheet ? true : undefined}
-      className="animate-slide-in-right fixed inset-0 z-40 bg-surface lg:static lg:inset-auto lg:z-auto lg:w-[360px] lg:shrink-0 lg:border lg:border-line lg:rounded-xl flex flex-col min-h-0"
+      className="animate-slide-in-right fixed inset-0 z-40 bg-surface lg:absolute lg:inset-auto lg:top-4 lg:bottom-4 lg:right-4 lg:z-30 lg:w-[360px] lg:border lg:border-line lg:rounded-xl lg:shadow-md flex flex-col min-h-0"
     >
       <header className="flex items-start justify-between gap-3 p-4 border-b border-line">
         <h2 id={titleId} className="text-[15px] font-semibold text-ink">
