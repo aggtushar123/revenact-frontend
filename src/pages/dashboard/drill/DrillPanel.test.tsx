@@ -444,13 +444,11 @@ describe('DrillPanel server source', () => {
           value_label: 'tickets',
           count: 812,
           truncated: true,
-          companies: Array.from({ length: 500 }, (_, i) => ({
-            id: i + 1,
-            name: `Company ${i + 1}`,
-            owner: 'Carl CSM',
-            arr: 1000,
-            value: 1,
-          })),
+          companies: [
+            { id: 1, name: 'Company 1', owner: 'Carl CSM', arr: 1000, value: 1 },
+            { id: 2, name: 'Company 2', owner: 'Carl CSM', arr: 1000, value: 1 },
+            { id: 3, name: 'Company 3', owner: 'Carl CSM', arr: 1000, value: 1 },
+          ],
         },
         currency: 'USD',
       }),
@@ -460,7 +458,7 @@ describe('DrillPanel server source', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Open tickets' }));
 
     const dialog = await screen.findByRole('dialog');
-    await waitFor(() => expect(dialog).toHaveTextContent('Showing 500 of 812'));
+    await waitFor(() => expect(dialog).toHaveTextContent('Showing 3 of 812'));
     expect(screen.queryByRole('link', { name: /Open as a list/ })).not.toBeInTheDocument();
   });
 });
