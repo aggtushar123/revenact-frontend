@@ -5,10 +5,14 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import usageReducer from '../../../../features/usage/usageSlice';
+import type { UsageAccount } from '../../../../features/usage/usageSlice';
+import authReducer from '../../../../features/auth/authSlice';
 import { AreaLayout } from '../../AreaLayout';
 import { UsageOverviewContainer } from '../UsageOverviewContainer';
 import { ControlsView } from './ControlsView';
 import { niceMax } from './chartTheme';
+import { DrillProvider } from '../../drill/DrillContext';
+import { DrillPanel } from '../../drill/DrillPanel';
 
 // Integration tier: container + view + charts through the real router, with
 // only the fetch boundary mocked. Recharts needs a sized container jsdom won't
@@ -98,17 +102,27 @@ function mockFetch(body: unknown = stats, status = 200) {
 }
 
 function renderUsageOverview(url = '/dashboard/health/usage') {
-  const store = configureStore({ reducer: { usage: usageReducer } });
+  // `auth` is here only so `useOrgCurrency` (read by the drill panel's row
+  // list) has a slice to select from — its default state has no user, which
+  // is exactly what falls back to 'USD', matching this file's fixtures.
+  // `DrillProvider` + `DrillPanel` mirror DashboardFrame's real, app-wide
+  // pairing (see health-overview/testUtils.tsx `renderWithDrill`) so a click
+  // on a drillable Kpi or chart segment opens a real dialog instead of
+  // throwing on a missing `useDrill()` provider.
+  const store = configureStore({ reducer: { usage: usageReducer, auth: authReducer } });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path="/dashboard/health" element={<AreaLayout area="health" />}>
-            <Route element={<UsageOverviewContainer />}>
-              <Route path="usage" element={<ControlsView />} />
+        <DrillProvider>
+          <Routes>
+            <Route path="/dashboard/health" element={<AreaLayout area="health" />}>
+              <Route element={<UsageOverviewContainer />}>
+                <Route path="usage" element={<ControlsView />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+          <DrillPanel />
+        </DrillProvider>
       </MemoryRouter>
     </Provider>,
   );
@@ -329,6 +343,214 @@ describe('Usage Overview', () => {
     expect(
       screen.getByText('No account in this selection has seat data recorded.')
     ).toBeInTheDocument();
+  });
+});
+
+describe('Usage Overview drill', () => {
+  // A small, hand-picked book rather than the shared `stats` fixture above —
+  // every threshold this suite exercises (90% at-capacity, >0 shelfware ARR)
+  // needs a near miss sitting just the wrong side of it, and the shared
+  // fixture wasn't built with those in mind.
+  const acct = (over: Partial<UsageAccount> = {}): UsageAccount => ({
+    id: 1,
+    name: 'Acct',
+    owner: 'Carl',
+    lifecycle_stage: 'Live',
+    health_category: 'average' as const,
+    utilisation: 50,
+    active_seats: 500,
+    contracted_seats: 1000,
+    idle_seats: 500,
+    arr: 10_000,
+    shelfware_arr: 0,
+    products: 1,
+    renewal_date: null,
+    band: 'fair',
+    ...over,
+  });
+
+  const atCap = acct({
+    id: 1,
+    name: 'AtCap',
+    owner: 'Carl',
+    utilisation: 92,
+    active_seats: 920,
+    idle_seats: 80,
+    arr: 50_000,
+    band: 'at_capacity',
+  });
+  // Near miss: one point under the At capacity threshold.
+  const nearMissAtCap = acct({
+    id: 2,
+    name: 'NearMissAtCap',
+    owner: 'Carl',
+    utilisation: 89,
+    active_seats: 890,
+    idle_seats: 110,
+    arr: 40_000,
+    band: 'healthy',
+  });
+  const shelfy = acct({
+    id: 3,
+    name: 'Shelfy',
+    owner: 'Dana',
+    utilisation: 30,
+    active_seats: 300,
+    idle_seats: 700,
+    arr: 60_000,
+    shelfware_arr: 42_000,
+    band: 'low',
+  });
+  // Near miss: no shelfware at all (the boundary is `> 0`).
+  const nearMissShelf = acct({
+    id: 4,
+    name: 'NearMissShelf',
+    owner: 'Dana',
+    utilisation: 80,
+    active_seats: 800,
+    idle_seats: 200,
+    arr: 30_000,
+    shelfware_arr: 0,
+    band: 'healthy',
+  });
+
+  const scatter = [atCap, nearMissAtCap, shelfy, nearMissShelf];
+
+  const drillStats = {
+    kpis: {
+      accounts: 5,
+      contracted_seats: 4000,
+      active_seats: 2910,
+      utilisation: 72.75,
+      idle_seats: 1090,
+      shelfware_arr: 42_000,
+      at_capacity_arr: 50_000,
+      at_capacity_count: 1,
+      unmeasured_count: 1,
+      measured_count: 4,
+      unpriced_count: 0,
+    },
+    bands: [
+      { key: 'dormant', name: 'Dormant (<25%)', accounts: 0, arr: 0, idle_seats: 0 },
+      { key: 'low', name: 'Low (25–50%)', accounts: 1, arr: 60_000, idle_seats: 700 },
+      { key: 'fair', name: 'Fair (50–75%)', accounts: 0, arr: 0, idle_seats: 0 },
+      { key: 'healthy', name: 'Healthy (75–90%)', accounts: 2, arr: 70_000, idle_seats: 310 },
+      { key: 'at_capacity', name: 'At capacity (90–100%)', accounts: 1, arr: 50_000, idle_seats: 80 },
+      { key: 'over', name: 'Over-deployed (100%+)', accounts: 0, arr: 0, idle_seats: 0 },
+    ],
+    adoption: [],
+    scatter,
+    shelfware: [shelfy],
+    at_capacity: [atCap],
+    currency: 'USD' as const,
+    filters: { owners: [], lifecycles: [], customers: [] },
+  };
+
+  function renderDrill() {
+    mockFetch(drillStats);
+    return renderUsageOverview();
+  }
+
+  // ── Kpi tiles ──────────────────────────────────────────────────────
+
+  it('opens the seat-utilisation drill with every measured account', async () => {
+    const user = userEvent.setup();
+    renderDrill();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Seat utilisation 72.75%, show accounts' })
+    );
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'AtCap' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'NearMissAtCap' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Shelfy' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'NearMissShelf' })).toBeInTheDocument();
+    // The figure is a book-wide ratio, not a count of these rows — each row's
+    // own detail is what ties it back to that ratio.
+    expect(within(dialog).getByText('92% used')).toBeInTheDocument();
+  });
+
+  it('opens the shelfware drill with only the accounts carrying idle ARR', async () => {
+    const user = userEvent.setup();
+    renderDrill();
+
+    await user.click(await screen.findByRole('button', { name: 'Shelfware $42.0K, show accounts' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'Shelfy' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'AtCap' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'NearMissAtCap' })).not.toBeInTheDocument();
+    // The near miss: same book, zero shelfware ARR.
+    expect(within(dialog).queryByRole('link', { name: 'NearMissShelf' })).not.toBeInTheDocument();
+    // The tile's figure is idle ARR, which the row's own trailing amount
+    // (contract ARR) doesn't add up to — the detail is what explains it.
+    expect(within(dialog).getByText('$42.0K idle · 700 idle seats')).toBeInTheDocument();
+  });
+
+  it('opens the at-capacity drill with only accounts at or above 90% utilisation', async () => {
+    const user = userEvent.setup();
+    renderDrill();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'At capacity $50.0K, show accounts' })
+    );
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'AtCap' })).toBeInTheDocument();
+    // The near miss: one point under the 90% line.
+    expect(within(dialog).queryByRole('link', { name: 'NearMissAtCap' })).not.toBeInTheDocument();
+    expect(within(dialog).getByText('92% used')).toBeInTheDocument();
+  });
+
+  it('does not offer a drill for accounts with no seat data at all', async () => {
+    // `unmeasured_count` accounts aren't in `scatter` — there is no rows/
+    // predicate combination that reproduces them, so the tile stays a plain
+    // count rather than pretending to explain itself.
+    renderDrill();
+
+    const tileValue = await screen.findByText('No seat data');
+    expect(tileValue.closest('button')).toBeNull();
+    expect(screen.queryByRole('button', { name: /No seat data/ })).not.toBeInTheDocument();
+  });
+
+  // ── Utilisation band chart ────────────────────────────────────────
+
+  it('opens exactly the accounts in one utilisation band from a keyboard target', async () => {
+    const user = userEvent.setup();
+    renderDrill();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Healthy (75–90%) $70.0K, show accounts' })
+    );
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'NearMissAtCap' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'NearMissShelf' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'AtCap' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'Shelfy' })).not.toBeInTheDocument();
+  });
+
+  it('opens a different band for the same book', async () => {
+    const user = userEvent.setup();
+    renderDrill();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Low (25–50%) $60.0K, show accounts' })
+    );
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'Shelfy' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'NearMissAtCap' })).not.toBeInTheDocument();
+  });
+
+  it('offers no keyboard target for a band with no accounts in it', async () => {
+    renderDrill();
+
+    await screen.findByText('Where the money sits');
+    expect(screen.queryByRole('button', { name: /Dormant/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Fair/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Over-deployed/ })).not.toBeInTheDocument();
   });
 });
 

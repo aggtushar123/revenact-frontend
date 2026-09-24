@@ -1,4 +1,5 @@
 import type { HealthDataRow } from '../../../features/health/types';
+import type { UsageAccount } from '../../../features/usage/usageSlice';
 import type { DrillRow } from './types';
 
 /**
@@ -20,6 +21,29 @@ export function fromHealthRows(
   return rows.map((row) => ({
     id: row.id,
     name: row.account,
+    owner: row.owner,
+    arr: row.arr,
+    detail: detail?.(row),
+  }));
+}
+
+/**
+ * A `UsageAccount` as the drill panel wants it — Usage Overview's counterpart
+ * to `fromHealthRows`.
+ *
+ * Every drill on that tab (the seat-utilisation, shelfware and at-capacity
+ * tiles, and the utilisation-band chart's cells) filters `stats.scatter` —
+ * the complete list of every *measured* account the book-wide figures were
+ * computed over — down to a subset and hands it here, rather than each call
+ * site building its own `DrillRow` literal.
+ */
+export function fromUsageRows(
+  rows: UsageAccount[],
+  detail?: (row: UsageAccount) => string | undefined,
+): DrillRow[] {
+  return rows.map((row) => ({
+    id: String(row.id),
+    name: row.name,
     owner: row.owner,
     arr: row.arr,
     detail: detail?.(row),
