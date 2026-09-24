@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useSearchParams } from 'react-router-dom';
 import { MetricsPanel } from '../../components/organizations/MetricsPanel';
 import { ActionBar } from '../../components/organizations/ActionBar';
 import { OrganizationsTable } from '../../components/organizations/OrganizationsTable';
@@ -15,6 +16,21 @@ export function List() {
   const { customers, count, totalCount, next, previous, isLoading, error } = useSelector(
     (state: RootState) => state.customers
   );
+
+  // A dashboard drill lands here as `?ids=3,7` (DrillPanel's "Open as a
+  // list"). A present-but-blank param (`?ids=`) is treated the same as no
+  // param at all — never send an empty `ids=` to the backend.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawDrillIds = searchParams.get('ids');
+  const drillIds = rawDrillIds && rawDrillIds.trim() !== '' ? rawDrillIds : null;
+
+  const handleShowAll = () => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('ids');
+      return next;
+    });
+  };
   // Index (0-based) of the first row in the currently-loaded page, for the
   // "Showing X-Y of Z" footer. Tracked from how many rows each fetched page
   // actually contained — not a hardcoded page-size assumption, which would
@@ -35,13 +51,17 @@ export function List() {
 
   useEffect(() => {
     let cancelled = false;
-    const url = debouncedSearch ? `/customers/?search=${encodeURIComponent(debouncedSearch)}` : undefined;
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('search', debouncedSearch);
+    if (drillIds) params.set('ids', drillIds);
+    const query = params.toString();
+    const url = query ? `/customers/?${query}` : undefined;
     dispatch(fetchCustomers(url))
       .unwrap()
       .then(() => {
         // Guards against a slower, now-stale request (e.g. an earlier
         // keystroke's fetch) resetting the offset after a newer one already
-        // has — this effect re-runs on every debouncedSearch change.
+        // has — this effect re-runs on every debouncedSearch/ids change.
         if (!cancelled) setOffset(0);
       })
       .catch(() => {
@@ -50,7 +70,7 @@ export function List() {
     return () => {
       cancelled = true;
     };
-  }, [dispatch, debouncedSearch]);
+  }, [dispatch, debouncedSearch, drillIds]);
 
   const rows = useMemo(() => customers.map((c) => mapCustomerToOrgRow(c)), [customers]);
 
@@ -86,9 +106,13 @@ export function List() {
   // Reset during render (React's documented pattern for "adjusting state
   // when a prop/derived value changes") rather than in an effect, which
   // would cost an extra commit-then-rerender cycle for no benefit here.
-  const [selectionPageKey, setSelectionPageKey] = useState({ offset, debouncedSearch });
-  if (selectionPageKey.offset !== offset || selectionPageKey.debouncedSearch !== debouncedSearch) {
-    setSelectionPageKey({ offset, debouncedSearch });
+  const [selectionPageKey, setSelectionPageKey] = useState({ offset, debouncedSearch, drillIds });
+  if (
+    selectionPageKey.offset !== offset ||
+    selectionPageKey.debouncedSearch !== debouncedSearch ||
+    selectionPageKey.drillIds !== drillIds
+  ) {
+    setSelectionPageKey({ offset, debouncedSearch, drillIds });
     setSelectedIds(new Set());
   }
 
@@ -137,6 +161,22 @@ export function List() {
           onChurnRequest={(ids, names) => setChurnTargets({ ids, names })}
           onArchiveRequest={(ids, names) => setArchiveTargets({ ids, names })}
         />
+
+        {drillIds && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-line-subtle bg-subtle px-3 py-2 text-[13px] text-ink">
+            <span>
+              Showing <span className="font-mono-brand tabular-nums">{count}</span> accounts from the
+              dashboard
+            </span>
+            <button
+              type="button"
+              onClick={handleShowAll}
+              className="min-h-9 inline-flex items-center rounded-md px-2 text-[12px] font-semibold text-accent hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              Show all
+            </button>
+          </div>
+        )}
 
         <div className="flex-1 overflow-hidden mt-3 relative">
           <OrganizationsTable

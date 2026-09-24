@@ -61,7 +61,11 @@ const globex = {
 
 const initech = { ...globex, id: 2, name: 'Initech' };
 
-function renderPage(defaultLifecycleStage = '', currency: 'USD' | 'EUR' = 'USD') {
+function renderPage(
+  defaultLifecycleStage = '',
+  currency: 'USD' | 'EUR' = 'USD',
+  initialEntries: string[] = ['/organizations/list']
+) {
   // ActionBar (rendered by List) now reads state.auth.user's own
   // organisation for Global Presets' default lifecycle stage — needs
   // the slice present even for tests that don't exercise that path.
@@ -102,7 +106,7 @@ function renderPage(defaultLifecycleStage = '', currency: 'USD' | 'EUR' = 'USD')
   });
   render(
     <Provider store={store}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
         <List />
       </MemoryRouter>
     </Provider>
@@ -263,6 +267,103 @@ describe('Organizations List page', () => {
       expect.anything()
     );
     expect(screen.getByText('Showing 1-1 of 1 organizations')).toBeInTheDocument();
+  });
+});
+
+describe('Organizations List page — dashboard drill (?ids=)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opening /organizations/list?ids=3,7 fetches ids= and shows the drill notice', async () => {
+    const fetchMock = makeFetchMock({
+      customers: [{ status: 200, body: { count: 2, next: null, previous: null, results: [globex, initech] } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+
+    const customersCalls = fetchMock.mock.calls.filter(
+      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
+    );
+    expect(String(customersCalls[0][0])).toContain('ids=3%2C7');
+
+    const showAllButton = screen.getByRole('button', { name: 'Show all' });
+    expect(showAllButton.closest('div')).toHaveTextContent('Showing 2 accounts from the dashboard');
+  });
+
+  it('"Show all" removes ids from the URL, re-fetches without it, and clears the notice', async () => {
+    const fetchMock = makeFetchMock({
+      customers: [
+        { status: 200, body: { count: 2, next: null, previous: null, results: [globex, initech] } },
+        { status: 200, body: { count: 1, next: null, previous: null, results: [globex] } },
+      ],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show all' }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Show all' })).not.toBeInTheDocument());
+
+    const customersCalls = fetchMock.mock.calls.filter(
+      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
+    );
+    const lastUrl = String(customersCalls[customersCalls.length - 1][0]);
+    expect(lastUrl).not.toContain('ids=');
+  });
+
+  it('searching while ids is set sends both search and ids params', async () => {
+    const fetchMock = makeFetchMock({
+      customers: [
+        { status: 200, body: { count: 2, next: null, previous: null, results: [globex, initech] } },
+        { status: 200, body: { count: 1, next: null, previous: null, results: [initech] } },
+      ],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+
+    await user.type(
+      screen.getByPlaceholderText('Search by name, Revenact ID or External ID'),
+      'init'
+    );
+
+    await waitFor(
+      () => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument(),
+      { timeout: 2000 }
+    );
+
+    const customersCalls = fetchMock.mock.calls.filter(
+      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
+    );
+    const lastUrl = String(customersCalls[customersCalls.length - 1][0]);
+    expect(lastUrl).toContain('search=init');
+    expect(lastUrl).toContain('ids=3%2C7');
+  });
+
+  it('an empty ids= param is treated as absent (no notice, no ids sent)', async () => {
+    const fetchMock = makeFetchMock({
+      customers: [{ status: 200, body: { count: 1, next: null, previous: null, results: [globex] } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage('', 'USD', ['/organizations/list?ids=']);
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show all' })).not.toBeInTheDocument();
+
+    const customersCalls = fetchMock.mock.calls.filter(
+      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
+    );
+    expect(String(customersCalls[0][0])).not.toContain('ids=');
   });
 });
 
