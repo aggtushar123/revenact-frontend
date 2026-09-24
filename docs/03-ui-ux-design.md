@@ -338,10 +338,14 @@ for the whole dashboard, not one per view.
     the drill sits over the rail from `lg` — then opens the rail with an
     editable, unsent draft.
   - Attention row: "Why?", a quiet button after Done, named "Ask why <title>
-    is on my list". Unlike the drill's draft, it sends at once.
-  - Every entry point opens the rail (or the phone sheet) for that visit
-    only; only the header's own expand/collapse (or Close) toggle persists
-    the open/closed choice to `localStorage`. Sending at once (`ask()`)
+    is on my list". Unlike the drill's draft, it sends at once. It is
+    `aria-disabled` while an answer is on its way or while that row's
+    Snooze/Done is in flight.
+  - Every entry point (and a History pick) opens the rail (or the phone
+    sheet) for that visit only; only the rail header's own expand/collapse
+    toggle, from `sm` up, persists the open/closed choice to `localStorage`.
+    The phone sheet's Close never saves anything; the sheet always starts
+    closed. Sending at once (`ask()`)
     replaces any earlier drafted question and focus, so only one is ever
     pending.
 - **History.** An 11px origin tag (LayoutDashboard icon + "Revenue › Forecast")

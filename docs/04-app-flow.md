@@ -440,9 +440,10 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     holds actually answers the current filters — a stale answer for a
     previous query (a different horizon, a filter changed mid-flight) counts
     as not loaded yet, not shown as if it were current.
-- **`DashboardFrame`** is the `dashboard` route's element: the scroll
-  container (`overflow-y-auto`, `p-4`) for Overview and every area, since
-  `DashboardLayout`'s `<main>` is `overflow-hidden`.
+- **`DashboardFrame`** is the `dashboard` route's element: an outer row
+  (`p-4`, `relative`) holding the scroll container (`overflow-y-auto`) for
+  Overview and every area, since `DashboardLayout`'s `<main>` is
+  `overflow-hidden`.
 - **Ask Revenact.** `DashboardFrame` mounts `FilterNamesProvider` →
   `AskProvider` → `DrillProvider` around `[scroll area][AskRail]`
   (`src/pages/dashboard/ask/`). The conversation lives in `AskProvider`, above
@@ -475,11 +476,15 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
       otherwise it is disabled with a note explaining the 200-account limit,
       and nothing is sent until the person sends it.
     - "Why?" on an attention row: it sends "Why is this on my list?" at once
-      with focus `{kind:'attention', key}`.
-    - Every entry point opens the rail (or the phone sheet) for that visit
-      only; only the rail header's own expand/collapse (or Close) control
-      writes the remembered open/closed choice to `localStorage` — an entry
-      point never overwrites it.
+      with focus `{kind:'attention', key}`. While an answer is in flight
+      (or that row's Snooze/Done is) it is `aria-disabled` and `ask()` sends
+      nothing and clears nothing.
+    - Every entry point (and a History pick) opens the rail (or the phone
+      sheet) for that visit only; only the rail header's own
+      expand/collapse control, from `sm` up, writes the remembered
+      open/closed choice to `localStorage` — an entry point never
+      overwrites it. The phone sheet's Close saves nothing; the sheet
+      always starts closed.
     - Calling `ask()` (a send-at-once entry point) replaces any earlier
       drafted question and its focus, so a prior "Ask about these" draft
       can't be sent alongside a new focus.
