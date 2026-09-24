@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../../features/auth/authSlice';
@@ -171,6 +171,43 @@ describe('DrillPanel', () => {
 
     await userEvent.tab({ shift: true });
     expect(last).toHaveFocus();
+  });
+
+  it('closes when the filter or area changes, without refocusing the old trigger', async () => {
+    function Navigator() {
+      const navigate = useNavigate();
+      return (
+        <>
+          <button onClick={() => navigate('/dashboard/health?owner=5')}>Change owner</button>
+          <button onClick={() => navigate('/dashboard/forecast')}>Other area</button>
+        </>
+      );
+    }
+    const store = authStore();
+    render(
+      <Provider store={store}>
+        <MemoryRouter initialEntries={['/dashboard/health']}>
+          <DrillProvider>
+            <Opener />
+            <Navigator />
+            <DrillPanel />
+          </DrillProvider>
+        </MemoryRouter>
+      </Provider>,
+    );
+    const trigger = screen.getByRole('button', { name: 'At risk' });
+    await userEvent.click(trigger);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    const changeOwner = screen.getByRole('button', { name: 'Change owner' });
+    changeOwner.focus();
+    fireEvent.click(changeOwner);
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(trigger).not.toHaveFocus();
+
+    await userEvent.click(trigger);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Other area' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
   it('leaves focus free between the panel and the page at lg', async () => {
