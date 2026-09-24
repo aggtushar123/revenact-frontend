@@ -236,7 +236,7 @@ attention list beside a headline card per area.
 | File | What it holds |
 |---|---|
 | `features/attention/attentionApi.ts` | Plain `apiFetch` wrappers, no slice: `fetchAttention(query)` (`GET /dashboard/attention/`), `snooze(key, {days} \| {done: true})`, `unsnooze(key)` (`DELETE`, key URL-encoded) |
-| `overview/AttentionList.tsx` | The "Needs attention" panel — renewal, risk, going-quiet, support and anomaly rows in the server's order. Snooze/Done are optimistic, held in local state keyed by item so an Undo line outlives a reload of the same filters; `Overview.tsx` keys the whole list by the query string so a filter change starts it clean |
+| `overview/AttentionList.tsx` | The "Needs attention" panel — renewal, risk, going-quiet, support and anomaly rows in the server's order. Snooze/Done are optimistic, held in local state keyed by item so the Undo line keeps its place until the filter changes or the page is left (`Overview.tsx` keys the whole list by the query string, and only refetches on a filter change). Stale rows (refetch in flight, failed load) are read-only; focus moves to Undo and back |
 | `overview/HeadlineCards.tsx` | Revenue, Health and Support cards, each reading the same slice/endpoint its area page does (`forecastSlice`, `healthSlice`, `ticketsSlice`) so the Overview can never disagree with the area it links to |
 | `overview/fixtures.ts` | `mockOverviewFetch` — a URL-routed fetch stub across the four endpoints the page touches, used by all three overview test suites |
 

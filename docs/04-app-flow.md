@@ -395,21 +395,32 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     re-ranks). Each row shows a kind chip, a title (a link to
     `/organizations/<id>` for every kind but anomaly), a reason line and the
     amount at stake. An **anomaly** row's title is a button, not a link — it
-    opens the drill panel over its list of companies (`"<n> companies"`),
+    opens the drill panel over its list of companies (`"1 company"` /
+    `"<n> companies"`),
     since one anomaly can span several.
   - **Snooze 7 days** and **Done** are optimistic: the row is replaced at
     once by a "Snoozed · `<title>`" / "Marked done · `<title>`" line with an
     **Undo** button in the same place; a failed call restores the row and
-    shows an alert. Undo lasts through a reload of the same filters — it's
-    held in the list's own state, keyed by item and spliced back into the
-    server's list at the position it was acted on, so a background refetch
-    can't make it vanish — and resets the moment a filter changes, since
-    `Overview.tsx` keys the whole `AttentionList` by the query string.
-  - A snoozed or done item comes back on its own once it **gets worse** than
-    it was when acted on (its risk score rising, an overdue count growing, a
-    new ticket opening) or once a **new episode starts** for it (a different
-    renewal date, a different last-contact gap) — never merely because 7
-    days passed or the calendar moved on.
+    shows an alert and puts focus back on the row's Snooze. Focus moves to
+    the Undo button after Snooze/Done and back to Snooze after Undo, and the
+    swapped line is `aria-live="polite"`. Undo is held in the list's own
+    state, keyed by item and spliced back in at the position it was acted
+    on; it lasts until the filter changes (`Overview.tsx` keys the whole
+    `AttentionList` by the query string, so another filter starts clean) or
+    the page is left. The Overview only refetches on a filter change, so
+    there is no same-filter reload for it to survive. An Undo whose DELETE
+    answers 404 (the snooze already gone) counts as done.
+  - While a refetch runs, or after a failed load, the previous rows stay on
+    screen dimmed but read-only: Snooze, Done and Undo are disabled and the
+    list is `aria-busy`, so nothing is filed under a filter it doesn't
+    belong to.
+  - **Snooze 7 days** expires after 7 days: the item returns then if it is
+    still a candidate. It returns sooner if it **gets worse** than it was
+    when snoozed (risk score rising, renewal further overdue, more ARR at
+    stake, more open tickets) or a **new episode starts** (a new renewal
+    date, a new last contact, a newly open ticket).
+  - **Done** has no expiry: the item returns only when it gets worse or a
+    new episode starts, never merely because time passed.
   - **The three headline cards** (`overview/HeadlineCards.tsx`) — Revenue,
     Health, Support — each read the same slice/endpoint their area page
     does, so the Overview can never disagree with the page its
