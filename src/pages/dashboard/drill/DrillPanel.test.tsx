@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -52,6 +52,28 @@ function authStore() {
     },
   });
 }
+
+// The panel only has a real matchMedia to read in a browser; jsdom has none
+// (window.matchMedia is undefined), which DrillPanel treats as "not lg" —
+// the tests that care about the `lg`/sheet distinction stub it explicitly,
+// and every other test here relies on that same "missing = not lg" default.
+function stubMatchMedia(matchesLarge: boolean) {
+  window.matchMedia = ((query: string) => ({
+    matches: matchesLarge,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  })) as unknown as typeof window.matchMedia;
+}
+
+afterEach(() => {
+  // @ts-expect-error -- undo the stub so later tests see jsdom's real "no matchMedia"
+  delete window.matchMedia;
+});
 
 const rows = [
   { id: '3', name: 'Uber', owner: 'Carl CSM', arr: 42000, detail: '197 days to renewal' },
@@ -129,5 +151,33 @@ describe('DrillPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Declining' }));
     expect(screen.getByText('No accounts behind this number.')).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /Open as a list/ })).not.toBeInTheDocument();
+  });
+
+  it('is aria-modal and traps Tab inside the sheet below lg', async () => {
+    stubMatchMedia(false);
+    renderPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'At risk' }));
+
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+
+    const closeButton = screen.getByRole('button', { name: 'Close' });
+    const links = screen.getAllByRole('link');
+    const last = links[links.length - 1];
+
+    last.focus();
+    await userEvent.tab();
+    expect(closeButton).toHaveFocus();
+
+    await userEvent.tab({ shift: true });
+    expect(last).toHaveFocus();
+  });
+
+  it('leaves focus free between the panel and the page at lg', async () => {
+    stubMatchMedia(true);
+    renderPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'At risk' }));
+
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-modal');
   });
 });

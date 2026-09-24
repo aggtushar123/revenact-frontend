@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useOrgCurrency } from '../../../hooks';
@@ -8,28 +8,79 @@ import type { DrillRow } from './types';
 
 const LIST_LIMIT = 500;
 
+// Same breakpoint as the panel's own `lg:` classes below — this is the
+// point where it stops being a full-screen sheet over the page and
+// becomes a side panel next to it.
+const LARGE_SCREEN_QUERY = '(min-width: 1024px)';
+
+const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Whether the viewport is at `lg` or above. jsdom has no `matchMedia`, so a
+ *  test that never stubs it renders as "not large" (a sheet) — the same
+ *  mobile-first default the panel's own CSS assumes. */
+function useIsLargeScreen(): boolean {
+  const [isLarge, setIsLarge] = useState(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(LARGE_SCREEN_QUERY).matches,
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mql = window.matchMedia(LARGE_SCREEN_QUERY);
+    const onChange = () => setIsLarge(mql.matches);
+    mql.addEventListener('change', onChange);
+    return () => mql.removeEventListener('change', onChange);
+  }, []);
+
+  return isLarge;
+}
+
 /** The rows behind one number. Beside the scroll area from `lg`, a sheet
- *  over the page below it. */
+ *  over the page below it. Below `lg` it is a full-screen sheet with
+ *  nowhere else useful for focus to go, so it is `aria-modal` and traps
+ *  Tab/Shift+Tab within itself; at `lg` it sits beside the page as an
+ *  ordinary panel, so focus is free to move between the two. */
 export function DrillPanel() {
   const { current, close } = useDrill();
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const isLargeScreen = useIsLargeScreen();
+  const isSheet = !isLargeScreen;
 
   useEffect(() => {
     if (!current) return;
     closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') close();
+      if (event.key === 'Escape') {
+        close();
+        return;
+      }
+      if (event.key !== 'Tab' || !isSheet) return;
+      const root = panelRef.current;
+      if (!root) return;
+      const focusable = Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [current, close]);
+  }, [current, close, isSheet]);
 
   if (!current) return null;
   return (
     <aside
+      ref={panelRef}
       role="dialog"
       aria-labelledby={titleId}
+      aria-modal={isSheet ? true : undefined}
       className="animate-slide-in-right fixed inset-0 z-40 bg-surface lg:static lg:inset-auto lg:z-auto lg:w-[360px] lg:shrink-0 lg:border lg:border-line lg:rounded-xl flex flex-col min-h-0"
     >
       <header className="flex items-start justify-between gap-3 p-4 border-b border-line">
