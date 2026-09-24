@@ -7,12 +7,12 @@
 // person is as a structured `context` the server grounds the answer in.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, Clock, MessageSquare, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, Clock, LayoutDashboard, MessageSquare, Plus, Search, X } from 'lucide-react';
 import { AskRevenactBox } from '../shared/AskRevenactBox';
 import { fetchConversation, fetchConversations } from '../../pages/copilot/copilotApi';
 import { MessageSources } from '../../pages/copilot/MessageSources';
 import type { Conversation, ConversationSummary, CopilotMessage, DashboardContext } from '../../pages/copilot/types';
-import { contextLabel, type FilterNames } from './dashboardLabels';
+import { contextLabel, viewLabel, type FilterNames } from './dashboardLabels';
 import type { RailContext } from './railContext';
 import { useCopilotThread, type CopilotThread, type Turn } from './useCopilotThread';
 
@@ -315,6 +315,14 @@ export function HistoryPopover({ onClose, onOpen }: { onClose: () => void; onOpe
                   >
                     <MessageSquare className="w-4 h-4 text-ink-faint shrink-0" aria-hidden="true" />
                     <span className="truncate">{c.title}</span>
+                    {c.origin ? (
+                      <span className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-md bg-surface border border-line px-1.5 py-0.5 text-[11px] text-ink-muted">
+                        <LayoutDashboard className="w-3 h-3" aria-hidden="true" />
+                        <span className="sr-only">Started on the dashboard: </span>
+                        {' '}
+                        {viewLabel(c.origin.area, c.origin.view)}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               ))}

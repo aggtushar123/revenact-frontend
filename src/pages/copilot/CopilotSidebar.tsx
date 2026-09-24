@@ -4,6 +4,7 @@ import { formatRelativeTime } from '../../features/customers/formatters';
 import type { CopilotSession, SessionInvite } from '../../features/copilotSessions/types';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { answerQuestion } from '../../features/knowledge/knowledgeSlice';
+import { viewLabel } from '../../components/copilot/dashboardLabels';
 import type { ConversationSummary } from './types';
 
 interface Props {
@@ -156,7 +157,11 @@ export function CopilotSidebar({
                     <ChatItem
                       key={conversation.id}
                       text={conversation.title}
-                      subtext={formatRelativeTime(conversation.updated_at)}
+                      subtext={
+                        conversation.origin
+                          ? `${viewLabel(conversation.origin.area, conversation.origin.view)} · ${formatRelativeTime(conversation.updated_at)}`
+                          : formatRelativeTime(conversation.updated_at)
+                      }
                       isActive={conversation.id === activeConversationId}
                       isLive={session?.status === 'live' || session?.status === 'awaiting_handoff'}
                       participantCount={session ? session.participants.length : undefined}
