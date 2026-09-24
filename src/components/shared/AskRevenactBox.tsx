@@ -19,10 +19,15 @@ interface AskRevenactBoxProps {
   /** The owner's handle on the input, to put focus back after a send it
    *  started elsewhere (a suggestion, Retry). */
   inputRef?: RefObject<HTMLInputElement | null>;
+  /** The text the box opens with (a prefilled question). Remount with a new
+   *  `key` to replace it. */
+  initialValue?: string;
+  /** Focus the input on mount. */
+  autoFocus?: boolean;
 }
 
-export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled = false, inputRef: givenRef }) => {
-  const [query, setQuery] = useState('');
+export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled = false, inputRef: givenRef, initialValue = '', autoFocus = false }) => {
+  const [query, setQuery] = useState(initialValue);
   const [modelMode, setModelMode] = useState<'Fast' | 'Reasoning' | 'Pro'>('Fast');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
@@ -76,6 +81,7 @@ export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask Revenact"
+          autoFocus={autoFocus}
           className="w-full text-[13px] text-[var(--rv-ask-text)] placeholder:text-[var(--rv-text-faint)] placeholder:font-normal outline-none border-none bg-transparent py-0.5 font-sans"
         />
       </form>

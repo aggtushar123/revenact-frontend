@@ -11,7 +11,8 @@ import { ChevronDown, Clock, MessageSquare, Plus, Search, X } from 'lucide-react
 import { AskRevenactBox } from '../shared/AskRevenactBox';
 import { fetchConversation, fetchConversations } from '../../pages/copilot/copilotApi';
 import { MessageSources } from '../../pages/copilot/MessageSources';
-import type { Conversation, ConversationSummary, CopilotMessage } from '../../pages/copilot/types';
+import type { Conversation, ConversationSummary, CopilotMessage, DashboardContext } from '../../pages/copilot/types';
+import { contextLabel, type FilterNames } from './dashboardLabels';
 import type { RailContext } from './railContext';
 import { useCopilotThread, type CopilotThread, type Turn } from './useCopilotThread';
 
@@ -32,11 +33,21 @@ export interface CopilotRailProps {
   top?: ReactNode;
   /** Drive the rail from outside (the dashboard sends "Why?" without the composer). */
   thread?: CopilotThread;
+  /** Names for filter values. Per-message chips render only when given, so a
+   *  dashboard conversation reopened elsewhere reads as plain text. */
+  names?: FilterNames;
+  /** Shown while the conversation is empty; clicking one sends it. */
+  suggestions?: readonly string[];
+  /** Prefills the composer; a new nonce replaces what is typed. */
+  draft?: { text: string; nonce: number } | null;
+  /** Called as a question is sent. */
+  onSent?: () => void;
 }
 
-function UserTurn({ text }: { text: string }) {
+function UserTurn({ text, chip }: { text: string; chip?: string }) {
   return (
     <div className="self-end max-w-[92%] flex flex-col items-end gap-1">
+      {chip ? <span className="rounded-md bg-subtle border border-line px-2 py-0.5 text-[11px] text-ink-muted">{chip}</span> : null}
       <div className="bg-accent text-on-accent rounded-2xl rounded-br-md px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap">{text}</div>
     </div>
   );
@@ -54,6 +65,9 @@ function Thinking() {
   );
 }
 
+const SUGGESTION =
+  'w-full text-left min-h-9 px-3 py-2 rounded-lg border border-line bg-surface text-[13px] text-ink enabled:hover:bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 disabled:cursor-not-allowed';
+
 export function CopilotRail({
   context,
   onClearContext,
@@ -64,6 +78,10 @@ export function CopilotRail({
   className = 'w-[320px]',
   top,
   thread: given,
+  names,
+  suggestions,
+  draft,
+  onSent,
 }: CopilotRailProps) {
   const own = useCopilotThread(conversation, onConversation);
   const thread = given ?? own;
@@ -72,6 +90,7 @@ export function CopilotRail({
   const endRef = useRef<HTMLDivElement>(null);
   const messages: CopilotMessage[] = conversation?.messages ?? [];
   const empty = messages.length === 0 && !pending && !failed;
+  const chipOf = (asked: DashboardContext | null | undefined) => (names && asked ? contextLabel(asked, names) : undefined);
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end' });
@@ -82,6 +101,7 @@ export function CopilotRail({
       context?.kind === 'dashboard'
         ? { text, content: text, context: context.context }
         : { text, content: (context ? `[About: ${context.label}] ` : '') + text };
+    onSent?.();
     await thread.send(turn);
     inputRef.current?.focus();
   }
@@ -95,14 +115,27 @@ export function CopilotRail({
       {top}
       <section className={`flex-1 min-h-0 flex flex-col overflow-hidden ${glass ? 'rv-card-glass' : ''}`} aria-label={`${label} conversation`}>
         <div role="log" aria-label={`${label} messages`} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-3">
-          {empty ? (
+          {empty && suggestions?.length ? (
+            <div className="m-auto w-full flex flex-col gap-2">
+              <p className="text-[11px] text-ink-muted text-center">Ask about what is on screen.</p>
+              <ul aria-label="Suggested questions" className="flex flex-col gap-1.5">
+                {suggestions.map((question) => (
+                  <li key={question}>
+                    <button type="button" onClick={() => void send(question)} disabled={Boolean(pending)} className={SUGGESTION}>
+                      {question}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : empty ? (
             <p className="m-auto text-[13px] text-ink-faint text-center max-w-[24ch]">
               Ask about what is in front of you. Answers use your accounts, mail and tickets.
             </p>
           ) : null}
           {messages.map((m) =>
             m.role === 'user' ? (
-              <UserTurn key={m.id} text={m.content} />
+              <UserTurn key={m.id} text={m.content} chip={chipOf(m.context)} />
             ) : (
               <div key={m.id} className="self-start max-w-[92%] text-[13px] leading-relaxed text-ink">
                 <p className="whitespace-pre-wrap">{m.content}</p>
@@ -112,13 +145,13 @@ export function CopilotRail({
           )}
           {pending ? (
             <>
-              <UserTurn text={pending.text} />
+              <UserTurn text={pending.text} chip={chipOf(pending.context)} />
               <Thinking />
             </>
           ) : null}
           {failed ? (
             <>
-              <UserTurn text={failed.text} />
+              <UserTurn text={failed.text} chip={chipOf(failed.context)} />
               <div role="alert" className={`self-start flex flex-wrap items-center gap-2 text-[13px] ${failed.budget ? 'text-ink-muted' : 'text-danger'}`}>
                 <span>{failed.message}</span>
                 {failed.budget ? null : (
@@ -154,7 +187,14 @@ export function CopilotRail({
               </span>
             </div>
           ) : null}
-          <AskRevenactBox inputRef={inputRef} onSend={(text) => void send(text)} disabled={Boolean(pending)} />
+          <AskRevenactBox
+            key={draft?.nonce ?? 0}
+            initialValue={draft?.text}
+            autoFocus={Boolean(draft)}
+            inputRef={inputRef}
+            onSend={(text) => void send(text)}
+            disabled={Boolean(pending)}
+          />
         </div>
       </section>
     </aside>
