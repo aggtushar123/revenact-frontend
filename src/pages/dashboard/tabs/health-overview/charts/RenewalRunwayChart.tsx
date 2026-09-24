@@ -4,6 +4,9 @@ import type { HealthStatus } from '../mockData';
 import type { RenewalBucket } from '../movement';
 import { HEALTH_STACK, makeStackedTotalLabel } from './stackedTotalLabel';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { useDrill } from '../../../drill/useDrill';
+import { fromHealthRows } from '../../../drill/rows';
+import { DrillTargets } from '../../../drill/DrillTargets';
 
 const STATUS_COLORS: Record<HealthStatus, string> = {
   Poor: 'var(--danger)',
@@ -23,6 +26,8 @@ export interface RenewalRunwayChartProps {
  * but groups by calendar month, for planning rather than triage.
  */
 export function RenewalRunwayChart({ buckets }: RenewalRunwayChartProps) {
+  const { open } = useDrill();
+
   const data = useMemo(
     () =>
       buckets.map((b) => ({
@@ -37,6 +42,30 @@ export function RenewalRunwayChart({ buckets }: RenewalRunwayChartProps) {
   );
 
   const soonest = buckets[0];
+
+  const openSegment = (bucket: RenewalBucket, status: HealthStatus, trigger?: HTMLElement) => {
+    const picked = bucket.rows[status];
+    open(
+      {
+        title: `${bucket.label} · ${status}`,
+        figure: String(picked.length),
+        source: { kind: 'rows', rows: fromHealthRows(picked) },
+      },
+      trigger,
+    );
+  };
+
+  // One button per bucket × status that actually has an account in it — a
+  // keyboard user (and this chart's own test) can't reach a recharts <Bar>'s
+  // SVG segments, so this is the real drill target; the Bar's own onClick
+  // below is the pointer shortcut to the same thing.
+  const drillItems = buckets.flatMap((bucket) =>
+    HEALTH_STACK.filter((status) => bucket.counts[status] > 0).map((status) => ({
+      name: `${bucket.label} · ${status}`,
+      figure: String(bucket.counts[status]),
+      onSelect: (trigger: HTMLElement) => openSegment(bucket, status, trigger),
+    })),
+  );
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -53,6 +82,8 @@ export function RenewalRunwayChart({ buckets }: RenewalRunwayChartProps) {
           </p>
         )}
       </div>
+
+      <DrillTargets label="Renewal runway" items={drillItems} />
 
       <div className="flex-1 w-full min-h-0 px-2 pb-2">
         <ResponsiveContainer width="100%" height="100%">
@@ -75,7 +106,14 @@ export function RenewalRunwayChart({ buckets }: RenewalRunwayChartProps) {
               }}
             />
             {HEALTH_STACK.map((status) => (
-              <Bar {...STATIC_SERIES} key={status} dataKey={status} stackId="renewal" fill={STATUS_COLORS[status]}>
+              <Bar
+                {...STATIC_SERIES}
+                key={status}
+                dataKey={status}
+                stackId="renewal"
+                fill={STATUS_COLORS[status]}
+                onClick={(_, index) => openSegment(buckets[index], status)}
+              >
                 <LabelList content={makeStackedTotalLabel(status, data, 11)} />
               </Bar>
             ))}

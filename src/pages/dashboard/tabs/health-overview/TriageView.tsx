@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import type { HealthStatus } from '../../../../features/health/types';
 import { useHealthOverview } from './useHealthOverview';
 import { HealthEmpty, HealthError, HealthLoading, HealthTruncatedNotice } from './HealthDataState';
-import { summarise, triage } from './triage';
+import { triage } from './triage';
 import { TriageTiles } from './charts/TriageTiles';
 import { TriageQueue } from './charts/TriageQueue';
 
@@ -39,7 +39,6 @@ export function TriageView() {
   // Score the whole book once, then filter — so a row's rank is its rank in
   // the book, not a position that changes meaning when you narrow the view.
   const scored = useMemo(() => triage(rows, now), [rows, now]);
-  const summary = useMemo(() => summarise(scored), [scored]);
 
   const visible = useMemo(
     () => (activeFilter ? scored.filter((t) => t.row.healthStatus === activeFilter) : scored),
@@ -93,7 +92,7 @@ export function TriageView() {
         </span>
       </div>
 
-      <TriageTiles summary={summary} />
+      <TriageTiles scored={scored} />
 
       <TriageQueue scored={visible} limit={expanded ? visible.length : INITIAL_LIMIT} />
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { renderWithHealth } from './testUtils';
+import { renderWithHealth, renderWithDrill, healthRow } from './testUtils';
 import userEvent from '@testing-library/user-event';
 import { MovementView } from './MovementView';
 import { HealthFlowChart } from './charts/HealthFlowChart';
@@ -84,6 +84,59 @@ describe('MovementView', () => {
   it('keeps the renewal runway alongside the flow', () => {
     renderWithHealth(<MovementView />, { rows: BOOK });
     expect(screen.getByRole('heading', { name: /renewal runway/i })).toBeInTheDocument();
+  });
+});
+
+describe('MovementView drill', () => {
+  const trail = (...statuses: ('Good' | 'Average' | 'Poor')[]) =>
+    statuses.map((status, i) => ({ month: `M${i}`, status }));
+
+  const rows = [
+    // Drops twice inside the window (Good -> Average -> Poor).
+    healthRow({ id: '1', account: 'DownAcct', healthStatus: 'Poor', history: trail('Good', 'Average', 'Poor') }),
+    // Rises twice inside the window (Poor -> Average -> Good).
+    healthRow({ id: '2', account: 'UpAcct', healthStatus: 'Good', history: trail('Poor', 'Average', 'Good') }),
+    // Near miss: never moves.
+    healthRow({ id: '3', account: 'FlatAcct', healthStatus: 'Good', history: trail('Good', 'Good', 'Good') }),
+    // Moves both ways inside the window — belongs in both drill lists, once each.
+    healthRow({ id: '4', account: 'RoundTripAcct', healthStatus: 'Good', history: trail('Good', 'Average', 'Good') }),
+  ];
+
+  it('Downgrades opens exactly the accounts with a drop inside the window', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<MovementView />, { rows });
+
+    const declined = netMovement(buildFlow(rows, 6)).declined;
+    await user.click(screen.getByRole('button', { name: `Downgrades ${declined}, show accounts` }));
+    const dialog = screen.getByRole('dialog');
+
+    ['DownAcct', 'RoundTripAcct'].forEach((name) =>
+      expect(within(dialog).getByRole('link', { name })).toBeInTheDocument(),
+    );
+    ['UpAcct', 'FlatAcct'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('Upgrades opens exactly the accounts with a rise inside the window', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<MovementView />, { rows });
+
+    const improved = netMovement(buildFlow(rows, 6)).improved;
+    await user.click(screen.getByRole('button', { name: `Upgrades ${improved}, show accounts` }));
+    const dialog = screen.getByRole('dialog');
+
+    ['UpAcct', 'RoundTripAcct'].forEach((name) =>
+      expect(within(dialog).getByRole('link', { name })).toBeInTheDocument(),
+    );
+    ['DownAcct', 'FlatAcct'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('Net movement is not drillable', () => {
+    renderWithDrill(<MovementView />, { rows });
+    expect(screen.queryByRole('button', { name: /Net movement/ })).not.toBeInTheDocument();
   });
 });
 

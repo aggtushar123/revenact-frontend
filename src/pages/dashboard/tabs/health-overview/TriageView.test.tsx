@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { renderWithHealth, renderHealthAt } from './testUtils';
+import { renderWithHealth, renderHealthAt, renderWithDrill, healthRow } from './testUtils';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { TriageView } from './TriageView';
@@ -112,6 +112,146 @@ describe('TriageView', () => {
     expect(screen.getAllByLabelText(/CSM Pulse (\d|not rated), AI Pulse (\d|not rated)/).length)
       .toBeGreaterThan(0);
     expect(screen.getAllByLabelText(/^Trajectory: /).length).toBeGreaterThan(0);
+  });
+});
+
+describe('TriageView drill', () => {
+  // Renewal always distant, so a row's score comes only from the factor
+  // under test — a default `renewalDate` close enough to trigger the
+  // renewal-proximity weighting would contaminate every row identically.
+  const FAR = 'Dec 31, 2099';
+
+  it('"Needs action now" opens exactly the accounts scoring at or above the threshold', async () => {
+    const user = userEvent.setup();
+    const rows = [
+      // Poor alone already clears the threshold (severity 3 * 22 = 66).
+      healthRow({ id: '1', account: 'ActionPoor', healthStatus: 'Poor', renewalDate: FAR }),
+      // Average (22) + a 2-point AI-colder gap (2 * 11 = 22) = 44.
+      healthRow({
+        id: '2',
+        account: 'ActionGap',
+        healthStatus: 'Average',
+        csmPulseScore: 5,
+        aiPulseScore: 3,
+        renewalDate: FAR,
+      }),
+      // Average (22) + pilot (6) + a 2-point gap (22) = 50.
+      healthRow({
+        id: '3',
+        account: 'ActionCombo',
+        healthStatus: 'Average',
+        csmPulseScore: 4,
+        aiPulseScore: 2,
+        lifecycleStage: 'Pilot',
+        renewalDate: FAR,
+      }),
+      // Near miss: Average alone is only 22 — well short of 40.
+      healthRow({ id: '4', account: 'BelowThreshold', healthStatus: 'Average', renewalDate: FAR }),
+      // Near miss: pilot (6) + a 1-point gap (11) on an otherwise Good
+      // account is 17 — nowhere near the threshold.
+      healthRow({
+        id: '5',
+        account: 'BelowThresholdGood',
+        healthStatus: 'Good',
+        lifecycleStage: 'Pilot',
+        csmPulseScore: 4,
+        aiPulseScore: 3,
+        renewalDate: FAR,
+      }),
+      // Near miss, right at the boundary: Average (22) + a 1-point gap
+      // (11) = 33 — the closest a row gets to 40 without clearing it.
+      healthRow({
+        id: '6',
+        account: 'AlmostThere',
+        healthStatus: 'Average',
+        csmPulseScore: 4,
+        aiPulseScore: 3,
+        renewalDate: FAR,
+      }),
+    ];
+
+    renderWithDrill(<TriageView />, { rows });
+
+    await user.click(screen.getByRole('button', { name: 'Needs action now 3, show accounts' }));
+    const dialog = screen.getByRole('dialog');
+
+    ['ActionPoor', 'ActionGap', 'ActionCombo'].forEach((name) =>
+      expect(within(dialog).getByRole('link', { name })).toBeInTheDocument(),
+    );
+    ['BelowThreshold', 'BelowThresholdGood', 'AlmostThere'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('"Declining" opens exactly the accounts whose trajectory fell', async () => {
+    const user = userEvent.setup();
+    const trail = (...statuses: ('Good' | 'Average' | 'Poor')[]) =>
+      statuses.map((status, i) => ({ month: `M${i}`, status }));
+    const rows = [
+      healthRow({
+        id: '1',
+        account: 'DownTrend',
+        healthStatus: 'Poor',
+        renewalDate: FAR,
+        history: trail('Good', 'Average', 'Poor'),
+      }),
+      // Near miss: flat, never moves.
+      healthRow({
+        id: '2',
+        account: 'FlatTrend',
+        healthStatus: 'Good',
+        renewalDate: FAR,
+        history: trail('Good', 'Good', 'Good'),
+      }),
+      // Near miss: the opposite direction.
+      healthRow({
+        id: '3',
+        account: 'UpTrend',
+        healthStatus: 'Good',
+        renewalDate: FAR,
+        history: trail('Poor', 'Average', 'Good'),
+      }),
+      // Near miss: one data point is 'unknown', not 'declining'.
+      healthRow({
+        id: '4',
+        account: 'ShortHistory',
+        healthStatus: 'Poor',
+        renewalDate: FAR,
+        history: trail('Poor'),
+      }),
+    ];
+
+    renderWithDrill(<TriageView />, { rows });
+
+    await user.click(screen.getByRole('button', { name: 'Declining 1, show accounts' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'DownTrend' })).toBeInTheDocument();
+    ['FlatTrend', 'UpTrend', 'ShortHistory'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('"Book at Good" opens exactly the accounts currently at Good', async () => {
+    const user = userEvent.setup();
+    const rows = [
+      healthRow({ id: '1', account: 'GoodOne', healthStatus: 'Good', renewalDate: FAR }),
+      healthRow({ id: '2', account: 'GoodTwo', healthStatus: 'Good', renewalDate: FAR }),
+      healthRow({ id: '3', account: 'AverageOne', healthStatus: 'Average', renewalDate: FAR }),
+      healthRow({ id: '4', account: 'PoorOne', healthStatus: 'Poor', renewalDate: FAR }),
+    ];
+
+    renderWithDrill(<TriageView />, { rows });
+
+    await user.click(screen.getByRole('button', { name: 'Book at Good 2/4, show accounts' }));
+    const dialog = screen.getByRole('dialog');
+
+    ['GoodOne', 'GoodTwo'].forEach((name) =>
+      expect(within(dialog).getByRole('link', { name })).toBeInTheDocument(),
+    );
+    ['AverageOne', 'PoorOne'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
   });
 });
 

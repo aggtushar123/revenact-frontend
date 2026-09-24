@@ -1,11 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { renderWithHealth } from './testUtils';
+import userEvent from '@testing-library/user-event';
+import { addDays, format } from 'date-fns';
+import { renderWithHealth, renderWithDrill, healthRow } from './testUtils';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { DivergenceView } from './DivergenceView';
 import { DivergenceList } from './charts/DivergenceList';
 import { HealthOverviewContainer } from '../HealthOverviewContainer';
 import { MOCK_HEALTH_DATA } from './mockData';
+import { RENEWAL_DATE_FORMAT } from './triage';
 
 /** The generated mock, used here purely as a fixture book — the tabs
  *  themselves read `state.health`, which the real app fills from
@@ -94,6 +97,69 @@ describe('DivergenceList', () => {
     );
     expect(screen.getByText(/No account currently has an AI Pulse/)).toBeInTheDocument();
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+  });
+});
+
+describe('DivergenceView drill', () => {
+  const near = format(addDays(new Date(), 30), RENEWAL_DATE_FORMAT); // inside 90 days
+  const far = format(addDays(new Date(), 400), RENEWAL_DATE_FORMAT); // outside 90 days
+
+  const rows = [
+    // Disagreeing (ai-colder) and renewing soon — an urgent blind spot.
+    healthRow({ id: '1', account: 'AiColderUrgent', csmPulseScore: 5, aiPulseScore: 2, renewalDate: near }),
+    // Near miss: same direction, but renews far out — disagreeing, not urgent.
+    healthRow({ id: '2', account: 'AiColderFar', csmPulseScore: 5, aiPulseScore: 2, renewalDate: far }),
+    // Near miss: disagreeing the other way — never an "urgent blind spot",
+    // which is specifically the AI reading colder.
+    healthRow({ id: '3', account: 'CsmColderSoon', csmPulseScore: 2, aiPulseScore: 5, renewalDate: near }),
+    // Near miss: within threshold, doesn't count as disagreement at all.
+    healthRow({ id: '4', account: 'Aligned', csmPulseScore: 4, aiPulseScore: 3, renewalDate: near }),
+    // Unrated on each side.
+    healthRow({ id: '5', account: 'NoCsm', csmPulseScore: null, aiPulseScore: 4, renewalDate: near }),
+    healthRow({ id: '6', account: 'NoAi', csmPulseScore: 4, aiPulseScore: null, renewalDate: near }),
+  ];
+
+  it('the disagreeing number opens exactly the ai-colder and csm-colder accounts', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<DivergenceView />, { rows });
+
+    await user.click(screen.getByRole('button', { name: /^Disagreeing 3, show accounts$/ }));
+    const dialog = screen.getByRole('dialog');
+
+    ['AiColderUrgent', 'AiColderFar', 'CsmColderSoon'].forEach((name) =>
+      expect(within(dialog).getByRole('link', { name })).toBeInTheDocument(),
+    );
+    ['Aligned', 'NoCsm', 'NoAi'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('the urgent blind spots number opens only the ai-colder accounts renewing inside 90 days', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<DivergenceView />, { rows });
+
+    await user.click(screen.getByRole('button', { name: /^Urgent blind spots 1, show accounts$/ }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'AiColderUrgent' })).toBeInTheDocument();
+    ['AiColderFar', 'CsmColderSoon', 'Aligned', 'NoCsm', 'NoAi'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('the unrated number opens exactly the accounts one side hasn’t rated', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<DivergenceView />, { rows });
+
+    await user.click(screen.getByRole('button', { name: /^Unrated 2, show accounts$/ }));
+    const dialog = screen.getByRole('dialog');
+
+    ['NoCsm', 'NoAi'].forEach((name) =>
+      expect(within(dialog).getByRole('link', { name })).toBeInTheDocument(),
+    );
+    ['AiColderUrgent', 'AiColderFar', 'CsmColderSoon', 'Aligned'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
   });
 });
 

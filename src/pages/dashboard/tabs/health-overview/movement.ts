@@ -165,6 +165,10 @@ export interface RenewalBucket {
   total: number;
   /** Accounts in this bucket that are not currently Good. */
   atRisk: number;
+  /** The exact accounts behind each of `counts` — what the runway chart's
+   *  bucket × health segment drills into. Always the same length as the
+   *  matching `counts` entry. */
+  rows: Record<HealthStatus, HealthDataRow[]>;
 }
 
 const BUCKET_BOUNDS: { label: string; from: number; to: number | null }[] = [
@@ -186,6 +190,7 @@ export function renewalBuckets(rows: HealthDataRow[], now: Date = new Date()): R
     counts: emptyCounts(),
     total: 0,
     atRisk: 0,
+    rows: { Good: [], Average: [], Poor: [] },
   }));
 
   for (const row of rows) {
@@ -198,10 +203,40 @@ export function renewalBuckets(rows: HealthDataRow[], now: Date = new Date()): R
 
     bucket.counts[row.healthStatus] += 1;
     bucket.total += 1;
+    bucket.rows[row.healthStatus].push(row);
     if (row.healthStatus !== 'Good') bucket.atRisk += 1;
   }
 
   return buckets;
+}
+
+/**
+ * Accounts that moved a grade — up or down — inside the last `windowMonths`
+ * of their own history.
+ *
+ * Same slicing rule as `trajectoryOf` (`triage.ts`): `windowMonths <= 0`
+ * means the full history, and fewer than two data points in the window
+ * means no movement at all, never a thrown error. Unlike `netMovement`,
+ * which counts moves (an account that fell and recovered counts twice, once
+ * each way), this counts *accounts* — the Movement tiles' drill lists each
+ * one once per direction, however many times it crossed a grade within the
+ * window.
+ */
+export function movedRows(
+  rows: HealthDataRow[],
+  windowMonths: number,
+  direction: 'declined' | 'improved',
+): HealthDataRow[] {
+  return rows.filter((row) => {
+    const full = (row.history ?? []).map((h) => h.status);
+    const trail = windowMonths > 0 ? full.slice(-windowMonths) : full;
+    for (let i = 1; i < trail.length; i++) {
+      const delta = STATUS_LADDER.indexOf(trail[i]) - STATUS_LADDER.indexOf(trail[i - 1]);
+      if (direction === 'declined' && delta < 0) return true;
+      if (direction === 'improved' && delta > 0) return true;
+    }
+    return false;
+  });
 }
 
 export interface RenewalMonth {

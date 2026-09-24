@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
-import { buildFlow, monthsOf, netMovement, renewalBuckets, renewalMonths } from './movement';
+import { buildFlow, monthsOf, movedRows, netMovement, renewalBuckets, renewalMonths } from './movement';
 import { healthRow } from './testUtils';
 
 /** Local midnight, matching the other suites, so calendar maths is stable. */
@@ -129,6 +129,43 @@ describe('netMovement', () => {
   });
 });
 
+describe('movedRows', () => {
+  // Movement's own drill: which accounts belong behind the Downgrades /
+  // Upgrades tiles. `down` and `up` are unambiguous; `flat` never moves;
+  // `roundTrip` moved both ways inside the same window and must appear in
+  // both lists; `oneMonth` can't move (fewer than two data points).
+  const down = makeRow(['Good', 'Average', 'Poor'], { id: '1', account: 'Down' });
+  const up = makeRow(['Poor', 'Average', 'Good'], { id: '2', account: 'Up' });
+  const flat = makeRow(['Good', 'Good', 'Good'], { id: '3', account: 'Flat' });
+  const roundTrip = makeRow(['Good', 'Average', 'Good'], { id: '4', account: 'RoundTrip' });
+  const oneMonth = makeRow(['Good'], { id: '5', account: 'OneMonth' });
+
+  it('returns exactly the accounts with a downgrade, or exactly those with an upgrade, inside the window', () => {
+    const book = [down, up, flat, roundTrip, oneMonth];
+    expect(movedRows(book, 3, 'declined').map((r) => r.id)).toEqual(['1', '4']);
+    expect(movedRows(book, 3, 'improved').map((r) => r.id)).toEqual(['2', '4']);
+  });
+
+  it('ignores a move that happened before the window', () => {
+    // Poor -> Good happens between the 1st and 2nd month; the last two
+    // months (the window) hold steady at Good. A predicate that reads the
+    // whole history instead of just the window would wrongly include this.
+    const oldUpgrade = makeRow(['Poor', 'Good', 'Good', 'Good'], { id: '6', account: 'OldUpgrade' });
+    expect(movedRows([oldUpgrade], 2, 'improved')).toEqual([]);
+    expect(movedRows([oldUpgrade], 4, 'improved').map((r) => r.id)).toEqual(['6']);
+  });
+
+  it('treats windowMonths <= 0 as the full history, like buildFlow and trajectoryOf do', () => {
+    const oldUpgrade = makeRow(['Poor', 'Good', 'Good', 'Good'], { id: '6' });
+    expect(movedRows([oldUpgrade], 0, 'improved').map((r) => r.id)).toEqual(['6']);
+  });
+
+  it('never throws on a row with fewer than two months of history', () => {
+    expect(movedRows([oneMonth, makeRow([], { id: '7' })], 3, 'declined')).toEqual([]);
+    expect(movedRows([oneMonth, makeRow([], { id: '7' })], 3, 'improved')).toEqual([]);
+  });
+});
+
 describe('renewalBuckets', () => {
   const at = (renewalDate: string, healthStatus: HealthStatus = 'Good') =>
     makeRow(['Good'], { renewalDate, healthStatus });
@@ -164,6 +201,39 @@ describe('renewalBuckets', () => {
   it('skips accounts whose renewal date does not parse', () => {
     const buckets = renewalBuckets([at(''), at('whenever'), at('Jul 1, 2026')], NOW);
     expect(buckets.reduce((sum, b) => sum + b.total, 0)).toBe(1);
+  });
+
+  it('carries the exact accounts behind each bucket-status count — the runway chart’s drill', () => {
+    const soonPoor = at('Jul 1, 2026', 'Poor'); // bucket 0
+    const soonGood = at('Jul 2, 2026', 'Good'); // bucket 0, near miss: same bucket, other status
+    const farPoor = at('Dec 1, 2027', 'Poor'); // bucket 3, near miss: same status, other bucket
+    const withIds = [
+      { ...soonPoor, id: '1' },
+      { ...soonGood, id: '2' },
+      { ...farPoor, id: '3' },
+    ];
+    const buckets = renewalBuckets(withIds, NOW);
+
+    expect(buckets[0].rows.Poor.map((r) => r.id)).toEqual(['1']);
+    expect(buckets[0].rows.Good.map((r) => r.id)).toEqual(['2']);
+    expect(buckets[0].rows.Average).toEqual([]);
+    expect(buckets[3].rows.Poor.map((r) => r.id)).toEqual(['3']);
+    // Every bucket's row lists agree with its own counts.
+    buckets.forEach((b) => {
+      expect(b.rows.Good.length).toBe(b.counts.Good);
+      expect(b.rows.Average.length).toBe(b.counts.Average);
+      expect(b.rows.Poor.length).toBe(b.counts.Poor);
+    });
+  });
+
+  it('leaves an unparseable renewal date out of every bucket’s rows', () => {
+    const noDate = { ...at('', 'Good'), id: '9' };
+    const buckets = renewalBuckets([noDate], NOW);
+    buckets.forEach((b) => {
+      expect(b.rows.Good).toEqual([]);
+      expect(b.rows.Average).toEqual([]);
+      expect(b.rows.Poor).toEqual([]);
+    });
   });
 });
 
