@@ -6,6 +6,7 @@ import { formatCompactMoney } from '../../../features/customers/formatters';
 import { snooze, unsnooze } from '../../../features/attention/attentionApi';
 import type { AttentionItem, AttentionKind } from '../../../features/attention/attentionApi';
 import { useDrill } from '../drill/useDrill';
+import { useAsk } from '../ask/useAsk';
 import { Panel } from '../shared/Panel';
 import { Empty, ErrorState } from '../shared/DataState';
 
@@ -99,6 +100,9 @@ function merge(server: AttentionItem[], local: Record<string, Local>): Entry[] {
  * Undo (or a failed action) hands it back to the row's Snooze. A button
  * whose call is in flight is `aria-disabled`, not `disabled`, so it can
  * still hold that focus.
+ *
+ * Inside the dashboard frame each row also has Why?, which asks the Ask
+ * rail about that item at once.
  */
 export function AttentionList({
   items,
@@ -115,6 +119,7 @@ export function AttentionList({
   error: boolean;
 }) {
   const { open } = useDrill();
+  const ask = useAsk();
   const [local, setLocal] = useState<Record<string, Local>>({});
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [actionError, setActionError] = useState<string | null>(null);
@@ -307,6 +312,17 @@ export function AttentionList({
                     >
                       Done
                     </button>
+                    {ask && (
+                      <button
+                        type="button"
+                        aria-label={`Ask why ${item.title} is on my list`}
+                        className={QUIET}
+                        disabled={stale}
+                        onClick={() => ask.ask('Why is this on my list?', { kind: 'attention', key: item.key })}
+                      >
+                        Why?
+                      </button>
+                    )}
                   </span>
                 </div>
               </li>

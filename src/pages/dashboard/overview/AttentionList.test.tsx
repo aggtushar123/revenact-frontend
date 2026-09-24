@@ -304,4 +304,9 @@ describe('AttentionList', () => {
     expect(dialog).toHaveTextContent('1 company');
     expect(dialog).not.toHaveTextContent('1 companies');
   });
+
+  it('offers no "Why?" outside the dashboard frame', () => {
+    renderList();
+    expect(screen.queryByRole('button', { name: /^Ask why/ })).not.toBeInTheDocument();
+  });
 });
