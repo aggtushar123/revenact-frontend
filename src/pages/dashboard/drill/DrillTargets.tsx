@@ -7,7 +7,9 @@ export function DrillTargets({
   items,
 }: {
   label: string;
-  items: { name: string; figure: string; onSelect: (trigger: HTMLElement) => void }[];
+  /** `key` identifies the part when two can share a display name (two
+   *  connectors both called "Support"); it falls back to `name`. */
+  items: { key?: string; name: string; figure: string; onSelect: (trigger: HTMLElement) => void }[];
 }) {
   if (items.length === 0) return null;
   return (
@@ -16,7 +18,7 @@ export function DrillTargets({
       className="sr-only focus-within:not-sr-only focus-within:flex focus-within:flex-wrap focus-within:gap-1 focus-within:mb-2"
     >
       {items.map((item) => (
-        <li key={item.name}>
+        <li key={item.key ?? item.name}>
           <button
             type="button"
             onClick={(event) => item.onSelect(event.currentTarget)}

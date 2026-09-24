@@ -9,6 +9,27 @@ import { DrillTargets } from '../../../drill/DrillTargets';
 
 const PATH = '/tickets/stats/';
 
+/** One distinct display name per origin. Connector names are the user's
+ *  own, so two can match each other, or match the "Revenact" bucket for
+ *  tickets raised here: a clashing connector gets its provider appended
+ *  (the Revenact bucket keeps its bare name), and anything still clashing
+ *  is numbered. Otherwise two targets would read "Support 9" and "Support
+ *  7" with nothing to tell them apart. */
+function originLabels(rows: TicketOrigin[]): string[] {
+  const byName = new Map<string, number>();
+  for (const row of rows) byName.set(row.name, (byName.get(row.name) ?? 0) + 1);
+  const seen = new Map<string, number>();
+  return rows.map((row) => {
+    const base =
+      (byName.get(row.name) ?? 0) > 1 && row.connector_id !== null && row.provider
+        ? `${row.name} (${row.provider})`
+        : row.name;
+    const n = (seen.get(base) ?? 0) + 1;
+    seen.set(base, n);
+    return n === 1 ? base : `${base} (${n})`;
+  });
+}
+
 /**
  * Where the tickets come from, ranked.
  *
@@ -36,16 +57,20 @@ export function OriginBar({
 }) {
   const { open } = useDrill();
   // Biggest first. The API's order is the connector's, which is not a ranking.
-  const ranked = useMemo(() => [...data].sort((a, b) => b.value - a.value), [data]);
+  const ranked = useMemo(() => {
+    const sorted = [...data].sort((a, b) => b.value - a.value);
+    const labels = originLabels(sorted);
+    return sorted.map((row, i) => ({ ...row, label: labels[i] }));
+  }, [data]);
   // Computed, not hard-coded: the mock's domain={[0, 400]} silently
   // clipped any bar above 400.
   const max = niceMax(ranked.map((d) => d.value));
 
-  const openSegment = (row: TicketOrigin, trigger?: HTMLElement) => {
+  const openSegment = (row: (typeof ranked)[number], trigger?: HTMLElement) => {
     const segment = row.connector_id === null ? 'origin:none' : `origin:${row.connector_id}`;
     open(
       {
-        title: row.name,
+        title: row.label,
         figure: String(row.value),
         source: { kind: 'server', path: PATH, query, segment },
       },
@@ -56,7 +81,8 @@ export function OriginBar({
   // Every origin drills, including the null-connector "Revenact" bucket —
   // the backend's own `origin:none` segment.
   const drillItems = (drillable ? ranked : []).map((row) => ({
-    name: row.name,
+    key: String(row.connector_id ?? 'none'),
+    name: row.label,
     figure: String(row.value),
     onSelect: (trigger: HTMLElement) => openSegment(row, trigger),
   }));
@@ -83,7 +109,7 @@ export function OriginBar({
               <XAxis type="number" hide domain={[0, max]} allowDecimals={false} />
               <YAxis
                 type="category"
-                dataKey="name"
+                dataKey="label"
                 axisLine={false}
                 tickLine={false}
                 // 78, not the assignee chart's 110: that card is three times

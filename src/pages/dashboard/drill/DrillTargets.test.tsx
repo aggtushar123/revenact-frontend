@@ -15,4 +15,20 @@ describe('DrillTargets', () => {
     await userEvent.keyboard('{Enter}');
     expect(onSelect).toHaveBeenCalledWith(button);
   });
+
+  it('keys items by their own key, so two parts with one name both render without a key warning', () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <DrillTargets
+        label="Origins"
+        items={[
+          { key: '1', name: 'Support', figure: '9', onSelect: vi.fn() },
+          { key: '2', name: 'Support', figure: '7', onSelect: vi.fn() },
+        ]}
+      />,
+    );
+    expect(screen.getAllByRole('button')).toHaveLength(2);
+    expect(errors.mock.calls.filter((call) => String(call[0]).includes('same key'))).toHaveLength(0);
+    errors.mockRestore();
+  });
 });
