@@ -82,9 +82,15 @@ interface ForecastState {
   stats: ForecastStats | null;
   isLoading: boolean;
   error: string | null;
+  /** The query `stats` answers ('' for none); null before the first load.
+   *  A reader showing a different query treats `stats` as not yet loaded. */
+  query: string | null;
+  /** The latest request. An older one landing late is ignored, so a slow
+   *  answer to a previous filter never overwrites the current one. */
+  requestId: string | null;
 }
 
-const initialState: ForecastState = { stats: null, isLoading: false, error: null };
+const initialState: ForecastState = { stats: null, isLoading: false, error: null, query: null, requestId: null };
 
 export const fetchForecast = createAsyncThunk<ForecastStats, string | void, { rejectValue: string }>(
   'forecast/fetch',
@@ -106,15 +112,19 @@ const forecastSlice = createSlice({
   reducers: {},
   extraReducers: (builder) => {
     builder
-      .addCase(fetchForecast.pending, (state) => {
+      .addCase(fetchForecast.pending, (state, action) => {
         state.isLoading = true;
         state.error = null;
+        state.requestId = action.meta.requestId;
       })
       .addCase(fetchForecast.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.requestId) return;
         state.isLoading = false;
         state.stats = action.payload;
+        state.query = action.meta.arg ?? '';
       })
       .addCase(fetchForecast.rejected, (state, action) => {
+        if (action.meta.requestId !== state.requestId) return;
         state.isLoading = false;
         // Previous numbers stay: a failed refetch shouldn't blank a forecast
         // someone is reading out loud.

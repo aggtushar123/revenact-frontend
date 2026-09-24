@@ -69,17 +69,20 @@ function Card({
 
 function RevenueCard({ values }: { values: Values }) {
   const dispatch = useAppDispatch();
-  const { stats, isLoading, error } = useAppSelector((state) => state.forecast);
+  const { stats, error, query: answered } = useAppSelector((state) => state.forecast);
   const query = toQuery({ ...values, horizon_days: '365' });
 
   useEffect(() => {
     dispatch(fetchForecast(query));
   }, [dispatch, query]);
 
-  const money = (value: number) => formatCompactMoney(value, stats?.currency ?? 'USD');
-  const bridge = error ? null : stats?.bridge;
+  // The slice is shared with the Revenue area: figures for another filter
+  // or horizon are not this card's, so they count as not loaded yet.
+  const own = answered === query ? stats : null;
+  const money = (value: number) => formatCompactMoney(value, own?.currency ?? 'USD');
+  const bridge = error ? null : own?.bridge;
   return (
-    <Card title="Revenue" area="revenue" loading={isLoading && !stats}>
+    <Card title="Revenue" area="revenue" loading={!own && !error}>
       <Kpi label="ARR today" value={bridge ? money(bridge.opening_arr) : DASH} />
       <Kpi label="At risk" value={bridge ? money(bridge.churn + bridge.contraction) : DASH} detail="churn and contraction, 12 months" />
     </Card>
@@ -132,14 +135,17 @@ function HealthCard({ values }: { values: Values }) {
 /** Tickets has no lifecycle filter, so only owner and account travel. */
 function SupportCard({ values }: { values: Values }) {
   const dispatch = useAppDispatch();
-  const { stats, statsLoading, statsError } = useAppSelector((state) => state.tickets);
+  const { stats, statsError, statsQuery } = useAppSelector((state) => state.tickets);
   const query = toQuery({ owner: values.owner, customer: values.customer });
 
   useEffect(() => {
     dispatch(fetchTicketStats(query));
   }, [dispatch, query]);
 
-  const kpis = statsError ? null : stats?.kpis;
+  // Shared with the Support area, whose bar has its own filters: only
+  // stats for this card's query are this card's.
+  const own = statsQuery === query ? stats : null;
+  const kpis = statsError ? null : own?.kpis;
   const oldest = kpis?.oldest_open_days;
   const detail = !kpis
     ? undefined
@@ -147,7 +153,7 @@ function SupportCard({ values }: { values: Values }) {
       ? 'none open'
       : `oldest ${oldest} ${oldest === 1 ? 'day' : 'days'}`;
   return (
-    <Card title="Support" area="support" loading={statsLoading && !stats} figures={1}>
+    <Card title="Support" area="support" loading={!own && !statsError} figures={1}>
       <Kpi label="Open tickets" value={kpis ? String(kpis.open_count ?? 0) : DASH} detail={detail} />
     </Card>
   );

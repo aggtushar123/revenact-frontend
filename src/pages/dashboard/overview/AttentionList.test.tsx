@@ -62,16 +62,18 @@ const items: AttentionItem[] = [
 
 function renderList(props: Partial<Parameters<typeof AttentionList>[0]> = {}) {
   const store = configureStore({ reducer: { auth: authReducer } });
-  return render(
+  const tree = (next: Partial<Parameters<typeof AttentionList>[0]>) => (
     <Provider store={store}>
       <MemoryRouter>
         <DrillProvider>
-          <AttentionList items={items} currency="USD" loading={false} error={false} {...props} />
+          <AttentionList items={items} currency="USD" loading={false} error={false} {...next} />
           <DrillPanel />
         </DrillProvider>
       </MemoryRouter>
-    </Provider>,
+    </Provider>
   );
+  const view = render(tree(props));
+  return { ...view, rerenderWith: (next: Partial<Parameters<typeof AttentionList>[0]>) => view.rerender(tree(next)) };
 }
 
 const rows = () => within(screen.getByRole('list', { name: 'Needs attention' })).getAllByRole('listitem');
@@ -119,13 +121,13 @@ describe('AttentionList', () => {
   it('snoozes for 7 days, hides the row, and Undo restores it in place', async () => {
     renderList();
     const first = rows()[0];
-    await userEvent.click(within(first).getByRole('button', { name: 'Snooze 7 days' }));
+    await userEvent.click(within(first).getByRole('button', { name: 'Snooze Uber for 7 days' }));
     expect(snooze).toHaveBeenCalledWith('renewal:12', { days: 7 });
     expect(screen.queryByRole('link', { name: 'Uber' })).not.toBeInTheDocument();
     expect(rows()[0]).toHaveTextContent('Snoozed');
     expect(screen.getByTestId('attention-count')).toHaveTextContent('2');
 
-    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Undo' }));
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' }));
     expect(unsnooze).toHaveBeenCalledWith('renewal:12');
     expect(within(rows()[0]).getByRole('link', { name: 'Uber' })).toBeInTheDocument();
     expect(screen.getByTestId('attention-count')).toHaveTextContent('3');
@@ -133,16 +135,16 @@ describe('AttentionList', () => {
 
   it('marks an item done', async () => {
     renderList();
-    await userEvent.click(within(rows()[2]).getByRole('button', { name: 'Done' }));
+    await userEvent.click(within(rows()[2]).getByRole('button', { name: 'Mark Pizza Hut done' }));
     expect(snooze).toHaveBeenCalledWith('going_quiet:7', { done: true });
     expect(rows()[2]).toHaveTextContent('Marked done');
-    expect(within(rows()[2]).getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    expect(within(rows()[2]).getByRole('button', { name: 'Undo: Pizza Hut' })).toBeInTheDocument();
   });
 
   it('restores the row and shows an alert when the snooze fails', async () => {
     vi.mocked(snooze).mockRejectedValueOnce(new Error('network'));
     renderList();
-    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze 7 days' }));
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not snooze Uber');
     await waitFor(() => expect(within(rows()[0]).getByRole('link', { name: 'Uber' })).toBeInTheDocument());
   });
@@ -158,10 +160,59 @@ describe('AttentionList', () => {
     expect(screen.queryByText('Nothing needs you right now.')).not.toBeInTheDocument();
   });
 
-  it('keeps stale items visible under an error', () => {
+  it('keeps stale items visible under a compact inline error', () => {
     renderList({ error: true });
-    expect(screen.getByRole('alert')).toHaveTextContent('Could not load what needs attention.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load for these filters. Showing the last list.');
+    expect(screen.queryByText('Could not load what needs attention.')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Uber' })).toBeInTheDocument();
+  });
+
+  it('keeps the Undo line through a reload that drops the item, and Undo puts it back in place', async () => {
+    const { rerenderWith } = renderList();
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
+    // The server no longer returns the snoozed item.
+    rerenderWith({ items: items.slice(1) });
+    expect(rows()).toHaveLength(3);
+    expect(rows()[0]).toHaveTextContent('Snoozed');
+    expect(screen.getByTestId('attention-count')).toHaveTextContent('2');
+
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' }));
+    expect(unsnooze).toHaveBeenCalledWith('renewal:12');
+    expect(within(rows()[0]).getByRole('link', { name: 'Uber' })).toBeInTheDocument();
+    expect(rows()).toHaveLength(3);
+
+    // Once the server returns it again, it is shown once, not twice.
+    rerenderWith({ items });
+    expect(rows()).toHaveLength(3);
+    expect(screen.getAllByRole('link', { name: 'Uber' })).toHaveLength(1);
+  });
+
+  it('never shows an acted item twice while the server still returns it', async () => {
+    const { rerenderWith } = renderList();
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
+    rerenderWith({ items: [...items] });
+    expect(rows()).toHaveLength(3);
+    expect(rows()[0]).toHaveTextContent('Snoozed');
+    expect(screen.queryByRole('link', { name: 'Uber' })).not.toBeInTheDocument();
+  });
+
+  it('disables Undo while the snooze is in flight, and Snooze and Done while the undo is', async () => {
+    let finishSnooze!: () => void;
+    vi.mocked(snooze).mockImplementationOnce(() => new Promise<void>((resolve) => (finishSnooze = resolve)));
+    let finishUndo!: () => void;
+    vi.mocked(unsnooze).mockImplementationOnce(() => new Promise<void>((resolve) => (finishUndo = resolve)));
+    renderList();
+
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' }));
+    expect(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' })).toBeDisabled();
+    finishSnooze();
+    await waitFor(() => expect(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' })).toBeEnabled());
+
+    await userEvent.click(within(rows()[0]).getByRole('button', { name: 'Undo: Uber' }));
+    expect(within(rows()[0]).getByRole('button', { name: 'Snooze Uber for 7 days' })).toBeDisabled();
+    expect(within(rows()[0]).getByRole('button', { name: 'Mark Uber done' })).toBeDisabled();
+    finishUndo();
+    await waitFor(() => expect(within(rows()[0]).getByRole('button', { name: 'Mark Uber done' })).toBeEnabled());
   });
 
   it('shows five skeleton rows while loading, never a spinner', () => {

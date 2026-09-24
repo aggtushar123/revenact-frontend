@@ -52,14 +52,45 @@ function SkeletonRows() {
   );
 }
 
+/** An item the viewer has touched this session, held here so a reload of
+ *  the list cannot take it away: a snoozed item keeps its Undo line after
+ *  the server stops returning it, and an undone one comes back at the
+ *  place it left even before the server returns it again. */
+interface Local {
+  state: Acted | 'restored';
+  item: AttentionItem;
+  /** Its position in the list as shown when it was acted on. */
+  index: number;
+}
+
+type Entry = { item: AttentionItem; acted: Acted | null };
+
+/** The server's list with the local entries spliced back in at their saved
+ *  positions. Acted keys are dropped from the server's list first, so an
+ *  item the server still returns is never shown twice. A restored item the
+ *  server returns again simply takes the server's place for it. */
+function merge(server: AttentionItem[], local: Record<string, Local>): Entry[] {
+  const serverKeys = new Set(server.map((item) => item.key));
+  const overrides = Object.values(local)
+    .filter((entry) => entry.state !== 'restored' || !serverKeys.has(entry.item.key))
+    .sort((a, b) => a.index - b.index);
+  const skip = new Set(overrides.map((entry) => entry.item.key));
+  const out: Entry[] = server.filter((item) => !skip.has(item.key)).map((item) => ({ item, acted: null }));
+  for (const entry of overrides) {
+    const acted = entry.state === 'restored' ? null : entry.state;
+    out.splice(Math.min(entry.index, out.length), 0, { item: entry.item, acted });
+  }
+  return out;
+}
+
 /**
  * The ranked "Needs attention" list: what to act on first, across renewals,
  * risk, quiet accounts, support and anomalies. The order is the server's
  * (score descending); nothing here re-ranks it.
  *
  * Snooze and Done are optimistic: the row gives way to an Undo line at once
- * and comes back if the server says no. The line holds the row's place, so
- * Undo restores it exactly where it was.
+ * and comes back if the server says no. The line holds the row's place, and
+ * outlives a reload of the list, so Undo restores it exactly where it was.
  */
 export function AttentionList({
   items,
@@ -75,46 +106,51 @@ export function AttentionList({
   error: boolean;
 }) {
   const { open } = useDrill();
-  const [acted, setActed] = useState<Record<string, Acted>>({});
+  const [local, setLocal] = useState<Record<string, Local>>({});
   const [pending, setPending] = useState<Record<string, boolean>>({});
   const [actionError, setActionError] = useState<string | null>(null);
 
-  const list = items ?? [];
-  const remaining = list.filter((item) => !acted[item.key]).length;
+  const entries = merge(items ?? [], local);
+  const remaining = entries.filter((entry) => !entry.acted).length;
 
-  const mark = (key: string, choice: Acted | null) =>
-    setActed((prev) => {
+  const put = (key: string, entry: Local | undefined) =>
+    setLocal((prev) => {
       const next = { ...prev };
-      if (choice) next[key] = choice;
+      if (entry) next[key] = entry;
       else delete next[key];
       return next;
     });
+  const busy = (key: string, value: boolean) => setPending((prev) => ({ ...prev, [key]: value }));
 
   const reason = (err: unknown) => (err instanceof ApiError ? ` ${err.message}` : '');
 
-  async function act(item: AttentionItem, choice: Acted) {
+  async function act(item: AttentionItem, index: number, choice: Acted) {
+    const before = local[item.key];
     setActionError(null);
-    mark(item.key, choice);
-    setPending((prev) => ({ ...prev, [item.key]: true }));
+    put(item.key, { state: choice, item, index });
+    busy(item.key, true);
     try {
       await snooze(item.key, choice === 'done' ? { done: true } : { days: 7 });
     } catch (err) {
-      mark(item.key, null);
+      put(item.key, before);
       setActionError(`Could not ${choice === 'done' ? 'mark done' : 'snooze'} ${item.title}.${reason(err)}`);
     } finally {
-      setPending((prev) => ({ ...prev, [item.key]: false }));
+      busy(item.key, false);
     }
   }
 
   async function undo(item: AttentionItem) {
-    const was = acted[item.key];
+    const was = local[item.key];
     setActionError(null);
-    mark(item.key, null);
+    put(item.key, { state: 'restored', item, index: was.index });
+    busy(item.key, true);
     try {
       await unsnooze(item.key);
     } catch (err) {
-      mark(item.key, was);
+      put(item.key, was);
       setActionError(`Could not undo ${item.title}.${reason(err)}`);
+    } finally {
+      busy(item.key, false);
     }
   }
 
@@ -136,26 +172,33 @@ export function AttentionList({
   let body;
   if (loading && items === null) {
     body = <SkeletonRows />;
-  } else if (error && list.length === 0) {
+  } else if (error && entries.length === 0) {
     body = <ErrorState message="Could not load what needs attention." />;
-  } else if (list.length === 0) {
+  } else if (entries.length === 0) {
     body = <Empty label="Nothing needs you right now." />;
   } else {
     body = (
       <>
         {error && (
-          <ErrorState message="Could not load what needs attention." detail="Showing the list as it last loaded." />
+          <p role="alert" className="mb-2 text-[11px] font-semibold text-danger">
+            Could not load for these filters. Showing the last list.
+          </p>
         )}
         <ol aria-label="Needs attention" className="divide-y divide-line">
-          {list.map((item) => {
-            const done = acted[item.key];
+          {entries.map(({ item, acted: done }, index) => {
             if (done) {
               return (
                 <li key={item.key} className="flex items-center justify-between gap-3 py-3">
                   <p className="text-[13px] text-ink-muted min-w-0 truncate">
                     {ACTED_LINE[done]} · <span className="text-ink">{item.title}</span>
                   </p>
-                  <button type="button" className={QUIET} disabled={pending[item.key]} onClick={() => undo(item)}>
+                  <button
+                    type="button"
+                    aria-label={`Undo: ${item.title}`}
+                    className={QUIET}
+                    disabled={pending[item.key]}
+                    onClick={() => undo(item)}
+                  >
                     Undo
                   </button>
                 </li>
@@ -207,10 +250,22 @@ export function AttentionList({
                     <span className="block text-[11px] text-ink-muted">at stake</span>
                   </span>
                   <span className="flex gap-2">
-                    <button type="button" className={SECONDARY} onClick={() => act(item, 'snoozed')}>
+                    <button
+                      type="button"
+                      aria-label={`Snooze ${item.title} for 7 days`}
+                      className={SECONDARY}
+                      disabled={pending[item.key]}
+                      onClick={() => act(item, index, 'snoozed')}
+                    >
                       Snooze 7 days
                     </button>
-                    <button type="button" className={QUIET} onClick={() => act(item, 'done')}>
+                    <button
+                      type="button"
+                      aria-label={`Mark ${item.title} done`}
+                      className={QUIET}
+                      disabled={pending[item.key]}
+                      onClick={() => act(item, index, 'done')}
+                    >
                       Done
                     </button>
                   </span>

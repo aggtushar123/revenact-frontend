@@ -4,23 +4,27 @@ import { MemoryRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../../features/auth/authSlice';
-import forecastReducer from '../../../features/forecast/forecastSlice';
+import forecastReducer, { fetchForecast } from '../../../features/forecast/forecastSlice';
+import type { ForecastStats } from '../../../features/forecast/forecastSlice';
 import healthReducer from '../../../features/health/healthSlice';
 import ticketsReducer from '../../../features/tickets/ticketsSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 import { HeadlineCards } from './HeadlineCards';
-import { mockOverviewFetch, urlsFor } from './fixtures';
+import { forecastBody, mockOverviewFetch, urlsFor } from './fixtures';
 
 // Integration tier: the three cards with the real slices, only fetch mocked.
 
+const reducer = { auth: authReducer, forecast: forecastReducer, health: healthReducer, tickets: ticketsReducer };
+
 function makeStore() {
-  return configureStore({
-    reducer: { auth: authReducer, forecast: forecastReducer, health: healthReducer, tickets: ticketsReducer },
-  });
+  return configureStore({ reducer });
 }
 
-function renderCards(values = { owner: '2', lifecycle: '', customer: '' }, url = '/dashboard/overview?owner=2') {
-  const store = makeStore();
+function renderCards(
+  values = { owner: '2', lifecycle: '', customer: '' },
+  url = '/dashboard/overview?owner=2',
+  store = makeStore(),
+) {
   const view = render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
@@ -97,6 +101,21 @@ describe('HeadlineCards', () => {
     vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
     renderCards();
     expect(screen.getAllByTestId('headline-skeleton')).toHaveLength(3);
+  });
+
+  it('never shows figures the shared slice holds for another query', () => {
+    // Never resolves: the card's own request stays in flight.
+    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+    const store = makeStore();
+    // The Revenue area loaded owner=9 over 90 days before we arrived.
+    const earlier = 'owner=9&horizon_days=90';
+    store.dispatch(fetchForecast.pending('earlier', earlier));
+    store.dispatch(fetchForecast.fulfilled(forecastBody as unknown as ForecastStats, 'earlier', earlier));
+    expect(store.getState().forecast.stats).not.toBeNull();
+    renderCards(undefined, undefined, store);
+    const revenue = card('Revenue');
+    expect(within(revenue).getByTestId('headline-skeleton')).toBeInTheDocument();
+    expect(within(revenue).queryByText('$924.7K')).not.toBeInTheDocument();
   });
 
   it('shows a dash for a card whose fetch failed', async () => {
