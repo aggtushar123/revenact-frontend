@@ -119,17 +119,21 @@ export function RenewalView() {
           detail={`${atRiskShare}% of the window, weighted by risk`}
           tone={atRiskShare >= 20 ? 'loss' : 'neutral'}
           onDrill={(trigger) => {
-            const riskById = new Map(forecastAtRisk.map((r) => [r.row.id, r.risk]));
+            // Same `risk`/`exposure` pair `summarise` summed into the tile's
+            // own figure (Σ ARR × risk) — read here per row, not recomputed,
+            // so each row's weighted amount visibly adds up to it.
+            const byId = new Map(forecastAtRisk.map((r) => [r.row.id, r]));
             open(
               {
                 title: 'Forecast at risk',
                 figure: money(summary.exposure),
                 source: {
                   kind: 'rows',
-                  rows: fromHealthRows(
-                    forecastAtRisk.map((r) => r.row),
-                    (row) => `${Math.round((riskById.get(row.id) ?? 0) * 100)}% risk`,
-                  ),
+                  rows: fromHealthRows(forecastAtRisk.map((r) => r.row), (row) => {
+                    const item = byId.get(row.id);
+                    const riskPct = Math.round((item?.risk ?? 0) * 100);
+                    return `${riskPct}% risk · ${money(item?.exposure ?? 0)} at risk`;
+                  }),
                 },
               },
               trigger,

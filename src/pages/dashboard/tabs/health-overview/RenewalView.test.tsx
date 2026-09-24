@@ -245,7 +245,7 @@ describe('RenewalView drill', () => {
     );
   });
 
-  it('Forecast at risk opens only the priced accounts, with their risk as the detail', async () => {
+  it('Forecast at risk opens only the priced accounts, with their risk and weighted exposure as the detail', async () => {
     const user = userEvent.setup();
     renderWithDrill(<RenewalView />, { rows: drillBook });
 
@@ -256,8 +256,31 @@ describe('RenewalView drill', () => {
     expect(within(dialog).getByRole('link', { name: 'ColdSoon' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('link', { name: 'UnpricedSoon' })).not.toBeInTheDocument();
 
+    // PricedSoon: $100K x 40% risk = $40.0K at risk. ColdSoon: $50K x the
+    // default 5% risk = $2.5K. Each row's own weighted figure, not just the
+    // percentage, so the rows visibly add up to the tile's $42.5K.
     const pricedRow = within(dialog).getByRole('link', { name: 'PricedSoon' }).closest('li') as HTMLElement;
-    expect(pricedRow).toHaveTextContent('40% risk');
+    expect(pricedRow).toHaveTextContent('40% risk · $40.0K at risk');
+    const coldRow = within(dialog).getByRole('link', { name: 'ColdSoon' }).closest('li') as HTMLElement;
+    expect(coldRow).toHaveTextContent('5% risk · $2.5K at risk');
+  });
+
+  it('Forecast at risk: each row\'s weighted exposure sums (within rounding) to the tile\'s own figure', async () => {
+    const user = userEvent.setup();
+    const twoAccounts = [
+      renewingIn(10, { id: '1', account: 'BigRisk', arr: 200_000, riskOfLoss: 0.3 }),
+      renewingIn(20, { id: '2', account: 'SmallRisk', arr: 100_000, riskOfLoss: 0.1 }),
+    ];
+    renderWithDrill(<RenewalView />, { rows: twoAccounts });
+
+    // 200_000 x 0.3 + 100_000 x 0.1 = 60_000 + 10_000 = $70.0K.
+    await user.click(screen.getByRole('button', { name: /Forecast at risk \$70\.0K, show accounts/ }));
+    const dialog = screen.getByRole('dialog');
+
+    const bigRow = within(dialog).getByRole('link', { name: 'BigRisk' }).closest('li') as HTMLElement;
+    const smallRow = within(dialog).getByRole('link', { name: 'SmallRisk' }).closest('li') as HTMLElement;
+    expect(bigRow).toHaveTextContent('30% risk · $60.0K at risk');
+    expect(smallRow).toHaveTextContent('10% risk · $10.0K at risk');
   });
 
   it('No recent contact opens only the accounts with nothing logged in 60 days', async () => {
