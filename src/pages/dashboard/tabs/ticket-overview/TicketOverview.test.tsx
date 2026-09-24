@@ -139,7 +139,7 @@ describe('Ticket Overview', () => {
     // to the total. That agreement is the point, so the assertion
     // targets the card rather than asserting the number is unique.
     const card = async (label: string) =>
-      within((await screen.findByText(label)).closest('div')!.parentElement!);
+      within((await screen.findByText(label)).parentElement!);
 
     expect((await card('Total Ticket Volume')).getByText('735')).toBeInTheDocument();
     expect((await card('Tickets On Hold')).getByText('42')).toBeInTheDocument();

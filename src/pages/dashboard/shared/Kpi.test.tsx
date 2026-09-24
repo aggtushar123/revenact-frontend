@@ -25,6 +25,20 @@ describe('Kpi', () => {
     expect(container.innerHTML).not.toMatch(/border-l-(danger|success|info)/);
   });
 
+  it('a drillable figure keeps its detail as the button\'s description and holds only phrasing content', () => {
+    render(<Kpi label="At risk" value="$114.5K" detail="weighted churn and contraction" onDrill={() => {}} />);
+    const button = screen.getByRole('button', { name: 'At risk $114.5K, show accounts' });
+    expect(button).toHaveAccessibleDescription('weighted churn and contraction');
+    expect(button.querySelector('div')).toBeNull();
+    expect(screen.getByText('weighted churn and contraction')).toBeVisible();
+  });
+
+  it('a drillable figure with no detail has no description', () => {
+    render(<Kpi label="At risk" value="$114.5K" onDrill={() => {}} />);
+    const button = screen.getByRole('button', { name: 'At risk $114.5K, show accounts' });
+    expect(button).not.toHaveAttribute('aria-describedby');
+  });
+
   it('KpiStrip lays out children in a list', () => {
     render(
       <KpiStrip>
