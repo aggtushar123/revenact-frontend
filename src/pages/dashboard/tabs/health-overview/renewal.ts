@@ -185,7 +185,9 @@ export function renewalDrillSets(scored: RenewalRow[]): RenewalDrillSets {
 
   return {
     upForRenewal,
-    forecastAtRisk: upForRenewal.filter((item) => item.row.arr !== null),
+    // Priced and actually carrying some weighted exposure: a row at $0 adds
+    // nothing to the tile's sum, so listing it would only read "$0 at risk".
+    forecastAtRisk: upForRenewal.filter((item) => item.exposure !== null && item.exposure > 0),
     noRecentContact: upForRenewal.filter((item) => item.coverage === "cold"),
     pastDue: scored.filter((item) => item.days < 0),
   };
@@ -201,7 +203,7 @@ export function summarise(scored: RenewalRow[]): RenewalSummary {
   return {
     count: upForRenewal.length,
     arr: sumArr(upForRenewal),
-    unpriced: upForRenewal.length - forecastAtRisk.length,
+    unpriced: upForRenewal.filter((item) => item.row.arr === null).length,
     exposure: forecastAtRisk.reduce((sum, item) => sum + (item.exposure ?? 0), 0),
     coldCount: noRecentContact.length,
     coldArr: sumArr(noRecentContact),

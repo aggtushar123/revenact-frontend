@@ -369,6 +369,23 @@ describe('renewalDrillSets', () => {
     expect(forecastAtRisk.map((r) => r.row.account).sort()).toEqual(['Good90', 'Poor90'].sort());
   });
 
+  it('leaves out an account with nothing at risk, without changing the sum or the unpriced count', () => {
+    // A priced account whose weighted exposure is 0 (a $0 contract) adds
+    // nothing to the tile, so listing it under "Forecast at risk" would
+    // show a row with "$0 at risk".
+    const withZero = [
+      ...book(),
+      ...renewalRows([renewingIn(30, { id: '6', account: 'ZeroArr', arr: 0 })], NOW).rows,
+    ];
+    const { forecastAtRisk } = renewalDrillSets(withZero);
+    expect(forecastAtRisk.map((r) => r.row.account).sort()).toEqual(['Good90', 'Poor90'].sort());
+
+    const before = summarise(book());
+    const after = summarise(withZero);
+    expect(after.exposure).toBe(before.exposure);
+    expect(after.unpriced).toBe(before.unpriced);
+  });
+
   it('narrows to accounts with no recent contact', () => {
     const { noRecentContact } = renewalDrillSets(book());
     expect(noRecentContact.map((r) => r.row.account)).toEqual(['Poor90']);
