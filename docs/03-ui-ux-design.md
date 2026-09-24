@@ -195,7 +195,7 @@ used to be copied into every dashboard tab.
 | Component | Rule |
 |---|---|
 | `DashboardToolbar` | The one row under the area tabs: a sub-view switch (`NavLink`s, hidden when there is only one view) on the left, `FilterSelect`s on the right, reading and writing the URL through `useDashboardFilters`. A period control (e.g. Forecast's horizon) is marked `clearable: false` and survives "Clear n"; the rest of the active filters do not. A chip shows as active only when its value differs from that filter's default, so a period on its default does not look filtered. An option may carry a short `display` label for the chip (Health's chips show the name; the count stays in the dropdown). The visible chip shows the focus ring of the invisible native `<select>` over it |
-| `Kpi` / `KpiStrip` | `Kpi` is one label/value/detail figure; colour is reserved for `tone="loss"`/`"gain"`, never decorative. Given an `onDrill`, it renders as a `<button>` instead of a `<div>` — same type, size and layout, with `hover:bg-subtle` and a focus ring added, and an explicit `aria-label="<label> <value>, show accounts"` rather than relying on the visible digits. `KpiStrip` lays a row of them out four across from `md` (`columns={3}` for a three-figure summary, `columns={2}` inside a card; `stackFromLg` for a quarter-width card such as Tickets' KPIs, keeping every label to two lines), divided by hairlines rather than boxed — replaced six local `Tile`s that tinted a border by tone and coloured numbers that meant nothing |
+| `Kpi` / `KpiStrip` | `Kpi` is one label/value/detail figure; colour is reserved for `tone="loss"`/`"gain"`, never decorative. Given an `onDrill`, it renders as a `<button>` instead of a `<div>` — same type, size and layout, with `hover:bg-subtle` and a focus ring added, and an explicit `aria-label="<label> <value>, show accounts"` rather than relying on the visible digits; the detail line stays in the accessible description through `aria-describedby`, and the inner lines are block `<span>`s so the button holds only phrasing content. `KpiStrip` lays a row of them out four across from `md` (`columns={3}` for a three-figure summary, `columns={2}` inside a card; `stackFromLg` for a quarter-width card such as Tickets' KPIs, keeping every label to two lines), divided by hairlines rather than boxed — replaced six local `Tile`s that tinted a border by tone and coloured numbers that meant nothing |
 | `Panel` | The one container on the dashboard: `bg-surface border border-line rounded-xl p-4`, an optional title/action header. Never nest one inside another — group inside with `divide-y` or whitespace instead |
 | `DataState` (`Loading`, `ErrorState`, `Empty`, `TruncatedNotice`) | One wording for loading, error, empty and truncated, generalised from Health's own set so eight views stop describing the same outage eight different ways |
 
@@ -217,14 +217,28 @@ for the whole dashboard, not one per view.
   useful for focus to go beside it, so it becomes a full-screen sheet
   (`fixed inset-0`, `aria-modal="true"`) with its own Tab/Shift+Tab focus
   trap. Either shape slides in over 180ms `ease-out` (`.animate-slide-in-right`,
-  skipped under reduced motion), moves focus to its close button on open, and
-  closes on Escape or the close button, returning focus to whatever triggered
-  it.
+  skipped under reduced motion), moves focus to its close button on open (not
+  when the viewport merely crosses `lg`), and closes on the close button,
+  returning focus to whatever triggered it. Escape always closes the sheet;
+  at `lg`, where the page beside it may want Escape for itself, it closes the
+  panel only when focus is inside it and the event isn't already
+  `defaultPrevented`.
+- **Lifetime.** The panel closes when the area or any filter changes (path
+  or query string), without pulling focus back to the old trigger. While a
+  view refetches, its old figures stay on screen dimmed but its server
+  drills are off, so a header can never show the old figure over the new
+  list. A zero bucket in Tickets or Topics offers no drill target.
 - **Rows.** A company name linking to `/organizations/<id>`, its ARR in
   `font-mono-brand tabular-nums`, and one small `text-ink-muted` detail line
   underneath worded for what the number counted — a risk score ("risk 62"),
   a day count ("45 days overdue" / "never contacted"), a share ("38% of
-  ARR"), or a segment's own unit ("3 tickets", "62% used"). A server drill
+  ARR"), or a segment's own unit ("3 tickets", "62% used"). A ticket or
+  interaction drill adds one 11px `text-ink-muted` line under the header:
+  the list is companies with at least one matching record, records not
+  linked to a company aren't listed, and one on a shared account counts for
+  each of its companies. When the backend doesn't recognise a segment (no
+  `drill` key in its answer) the panel says "This number can't be listed."
+  rather than a generic failure. A server drill
   the backend itself capped at 500 shows "Showing n of count" above the
   list. "Open as a list" (`/organizations/list?ids=...`) appears only when
   the full count is known, 500 or fewer, and not truncated. A drill never

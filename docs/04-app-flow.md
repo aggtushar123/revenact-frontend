@@ -227,7 +227,9 @@ table fetches `/customers/?ids=3,7` instead of the plain list, a banner reads
 param and restores focus to the search box, and `MetricsPanel`'s population
 figure comes from a separate, unfiltered `/customers/` count probe rather
 than the `ids`-filtered fetch — so it keeps reading the whole book, not the
-drilled-down page.
+drilled-down page. Until that probe answers (or if it fails) the figure reads
+"—", never 0, and the banner leaves out its number while the `ids` fetch is
+loading.
 
 ### 4.3 Accounts
 
@@ -456,11 +458,30 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     area; below that it is a full-screen sheet (`aria-modal="true"`) with
     its own Tab/Shift+Tab focus trap, since there's nowhere else useful for
     focus to go. Escape and the close button both close it from either
-    layout, and focus returns to the trigger that opened it.
+    layout — Escape always closes the sheet, but at `lg` it closes the panel
+    only when focus is inside it and nothing else already handled the key
+    (`defaultPrevented`), so the page keeps its own Escape. Focus returns to
+    the trigger that opened it, and moves to the close button when a drill
+    opens, not when the viewport merely crosses `lg`.
+  - **Lifetime.** A drill describes the screen it was opened on, so the
+    panel closes when the path or query string changes (another area, or
+    any filter), without refocusing the old trigger. While a view refetches
+    it keeps its old figures on screen, dimmed, but every server drill on it
+    (Forecast, Customer Overview's churned tile, Activity's gone-quiet tile,
+    Tickets, Topics) is off until the new figures land — a drill then would
+    send the new query and list its accounts under the old figure. A bucket
+    at 0 in Tickets or Topics offers no drill. A segment the backend doesn't
+    recognise comes back with no `drill` key and the panel says "This number
+    can't be listed.".
   - **Rows.** Each links to `/organizations/<id>`, shows its ARR and an
     optional one-line detail worded for the segment (a risk score, days
     overdue, seats used, tickets, interactions — `drillApi.ts`'s
-    `formatDetail`). A server drill that the backend itself truncated at 500
+    `formatDetail`). A ticket or interaction drill lists companies, not
+    records, so one 11px line under the header says so: companies with at
+    least one matching ticket (interaction), records not linked to a company
+    aren't listed, and one on a shared account counts for each of its
+    companies. Renewals' calendar and coverage-gap segments show the ARR the
+    segment draws, not an account count. A server drill that the backend itself truncated at 500
     prints "Showing n of count". "Open as a list" appears only when the full
     count is known, `<= 500` and not truncated, and goes to
     `/organizations/list?ids=<comma ids>`.
