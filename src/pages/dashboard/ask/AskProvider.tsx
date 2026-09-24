@@ -51,8 +51,8 @@ export function AskProvider({ children }: { children: ReactNode }) {
     [isSm],
   );
 
-  // Entry points (a drill's "Ask about these", an attention row's "Why?")
-  // open the rail for this visit only; the saved choice is the person's own
+  // Entry points (a drill's "Ask about these", an attention row's "Why?",
+  // New chat, a History pick) open the rail for this visit only; the saved choice is the person's own
   // toggle, so one click never overwrites a remembered "collapsed".
   const reveal = useCallback(() => {
     if (isSm) setChoice(true);
@@ -93,6 +93,10 @@ export function AskProvider({ children }: { children: ReactNode }) {
         // text are spent, or the chip would name accounts nobody asked about.
         setFocus(null);
         setPendingDraft(null);
+      },
+      newChat: () => {
+        setConversation(null);
+        reveal();
       },
       openFromHistory: (next) => {
         // A dashboard conversation reopens where it was asked, so its first

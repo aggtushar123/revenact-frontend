@@ -10,6 +10,7 @@ import notificationsReducer from '../../features/notifications/notificationsSlic
 import type { Notification } from '../../features/notifications/types';
 import * as notificationApi from '../../features/notifications/notificationApi';
 import { Navbar } from './Navbar';
+import { NavActionsSlotContext } from '../../layouts/navActionsSlot';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 
 // The bell dropdown calls the real API on click (optimistic local update +
@@ -108,7 +109,8 @@ function renderNavbar(
   initialRoute: string | { pathname: string; state?: unknown } = '/dashboard',
   selectedCustomer: typeof globex | null = null,
   selectedContact: typeof sarahChen | null = null,
-  notifications: Notification[] = []
+  notifications: Notification[] = [],
+  setSlot: (el: HTMLElement | null) => void = () => {},
 ) {
   const store = configureStore({
     reducer: {
@@ -227,7 +229,9 @@ function renderNavbar(
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[initialRoute]}>
-        <Navbar />
+        <NavActionsSlotContext.Provider value={{ slot: null, setSlot }}>
+          <Navbar />
+        </NavActionsSlotContext.Provider>
         <Routes>
           <Route path="/dashboard" element={<div>Dashboard Marker</div>} />
           <Route path="/profile" element={<div>Profile Marker</div>} />
@@ -545,5 +549,27 @@ describe('Navbar dashboard area tabs', () => {
       'focus-visible:outline-2',
       'focus-visible:outline-accent',
     );
+  });
+});
+
+describe('Navbar actions on the dashboard', () => {
+  // The four decorative icons do nothing; the dashboard puts its Ask
+  // controls there instead, through a slot it portals into.
+  const DECORATIVE = 'svg.lucide-search, svg.lucide-circle-plus, svg.lucide-circle-question-mark, svg.lucide-message-square';
+
+  it('drops the decorative icons and renders the actions slot on /dashboard/*', () => {
+    const setSlot = vi.fn();
+    renderNavbar('/dashboard/overview', null, null, [], setSlot);
+    expect(document.querySelectorAll(DECORATIVE)).toHaveLength(0);
+    expect(setSlot).toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
+    expect(screen.getByAltText('Alice Admin')).toBeInTheDocument();
+  });
+
+  it('keeps the other pages as they were, with no slot', () => {
+    const setSlot = vi.fn();
+    renderNavbar('/organizations/list', null, null, [], setSlot);
+    expect(document.querySelectorAll(DECORATIVE)).toHaveLength(4);
+    expect(setSlot).not.toHaveBeenCalledWith(expect.any(HTMLElement));
   });
 });

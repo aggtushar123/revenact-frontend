@@ -1,7 +1,7 @@
 // Test-only helpers, never hot-reloaded: Where sits beside the render helpers
 // so a test imports one module (the brief's interface), not two.
 /* eslint-disable react-refresh/only-export-components */
-import type { ReactElement } from 'react';
+import { useState, type ReactElement, type ReactNode } from 'react';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -10,6 +10,7 @@ import authReducer from '../../../features/auth/authSlice';
 import { ALL_CAPABILITIES } from '../../../test/capabilities';
 import { setViewport } from '../../../test/viewport';
 import { dashboardRoutes } from '../routes';
+import { NavActionsSlotContext } from '../../../layouts/navActionsSlot';
 
 export function authStore() {
   return configureStore({
@@ -37,14 +38,28 @@ export function Where() {
   return <span data-testid="where">{location.pathname + location.search}</span>;
 }
 
+/** Stands in for the Navbar's actions slot, which DashboardLayout owns. */
+export function NavSlotHost({ children }: { children: ReactNode }) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  return (
+    <NavActionsSlotContext.Provider value={{ slot, setSlot }}>
+      <div ref={setSlot} data-testid="nav-actions" />
+      {children}
+    </NavActionsSlotContext.Provider>
+  );
+}
+
 /** The real dashboard route tree (DashboardFrame, providers, rail, drill
- *  panel) with every view replaced by `view`, at a given window width. */
+ *  panel, and the Ask controls in a stand-in Navbar slot) with every view
+ *  replaced by `view`, at a given window width. */
 export function renderDashboard(url: string, view: () => ReactElement, width = 1440) {
   setViewport(width);
   return render(
     <Provider store={authStore()}>
       <MemoryRouter initialEntries={[url]}>
-        <Routes>{dashboardRoutes(view)}</Routes>
+        <NavSlotHost>
+          <Routes>{dashboardRoutes(view)}</Routes>
+        </NavSlotHost>
       </MemoryRouter>
     </Provider>,
   );

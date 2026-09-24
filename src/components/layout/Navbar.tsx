@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ACCOUNTS_DATA } from '../organizations/accountsData';
 import type { AccountRow } from '../organizations/accountsData';
@@ -27,6 +27,7 @@ import {
 import { notificationRead, allRead } from '../../features/notifications/notificationsSlice';
 import { AREAS } from '../../pages/dashboard/areas';
 import { sharedSearch } from '../../pages/dashboard/shared/useDashboardFilters';
+import { NavActionsSlotContext } from '../../layouts/navActionsSlot';
 
 export function Navbar() {
   const location = useLocation();
@@ -39,6 +40,7 @@ export function Navbar() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const { setSlot } = useContext(NavActionsSlotContext);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -400,10 +402,18 @@ export function Navbar() {
         {/* Right side actions. The Copilot is the home page now, first in
             the sidebar; it no longer needs a button on every other page. */}
         <div className="flex items-center gap-1.5 text-ink-faint ml-1">
-          <IconButton icon={<Search className="w-4 h-4" />} />
-          <IconButton icon={<PlusCircle className="w-4 h-4" />} />
-          <IconButton icon={<HelpCircle className="w-4 h-4" />} />
-          <IconButton icon={<MessageSquare className="w-4 h-4" />} />
+          {/* The dashboard puts its Ask controls here (portaled from
+              DashboardFrame) in place of the decorative icons. */}
+          {isDashboard ? (
+            <div ref={setSlot} className="flex items-center" />
+          ) : (
+            <>
+              <IconButton icon={<Search className="w-4 h-4" />} />
+              <IconButton icon={<PlusCircle className="w-4 h-4" />} />
+              <IconButton icon={<HelpCircle className="w-4 h-4" />} />
+              <IconButton icon={<MessageSquare className="w-4 h-4" />} />
+            </>
+          )}
 
           <div className="relative" ref={notificationsRef}>
             <button

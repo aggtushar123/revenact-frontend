@@ -283,8 +283,9 @@ the whole book's population rather than the filtered page's.
 | `components/copilot/dashboardLabels.ts`, `suggestions.ts` | Chip text (`viewLabel` for the history tag, `contextLabel` for a message's own chip), three questions per area |
 | `ask/useDashboardContext.ts` | Route + `SHARED_KEYS` → `DashboardContext` and its chip, read at send time |
 | `ask/filterNames.ts`, `FilterNamesProvider.tsx` | `DashboardToolbar` reports the shared filters' option names for chips |
-| `ask/context.ts`, `useAsk.ts`, `AskProvider.tsx` | The dashboard's one conversation and thread, open state (`askPreference.ts`, written only by the rail's own toggle — an entry point opens the rail for that visit without touching it), focus, prefilled draft (`draft()`; a later `ask()` replaces it and its focus), history restore (`originPath.ts`); `useAsk()` is null outside the frame, so entry points hide in isolated view tests |
-| `ask/AskRail.tsx` | Rail header, collapsed tab, phone sheet (focus trap, Escape/Close return focus to the Ask button) |
+| `ask/context.ts`, `useAsk.ts`, `AskProvider.tsx` | The dashboard's one conversation and thread, open state (`askPreference.ts`, written only by the Sparkles switch — an entry point opens the rail for that visit without touching it), focus, prefilled draft (`draft()`; a later `ask()` replaces it and its focus), history restore (`originPath.ts`); `useAsk()` is null outside the frame, so entry points hide in isolated view tests |
+| `ask/AskRail.tsx` | The 320px glass rail (no header; hidden = not rendered) and the phone sheet (focus trap, Close, Escape/Close return focus to the Sparkles switch) |
+| `ask/AskControls.tsx` | Communications' pill (New chat, History + popover, Sparkles switch), portaled into the Navbar's actions slot (`layouts/navActionsSlot.ts`, owned by `DashboardLayout`) |
 | `ask/testAsk.tsx`, `components/copilot/testCopilot.ts` | `renderDashboard(url, view, width)`, `stubCopilot`, `postedBodies` |
 
 #### Ticket Overview (`tabs/ticket-overview/`)

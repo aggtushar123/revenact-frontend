@@ -23,13 +23,13 @@ export interface CopilotRailProps {
   onConversation: (conversation: Conversation | null) => void;
   /** The rail's accessible name. */
   label?: string;
-  /** 'glass' is Communications' translucent card, its documented exception;
-   *  'plain' is a bordered surface for everywhere else. */
+  /** 'glass' is the translucent card of Communications and the Dashboard's
+   *  Ask rail, the documented exception; 'plain' is a bordered surface (the
+   *  Dashboard's phone sheet). */
   variant?: 'glass' | 'plain';
   /** Width classes. */
   className?: string;
-  /** Rendered above the conversation (Communications' Next event card, the
-   *  Dashboard's rail header). */
+  /** Rendered above the conversation (Communications' Next event card). */
   top?: ReactNode;
   /** Drive the rail from outside (the dashboard sends "Why?" without the composer). */
   thread?: CopilotThread;

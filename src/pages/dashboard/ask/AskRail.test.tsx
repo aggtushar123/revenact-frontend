@@ -1,12 +1,14 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import { Provider } from 'react-redux';
+import { Link, MemoryRouter, Routes } from 'react-router-dom';
+import { dashboardRoutes } from '../routes';
 import userEvent from '@testing-library/user-event';
-import { Link } from 'react-router-dom';
 import { useDrill } from '../drill/useDrill';
 import { useAsk } from './useAsk';
-import { resetViewport } from '../../../test/viewport';
+import { resetViewport, setViewport } from '../../../test/viewport';
 import { postedBodies, stubCopilot } from '../../../components/copilot/testCopilot';
-import { renderDashboard, Where } from './testAsk';
+import { authStore, renderDashboard, Where } from './testAsk';
 import { ASK_PREFERENCE_KEY } from './askPreference';
 
 function Probe() {
@@ -48,25 +50,70 @@ describe('the Ask rail on the dashboard', () => {
     vi.restoreAllMocks();
   });
 
-  it('is open by default at xl, beside the scroll area', () => {
+  it('is open by default at xl, beside the scroll area, shaped like Communications\' rail', () => {
     stubCopilot();
     renderDashboard('/dashboard/overview', () => <Probe />, 1440);
     expect(rail()).toBeInTheDocument();
     expect(within(rail()!).getByText('Overview')).toBeInTheDocument();
     expect(within(rail()!).getByRole('list', { name: 'Suggested questions' })).toBeInTheDocument();
+    // No header row of its own: the controls live in the top bar.
+    expect(within(rail()!).queryByRole('heading', { name: 'Ask Revenact' })).not.toBeInTheDocument();
+    expect(within(rail()!).queryByRole('button', { name: 'New chat' })).not.toBeInTheDocument();
+    expect(rail()).toHaveClass('w-[320px]');
+    expect(within(rail()!).getByRole('region', { name: 'Ask Revenact conversation' })).toHaveClass('rv-card-glass');
   });
 
-  it('is a slim tab below xl, and remembers the choice either way', async () => {
+  it('has its controls in the top bar pill, as Communications does', () => {
+    stubCopilot();
+    renderDashboard('/dashboard/overview', () => <Probe />, 1440);
+    const bar = within(screen.getByTestId('nav-actions'));
+    expect(bar.getByRole('button', { name: 'New chat' })).toHaveAttribute('title', 'New chat');
+    expect(bar.getByRole('button', { name: 'History' })).toHaveAttribute('aria-expanded', 'false');
+    const toggle = bar.getByRole('button', { name: 'Hide Copilot' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'true');
+    expect(toggle).toHaveAttribute('title', 'Hide Copilot');
+    expect(toggle).toHaveClass('bg-accent', 'text-on-accent');
+  });
+
+  it('opens History anchored inside the pill', async () => {
+    stubCopilot();
+    renderDashboard('/dashboard/overview', () => <Probe />, 1440);
+    const history = screen.getByRole('button', { name: 'History' });
+    await userEvent.click(history);
+    const panel = await screen.findByRole('dialog', { name: 'History' });
+    expect(screen.getByTestId('nav-actions')).toContainElement(panel);
+    expect(history).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('renders no controls, and does not crash, without a top bar slot', () => {
+    stubCopilot();
+    setViewport(1440);
+    render(
+      <Provider store={authStore()}>
+        <MemoryRouter initialEntries={['/dashboard/overview']}>
+          <Routes>{dashboardRoutes(() => <Probe />)}</Routes>
+        </MemoryRouter>
+      </Provider>,
+    );
+    expect(rail()).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'New chat' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Hide Copilot' })).not.toBeInTheDocument();
+  });
+
+  it('is hidden below xl, and the Copilot switch remembers the choice either way', async () => {
     stubCopilot();
     const first = renderDashboard('/dashboard/overview', () => <Probe />, 1100);
     expect(rail()).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Open Ask Revenact' }));
-    expect(rail()).toBeInTheDocument();
-    expect(screen.getByPlaceholderText('Ask Revenact')).toHaveFocus();
+    const toggle = screen.getByRole('button', { name: 'Show Copilot' });
+    expect(toggle).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(toggle);
+    expect(await screen.findByRole('complementary', { name: 'Ask Revenact' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByPlaceholderText('Ask Revenact')).toHaveFocus());
     expect(localStorage.getItem(ASK_PREFERENCE_KEY)).toBe('open');
-    await userEvent.click(screen.getByRole('button', { name: 'Collapse Ask Revenact' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Hide Copilot' }));
+    await waitFor(() => expect(rail()).not.toBeInTheDocument());
     expect(localStorage.getItem(ASK_PREFERENCE_KEY)).toBe('closed');
-    expect(screen.getByRole('button', { name: 'Open Ask Revenact' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Show Copilot' })).toHaveFocus();
     first.unmount();
 
     renderDashboard('/dashboard/overview', () => <Probe />, 1440);
@@ -79,8 +126,24 @@ describe('the Ask rail on the dashboard', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied'); });
     renderDashboard('/dashboard/overview', () => <Probe />, 1440);
     expect(rail()).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Collapse Ask Revenact' }));
-    expect(rail()).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Hide Copilot' }));
+    await waitFor(() => expect(rail()).not.toBeInTheDocument());
+  });
+
+  it('New chat clears the conversation and opens the rail without saving the choice', async () => {
+    stubCopilot();
+    renderDashboard('/dashboard/overview', () => <Probe />, 1440);
+    await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'What needs me?{enter}');
+    await screen.findByText('Answer to: What needs me?');
+    await userEvent.click(screen.getByRole('button', { name: 'New chat' }));
+    await waitFor(() => expect(screen.queryByText('Answer to: What needs me?')).not.toBeInTheDocument());
+    expect(within(rail()!).getByRole('list', { name: 'Suggested questions' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Hide Copilot' }));
+    await waitFor(() => expect(rail()).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'New chat' }));
+    expect(await screen.findByRole('complementary', { name: 'Ask Revenact' })).toBeInTheDocument();
+    expect(localStorage.getItem(ASK_PREFERENCE_KEY)).toBe('closed');
   });
 
   it('keeps the conversation across areas, and a follow-up carries the new screen', async () => {

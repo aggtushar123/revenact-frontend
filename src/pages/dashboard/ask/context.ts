@@ -21,6 +21,8 @@ export interface AskState {
   draft: (question: string, focus: DashboardFocus) => void;
   /** Open the rail and send `question` now, grounded in the screen as it is. */
   ask: (question: string, focus: DashboardFocus | null) => void;
+  /** Start over: an empty conversation, with the rail shown for this visit. */
+  newChat: () => void;
   /** Show a conversation picked in History. */
   openFromHistory: (conversation: Conversation) => void;
 }

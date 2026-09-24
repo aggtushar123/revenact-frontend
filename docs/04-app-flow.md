@@ -460,11 +460,19 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     (`whitespace-pre-wrap`), not the paragraph/list/bold `AnswerText` formatting
     `/copilot` uses; a reply withheld from a reader with narrower visibility in
     a shared session renders the same way, as plain text.
-  - **Layout.** Open by default from `xl` (1280px), a slim "Ask" tab below it;
-    the open/closed choice is kept in `localStorage`
-    (`revenact_dashboard_ask`, read and written in try/catch). Below `sm` an
-    "Ask" button, the frame's first row, opens a full-screen sheet
-    (`aria-modal`, Tab trapped, Escape/Close return focus to the button).
+  - **Layout.** Shaped like Communications' Copilot rail: a 320px glass
+    column (`CopilotRail variant="glass"`), no header row of its own. Its
+    controls are a pill in the Navbar, where the four decorative icons were
+    (`/dashboard/*` only): New chat, History (its popover anchored in the
+    pill) and the Sparkles switch ("Show Copilot"/"Hide Copilot",
+    `aria-pressed`). `DashboardLayout` owns a Navbar actions slot
+    (`layouts/navActionsSlot.ts`); the Navbar renders it on dashboard routes
+    and `AskControls` portals the pill into it (nothing renders without a
+    slot). Open by default from `xl` (1280px), hidden (not rendered) below it
+    until switched on; the switch's choice is kept in `localStorage`
+    (`revenact_dashboard_ask`, read and written in try/catch). Below `sm` the
+    switch opens a full-screen sheet instead (`aria-modal`, Tab trapped, a
+    Close button, Escape/Close return focus to the switch).
   - **Entry points.**
     - Typing.
     - Three suggested questions per area while the conversation is empty
@@ -480,8 +488,8 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
       (or that row's Snooze/Done is) it is `aria-disabled` and `ask()` sends
       nothing and clears nothing.
     - Every entry point (and a History pick) opens the rail (or the phone
-      sheet) for that visit only; only the rail header's own
-      expand/collapse control, from `sm` up, writes the remembered
+      sheet) for that visit only, and so does New chat; only the Sparkles
+      switch, from `sm` up, writes the remembered
       open/closed choice to `localStorage` — an entry point never
       overwrites it. The phone sheet's Close saves nothing; the sheet
       always starts closed.
@@ -499,7 +507,7 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
       question exactly as first asked — its own context and focus — not the
       screen as it now stands.
     - Sources render under answers as on `/copilot`.
-  - **History.** The rail header has New chat, History and Collapse. History is
+  - **History.** The Navbar pill has New chat, History and the switch. History is
     shared with Communications and the Copilot page. A conversation whose
     `origin` is set shows a tag with only its area and view (e.g. "Revenue ›
     Forecast"), never the filters it was asked with — those live on each
