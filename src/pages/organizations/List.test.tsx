@@ -417,6 +417,53 @@ describe('Organizations List page — dashboard drill (?ids=)', () => {
     await waitFor(() => expect(screen.getByTitle('Number of organizations')).toHaveTextContent('12'));
   });
 
+  it('a fresh drill landing shows "—", not 0, until the total probe resolves', async () => {
+    let resolveProbe: (value: unknown) => void = () => {};
+    const probe = new Promise((resolve) => {
+      resolveProbe = resolve;
+    });
+    const base = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        typeof url === 'string' && /\/customers\/(\?)?$/.test(url.replace(/^.*\/api\/v1/, ''))
+          ? probe
+          : base(url),
+      ),
+    );
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    expect(screen.getByTitle('Number of organizations')).toHaveTextContent('—');
+    expect(screen.getByTitle('Number of organizations')).not.toHaveTextContent('0');
+
+    resolveProbe(jsonResponse(200, { count: 12, next: null, previous: null, results: [] }));
+    await waitFor(() => expect(screen.getByTitle('Number of organizations')).toHaveTextContent('12'));
+  });
+
+  it('a drill landing whose total probe fails keeps "—" rather than a fabricated 0', async () => {
+    const base = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        typeof url === 'string' && /\/customers\/(\?)?$/.test(url.replace(/^.*\/api\/v1/, ''))
+          ? Promise.resolve(jsonResponse(500, { detail: 'boom' }))
+          : base(url),
+      ),
+    );
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByTitle('Number of organizations')).toHaveTextContent('—');
+  });
+
   it('a normal visit (no drill) still shows the list fetch\'s own count in MetricsPanel', async () => {
     const fetchMock = makeFetchMock({
       customers: [{ status: 200, body: { count: 7, next: null, previous: null, results: [globex] } }],

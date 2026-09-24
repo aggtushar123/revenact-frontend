@@ -90,7 +90,9 @@ interface MetricsPanelProps {
    * buckets: those are scoped to `live_customers` (excludes churned —
    * see revenact-backend's CustomerStatsView/scoping.py), a narrower
    * population than the list's, so summing them would undercount. */
-  totalCount: number;
+  /** `null` when the count isn't known yet (or couldn't be fetched) —
+   *  shown as "—", never a fabricated 0. */
+  totalCount: number | null;
 }
 
 const ZERO_BUCKET = { count: 0, mrr: 0, arr: 0 };
@@ -341,7 +343,7 @@ export function MetricsPanel({ totalCount }: MetricsPanelProps) {
             <svg viewBox="0 0 24 24" className="w-full h-full fill-current"><path d="M12 2L2 20h20L12 2zm0 3.8l6.1 11H5.9L12 5.8z"/></svg>
           </div>
           <span title="Number of organizations" className="text-2xl font-bold text-ink leading-tight">
-            {totalCount}
+            {totalCount ?? '—'}
           </span>
         </div>
       </div>

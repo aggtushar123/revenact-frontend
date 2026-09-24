@@ -33,29 +33,33 @@ export function List() {
   // same population the list itself counts (visible, non-archived,
   // churned included) rather than GET /customers/stats/'s narrower
   // `live_customers` scope (excludes churned) or a fabricated 0.
-  const [drillTotalCount, setDrillTotalCount] = useState<number | null>(null);
+  //
+  // The probe's answer is kept together with the ids it was fetched for,
+  // so a drill landing reads `null` (MetricsPanel's "—") while its own
+  // probe is pending or after it failed — never the slice's initial 0,
+  // and never a count left over from an earlier drill.
+  const [drillTotal, setDrillTotal] = useState<{ ids: string; count: number } | null>(null);
   useEffect(() => {
-    // No drill (including "Show all" clearing one) needs no probe — the
-    // ternary below ignores `drillTotalCount` whenever `drillIds` is
-    // falsy anyway, so a stale value left over from an earlier drill is
-    // harmless (and gets overwritten the next time a drill fetch
-    // resolves).
+    // No drill (including "Show all" clearing one) needs no probe.
     if (!drillIds) return;
     let cancelled = false;
     apiFetch<{ count: number }>('/customers/')
       .then((page) => {
-        if (!cancelled) setDrillTotalCount(page.count);
+        if (!cancelled) setDrillTotal({ ids: drillIds, count: page.count });
       })
       .catch(() => {
-        // Keep whatever we already had (possibly still null, e.g. on a
-        // first load that failed) rather than showing a fabricated 0 for
-        // a real failure.
+        // Left unset: the panel shows "—" for a real failure rather than
+        // a fabricated 0.
       });
     return () => {
       cancelled = true;
     };
   }, [drillIds]);
-  const metricsTotalCount = drillIds ? (drillTotalCount ?? totalCount) : totalCount;
+  const metricsTotalCount: number | null = drillIds
+    ? drillTotal?.ids === drillIds
+      ? drillTotal.count
+      : null
+    : totalCount;
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const handleShowAll = () => {
