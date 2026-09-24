@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { FilterSelect } from '../../../components/shared/FilterSelect';
 import type { FilterGroup, FilterOption } from '../../../components/shared/FilterSelect';
 import { useDashboardFilters } from './useDashboardFilters';
+import { useReportFilterNames } from '../ask/filterNames';
 
 export interface ToolbarFilter {
   key: string;
@@ -40,6 +41,7 @@ export function DashboardToolbar({
   const keys = filters.map((filter) => filter.key);
   const clearable = filters.filter((filter) => filter.clearable !== false).map((filter) => filter.key);
   const { values, set, clear, activeCount } = useDashboardFilters(keys, defaults);
+  useReportFilterNames(filters);
   const active = activeCount(clearable);
 
   return (
