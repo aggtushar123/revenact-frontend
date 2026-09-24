@@ -22,6 +22,7 @@ export function ActivitiesByAIAreaDonut({
   classified,
   total,
   query,
+  drillable = true,
 }: {
   data: InteractionBucket[];
   /** How many interactions in scope carry a classification, from the API. Used
@@ -31,6 +32,9 @@ export function ActivitiesByAIAreaDonut({
   /** Every interaction in scope, classified or not — for the note below. */
   total: number;
   query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
 }) {
   const { open } = useDrill();
   const plotted = data.reduce((sum, item) => sum + item.value, 0);
@@ -46,7 +50,7 @@ export function ActivitiesByAIAreaDonut({
     );
   };
 
-  const drillItems = data.map((entry) => ({
+  const drillItems = (drillable ? data : []).map((entry) => ({
     name: entry.name,
     figure: String(entry.value),
     onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
@@ -101,8 +105,8 @@ export function ActivitiesByAIAreaDonut({
                 <Cell
                   key={entry.key}
                   fill={AREA_COLORS[entry.name] ?? FALLBACK_COLOR}
-                  cursor="pointer"
-                  onClick={() => openSegment(entry)}
+                  cursor={drillable ? 'pointer' : undefined}
+                  onClick={drillable ? () => openSegment(entry) : undefined}
                 />
               ))}
             </Pie>

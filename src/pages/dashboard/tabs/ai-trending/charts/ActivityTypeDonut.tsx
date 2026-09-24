@@ -14,7 +14,17 @@ const PATH = '/interactions/stats/';
  * all three, and a donut whose segment disappears when a source goes quiet is
  * harder to read than one with an empty segment. Recharts draws nothing for a
  * zero, so the legend label still sits in the ring's order. */
-export function ActivityTypeDonut({ data, query }: { data: InteractionBucket[]; query: string }) {
+export function ActivityTypeDonut({
+  data,
+  query,
+  drillable = true,
+}: {
+  data: InteractionBucket[];
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
@@ -29,7 +39,7 @@ export function ActivityTypeDonut({ data, query }: { data: InteractionBucket[]; 
     );
   };
 
-  const drillItems = data.map((entry) => ({
+  const drillItems = (drillable ? data : []).map((entry) => ({
     name: entry.name,
     figure: String(entry.value),
     onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
@@ -75,8 +85,8 @@ export function ActivityTypeDonut({ data, query }: { data: InteractionBucket[]; 
                 <Cell
                   key={entry.key}
                   fill={SOURCE_COLORS[entry.name] ?? FALLBACK_COLOR}
-                  cursor="pointer"
-                  onClick={() => openSegment(entry)}
+                  cursor={drillable ? 'pointer' : undefined}
+                  onClick={drillable ? () => openSegment(entry) : undefined}
                 />
               ))}
             </Pie>

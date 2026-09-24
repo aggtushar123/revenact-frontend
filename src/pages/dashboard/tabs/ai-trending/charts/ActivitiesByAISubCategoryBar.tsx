@@ -23,6 +23,7 @@ export function ActivitiesByAISubCategoryBar({
   classified,
   total,
   query,
+  drillable = true,
 }: {
   data: InteractionBucket[];
   /** The API's own count of classified interactions — what the note below is
@@ -31,6 +32,9 @@ export function ActivitiesByAISubCategoryBar({
   classified: number;
   total: number;
   query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
 }) {
   const { open } = useDrill();
   const rows = data.slice(0, MAX_BARS).reverse();
@@ -47,7 +51,7 @@ export function ActivitiesByAISubCategoryBar({
     );
   };
 
-  const drillItems = rows.map((row) => ({
+  const drillItems = (drillable ? rows : []).map((row) => ({
     name: row.name,
     figure: String(row.value),
     onSelect: (trigger: HTMLElement) => openSegment(row, trigger),
@@ -97,7 +101,12 @@ export function ActivitiesByAISubCategoryBar({
                 fontSize={11}
               />
               {rows.map((row) => (
-                <Cell key={row.key} fill={ROLE.ink} cursor="pointer" onClick={() => openSegment(row)} />
+                <Cell
+                  key={row.key}
+                  fill={ROLE.ink}
+                  cursor={drillable ? 'pointer' : undefined}
+                  onClick={drillable ? () => openSegment(row) : undefined}
+                />
               ))}
             </Bar>
           </BarChart>

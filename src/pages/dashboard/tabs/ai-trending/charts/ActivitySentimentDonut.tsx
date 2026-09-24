@@ -9,7 +9,17 @@ import { DrillTargets } from '../../../drill/DrillTargets';
 const PATH = '/interactions/stats/';
 
 /** Interactions by sentiment, across all three sources. */
-export function ActivitySentimentDonut({ data, query }: { data: InteractionBucket[]; query: string }) {
+export function ActivitySentimentDonut({
+  data,
+  query,
+  drillable = true,
+}: {
+  data: InteractionBucket[];
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
   const total = data.reduce((sum, item) => sum + item.value, 0);
 
@@ -24,7 +34,7 @@ export function ActivitySentimentDonut({ data, query }: { data: InteractionBucke
     );
   };
 
-  const drillItems = data.map((entry) => ({
+  const drillItems = (drillable ? data : []).map((entry) => ({
     name: entry.name,
     figure: String(entry.value),
     onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
@@ -77,8 +87,8 @@ export function ActivitySentimentDonut({ data, query }: { data: InteractionBucke
                 <Cell
                   key={entry.key}
                   fill={SENTIMENT_COLORS[entry.name] ?? FALLBACK_COLOR}
-                  cursor="pointer"
-                  onClick={() => openSegment(entry)}
+                  cursor={drillable ? 'pointer' : undefined}
+                  onClick={drillable ? () => openSegment(entry) : undefined}
                 />
               ))}
             </Pie>

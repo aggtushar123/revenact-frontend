@@ -15,6 +15,9 @@ export interface ArrBridgeChartProps {
   /** The view's own filter query string, forwarded to the server drill so
    *  the accounts behind a bar respect the same book the bar was drawn from. */
   query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
 }
 
 /** Which server segment a bar drills into — Opening and Forecast are totals,
@@ -38,7 +41,13 @@ const SEGMENT: Record<string, string> = {
  * own. The alternative, a library for one chart, is a dependency to carry
  * forever.
  */
-export function ArrBridgeChart({ bridge, currency, horizonDays, query }: ArrBridgeChartProps) {
+export function ArrBridgeChart({
+  bridge,
+  currency,
+  horizonDays,
+  query,
+  drillable = true,
+}: ArrBridgeChartProps) {
   const { open } = useDrill();
 
   const data = useMemo(() => {
@@ -81,7 +90,7 @@ export function ArrBridgeChart({ bridge, currency, horizonDays, query }: ArrBrid
 
   const openSegment = (row: (typeof data)[number], trigger?: HTMLElement) => {
     const segment = SEGMENT[row.name];
-    if (!segment) return;
+    if (!segment || !drillable) return;
     open(
       {
         title: row.name,
@@ -96,8 +105,9 @@ export function ArrBridgeChart({ bridge, currency, horizonDays, query }: ArrBrid
   // recharts <Bar>'s SVG cells, so this is the real drill target; the Cell's
   // own onClick below is the pointer shortcut to the same thing. Opening and
   // Forecast are totals, not segments the server can drill into.
+  const canDrill = (row: (typeof data)[number]) => drillable && Boolean(SEGMENT[row.name]);
   const drillItems = data
-    .filter((row) => SEGMENT[row.name])
+    .filter(canDrill)
     .map((row) => ({
       name: row.name,
       figure: formatCompactMoney(row.value, currency),
@@ -169,7 +179,7 @@ export function ArrBridgeChart({ bridge, currency, horizonDays, query }: ArrBrid
               {data.map((row) =>
                 row.name === 'Forecast' ? (
                   <Cell key={row.name} fill="transparent" stroke={ROLE.ink} strokeWidth={2} />
-                ) : SEGMENT[row.name] ? (
+                ) : canDrill(row) ? (
                   <Cell
                     key={row.name}
                     fill={colour[row.kind]}

@@ -47,25 +47,25 @@ export function ControlsView() {
       >
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[300px]">
           <div className="lg:col-span-1">
-            <KPIGrid kpis={stats?.kpis ?? null} query={query} />
+            <KPIGrid kpis={stats?.kpis ?? null} query={query} drillable={!statsLoading} />
           </div>
 
           <div className="bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
-            <PriorityDonut data={stats?.priority ?? []} query={query} />
+            <PriorityDonut data={stats?.priority ?? []} query={query} drillable={!statsLoading} />
           </div>
 
           <div className="bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
-            <StatusDonut data={stats?.status ?? []} query={query} />
+            <StatusDonut data={stats?.status ?? []} query={query} drillable={!statsLoading} />
           </div>
 
           <div className="w-full lg:w-[240px] shrink-0">
-            <OriginBar data={stats?.origin ?? []} query={query} />
+            <OriginBar data={stats?.origin ?? []} query={query} drillable={!statsLoading} />
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[350px]">
           <div className="bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
-            <AssigneesStackedBar data={stats?.assignees ?? []} query={query} />
+            <AssigneesStackedBar data={stats?.assignees ?? []} query={query} drillable={!statsLoading} />
           </div>
 
           <div className="bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">

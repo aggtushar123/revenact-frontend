@@ -432,6 +432,31 @@ describe('Revenue Forecast drill', () => {
     expect(within(dialog).getByText('$31.1K expected expansion')).toBeInTheDocument();
   });
 
+  it('offers no server drill while a refetch is pending with the old figures on screen', async () => {
+    // The first answer lands; the one after a filter change never does. The
+    // old figures stay up (dimmed), but a drill now would send the NEW query
+    // and list accounts under the OLD figure, so nothing is a button.
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        calls += 1;
+        if (calls > 1) return new Promise(() => {});
+        return Promise.resolve({ ok: true, status: 200, json: async () => stats });
+      }),
+    );
+    const user = userEvent.setup();
+    renderForecast();
+
+    await screen.findByRole('button', { name: 'At risk $208.6K, show accounts' });
+    await user.selectOptions(screen.getByLabelText('Primary Owner'), '5');
+
+    await waitFor(() => expect(calls).toBeGreaterThan(1));
+    expect(screen.getByText('$208.6K')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /At risk/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Churn/ })).not.toBeInTheDocument();
+  });
+
   it('does not offer a drill from the Opening or Forecast bars', async () => {
     mockFetchRouted(stats, {});
     renderForecast();

@@ -97,7 +97,7 @@ export function ControlsView() {
             detail="weighted churn and contraction"
             tone="loss"
             onDrill={
-              bridge
+              bridge && !isLoading
                 ? (trigger) =>
                     open(
                       {
@@ -120,6 +120,7 @@ export function ControlsView() {
                 currency={currency}
                 horizonDays={stats?.horizon_days ?? 365}
                 query={query}
+                drillable={!isLoading}
               />
             )}
           </div>

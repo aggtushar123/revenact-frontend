@@ -8,13 +8,24 @@ import { DrillTargets } from '../../../drill/DrillTargets';
 
 const PATH = '/tickets/stats/';
 
-export function StatusDonut({ data, query }: { data: TicketBucket[]; query: string }) {
+export function StatusDonut({
+  data,
+  query,
+  drillable = true,
+}: {
+  data: TicketBucket[];
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
+  const canDrill = (entry: TicketBucket) => drillable && Boolean(STATUS_VALUES[entry.name]);
 
   const openSegment = (entry: TicketBucket, trigger?: HTMLElement) => {
     const value = STATUS_VALUES[entry.name];
-    if (!value) return;
+    if (!value || !canDrill(entry)) return;
     open(
       {
         title: entry.name,
@@ -28,7 +39,7 @@ export function StatusDonut({ data, query }: { data: TicketBucket[]; query: stri
   // One keyboard target per slice the server recognises — same
   // ignore-the-unmapped-name convention the pointer handler follows.
   const drillItems = data
-    .filter((entry) => STATUS_VALUES[entry.name])
+    .filter(canDrill)
     .map((entry) => ({
       name: entry.name,
       figure: String(entry.value),
@@ -89,8 +100,8 @@ export function StatusDonut({ data, query }: { data: TicketBucket[]; query: stri
                 <Cell
                   key={`cell-${index}`}
                   fill={STATUS_COLORS[entry.name] ?? FALLBACK_COLOR}
-                  cursor={STATUS_VALUES[entry.name] ? 'pointer' : undefined}
-                  onClick={STATUS_VALUES[entry.name] ? () => openSegment(entry) : undefined}
+                  cursor={canDrill(entry) ? 'pointer' : undefined}
+                  onClick={canDrill(entry) ? () => openSegment(entry) : undefined}
                 />
               ))}
             </Pie>

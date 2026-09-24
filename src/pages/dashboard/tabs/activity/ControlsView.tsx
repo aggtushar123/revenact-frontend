@@ -88,7 +88,7 @@ export function ControlsView() {
             }
             tone={kpis && kpis.dark_accounts > 0 ? 'loss' : 'neutral'}
             onDrill={
-              kpis
+              kpis && !isLoading
                 ? (trigger) =>
                     open(
                       {

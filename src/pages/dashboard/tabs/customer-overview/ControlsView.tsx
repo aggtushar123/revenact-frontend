@@ -96,7 +96,7 @@ export function ControlsView() {
             }
             tone={kpis && kpis.churned_12m > 0 ? 'loss' : 'neutral'}
             onDrill={
-              kpis
+              kpis && !isLoading
                 ? (trigger) =>
                     open(
                       {

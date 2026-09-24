@@ -8,13 +8,24 @@ import { DrillTargets } from '../../../drill/DrillTargets';
 
 const PATH = '/tickets/stats/';
 
-export function PriorityDonut({ data, query }: { data: TicketBucket[]; query: string }) {
+export function PriorityDonut({
+  data,
+  query,
+  drillable = true,
+}: {
+  data: TicketBucket[];
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
+  const canDrill = (entry: TicketBucket) => drillable && Boolean(PRIORITY_VALUES[entry.name]);
 
   const openSegment = (entry: TicketBucket, trigger?: HTMLElement) => {
     const value = PRIORITY_VALUES[entry.name];
-    if (!value) return;
+    if (!value || !canDrill(entry)) return;
     open(
       {
         title: entry.name,
@@ -30,7 +41,7 @@ export function PriorityDonut({ data, query }: { data: TicketBucket[]; query: st
   // still drawn (in the fallback colour) but offers no drill, same as an
   // unrecognised name in the pointer handler below.
   const drillItems = data
-    .filter((entry) => PRIORITY_VALUES[entry.name])
+    .filter(canDrill)
     .map((entry) => ({
       name: entry.name,
       figure: String(entry.value),
@@ -97,8 +108,8 @@ export function PriorityDonut({ data, query }: { data: TicketBucket[]; query: st
                 <Cell
                   key={`cell-${index}`}
                   fill={PRIORITY_COLORS[entry.name] ?? FALLBACK_COLOR}
-                  cursor={PRIORITY_VALUES[entry.name] ? 'pointer' : undefined}
-                  onClick={PRIORITY_VALUES[entry.name] ? () => openSegment(entry) : undefined}
+                  cursor={canDrill(entry) ? 'pointer' : undefined}
+                  onClick={canDrill(entry) ? () => openSegment(entry) : undefined}
                 />
               ))}
             </Pie>

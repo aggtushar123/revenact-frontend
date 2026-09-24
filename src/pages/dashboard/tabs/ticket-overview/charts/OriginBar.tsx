@@ -23,7 +23,17 @@ const PATH = '/tickets/stats/';
  * five numbers are actually for: a 5-ticket origin is a sliver, and the figure
  * beside it is the only way to read it.
  */
-export function OriginBar({ data, query }: { data: TicketOrigin[]; query: string }) {
+export function OriginBar({
+  data,
+  query,
+  drillable = true,
+}: {
+  data: TicketOrigin[];
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
   // Biggest first. The API's order is the connector's, which is not a ranking.
   const ranked = useMemo(() => [...data].sort((a, b) => b.value - a.value), [data]);
@@ -45,7 +55,7 @@ export function OriginBar({ data, query }: { data: TicketOrigin[]; query: string
 
   // Every origin drills, including the null-connector "Revenact" bucket —
   // the backend's own `origin:none` segment.
-  const drillItems = ranked.map((row) => ({
+  const drillItems = (drillable ? ranked : []).map((row) => ({
     name: row.name,
     figure: String(row.value),
     onSelect: (trigger: HTMLElement) => openSegment(row, trigger),
@@ -102,8 +112,8 @@ export function OriginBar({ data, query }: { data: TicketOrigin[]; query: string
                   <Cell
                     key={row.connector_id ?? 'none'}
                     fill={ROLE.ink}
-                    cursor="pointer"
-                    onClick={() => openSegment(row)}
+                    cursor={drillable ? 'pointer' : undefined}
+                    onClick={drillable ? () => openSegment(row) : undefined}
                   />
                 ))}
               </Bar>

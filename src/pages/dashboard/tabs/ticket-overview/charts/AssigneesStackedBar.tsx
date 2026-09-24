@@ -33,7 +33,17 @@ const LABEL_FILL: Partial<Record<string, string>> = {
   Closed: ROLE.ink,
 };
 
-export function AssigneesStackedBar({ data, query }: { data: TicketAssigneeRow[]; query: string }) {
+export function AssigneesStackedBar({
+  data,
+  query,
+  drillable = true,
+}: {
+  data: TicketAssigneeRow[];
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
   // The mock's domain={[0, 80]} clipped any assignee past 80 tickets.
   const max = niceMax(data.map((d) => d.total));
@@ -43,8 +53,9 @@ export function AssigneesStackedBar({ data, query }: { data: TicketAssigneeRow[]
   // one isn't a real choice, and `parse_segment` ignores it the same way it
   // ignores every other malformed filter. So this bar alone gets no click,
   // no cursor and no keyboard target.
+  const canDrill = (row: TicketAssigneeRow) => drillable && Boolean(row.name);
   const openSegment = (row: TicketAssigneeRow, trigger?: HTMLElement) => {
-    if (!row.name) return;
+    if (!canDrill(row)) return;
     open(
       {
         title: row.name,
@@ -56,7 +67,7 @@ export function AssigneesStackedBar({ data, query }: { data: TicketAssigneeRow[]
   };
 
   const drillItems = data
-    .filter((row) => row.name)
+    .filter(canDrill)
     .map((row) => ({
       name: row.name,
       figure: String(row.total),
@@ -149,8 +160,8 @@ export function AssigneesStackedBar({ data, query }: { data: TicketAssigneeRow[]
                 {data.map((row, index) => (
                   <Cell
                     key={row.name || `blank-${index}`}
-                    cursor={row.name ? 'pointer' : undefined}
-                    onClick={row.name ? () => openSegment(row) : undefined}
+                    cursor={canDrill(row) ? 'pointer' : undefined}
+                    onClick={canDrill(row) ? () => openSegment(row) : undefined}
                   />
                 ))}
               </Bar>

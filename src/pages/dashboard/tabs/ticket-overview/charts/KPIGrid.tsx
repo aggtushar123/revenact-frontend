@@ -24,7 +24,17 @@ const PATH = '/tickets/stats/';
  * behind. Resolution rate and average lifetime stay plain — a rate and an
  * average aren't a set of tickets to open a list of accounts from.
  */
-export function KPIGrid({ kpis, query }: { kpis: TicketKpis | null; query: string }) {
+export function KPIGrid({
+  kpis,
+  query,
+  drillable = true,
+}: {
+  kpis: TicketKpis | null;
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
 
   const drill = (title: string, value: number, segment: string) => (trigger: HTMLElement) =>
@@ -42,12 +52,12 @@ export function KPIGrid({ kpis, query }: { kpis: TicketKpis | null; query: strin
       <Kpi
         label="Total Ticket Volume"
         value={n(kpis?.total)}
-        onDrill={kpis ? drill('Total Ticket Volume', kpis.total, 'all') : undefined}
+        onDrill={kpis && drillable ? drill('Total Ticket Volume', kpis.total, 'all') : undefined}
       />
       <Kpi
         label="Tickets On Hold"
         value={n(kpis?.on_hold)}
-        onDrill={kpis ? drill('Tickets On Hold', kpis.on_hold, 'on_hold') : undefined}
+        onDrill={kpis && drillable ? drill('Tickets On Hold', kpis.on_hold, 'on_hold') : undefined}
       />
       <Kpi label="Avg. Ticket Lifetime (Days)" value={n(kpis?.avg_lifetime_days)} />
       <Kpi label="Ticket Resolution Rate" value={n(kpis?.resolution_rate, '%')} />
@@ -55,7 +65,7 @@ export function KPIGrid({ kpis, query }: { kpis: TicketKpis | null; query: strin
         label="Positive Sentiment Tickets"
         value={n(kpis?.positive_sentiment)}
         onDrill={
-          kpis ? drill('Positive Sentiment Tickets', kpis.positive_sentiment, 'sentiment:positive') : undefined
+          kpis && drillable ? drill('Positive Sentiment Tickets', kpis.positive_sentiment, 'sentiment:positive') : undefined
         }
       />
       <Kpi
@@ -63,7 +73,7 @@ export function KPIGrid({ kpis, query }: { kpis: TicketKpis | null; query: strin
         value={n(kpis?.negative_sentiment)}
         tone="loss"
         onDrill={
-          kpis ? drill('Negative Sentiment Tickets', kpis.negative_sentiment, 'sentiment:negative') : undefined
+          kpis && drillable ? drill('Negative Sentiment Tickets', kpis.negative_sentiment, 'sentiment:negative') : undefined
         }
       />
     </KpiStrip>
