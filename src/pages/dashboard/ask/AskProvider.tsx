@@ -1,10 +1,11 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useCopilotThread } from '../../../components/copilot/useCopilotThread';
 import { SM, XL, useMediaQuery } from '../../../lib/useMediaQuery';
 import type { Conversation, DashboardFocus } from '../../copilot/types';
 import { readAskPreference, writeAskPreference } from './askPreference';
 import { AskContext, type AskState } from './context';
+import { originPath } from './originPath';
 import { useDashboardContext } from './useDashboardContext';
 
 /** Holds the dashboard's one conversation, above the areas, so it survives
@@ -12,6 +13,7 @@ import { useDashboardContext } from './useDashboardContext';
  *  attention row hands it, and the question a drill prefills. */
 export function AskProvider({ children }: { children: ReactNode }) {
   const { pathname, search } = useLocation();
+  const navigate = useNavigate();
   const isSm = useMediaQuery(SM);
   const isXl = useMediaQuery(XL);
   const { context } = useDashboardContext();
@@ -91,11 +93,14 @@ export function AskProvider({ children }: { children: ReactNode }) {
         setPendingDraft(null);
       },
       openFromHistory: (next) => {
+        // A dashboard conversation reopens where it was asked, so its first
+        // answer sits beside the figures it was about.
+        if (next.origin) navigate(originPath(next.origin));
         setConversation(next);
-        reveal();
+        setOpen(true);
       },
     }),
-    [open, setOpen, reveal, conversation, thread, focus, clearFocus, markSent, pendingDraft, context],
+    [open, setOpen, reveal, conversation, thread, focus, clearFocus, markSent, pendingDraft, context, navigate],
   );
 
   return <AskContext.Provider value={value}>{children}</AskContext.Provider>;
