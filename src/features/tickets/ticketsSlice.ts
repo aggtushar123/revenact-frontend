@@ -50,6 +50,11 @@ export interface TicketKpis {
   resolution_rate: number;
   positive_sentiment: number;
   negative_sentiment: number;
+  /** Unresolved tickets in scope (backend PR #62). Optional so a fixture
+   *  written before the field existed still type-checks. */
+  open_count?: number;
+  /** Age of the oldest unresolved ticket; null when none is open. */
+  oldest_open_days?: number | null;
 }
 
 export interface TicketFilterOptions {
