@@ -1,4 +1,4 @@
-import { useState, useRef, type FormEvent, type KeyboardEvent } from 'react';
+import { useState, useRef, type FormEvent, type KeyboardEvent, type RefObject } from 'react';
 import {
   ArrowUp,
   ChevronDown,
@@ -16,16 +16,25 @@ import {
 interface AskRevenactBoxProps {
   onSend: (text: string, mode: 'Fast' | 'Reasoning' | 'Pro', context: string) => void;
   disabled?: boolean;
+  /** The owner's handle on the input, to put focus back after a send it
+   *  started elsewhere (a suggestion, Retry). */
+  inputRef?: RefObject<HTMLInputElement | null>;
+  /** The text the box opens with (a prefilled question). Remount with a new
+   *  `key` to replace it. */
+  initialValue?: string;
+  /** Focus the input on mount. */
+  autoFocus?: boolean;
 }
 
-export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled = false }) => {
-  const [query, setQuery] = useState('');
+export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled = false, inputRef: givenRef, initialValue = '', autoFocus = false }) => {
+  const [query, setQuery] = useState(initialValue);
   const [modelMode, setModelMode] = useState<'Fast' | 'Reasoning' | 'Pro'>('Fast');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const contextSource = 'Workspace';
-  const inputRef = useRef<HTMLInputElement>(null);
+  const ownRef = useRef<HTMLInputElement>(null);
+  const inputRef = givenRef ?? ownRef;
 
   const handleSubmit = (e?: FormEvent) => {
     if (e) e.preventDefault();
@@ -33,6 +42,7 @@ export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled
     if (!text || disabled) return;
     onSend(text, modelMode, contextSource);
     setQuery('');
+    inputRef.current?.focus();
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -71,6 +81,7 @@ export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask Revenact"
+          autoFocus={autoFocus}
           className="w-full text-[13px] text-[var(--rv-ask-text)] placeholder:text-[var(--rv-text-faint)] placeholder:font-normal outline-none border-none bg-transparent py-0.5 font-sans"
         />
       </form>
@@ -180,6 +191,7 @@ export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled
             type="button"
             disabled={!query.trim() || disabled}
             onClick={() => handleSubmit()}
+            aria-label="Send"
             className={`w-5.5 h-5.5 rounded-full flex items-center justify-center transition-colors shrink-0 ${
               query.trim() && !disabled
                 ? 'bg-[var(--rv-ask-btn-bg)] text-[var(--rv-ask-btn-text)] hover:opacity-90 shadow-xs cursor-pointer'

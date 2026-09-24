@@ -256,8 +256,10 @@ for the whole dashboard, not one per view.
   (`focus-within:not-sr-only`), so a sighted mouse user still sees only the
   chart.
 - **Shape.** `role="dialog"`, `aria-labelledby` the title. From `1024px`
-  (`lg`) it is a static 360px panel docked beside the dashboard's own scroll
-  area, `border border-line rounded-xl`; below `1024px` there is nowhere
+  (`lg`) it is a 360px panel laid over the Ask rail (`lg:absolute` in the
+  rail's own box, `lg:top-0 lg:right-4 lg:bottom-4`, `border border-line
+  rounded-xl shadow-md`), so the
+  figures never narrow; below `1024px` there is nowhere
   useful for focus to go beside it, so it becomes a full-screen sheet
   (`fixed inset-0`, `aria-modal="true"`) with its own Tab/Shift+Tab focus
   trap. Either shape slides in over 180ms `ease-out` (`.animate-slide-in-right`,
@@ -293,6 +295,85 @@ for the whole dashboard, not one per view.
   Health view) or only partly loaded (Usage, until its full scatter has
   arrived) — a partial list can only ever show *some* of what a figure
   counted.
+
+### Ask rail
+
+`src/components/copilot/CopilotRail.tsx`, shared by Communications and the
+Dashboard, both variant `glass` at `w-[320px]` (the Dashboard's glass is the
+owner's decision of 2026-09-24; `plain`, a bordered `bg-surface` column, is
+left for the phone sheet).
+
+- **Dashboard shape.** The frame is Communications', class for class (owner's
+  decision, 2026-09-24):
+  - Top bar: the Navbar on `/dashboard/*` is Communications' header, `h-16
+    shrink-0 flex items-center gap-3 px-4`, transparent (no `bg-surface`,
+    border or shadow). Left: "Dashboard" and the area tabs. Right
+    (`ml-auto`): the Ask pill, then the notification bell. No avatar or
+    account menu there; the sidebar's avatar at the bottom carries it. Every
+    other page's Navbar is unchanged.
+  - Body: `DashboardFrame` is Communications' body, `flex-1 min-h-0 flex
+    gap-3 px-4 pb-4` (`<main>` adds no padding on `/dashboard/*`), so the
+    content column (filters toolbar and views, its own scroll) and the rail
+    start at the same top and run the full height below the top bar. Hidden,
+    the content takes the full width.
+  - Controls: the same pill as Communications' top bar (`rounded-xl
+    bg-surface/70 border-line p-1`, three `w-9 h-9` icon buttons: New chat,
+    History, Sparkles "Show/Hide Copilot" with `bg-accent text-on-accent`
+    while open), in the Navbar in place of its four decorative icons on
+    `/dashboard/*`. History's popover hangs from the pill. The rail has no
+    header row.
+  - `xl` and wider: the rail is open by default beside the scroll area.
+  - Below `xl`: hidden (not rendered) until the switch shows it.
+  - Below `sm`: the switch opens a full-screen sheet with a single 44px
+    Close (×) button at the top right.
+  - The drill panel (360px) lies over the 320px rail from `lg` and overhangs
+    it by 40px, which is accepted.
+- **Chips.**
+  - The composer's chip says what the next question is about ("Revenue ›
+    Forecast · Owner: Priya · 2 accounts"). Its × removes only a focus, never
+    the screen.
+  - Each user question carries its own 11px `bg-subtle` chip above its bubble,
+    on the dashboard only (a dashboard conversation reopened in Communications
+    or `/copilot` shows no chip, since only the dashboard passes `names`).
+- **Empty.** Communications' empty state on both surfaces: one centred 13px
+  `ink-faint` line, "Ask about what is in front of you. Answers use your
+  accounts, mail and tickets." The dashboard's suggested questions were
+  removed on 2026-09-24 at the owner's request, to match Communications.
+- **Answers.** Rendered as plain text (`whitespace-pre-wrap`), not the
+  Markdown formatting `/copilot`'s `AnswerText` applies. A reply withheld from
+  a reader with narrower visibility in a shared session renders the same way,
+  as plain text — the rail never special-cases it.
+- **States.**
+  - In flight: a three-line `bg-subtle animate-pulse` skeleton shaped like an
+    answer (`role="status"`, "Thinking…" for screen readers).
+  - Budget spent (`429`): an `ink-muted` line, "This month's AI budget is used
+    up.", with no action.
+  - Any other failure, including a `400` (a malformed context): a
+    `text-danger` line with a Retry button; the question stays on screen.
+    Retry resends the question exactly as first asked — its own context and
+    focus, from the chip on the failed bubble — never the current screen.
+  - Focus returns to the input after every send.
+- **Entry points.**
+  - Drill panel: "Ask about these" (secondary button, Sparkles icon), enabled
+    only for a complete list of 200 accounts or fewer; above that it is
+    disabled with an 11px note ("Ask about up to 200 accounts at a time.
+    Narrow the filters to ask."). Clicking it closes the drill panel first —
+    the drill sits over the rail from `lg` — then opens the rail with an
+    editable, unsent draft.
+  - Attention row: "Why?", a quiet button after Done, named "Ask why <title>
+    is on my list". Unlike the drill's draft, it sends at once. It is
+    `aria-disabled` while an answer is on its way or while that row's
+    Snooze/Done is in flight.
+  - Every entry point (and a History pick, and New chat) opens the rail (or
+    the phone sheet) for that visit only; only the Navbar pill's Sparkles
+    switch, from `sm` up, persists the open/closed choice to `localStorage`.
+    The phone sheet's Close never saves anything; the sheet always starts
+    closed. Sending at once (`ask()`)
+    replaces any earlier drafted question and focus, so only one is ever
+    pending.
+- **History.** An 11px origin tag (LayoutDashboard icon + "Revenue › Forecast")
+  on dashboard conversations — the area and view only, never the filters it
+  was asked with; a question's own chip is what carries those.
 
 ### Overlays
 
@@ -431,15 +512,16 @@ inputs; labelled pagination buttons; the global reduced-motion override.
 2. **No focus trap or focus return in almost any dialog.** Fifteen modals
    plus several other floating ones declare `role="dialog"`
    (`ComposeEmailModal`, `PlatformOrganisations`, `PipelinesPage`,
-   `EditNodePane`, `OnboardingCarousel`, Communications' `CopilotRail`
-   history popover, the dashboard's drill panel) — of all of them, only the
-   drill panel traps focus, and only in its full-screen sheet below
-   `1024px`; it is also the only one that returns focus to its trigger on
-   close.
+   `EditNodePane`, `OnboardingCarousel`, the shared `CopilotRail`
+   history popover, the dashboard's drill panel, the dashboard's Ask sheet) —
+   of all of them, only the drill panel (in its sheet below `1024px`) and the
+   Ask sheet (below `640px`) trap focus, and only those two return focus to
+   their trigger on close.
 3. **Escape closes almost nothing.** Only the mention list, one inline
    rename, the dashboard's drill panel and the Copilot history popover
    handle it.
-4. Navbar Search, Plus, Help and Message buttons have neither labels nor
+4. Navbar Search, Plus, Help and Message buttons (off the dashboard; on
+   `/dashboard/*` the Ask pill replaces them) have neither labels nor
    handlers.
 5. Sidebar navigation relies on `title` when collapsed rather than a label.
 6. No global toast system, so success feedback is inconsistent.
@@ -456,6 +538,9 @@ One standing violation: the layout root uses `h-screen w-screen`, where the rule
 is `min-h-[100dvh]`, which matters on mobile browsers whose toolbars change the
 viewport height.
 
+The dashboard's Ask rail changes shape at `sm` (sheet below it) and `xl` (open
+by default from it); the drill panel lies over the rail from `lg`.
+
 ---
 
 ## 11. Review checklist
@@ -469,7 +554,8 @@ the design skill, reproduced so a reviewer can work through it.
    Reading line length 65 to 75 characters.
 4. No card inside a card. No gradient buttons, no purple, no glow, no
    glassmorphism on product surfaces. Exception, by the owner's decision on
-   2026-09-21: Communications, whose cards are `.rv-card-glass` /
+   2026-09-21: Communications (and, by the owner's decision on 2026-09-24,
+   the Dashboard's Ask rail), whose cards are `.rv-card-glass` /
    `.rv-glass-inner` so the canvas glow shows through, as in the reference
    mail client. The canvas gradients (`--rv-canvas-gradient-1/2`) were
    strengthened in both themes at the same time; that is the intended look
@@ -504,7 +590,7 @@ Ranked by leverage. Each is a task in the
 | 5 | Loading states are text lines, not skeletons | Only `HeadlinesTab` shows a text-line affordance; `ChatView` uses a layout-matching skeleton since 2026-09-22 |
 | 6 | `h-screen` in `DashboardLayout` | Rule says `min-h-[100dvh]` |
 | 7 | `rounded-2xl` and `rounded-3xl` outside the scale | Contact detail, Account placeholder |
-| 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass` is the one sanctioned exception) |
+| 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass`, also used by the Dashboard's Ask rail, is the one sanctioned exception) |
 | 9 | `Login.css` requests Inter, which is never loaded | Falls through to the system stack |
 | 10 | Dead files: `App.css` is never imported, the `counter` slice and the seeded `tasks` slice are unused | Template leftovers |
 | 11 | Navbar and ActivityFeed have controls with no handlers | Search, Plus, Help, Message, feed search, "Add Action", title chevrons |

@@ -68,7 +68,7 @@ closing it on unmount or token change.
 | `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard`, `AccountDetails` | auth |
 | `/contacts/{list,:id}` | `ContactsList`, `ContactDetails` | auth |
 | `/pipelines/{list,board}` | `PipelinesPage` | auth |
-| `/communications` | `CommunicationsPage`, arranged as an inbox with its own top bar (no Navbar): the inbox card (folders for the four kinds of waiting with counts, Needs-you and Mine-only switches, a list grouped by month, the open item in place, with a `ReplyBox` under it: Draft with Copilot fills it from the thread and the account's history and lists the sources used; Send reply on an email row sends from the person's mailbox via `POST /communications/emails/<id>/reply/`); on `?source=mailbox:<provider>` the card is `MailboxView` instead, the person's own mail whole (Inbox/Drafts/Sent/Done/Muted with counts, Priority and Unread switches, Starred/Important/Spam/Trash and the categories, a Categories block of what is waiting, the list by month, the open message with star/done/mute and a reply that sends from the mailbox); and a Copilot rail (Next event, a real conversation with the picked source as context; New chat, History and a hide switch live in the top bar) | auth |
+| `/communications` | `CommunicationsPage`, arranged as an inbox with its own top bar (no Navbar): the inbox card (folders for the four kinds of waiting with counts, Needs-you and Mine-only switches, a list grouped by month, the open item in place, with a `ReplyBox` under it: Draft with Copilot fills it from the thread and the account's history and lists the sources used; Send reply on an email row sends from the person's mailbox via `POST /communications/emails/<id>/reply/`); on `?source=mailbox:<provider>` the card is `MailboxView` instead, the person's own mail whole (Inbox/Drafts/Sent/Done/Muted with counts, Priority and Unread switches, Starred/Important/Spam/Trash and the categories, a Categories block of what is waiting, the list by month, the open message with star/done/mute and a reply that sends from the mailbox); and the shared Copilot rail (`components/copilot/CopilotRail`, with Next event above it and the picked source as context; New chat, History and a hide switch live in the top bar) | auth |
 | `/copilot` | `CopilotIndex`: **the home page**. No Navbar, no frame; the greeting, the ask box, three suggested questions and the skills sit directly on the canvas, with a small Copilot/Cockpit switch top-right. Cockpit sits on the same canvas: My book (counts, value, health rings), Renewals with a window selector and drill-down, and My tasks, where the circle on a row completes the task through `PATCH /tasks/<id>/` (optimistic, reverted with the backend's message on refusal). First item in the sidebar | auth |
 | `/scenarios`, `/scenarios/create`, `/scenarios/:id` | `ScenariosList`, `CreateScenario` | auth |
 | `/canvas`, `/canvas/create`, `/canvas/:id` | `CanvasPage`, `CanvasEditor` | auth |
@@ -97,7 +97,10 @@ Campaigns, Canvas), KNOWLEDGE BRAIN (seven items, whole section hidden without
 and entity identity on detail pages, a title plus sub-navigation on list pages.
 On the right: the rose "AI Copilot" button, four unwired icon buttons, the
 notification bell with an unread badge and popover, and the avatar menu with My
-Profile and Sign out.
+Profile and Sign out. On `/dashboard/*` the Navbar is Communications' header
+instead (transparent `h-16 px-4`, no border or shadow): "Dashboard" and the area
+tabs on the left, the Ask pill then the bell on the right, and no avatar menu
+(the sidebar's avatar carries it).
 
 ---
 
@@ -367,6 +370,9 @@ scoped server-side by department.
    fails.
 7. A viewer who may see only part of a conversation gets a `visibility: partial`
    notice, and a reply citing records outside their scope is withheld entirely.
+8. Conversations started on the dashboard carry an `origin` (area, view,
+   filters). The chat history shows it before the time ("Revenue › Forecast ·
+   2h ago"); such a conversation opens here as plain text.
 
 The Cockpit tab is a personal view: portfolio summary, a renewals window of 30,
 60 or 90 days, and my tasks.
@@ -437,9 +443,86 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     holds actually answers the current filters — a stale answer for a
     previous query (a different horizon, a filter changed mid-flight) counts
     as not loaded yet, not shown as if it were current.
-- **`DashboardFrame`** is the `dashboard` route's element: the scroll
-  container (`overflow-y-auto`, `p-4`) for Overview and every area, since
-  `DashboardLayout`'s `<main>` is `overflow-hidden`.
+- **`DashboardFrame`** is the `dashboard` route's element: an outer row
+  (`p-4`, `relative`) holding the scroll container (`overflow-y-auto`) for
+  Overview and every area, since `DashboardLayout`'s `<main>` is
+  `overflow-hidden`.
+- **Ask Revenact.** `DashboardFrame` mounts `FilterNamesProvider` →
+  `AskProvider` → `DrillProvider` around `[scroll area][AskRail]`
+  (`src/pages/dashboard/ask/`). The conversation lives in `AskProvider`, above
+  the areas, so it survives tab and filter changes.
+  - **Sending.** Each question posts to `/copilot/messages/` with
+    `context: {surface:'dashboard', area, view, filters:{owner, lifecycle,
+    customer}, focus}` and no text prefix. `useDashboardContext()` reads the
+    route (`areas.ts`) and `useDashboardFilters(SHARED_KEYS)` at send time, so a
+    follow-up after a filter change carries the new filters; the client never
+    sends figures, and the server recomputes the screen. Each user message shows
+    its own chip from its echoed `context` (e.g. "Revenue › Forecast · Owner:
+    Priya"), with names from the view's filter options, which `DashboardToolbar`
+    reports into `FilterNamesProvider`. Replies render as plain text
+    (`whitespace-pre-wrap`), not the paragraph/list/bold `AnswerText` formatting
+    `/copilot` uses; a reply withheld from a reader with narrower visibility in
+    a shared session renders the same way, as plain text.
+  - **Layout.** Shaped like Communications' Copilot rail: a 320px glass
+    column (`CopilotRail variant="glass"`), no header row of its own. The
+    frame is Communications' too: `DashboardFrame` is `flex gap-3 px-4 pb-4`
+    under the transparent top bar (`<main>` unpadded on `/dashboard/*`), so
+    the content column (filters toolbar and views, its own scroll) and the
+    rail share a top and run the full remaining height; hidden, the content
+    takes the full width. The empty rail shows Communications' line ("Ask
+    about what is in front of you. Answers use your accounts, mail and
+    tickets."); the suggested questions were removed on 2026-09-24 at the
+    owner's request. Its
+    controls are a pill in the Navbar, where the four decorative icons were
+    (`/dashboard/*` only): New chat, History (its popover anchored in the
+    pill) and the Sparkles switch ("Show Copilot"/"Hide Copilot",
+    `aria-pressed`). `DashboardLayout` owns a Navbar actions slot
+    (`layouts/navActionsSlot.ts`); the Navbar renders it on dashboard routes
+    and `AskControls` portals the pill into it (nothing renders without a
+    slot). Open by default from `xl` (1280px), hidden (not rendered) below it
+    until switched on; the switch's choice is kept in `localStorage`
+    (`revenact_dashboard_ask`, read and written in try/catch). Below `sm` the
+    switch opens a full-screen sheet instead (`aria-modal`, Tab trapped, a
+    Close button, Escape/Close return focus to the switch).
+  - **Entry points.**
+    - Typing.
+    - "Ask about these" in the drill panel: it closes the drill first, because
+      the drill sits over the rail at `lg` and up, then opens the rail and
+      prefills "Why are these in <segment>?" with focus `{kind:'companies',
+      ids}`. It is enabled only for a complete list of up to 200 accounts;
+      otherwise it is disabled with a note explaining the 200-account limit,
+      and nothing is sent until the person sends it.
+    - "Why?" on an attention row: it sends "Why is this on my list?" at once
+      with focus `{kind:'attention', key}`. While an answer is in flight
+      (or that row's Snooze/Done is) it is `aria-disabled` and `ask()` sends
+      nothing and clears nothing.
+    - Every entry point (and a History pick) opens the rail (or the phone
+      sheet) for that visit only, and so does New chat; only the Sparkles
+      switch, from `sm` up, writes the remembered
+      open/closed choice to `localStorage` — an entry point never
+      overwrites it. The phone sheet's Close saves nothing; the sheet
+      always starts closed.
+    - Calling `ask()` (a send-at-once entry point) replaces any earlier
+      drafted question and its focus, so a prior "Ask about these" draft
+      can't be sent alongside a new focus.
+    - A focus lasts one question; it is also dropped by the chip's × or by
+      another area or filter.
+  - **States.**
+    - In flight: a "Thinking…" skeleton.
+    - A `400` (a malformed context) is shown as a generic error with Retry,
+      the same as any failure that isn't a budget one.
+    - A `429`: "This month's AI budget is used up." with no retry.
+    - Any other failure keeps the question, with Retry, which resends the
+      question exactly as first asked — its own context and focus — not the
+      screen as it now stands.
+    - Sources render under answers as on `/copilot`.
+  - **History.** The Navbar pill has New chat, History and the switch. History is
+    shared with Communications and the Copilot page. A conversation whose
+    `origin` is set shows a tag with only its area and view (e.g. "Revenue ›
+    Forecast"), never the filters it was asked with — those live on each
+    question's own chip. Reopening one on the dashboard navigates to its area,
+    view and filters, then shows the thread. From Communications or `/copilot`
+    it opens where you are, as plain text, with the tag shown.
 - **`AreaLayout`** hands each area's sub-view list down through `Outlet`
   context (`useSubViews`); each container renders `DashboardToolbar` (the
   sub-view switch plus the filter row) and dispatches its own fetch.
@@ -502,8 +585,9 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     anywhere: every figure there is an aggregate across a product's own
     customers, never a set of accounts.
   - **Panel.** `role="dialog"`, `aria-labelledby` the title. From `1024px`
-    (`lg`) it is a static 360px panel beside the dashboard's own scroll
-    area; below that it is a full-screen sheet (`aria-modal="true"`) with
+    (`lg`) it is a 360px panel positioned over the Ask rail (absolute, in the
+    rail's box: `lg:top-0 lg:right-4 lg:bottom-4`), so opening it never narrows the figures; below that it
+    is a full-screen sheet (`aria-modal="true"`) with
     its own Tab/Shift+Tab focus trap, since there's nowhere else useful for
     focus to go. Escape and the close button both close it from either
     layout — Escape always closes the sheet, but at `lg` it closes the panel

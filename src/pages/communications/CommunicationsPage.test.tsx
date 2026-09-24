@@ -57,7 +57,7 @@ const stats = {
   ticket_scope_note: 'Tickets are read by department.',
 };
 
-function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown>; mailbox?: unknown; connectors?: unknown[]; conversations?: unknown[] } = {}) {
+function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown>; mailbox?: unknown; connectors?: unknown[]; conversations?: unknown[]; conversation?: unknown } = {}) {
   const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url, init) => {
     const ok = (body: unknown, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => body });
     if (url.includes('/communications/stats/')) return ok({ ...stats, ...(overrides.stats ?? {}) });
@@ -67,6 +67,7 @@ function mockApi(overrides: { rows?: unknown[]; stats?: Record<string, unknown>;
       const content = JSON.parse(String(init.body)).content as string;
       return ok({ id: 1, title: 'Chat', created_at: '', updated_at: '', messages: [{ id: 1, role: 'user', content, sources: [], questions: [] }, { id: 2, role: 'assistant', content: 'Two tickets and one reply.', sources: [], questions: [] }] });
     }
+    if (/\/copilot\/conversations\/\d+\/$/.test(url)) return ok(overrides.conversation ?? { id: 1, title: 'Chat', created_at: '', updated_at: '', messages: [] });
     if (url.includes('/copilot/conversations/')) return ok(overrides.conversations ?? []);
     if (url.includes('/communications/emails/412/reply/')) return ok({ id: 900, direction: 'sent', subject: 'Re: revised renewal terms' }, 201);
     const results = overrides.rows ?? [emailRow, ticketRow];
@@ -210,6 +211,40 @@ describe('CommunicationsPage', () => {
     renderPage();
     expect(await screen.findByText('Inbox zero')).toBeInTheDocument();
     expect(screen.getByText(/nothing between you and the rest of the day/i)).toBeInTheDocument();
+  });
+
+  it('regression: the rail still sends the source as a text prefix and no structured context', async () => {
+    const spy = mockApi();
+    renderPage('/communications?source=connector%3A5');
+    const copilot = await screen.findByRole('complementary', { name: /copilot/i });
+    expect(await within(copilot).findByText('Support desk')).toBeInTheDocument();
+    expect(within(copilot).getByText('Nothing scheduled')).toBeInTheDocument();
+    await userEvent.type(within(copilot).getByPlaceholderText('Ask Revenact'), 'What is waiting?{enter}');
+    expect(await within(copilot).findByText('Two tickets and one reply.')).toBeInTheDocument();
+    const call = spy.mock.calls.find(([url, init]) => String(url).includes('/copilot/messages/') && init?.method === 'POST');
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ content: '[About: Support desk] What is waiting?' });
+  });
+
+  it('opens a dashboard conversation as plain text, with its tag, without leaving Communications', async () => {
+    const origin = { surface: 'dashboard', area: 'revenue', view: 'forecast', filters: { owner: '2', lifecycle: '', customer: '' } };
+    mockApi({
+      conversations: [{ id: 9, title: 'Why is at-risk ARR up?', created_at: '', updated_at: '', origin }],
+      conversation: {
+        id: 9, title: 'Why is at-risk ARR up?', created_at: '', updated_at: '', origin,
+        messages: [
+          { id: 1, role: 'user', content: 'Why is at-risk ARR up?', context: { ...origin, focus: null }, sources: [], questions: [] },
+          { id: 2, role: 'assistant', content: 'Two renewals slipped.', sources: [], questions: [] },
+        ],
+      },
+    });
+    renderPage();
+    await userEvent.click(await screen.findByRole('button', { name: /^history$/i }));
+    const panel = screen.getByRole('dialog', { name: 'History' });
+    expect(await within(panel).findByText('Revenue › Forecast')).toBeInTheDocument();
+    await userEvent.click(within(panel).getByRole('button', { name: /Why is at-risk ARR up\?/ }));
+    const copilot = await screen.findByRole('complementary', { name: /copilot/i });
+    expect(await within(copilot).findByText('Two renewals slipped.')).toBeInTheDocument();
+    expect(within(copilot).queryByText('Revenue › Forecast · Owner: 2')).not.toBeInTheDocument();
   });
 
   it('explains a failure rather than showing half a picture', async () => {

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { Sidebar } from '../components/layout/Sidebar';
 import { Navbar } from '../components/layout/Navbar';
@@ -9,6 +9,7 @@ import {
   notificationsReceived,
   notificationAdded,
 } from '../features/notifications/notificationsSlice';
+import { NavActionsSlotContext } from './navActionsSlot';
 
 export function DashboardLayout() {
   const location = useLocation();
@@ -24,6 +25,11 @@ export function DashboardLayout() {
   const isCommunications = location.pathname.startsWith('/communications');
   const isSettings = location.pathname.startsWith('/settings');
   const isAccountSettings = location.pathname.startsWith('/account-settings');
+  // The dashboard's frame pads itself the way Communications' body does.
+  const isDashboard = location.pathname.startsWith('/dashboard');
+  // The Navbar's actions slot, which a page below (the dashboard) portals into.
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const slotValue = useMemo(() => ({ slot, setSlot }), [slot]);
 
   // Real notifications — fetched once and pushed live for as long as
   // this layout is mounted, i.e. the whole logged-in session (not
@@ -51,14 +57,16 @@ export function DashboardLayout() {
   }, [accessToken, dispatch]);
 
   return (
-    <div className="flex bg-surface h-screen w-screen overflow-hidden text-ink font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden rv-canvas">
-        {!isScenarios && !isCopilot && !isCommunications && <Navbar />}
-        <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
-          <Outlet />
-        </main>
+    <NavActionsSlotContext.Provider value={slotValue}>
+      <div className="flex bg-surface h-screen w-screen overflow-hidden text-ink font-sans">
+        <Sidebar />
+        <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden rv-canvas">
+          {!isScenarios && !isCopilot && !isCommunications && <Navbar />}
+          <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications || isDashboard) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
+            <Outlet />
+          </main>
+        </div>
       </div>
-    </div>
+    </NavActionsSlotContext.Provider>
   );
 }
