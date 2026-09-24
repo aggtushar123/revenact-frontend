@@ -5,10 +5,14 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ticketsReducer from '../../../../features/tickets/ticketsSlice';
+import authReducer from '../../../../features/auth/authSlice';
 import { AreaLayout } from '../../AreaLayout';
 import { TicketOverviewContainer } from './TicketOverviewContainer';
 import { ControlsView } from './ControlsView';
 import { niceMax, ticksTo } from './chartTheme';
+import { DrillProvider } from '../../drill/DrillContext';
+import { DrillPanel } from '../../drill/DrillPanel';
+import { mockFetchRouted, drillResponse } from '../../drill/testDrill';
 
 // Integration tier: container + view + charts through the real router,
 // with only the fetch boundary mocked. Recharts needs a sized
@@ -45,6 +49,9 @@ const stats = {
   assignees: [
     { name: 'Quiet', Open: 1, 'In Progress': 0, 'On Hold': 0, Resolved: 2, Closed: 0, total: 3 },
     { name: 'Busy', Open: 16, 'In Progress': 21, 'On Hold': 10, Resolved: 54, Closed: 31, total: 132 },
+    // Unassigned tickets group under a blank name — not a real `assignee:`
+    // segment the backend will drill (see the drill suite below).
+    { name: '', Open: 4, 'In Progress': 0, 'On Hold': 0, Resolved: 0, Closed: 0, total: 4 },
   ],
   sentiment_timeline: [
     { date: 'Aug 2026', positive: 43, negative: 13 },
@@ -74,17 +81,25 @@ function mockFetch(body: unknown = stats, status = 200) {
 }
 
 function renderTickets(url = '/dashboard/support/tickets') {
-  const store = configureStore({ reducer: { tickets: ticketsReducer } });
+  // `auth` is here only so `useOrgCurrency` (read by the drill panel's row
+  // list) has a slice to select from. `DrillProvider` + `DrillPanel` mirror
+  // DashboardFrame's real, app-wide pairing so a click on a drillable Kpi or
+  // chart segment opens a real dialog instead of throwing on a missing
+  // `useDrill()` provider.
+  const store = configureStore({ reducer: { tickets: ticketsReducer, auth: authReducer } });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path="/dashboard/support" element={<AreaLayout area="support" />}>
-            <Route element={<TicketOverviewContainer />}>
-              <Route path="tickets" element={<ControlsView />} />
+        <DrillProvider>
+          <Routes>
+            <Route path="/dashboard/support" element={<AreaLayout area="support" />}>
+              <Route element={<TicketOverviewContainer />}>
+                <Route path="tickets" element={<ControlsView />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+          <DrillPanel />
+        </DrillProvider>
       </MemoryRouter>
     </Provider>
   );
@@ -114,6 +129,10 @@ describe('Ticket Overview', () => {
   it('renders the real KPI figures', async () => {
     mockFetch();
     renderTickets();
+
+    // The label renders before the fetch resolves — wait for a real figure
+    // first, or the card lookups below race a still-loading "—".
+    await waitFor(() => expect(screen.getAllByText('735').length).toBeGreaterThan(0));
 
     // Scoped to each card: 735 legitimately appears three times — the
     // KPI plus both donut centres, since priority and status each sum
@@ -262,6 +281,148 @@ describe('Ticket Overview', () => {
     await screen.findByText('Total Ticket Volume');
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(lastUrl(fetchMock)).not.toContain('from=');
+  });
+});
+
+// ── drill (server) ──────────────────────────────────────────────────
+
+describe('Ticket Overview drill', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opens the Total drill against the server', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      all: drillResponse(
+        [{ id: 7, name: 'Pizza Hut', owner: 'Carl CSM', arr: 69_600, value: 735 }],
+        'tickets',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTickets();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Total Ticket Volume 735, show accounts' })
+    );
+
+    await waitFor(() => expect(lastUrl(fetchMock)).toContain('/api/v1/tickets/stats/?drill=all'));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+    expect(within(dialog).getByText('735 tickets')).toBeInTheDocument();
+  });
+
+  it('carries the current filters into a KPI drill request', async () => {
+    const fetchMock = mockFetchRouted(stats, { on_hold: drillResponse([], 'tickets') });
+    const user = userEvent.setup();
+    renderTickets('/dashboard/support/tickets?owner=5');
+
+    await user.click(await screen.findByRole('button', { name: 'Tickets On Hold 42, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/tickets/stats/?owner=5&drill=on_hold')
+    );
+  });
+
+  it('drills into the Critical slice of the priority donut, translating the label to the real value', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      'priority:critical': drillResponse(
+        [{ id: 7, name: 'Pizza Hut', owner: 'Carl CSM', arr: 69_600, value: 73 }],
+        'tickets',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTickets();
+
+    await user.click(await screen.findByRole('button', { name: 'Critical 73, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/tickets/stats/?drill=priority%3Acritical')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+  });
+
+  it('drills into the In Progress slice of the status donut', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      'status:in-progress': drillResponse(
+        [{ id: 7, name: 'Pizza Hut', owner: 'Carl CSM', arr: 69_600, value: 118 }],
+        'tickets',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTickets();
+
+    await user.click(await screen.findByRole('button', { name: 'In Progress 118, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/tickets/stats/?drill=status%3Ain-progress')
+    );
+  });
+
+  it('drills into the null-connector origin bucket as origin:none', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      'origin:none': drillResponse(
+        [{ id: 7, name: 'Pizza Hut', owner: 'Carl CSM', arr: 69_600, value: 71 }],
+        'tickets',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTickets();
+
+    await user.click(await screen.findByRole('button', { name: 'Revenact 71, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/tickets/stats/?drill=origin%3Anone')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+  });
+
+  it('drills into a connected origin bar by its connector id', async () => {
+    const fetchMock = mockFetchRouted(stats, { 'origin:3': drillResponse([], 'tickets') });
+    const user = userEvent.setup();
+    renderTickets();
+
+    await user.click(await screen.findByRole('button', { name: 'Slack 346, show accounts' }));
+
+    await waitFor(() => expect(lastUrl(fetchMock)).toContain('/api/v1/tickets/stats/?drill=origin%3A3'));
+  });
+
+  it('drills into the whole assignee bar, not a single status segment of it', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      'assignee:Busy': drillResponse(
+        [{ id: 7, name: 'Pizza Hut', owner: 'Carl CSM', arr: 69_600, value: 132 }],
+        'tickets',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTickets();
+
+    await user.click(await screen.findByRole('button', { name: 'Busy 132, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/tickets/stats/?drill=assignee%3ABusy')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+  });
+
+  it('offers no drill for the blank-assignee bar', async () => {
+    mockFetchRouted(stats, {});
+    renderTickets();
+
+    await screen.findByText('Ticket Assignees by Ticket Status');
+    expect(screen.queryByRole('button', { name: /^ 4, show accounts$/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '4, show accounts' })).not.toBeInTheDocument();
+  });
+
+  it('does not make a button of the non-drillable KPIs', async () => {
+    mockFetchRouted(stats, {});
+    renderTickets();
+
+    await screen.findByText('Total Ticket Volume');
+    expect(screen.getByText('13.95').closest('button')).toBeNull();
+    expect(screen.getByText('61.9%').closest('button')).toBeNull();
   });
 });
 

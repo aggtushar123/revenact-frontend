@@ -1,8 +1,12 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { TicketAssigneeRow } from '../../../../../features/tickets/ticketsSlice';
 import { STATUS_COLORS, STATUS_ORDER, FALLBACK_COLOR, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { useDrill } from '../../../drill/useDrill';
+import { DrillTargets } from '../../../drill/DrillTargets';
+
+const PATH = '/tickets/stats/';
 
 // Which text colour (if any) clears 4.5:1 against a segment's own fill in
 // BOTH light and dark mode — computed from the literal token values in
@@ -29,9 +33,35 @@ const LABEL_FILL: Partial<Record<string, string>> = {
   Closed: ROLE.ink,
 };
 
-export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
+export function AssigneesStackedBar({ data, query }: { data: TicketAssigneeRow[]; query: string }) {
+  const { open } = useDrill();
   // The mock's domain={[0, 80]} clipped any assignee past 80 tickets.
   const max = niceMax(data.map((d) => d.total));
+
+  // A blank assignee name is a real group (an unassigned ticket), but the
+  // backend's `assignee:<name>` drill needs a non-empty value — an empty
+  // one isn't a real choice, and `parse_segment` ignores it the same way it
+  // ignores every other malformed filter. So this bar alone gets no click,
+  // no cursor and no keyboard target.
+  const openSegment = (row: TicketAssigneeRow, trigger?: HTMLElement) => {
+    if (!row.name) return;
+    open(
+      {
+        title: row.name,
+        figure: String(row.total),
+        source: { kind: 'server', path: PATH, query, segment: `assignee:${row.name}` },
+      },
+      trigger,
+    );
+  };
+
+  const drillItems = data
+    .filter((row) => row.name)
+    .map((row) => ({
+      name: row.name,
+      figure: String(row.total),
+      onSelect: (trigger: HTMLElement) => openSegment(row, trigger),
+    }));
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderCustomBarLabel = (props: any) => {
     const { x, y, width, height, payload, dataKey } = props;
@@ -59,7 +89,9 @@ export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
       <div className="flex flex-col mb-4">
         <h3 className="text-[13px] font-bold text-ink">Ticket Assignees by Ticket Status</h3>
       </div>
-      
+
+      <DrillTargets label="Ticket Assignees by Ticket Status" items={drillItems} />
+
       <div className="flex-1 w-full relative -ml-4">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
@@ -108,7 +140,20 @@ export function AssigneesStackedBar({ data }: { data: TicketAssigneeRow[] }) {
                 stackId="a"
                 fill={STATUS_COLORS[statusLabel] ?? FALLBACK_COLOR}
                 label={renderCustomBarLabel}
-              />
+              >
+                {/* Every status segment of a row opens the same drill — the
+                    whole bar is one assignee, not five. Cells carry no `fill`
+                    of their own, so the Bar's own colour (and the legend
+                    swatch, which reads it) are unaffected; the blank-assignee
+                    row alone gets no cursor and no click — see `openSegment`. */}
+                {data.map((row, index) => (
+                  <Cell
+                    key={row.name || `blank-${index}`}
+                    cursor={row.name ? 'pointer' : undefined}
+                    onClick={row.name ? () => openSegment(row) : undefined}
+                  />
+                ))}
+              </Bar>
             ))}
           </BarChart>
         </ResponsiveContainer>

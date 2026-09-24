@@ -55,6 +55,27 @@ export const PRIORITY_COLORS: Record<string, string> = {
  * render in grey rather than vanish. */
 export const FALLBACK_COLOR = ROLE.faint;
 
+/** Ticket.Priority: display label -> the machine value `?drill=priority:<value>`
+ * needs. The stats rows carry only the label (see `PRIORITY_COLORS` above),
+ * so a segment drill has to translate it back — a second copy of the same
+ * choice list `services/customers/models.py`'s `Ticket.Priority` defines. */
+export const PRIORITY_VALUES: Record<string, string> = {
+  Low: 'low',
+  Medium: 'medium',
+  High: 'high',
+  Critical: 'critical',
+};
+
+/** Ticket.Status: display label -> the machine value `?drill=status:<value>`
+ * needs. Same reasoning as `PRIORITY_VALUES` above. */
+export const STATUS_VALUES: Record<string, string> = {
+  Open: 'open',
+  'In Progress': 'in-progress',
+  'On Hold': 'on-hold',
+  Resolved: 'resolved',
+  Closed: 'closed',
+};
+
 /** The sentiment line chart's two series. Negative sentiment is a loss and
  *  positive a gain — the only two things danger/success are for. Each is
  *  named in text beside the chart too, so the colour never carries the

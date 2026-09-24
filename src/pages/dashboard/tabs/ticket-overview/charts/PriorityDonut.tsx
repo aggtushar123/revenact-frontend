@@ -1,11 +1,41 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { TicketBucket } from '../../../../../features/tickets/ticketsSlice';
-import { PRIORITY_COLORS, FALLBACK_COLOR } from '../chartTheme';
+import { PRIORITY_COLORS, PRIORITY_VALUES, FALLBACK_COLOR } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { useDrill } from '../../../drill/useDrill';
+import { DrillTargets } from '../../../drill/DrillTargets';
 
-export function PriorityDonut({ data }: { data: TicketBucket[] }) {
+const PATH = '/tickets/stats/';
+
+export function PriorityDonut({ data, query }: { data: TicketBucket[]; query: string }) {
+  const { open } = useDrill();
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
+
+  const openSegment = (entry: TicketBucket, trigger?: HTMLElement) => {
+    const value = PRIORITY_VALUES[entry.name];
+    if (!value) return;
+    open(
+      {
+        title: entry.name,
+        figure: String(entry.value),
+        source: { kind: 'server', path: PATH, query, segment: `priority:${value}` },
+      },
+      trigger,
+    );
+  };
+
+  // One keyboard target per slice the server actually recognises — a
+  // priority added to the backend before `PRIORITY_VALUES` catches up is
+  // still drawn (in the fallback colour) but offers no drill, same as an
+  // unrecognised name in the pointer handler below.
+  const drillItems = data
+    .filter((entry) => PRIORITY_VALUES[entry.name])
+    .map((entry) => ({
+      name: entry.name,
+      figure: String(entry.value),
+      onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
+    }));
 
   return (
     <div className="w-full h-full p-4 flex flex-col relative h-[280px]">
@@ -18,6 +48,8 @@ export function PriorityDonut({ data }: { data: TicketBucket[] }) {
           </svg>
         </button>
       </div>
+
+      <DrillTargets label="Ticket Priority Distribution" items={drillItems} />
 
       <div className="flex-1 w-full relative">
         <ResponsiveContainer width="100%" height="100%">
@@ -62,7 +94,12 @@ export function PriorityDonut({ data }: { data: TicketBucket[] }) {
               labelLine={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={PRIORITY_COLORS[entry.name] ?? FALLBACK_COLOR} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={PRIORITY_COLORS[entry.name] ?? FALLBACK_COLOR}
+                  cursor={PRIORITY_VALUES[entry.name] ? 'pointer' : undefined}
+                  onClick={PRIORITY_VALUES[entry.name] ? () => openSegment(entry) : undefined}
+                />
               ))}
             </Pie>
             <Tooltip

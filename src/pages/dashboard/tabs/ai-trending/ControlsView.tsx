@@ -57,7 +57,7 @@ export function ControlsView() {
         {/* Top Row: Type Donut (1/3) + Detailed Table (2/3) */}
         <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[500px]">
           <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
-            <ActivityTypeDonut data={stats?.by_type ?? []} />
+            <ActivityTypeDonut data={stats?.by_type ?? []} query={query} />
           </div>
           <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
             <ActivityDetailedTable rows={stats?.recent ?? []} />
@@ -67,7 +67,7 @@ export function ControlsView() {
         {/* Bottom Row: Sentiment Donut (1/3) + Sentiment Line Chart (2/3) */}
         <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px]">
           <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
-            <ActivitySentimentDonut data={stats?.sentiment ?? []} />
+            <ActivitySentimentDonut data={stats?.sentiment ?? []} query={query} />
           </div>
           <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
             <SentimentOverTimeLine data={stats?.sentiment_timeline ?? []} />
@@ -83,6 +83,7 @@ export function ControlsView() {
               data={stats?.areas ?? []}
               classified={classified}
               total={total}
+              query={query}
             />
           </div>
           <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
@@ -90,6 +91,7 @@ export function ControlsView() {
               data={stats?.categories ?? []}
               classified={classified}
               total={total}
+              query={query}
             />
           </div>
           <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
@@ -97,6 +99,7 @@ export function ControlsView() {
               data={stats?.subcategories ?? []}
               classified={classified}
               total={total}
+              query={query}
             />
           </div>
         </div>

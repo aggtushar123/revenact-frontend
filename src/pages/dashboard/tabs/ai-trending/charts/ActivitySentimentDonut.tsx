@@ -3,14 +3,37 @@ import type { InteractionBucket } from '../../../../../features/interactions/int
 import { SENTIMENT_COLORS, FALLBACK_COLOR, compact, percentOf } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { useDrill } from '../../../drill/useDrill';
+import { DrillTargets } from '../../../drill/DrillTargets';
+
+const PATH = '/interactions/stats/';
 
 /** Interactions by sentiment, across all three sources. */
-export function ActivitySentimentDonut({ data }: { data: InteractionBucket[] }) {
+export function ActivitySentimentDonut({ data, query }: { data: InteractionBucket[]; query: string }) {
+  const { open } = useDrill();
   const total = data.reduce((sum, item) => sum + item.value, 0);
+
+  const openSegment = (entry: InteractionBucket, trigger?: HTMLElement) => {
+    open(
+      {
+        title: entry.name,
+        figure: String(entry.value),
+        source: { kind: 'server', path: PATH, query, segment: `sentiment:${entry.key}` },
+      },
+      trigger,
+    );
+  };
+
+  const drillItems = data.map((entry) => ({
+    name: entry.name,
+    figure: String(entry.value),
+    onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
+  }));
 
   return (
     <div className="w-full h-full p-6 flex flex-col relative">
       <h3 className="text-[14px] font-bold text-ink mb-4">Activities By Sentiment</h3>
+      <DrillTargets label="Activities By Sentiment" items={drillItems} />
       <div className="flex-1 min-h-[300px] relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -51,7 +74,12 @@ export function ActivitySentimentDonut({ data }: { data: InteractionBucket[] }) 
               labelLine={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
             >
               {data.map((entry) => (
-                <Cell key={entry.key} fill={SENTIMENT_COLORS[entry.name] ?? FALLBACK_COLOR} />
+                <Cell
+                  key={entry.key}
+                  fill={SENTIMENT_COLORS[entry.name] ?? FALLBACK_COLOR}
+                  cursor="pointer"
+                  onClick={() => openSegment(entry)}
+                />
               ))}
             </Pie>
             <Tooltip
