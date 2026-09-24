@@ -8,6 +8,7 @@ import { TouchTimeline } from './charts/TouchTimeline';
 import { CadenceChart } from './charts/CadenceChart';
 import { OwnerCoverageList } from './charts/OwnerCoverageList';
 import { GoingDarkTable } from './charts/GoingDarkTable';
+import { useDrill } from '../../drill/useDrill';
 
 /** The filter query string, handed down by ActivityContainer's own bar. */
 export interface ActivityContext {
@@ -25,6 +26,7 @@ export interface ActivityContext {
 export function ControlsView() {
   const dispatch = useAppDispatch();
   const { stats, isLoading, error } = useAppSelector((state) => state.activity);
+  const { open } = useDrill();
 
   const context = useOutletContext<ActivityContext | undefined>();
   const query = context?.query ?? '';
@@ -85,6 +87,19 @@ export function ControlsView() {
                 : 'loading'
             }
             tone={kpis && kpis.dark_accounts > 0 ? 'loss' : 'neutral'}
+            onDrill={
+              kpis && !isLoading
+                ? (trigger) =>
+                    open(
+                      {
+                        title: 'Gone quiet',
+                        figure: String(kpis.dark_accounts),
+                        source: { kind: 'server', path: '/customers/activity/', query, segment: 'gone_quiet' },
+                      },
+                      trigger,
+                    )
+                : undefined
+            }
           />
           <Kpi
             label="Overdue tasks"

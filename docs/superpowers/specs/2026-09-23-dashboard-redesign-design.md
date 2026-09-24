@@ -186,19 +186,37 @@ Every KPI and every chart segment is a button with an accessible name
 closes it and focus returns to the trigger. It lists the rows behind the
 number, each linking to its company page, headed by "Open as a list".
 
-Where rows come from:
+Amended 2026-09-24 after mapping every view: a panel only opens where it
+can show **the complete list** behind the number. A capped list (Forecast
+`swing` and Activity `going_dark` hold the top 15, Customers
+`concentration` the top 10) is never used as a drill source, because a
+list shorter than its number undermines the number.
 
-- Health, Forecast (`swing`), Usage, Activity (`going_dark`, owners) and
-  Products already carry per-account rows: filtered client-side.
-- Tickets (`/tickets/stats/`) and Topics (`/interactions/stats/`) carry only
-  aggregates: both views gain a `drill=<field>:<value>` parameter returning
-  `{companies: [{id, name, count, arr}]}` for that segment, computed under
-  the same scoping as the totals, so the list never includes a company the
-  totals did not count.
+Where complete rows come from:
 
-"Open as a list" needs URL filters that do not exist yet: the Organizations
-list accepts `health`, `owner`, `lifecycle` and `ids`; Communications
-accepts `company`. Both are added.
+- **Already in the page:** Health (Triage, Divergence, Movement, Renewals,
+  Distribution; `HealthDataRow`, the whole book up to 500) and Usage
+  (`scatter`, every measured account). Filtered client-side.
+- **From the server (`?drill=<segment>`):** Tickets (`/tickets/stats/`),
+  Topics (`/interactions/stats/`), Forecast (`/customers/forecast/`: at
+  risk, churn, contraction, expansion), Activity (`/customers/activity/`:
+  gone quiet) and Customers (`/customers/overview/`: churned in 12
+  months). Each computes the list from the same filtered set as its totals
+  and intersects it with the viewer's customers; the response is
+  `{drill: {segment, value_label, count, truncated, companies: [{id, name,
+  owner, arr, value}]}, currency}`. A bad drill returns the normal stats.
+- **Not drillable in PR 2:** pure rates and totals with no account meaning
+  (touches logged, coverage, NRR, ARR today, resolution rate, average
+  ticket lifetime, overdue tasks), and Products, whose payload is
+  aggregate-only (its own pass later).
+
+"Open as a list" opens the Organizations list with `?ids=` (the backend
+customers list gains `ids`). Communications' `company` filter is dropped
+from PR 2: every drill lists companies, so the Organizations list is the
+natural destination.
+
+The "Accounts by Last Touch" chart on Distribution drew a hard-coded curve,
+not data; it is removed in PR 2.
 
 Responsive: layouts declared for 375 / 768 / 1024 / 1440; KPI strips wrap
 to 2×2; no horizontal scroll.

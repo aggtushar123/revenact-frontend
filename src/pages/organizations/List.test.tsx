@@ -61,7 +61,11 @@ const globex = {
 
 const initech = { ...globex, id: 2, name: 'Initech' };
 
-function renderPage(defaultLifecycleStage = '', currency: 'USD' | 'EUR' = 'USD') {
+function renderPage(
+  defaultLifecycleStage = '',
+  currency: 'USD' | 'EUR' = 'USD',
+  initialEntries: string[] = ['/organizations/list']
+) {
   // ActionBar (rendered by List) now reads state.auth.user's own
   // organisation for Global Presets' default lifecycle stage — needs
   // the slice present even for tests that don't exercise that path.
@@ -102,7 +106,7 @@ function renderPage(defaultLifecycleStage = '', currency: 'USD' | 'EUR' = 'USD')
   });
   render(
     <Provider store={store}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={initialEntries}>
         <List />
       </MemoryRouter>
     </Provider>
@@ -153,6 +157,38 @@ function makeFetchMock({
     }
     const next = queue.length > 1 ? queue.shift()! : queue[0];
     return Promise.resolve(jsonResponse(next.status, next.body));
+  });
+}
+
+// The dashboard-drill tests below (?ids=) also trigger a THIRD kind of
+// request List.tsx makes on its own — a bare, unfiltered GET /customers/
+// used only to read MetricsPanel's book-wide total while a drill is
+// active (List.tsx's own drillTotalCount effect), fired concurrently
+// with the table's own ids=/search=-filtered fetch. Both the probe and
+// an actual unfiltered list fetch (e.g. after "Show all") hit the exact
+// same bare endpoint, so `makeFetchMock`'s single shared queue can't
+// reliably tell a probe call apart from the table's own call by order —
+// these tests key responses off the URL instead.
+function makeDrillFetchMock({
+  idsResult,
+  bareResult = { count: 0, next: null, previous: null, results: [] },
+  searchResult,
+  stats = ZERO_STATS,
+}: {
+  idsResult: { count: number; next: string | null; previous: string | null; results: unknown[] };
+  bareResult?: { count: number; next: string | null; previous: string | null; results: unknown[] };
+  searchResult?: { count: number; next: string | null; previous: string | null; results: unknown[] };
+  stats?: unknown;
+}) {
+  return vi.fn((url: string) => {
+    if (typeof url !== 'string') return Promise.resolve(jsonResponse(200, bareResult));
+    if (url.includes('/customers/stats/')) return Promise.resolve(jsonResponse(200, stats));
+    if (url.includes('renewal_within')) {
+      return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
+    }
+    if (searchResult && url.includes('search=')) return Promise.resolve(jsonResponse(200, searchResult));
+    if (url.includes('ids=')) return Promise.resolve(jsonResponse(200, idsResult));
+    return Promise.resolve(jsonResponse(200, bareResult));
   });
 }
 
@@ -263,6 +299,223 @@ describe('Organizations List page', () => {
       expect.anything()
     );
     expect(screen.getByText('Showing 1-1 of 1 organizations')).toBeInTheDocument();
+  });
+});
+
+describe('Organizations List page — dashboard drill (?ids=)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opening /organizations/list?ids=3,7 fetches ids= and shows the drill notice', async () => {
+    const fetchMock = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+
+    const idsCall = fetchMock.mock.calls.find(([url]) => String(url).includes('ids=3%2C7'));
+    expect(idsCall).toBeTruthy();
+
+    const showAllButton = screen.getByRole('button', { name: 'Show all' });
+    expect(showAllButton.closest('div')).toHaveTextContent('Showing 2 accounts from the dashboard');
+  });
+
+  it('"Show all" removes ids from the URL, re-fetches without it, and clears the notice', async () => {
+    const fetchMock = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+      bareResult: { count: 1, next: null, previous: null, results: [globex] },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show all' }));
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Show all' })).not.toBeInTheDocument());
+
+    const customersCalls = fetchMock.mock.calls.filter(
+      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
+    );
+    const lastUrl = String(customersCalls[customersCalls.length - 1][0]);
+    expect(lastUrl).not.toContain('ids=');
+  });
+
+  it('searching while ids is set sends both search and ids params', async () => {
+    const fetchMock = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+      searchResult: { count: 1, next: null, previous: null, results: [initech] },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+
+    await user.type(
+      screen.getByPlaceholderText('Search by name, Revenact ID or External ID'),
+      'init'
+    );
+
+    await waitFor(
+      () => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument(),
+      { timeout: 2000 }
+    );
+
+    const customersCalls = fetchMock.mock.calls.filter(
+      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
+    );
+    const lastUrl = String(customersCalls[customersCalls.length - 1][0]);
+    expect(lastUrl).toContain('search=init');
+    expect(lastUrl).toContain('ids=3%2C7');
+  });
+
+  it('an empty ids= param is treated as absent (no notice, no ids sent)', async () => {
+    const fetchMock = makeFetchMock({
+      customers: [{ status: 200, body: { count: 1, next: null, previous: null, results: [globex] } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage('', 'USD', ['/organizations/list?ids=']);
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show all' })).not.toBeInTheDocument();
+
+    const customersCalls = fetchMock.mock.calls.filter(
+      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
+    );
+    expect(String(customersCalls[0][0])).not.toContain('ids=');
+  });
+
+  it('a fresh store at ?ids=3,7 shows the unfiltered list count in MetricsPanel, not the drilled count or 0', async () => {
+    // Fix round 2: round 1 summed GET /customers/stats/'s Health buckets
+    // for the total, but those are scoped to `live_customers` (excludes
+    // churned — see revenact-backend's CustomerStatsView/scoping.py),
+    // narrower than the list's own population (includes churned), so it
+    // undercounted even outside a drill. List.tsx now fetches the
+    // unfiltered list's own `count` directly (page 1, rows discarded)
+    // into local state whenever a drill is active, and passes that.
+    const fetchMock = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+      bareResult: { count: 12, next: null, previous: null, results: [] },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    // The table lists the 2 drilled rows...
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    expect(screen.getByText('Initech')).toBeInTheDocument();
+    expect(screen.getByText('Showing 1-2 of 2 organizations')).toBeInTheDocument();
+    // ...while the panel shows the real book-wide total (12), not 2 (the
+    // drilled count) and not 0 (fix round 1's regression).
+    await waitFor(() => expect(screen.getByTitle('Number of organizations')).toHaveTextContent('12'));
+  });
+
+  it('a fresh drill landing shows "—", not 0, until the total probe resolves', async () => {
+    let resolveProbe: (value: unknown) => void = () => {};
+    const probe = new Promise((resolve) => {
+      resolveProbe = resolve;
+    });
+    const base = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        typeof url === 'string' && /\/customers\/(\?)?$/.test(url.replace(/^.*\/api\/v1/, ''))
+          ? probe
+          : base(url),
+      ),
+    );
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    expect(screen.getByTitle('Number of organizations')).toHaveTextContent('—');
+    expect(screen.getByTitle('Number of organizations')).not.toHaveTextContent('0');
+
+    resolveProbe(jsonResponse(200, { count: 12, next: null, previous: null, results: [] }));
+    await waitFor(() => expect(screen.getByTitle('Number of organizations')).toHaveTextContent('12'));
+  });
+
+  it('a drill landing whose total probe fails keeps "—" rather than a fabricated 0', async () => {
+    const base = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        typeof url === 'string' && /\/customers\/(\?)?$/.test(url.replace(/^.*\/api\/v1/, ''))
+          ? Promise.resolve(jsonResponse(500, { detail: 'boom' }))
+          : base(url),
+      ),
+    );
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.getByTitle('Number of organizations')).toHaveTextContent('—');
+  });
+
+  it('the drill banner hides its number while the ids fetch is loading', async () => {
+    let resolveIds: (value: unknown) => void = () => {};
+    const idsPending = new Promise((resolve) => {
+      resolveIds = resolve;
+    });
+    const base = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+      bareResult: { count: 12, next: null, previous: null, results: [] },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => (typeof url === 'string' && url.includes('ids=') ? idsPending : base(url))),
+    );
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    const banner = screen.getByRole('button', { name: 'Show all' }).parentElement as HTMLElement;
+    expect(banner).toHaveTextContent('Showing accounts from the dashboard');
+    expect(banner.textContent).not.toMatch(/\d/);
+
+    resolveIds(jsonResponse(200, { count: 2, next: null, previous: null, results: [globex, initech] }));
+    await waitFor(() => expect(banner).toHaveTextContent('Showing 2 accounts from the dashboard'));
+  });
+
+  it('a normal visit (no drill) still shows the list fetch\'s own count in MetricsPanel', async () => {
+    const fetchMock = makeFetchMock({
+      customers: [{ status: 200, body: { count: 7, next: null, previous: null, results: [globex] } }],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage();
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTitle('Number of organizations')).toHaveTextContent('7'));
+  });
+
+  it('"Show all" moves focus to the search input, not <body>', async () => {
+    const fetchMock = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+      bareResult: { count: 1, next: null, previous: null, results: [globex] },
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show all' }));
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText('Search by name, Revenact ID or External ID')).toHaveFocus()
+    );
   });
 });
 

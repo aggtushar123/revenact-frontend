@@ -5,10 +5,14 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import interactionsReducer from '../../../../features/interactions/interactionsSlice';
+import authReducer from '../../../../features/auth/authSlice';
 import { AreaLayout } from '../../AreaLayout';
 import { AITrendingTopics } from '../AITrendingTopics';
 import { ControlsView } from './ControlsView';
 import { compact, niceMax, percentOf } from './chartTheme';
+import { DrillProvider } from '../../drill/DrillContext';
+import { DrillPanel } from '../../drill/DrillPanel';
+import { mockFetchRouted, drillResponse } from '../../drill/testDrill';
 
 // Integration tier: container + view + charts through the real router, with only
 // the fetch boundary mocked. Recharts needs a sized container, which jsdom
@@ -110,17 +114,25 @@ function mockFetch(body: unknown = stats, status = 200) {
 }
 
 function renderTopics(url = '/dashboard/support/topics') {
-  const store = configureStore({ reducer: { interactions: interactionsReducer } });
+  // `auth` is here only so `useOrgCurrency` (read by the drill panel's row
+  // list) has a slice to select from. `DrillProvider` + `DrillPanel` mirror
+  // DashboardFrame's real, app-wide pairing so a click on a drillable chart
+  // segment opens a real dialog instead of throwing on a missing
+  // `useDrill()` provider.
+  const store = configureStore({ reducer: { interactions: interactionsReducer, auth: authReducer } });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path="/dashboard/support" element={<AreaLayout area="support" />}>
-            <Route element={<AITrendingTopics />}>
-              <Route path="topics" element={<ControlsView />} />
+        <DrillProvider>
+          <Routes>
+            <Route path="/dashboard/support" element={<AreaLayout area="support" />}>
+              <Route element={<AITrendingTopics />}>
+                <Route path="topics" element={<ControlsView />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+          <DrillPanel />
+        </DrillProvider>
       </MemoryRouter>
     </Provider>
   );
@@ -388,6 +400,132 @@ describe('AI Trending Topics', () => {
 
     await screen.findByRole('alert');
     expect(screen.getByText('Expansion Discovery Call')).toBeInTheDocument();
+  });
+});
+
+// ── drill (server) ──────────────────────────────────────────────────
+
+describe('AI Trending Topics drill', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('drills into the Call slice of the activity-type donut', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      'type:call': drillResponse(
+        [{ id: 2, name: 'Apple EMEA', owner: 'Carl CSM', arr: 240_000, value: 182 }],
+        'interactions',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTopics();
+
+    await user.click(await screen.findByRole('button', { name: 'Call 182, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/interactions/stats/?drill=type%3Acall')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Apple EMEA' })).toBeInTheDocument();
+    expect(within(dialog).getByText('182 interactions')).toBeInTheDocument();
+  });
+
+  it('carries the current filters into a drill request', async () => {
+    const fetchMock = mockFetchRouted(stats, { 'type:call': drillResponse([], 'interactions') });
+    const user = userEvent.setup();
+    renderTopics('/dashboard/support/topics?sentiment=negative');
+
+    await user.click(await screen.findByRole('button', { name: 'Call 182, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain(
+        '/api/v1/interactions/stats/?sentiment=negative&drill=type%3Acall'
+      )
+    );
+  });
+
+  it('drills into the Negative slice of the sentiment donut', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      'sentiment:negative': drillResponse(
+        [{ id: 2, name: 'Apple EMEA', owner: 'Carl CSM', arr: 240_000, value: 157 }],
+        'interactions',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTopics();
+
+    await user.click(await screen.findByRole('button', { name: 'Negative 157, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/interactions/stats/?drill=sentiment%3Anegative')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Apple EMEA' })).toBeInTheDocument();
+  });
+
+  it('drills into the Customer Success slice of the AI area donut', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      'area:customer_success': drillResponse(
+        [{ id: 2, name: 'Apple EMEA', owner: 'Carl CSM', arr: 240_000, value: 265 }],
+        'interactions',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTopics();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Customer Success 265, show accounts' })
+    );
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/interactions/stats/?drill=area%3Acustomer_success')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Apple EMEA' })).toBeInTheDocument();
+  });
+
+  it('drills into an AI category bar', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      'category:account_management': drillResponse(
+        [{ id: 2, name: 'Apple EMEA', owner: 'Carl CSM', arr: 240_000, value: 235 }],
+        'interactions',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTopics();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Account Management 235, show accounts' })
+    );
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain(
+        '/api/v1/interactions/stats/?drill=category%3Aaccount_management'
+      )
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Apple EMEA' })).toBeInTheDocument();
+  });
+
+  it('drills into an AI subcategory bar', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      'subcategory:user_access': drillResponse(
+        [{ id: 2, name: 'Apple EMEA', owner: 'Carl CSM', arr: 240_000, value: 165 }],
+        'interactions',
+      ),
+    });
+    const user = userEvent.setup();
+    renderTopics();
+
+    await user.click(await screen.findByRole('button', { name: 'User Access 165, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain(
+        '/api/v1/interactions/stats/?drill=subcategory%3Auser_access'
+      )
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Apple EMEA' })).toBeInTheDocument();
   });
 });
 

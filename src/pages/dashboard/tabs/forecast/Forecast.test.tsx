@@ -5,9 +5,13 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import forecastReducer from '../../../../features/forecast/forecastSlice';
+import authReducer from '../../../../features/auth/authSlice';
 import { AreaLayout } from '../../AreaLayout';
 import { ForecastContainer } from '../ForecastContainer';
 import { ControlsView } from './ControlsView';
+import { DrillProvider } from '../../drill/DrillContext';
+import { DrillPanel } from '../../drill/DrillPanel';
+import { mockFetchRouted, drillResponse } from '../../drill/testDrill';
 
 // Integration tier: container + view + charts through the real router, with
 // only the fetch boundary mocked. The bridge is Recharts and needs a sized
@@ -91,17 +95,26 @@ function mockFetch(body: unknown = stats, status = 200) {
 }
 
 function renderForecast(url = '/dashboard/revenue/forecast') {
-  const store = configureStore({ reducer: { forecast: forecastReducer } });
+  // `auth` is here only so `useOrgCurrency` (read by the drill panel's row
+  // list) has a slice to select from — its default state has no user, which
+  // is exactly what falls back to 'USD', matching this file's fixtures.
+  // `DrillProvider` + `DrillPanel` mirror DashboardFrame's real, app-wide
+  // pairing so a click on a drillable Kpi or chart segment opens a real
+  // dialog instead of throwing on a missing `useDrill()` provider.
+  const store = configureStore({ reducer: { forecast: forecastReducer, auth: authReducer } });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path="/dashboard/revenue" element={<AreaLayout area="revenue" />}>
-            <Route element={<ForecastContainer />}>
-              <Route path="forecast" element={<ControlsView />} />
+        <DrillProvider>
+          <Routes>
+            <Route path="/dashboard/revenue" element={<AreaLayout area="revenue" />}>
+              <Route element={<ForecastContainer />}>
+                <Route path="forecast" element={<ControlsView />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+          <DrillPanel />
+        </DrillProvider>
       </MemoryRouter>
     </Provider>,
   );
@@ -311,5 +324,155 @@ describe('Revenue Forecast', () => {
       screen.getByText(/Nothing in this selection moves the forecast/)
     ).toBeInTheDocument();
     expect(screen.getByText('No open opportunities in this selection.')).toBeInTheDocument();
+  });
+});
+
+// ── drill (server) ──────────────────────────────────────────────────
+
+describe('Revenue Forecast drill', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opens the at-risk drill against the server, carrying the horizon', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      at_risk: drillResponse(
+        [{ id: 14, name: 'Uber', owner: 'Carl CSM', arr: 95_000, value: 57_000 }],
+        'downside',
+      ),
+    });
+    const user = userEvent.setup();
+    renderForecast();
+
+    await user.click(await screen.findByRole('button', { name: 'At risk $208.6K, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/customers/forecast/?horizon_days=365&drill=at_risk')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Uber' })).toBeInTheDocument();
+    expect(within(dialog).getByText('$57.0K downside')).toBeInTheDocument();
+  });
+
+  it('carries the current filters into the at-risk drill request', async () => {
+    const fetchMock = mockFetchRouted(stats, { at_risk: drillResponse([], 'downside') });
+    const user = userEvent.setup();
+    renderForecast('/dashboard/revenue/forecast?owner=5');
+
+    await user.click(await screen.findByRole('button', { name: 'At risk $208.6K, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain(
+        '/api/v1/customers/forecast/?owner=5&horizon_days=365&drill=at_risk'
+      )
+    );
+  });
+
+  it('drills into the Churn bar of the ARR bridge', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      churn: drillResponse(
+        [{ id: 21, name: 'WeWork', owner: null, arr: 24_000, value: 24_000 }],
+        'downside',
+      ),
+    });
+    const user = userEvent.setup();
+    renderForecast();
+
+    await user.click(await screen.findByRole('button', { name: 'Churn $175.4K, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/customers/forecast/?horizon_days=365&drill=churn')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'WeWork' })).toBeInTheDocument();
+    expect(within(dialog).getByText('$24.0K downside')).toBeInTheDocument();
+  });
+
+  it('drills into the Contraction bar of the ARR bridge', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      contraction: drillResponse(
+        [{ id: 9, name: 'Shopify', owner: 'Carl CSM', arr: 175_000, value: 8_750 }],
+        'downside',
+      ),
+    });
+    const user = userEvent.setup();
+    renderForecast();
+
+    await user.click(await screen.findByRole('button', { name: 'Contraction $33.1K, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain(
+        '/api/v1/customers/forecast/?horizon_days=365&drill=contraction'
+      )
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Shopify' })).toBeInTheDocument();
+    expect(within(dialog).getByText('$8.8K downside')).toBeInTheDocument();
+  });
+
+  it('drills into the Expansion bar of the ARR bridge', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      expansion: drillResponse(
+        [{ id: 9, name: 'Shopify', owner: 'Carl CSM', arr: 175_000, value: 31_080 }],
+        'expected expansion',
+      ),
+    });
+    const user = userEvent.setup();
+    renderForecast();
+
+    await user.click(await screen.findByRole('button', { name: 'Expansion $131.9K, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain(
+        '/api/v1/customers/forecast/?horizon_days=365&drill=expansion'
+      )
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Shopify' })).toBeInTheDocument();
+    expect(within(dialog).getByText('$31.1K expected expansion')).toBeInTheDocument();
+  });
+
+  it('offers no server drill while a refetch is pending with the old figures on screen', async () => {
+    // The first answer lands; the one after a filter change never does. The
+    // old figures stay up (dimmed), but a drill now would send the NEW query
+    // and list accounts under the OLD figure, so nothing is a button.
+    let calls = 0;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => {
+        calls += 1;
+        if (calls > 1) return new Promise(() => {});
+        return Promise.resolve({ ok: true, status: 200, json: async () => stats });
+      }),
+    );
+    const user = userEvent.setup();
+    renderForecast();
+
+    await screen.findByRole('button', { name: 'At risk $208.6K, show accounts' });
+    await user.selectOptions(screen.getByLabelText('Primary Owner'), '5');
+
+    await waitFor(() => expect(calls).toBeGreaterThan(1));
+    expect(screen.getByText('$208.6K')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /At risk/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Churn/ })).not.toBeInTheDocument();
+  });
+
+  it('does not offer a drill from the Opening or Forecast bars', async () => {
+    mockFetchRouted(stats, {});
+    renderForecast();
+
+    await screen.findByText('ARR bridge');
+    expect(screen.queryByRole('button', { name: /^Opening/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Forecast \$/ })).not.toBeInTheDocument();
+  });
+
+  it('does not make a button of the non-drillable KPIs', async () => {
+    mockFetchRouted(stats, {});
+    renderForecast();
+
+    await screen.findByText('ARR today');
+    expect(screen.getByText('$924.7K').closest('button')).toBeNull();
+    expect(within(tile('Forecast ARR')).getByText('$848.0K').closest('button')).toBeNull();
+    expect(screen.getByText('91.7%').closest('button')).toBeNull();
   });
 });

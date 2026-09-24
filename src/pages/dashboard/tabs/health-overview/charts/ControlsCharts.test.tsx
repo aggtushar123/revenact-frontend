@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type { HealthDataRow, HealthStatus } from '../../../../../features/health/types';
 import { AccountsByRenewalDateBar } from './AccountsByRenewalDateBar';
 import { HealthChangeOverTimeStacked } from './HealthChangeOverTimeStacked';
 import { topSegment } from './stackedTotalLabel';
-import { healthRow } from '../testUtils';
+import { healthRow, renderWithDrill } from '../testUtils';
 
 // Both of these charts used to ignore the data they were handed and draw
 // invented numbers — a hardcoded month list scaled by row count, and a
@@ -26,7 +27,7 @@ describe('AccountsByRenewalDateBar', () => {
   const at = (id: string, renewalDate: string) => makeRow(['Good'], { id, renewalDate });
 
   it('names the busiest renewal month from the data', () => {
-    render(
+    renderWithDrill(
       <AccountsByRenewalDateBar
         data={[
           at('1', 'Jul 1, 2026'),
@@ -40,10 +41,11 @@ describe('AccountsByRenewalDateBar', () => {
   });
 
   it('follows the data rather than a fixed month list', () => {
-    const { rerender } = render(<AccountsByRenewalDateBar data={[at('1', 'Jul 1, 2026')]} />);
+    renderWithDrill(<AccountsByRenewalDateBar data={[at('1', 'Jul 1, 2026')]} />);
     expect(screen.getByText(/Busiest: Jul 2026 · 1 renewing/)).toBeInTheDocument();
 
-    rerender(
+    cleanup();
+    renderWithDrill(
       <AccountsByRenewalDateBar data={[at('1', 'Mar 3, 2027'), at('2', 'Mar 9, 2027')]} />,
     );
     expect(screen.getByText(/Busiest: Mar 2027 · 2 renewing/)).toBeInTheDocument();
@@ -51,14 +53,55 @@ describe('AccountsByRenewalDateBar', () => {
   });
 
   it('says so when no renewal date can be read', () => {
-    render(<AccountsByRenewalDateBar data={[at('1', ''), at('2', 'whenever')]} />);
+    renderWithDrill(<AccountsByRenewalDateBar data={[at('1', ''), at('2', 'whenever')]} />);
     expect(screen.getByText(/No readable renewal dates/i)).toBeInTheDocument();
   });
 
   it('renders nothing misleading for an empty selection', () => {
-    render(<AccountsByRenewalDateBar data={[]} />);
+    renderWithDrill(<AccountsByRenewalDateBar data={[]} />);
     expect(screen.getByText(/No readable renewal dates/i)).toBeInTheDocument();
     expect(screen.queryByText(/Busiest/)).not.toBeInTheDocument();
+  });
+});
+
+describe('AccountsByRenewalDateBar drill', () => {
+  const julyGood = healthRow({ id: '1', account: 'JulyGood', renewalDate: 'Jul 1, 2026', healthStatus: 'Good' });
+  // Near miss: same month, a different health status.
+  const julyPoor = healthRow({ id: '2', account: 'JulyPoor', renewalDate: 'Jul 14, 2026', healthStatus: 'Poor' });
+  // Near miss: same health status, a different month.
+  const augustPoor = healthRow({ id: '3', account: 'AugustPoor', renewalDate: 'Aug 2, 2026', healthStatus: 'Poor' });
+
+  it('opens exactly the accounts in one month × health segment', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<AccountsByRenewalDateBar data={[julyGood, julyPoor, augustPoor]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Jul 2026 · Good 1, show accounts' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'JulyGood' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'JulyPoor' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'AugustPoor' })).not.toBeInTheDocument();
+  });
+
+  it('opens a different segment for the same status in a different month', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<AccountsByRenewalDateBar data={[julyGood, julyPoor, augustPoor]} />);
+
+    await user.click(screen.getByRole('button', { name: 'Aug 2026 · Poor 1, show accounts' }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'AugustPoor' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'JulyPoor' })).not.toBeInTheDocument();
+  });
+
+  it('offers no target at all when drillable is false (a truncated book)', () => {
+    renderWithDrill(<AccountsByRenewalDateBar data={[julyGood, julyPoor]} drillable={false} />);
+    expect(screen.queryAllByRole('button', { name: /show accounts/ })).toHaveLength(0);
+  });
+
+  it('offers no target for an empty month-status segment', () => {
+    renderWithDrill(<AccountsByRenewalDateBar data={[julyGood]} />);
+    expect(screen.queryByRole('button', { name: /Jul 2026 · Poor/ })).not.toBeInTheDocument();
   });
 });
 

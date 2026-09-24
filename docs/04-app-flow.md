@@ -221,6 +221,16 @@ in instead.
 Add, edit, churn and archive all run through `OrganizationFormModal`,
 `ChurnOrganizationModal` and a `ConfirmDialog` that patches `is_archived`.
 
+A dashboard drill's "Open as a list" (§4.7) lands here as `?ids=3,7`: the
+table fetches `/customers/?ids=3,7` instead of the plain list, a banner reads
+"Showing n accounts from the dashboard" with a "Show all" that clears the
+param and restores focus to the search box, and `MetricsPanel`'s population
+figure comes from a separate, unfiltered `/customers/` count probe rather
+than the `ids`-filtered fetch — so it keeps reading the whole book, not the
+drilled-down page. Until that probe answers (or if it fails) the figure reads
+"—", never 0, and the banner leaves out its number while the `ids` fetch is
+loading.
+
 ### 4.3 Accounts
 
 Reached from the Accounts tab of an organisation or from `/accounts/list`, in
@@ -409,6 +419,72 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
   their new home with the query string kept (`Keep`, `LegacyRedirect`); the
   mapping from an old path to its new one is `LEGACY` in `areas.ts`. `/dashboard`
   and `/dashboard/custom` both land on `/dashboard/overview`.
+- **Drill-down.** Any number or chart segment that can name the accounts
+  behind it opens the drill panel — one panel for the whole dashboard,
+  mounted once by `DashboardFrame` inside a `DrillProvider`
+  (`src/pages/dashboard/drill/`), not one per view. A `Kpi` given an
+  `onDrill` renders as a button (`"<label> <value>, show accounts"`); a
+  Recharts segment a keyboard can't reach gets a parallel `DrillTargets` row
+  of real buttons, visible on focus. Both call `useDrill().open({title,
+  figure, source}, trigger)`.
+  - **Source.** `{kind: 'rows', rows}` for a list already computed
+    client-side — Triage's three tiles, Divergence's headline numbers,
+    Movement's downgrade/upgrade counts, Renewals' four tiles plus its
+    calendar/coverage-gap/owner-load charts, Distribution's owner bar,
+    CSM/AI pulse bars and renewal-date bar, Customer Overview's "Top 3
+    concentration", Usage's three seat tiles and its utilisation-band chart.
+    `{kind: 'server', path, query, segment}` for one the client can't
+    compute cheaply, which fetches `GET <path>?<query>&drill=<segment>` —
+    Customer Overview's "Churned in 12 months" (`/customers/overview/`),
+    Activity's "Gone quiet" (`/customers/activity/`), Forecast's "At risk"
+    tile and its ARR-bridge chart (`/customers/forecast/`), Tickets'
+    KPIGrid and every donut/bar (`/tickets/stats/`), Topics' five charts
+    (`/interactions/stats/`).
+  - **Completeness.** A drill opens only where the list behind it is
+    complete, never from a capped one (Forecast's `swing` table, Activity's
+    `going_dark` table, Customer Overview's `concentration` list beyond its
+    own top three, Topics' `recent` table). Every Health view (Triage,
+    Divergence, Movement, Renewals, Distribution) turns every one of its
+    drills off when `useHealthOverview()` reports the book `truncated`;
+    Usage turns its three tiles and band chart off until
+    `stats.scatter.length >= kpis.measured_count` (the scatter is capped at
+    500 rows server-side with no `truncated` flag of its own), and its "No
+    seat data" tile is never drillable — those accounts aren't in `scatter`
+    at all. Product Usage (`product-usage/ControlsView.tsx`) has no drill
+    anywhere: every figure there is an aggregate across a product's own
+    customers, never a set of accounts.
+  - **Panel.** `role="dialog"`, `aria-labelledby` the title. From `1024px`
+    (`lg`) it is a static 360px panel beside the dashboard's own scroll
+    area; below that it is a full-screen sheet (`aria-modal="true"`) with
+    its own Tab/Shift+Tab focus trap, since there's nowhere else useful for
+    focus to go. Escape and the close button both close it from either
+    layout — Escape always closes the sheet, but at `lg` it closes the panel
+    only when focus is inside it and nothing else already handled the key
+    (`defaultPrevented`), so the page keeps its own Escape. Focus returns to
+    the trigger that opened it, and moves to the close button when a drill
+    opens, not when the viewport merely crosses `lg`.
+  - **Lifetime.** A drill describes the screen it was opened on, so the
+    panel closes when the path or query string changes (another area, or
+    any filter), without refocusing the old trigger. While a view refetches
+    it keeps its old figures on screen, dimmed, but every server drill on it
+    (Forecast, Customer Overview's churned tile, Activity's gone-quiet tile,
+    Tickets, Topics) is off until the new figures land — a drill then would
+    send the new query and list its accounts under the old figure. A bucket
+    at 0 in Tickets or Topics offers no drill. A segment the backend doesn't
+    recognise comes back with no `drill` key and the panel says "This number
+    can't be listed.".
+  - **Rows.** Each links to `/organizations/<id>`, shows its ARR and an
+    optional one-line detail worded for the segment (a risk score, days
+    overdue, seats used, tickets, interactions — `drillApi.ts`'s
+    `formatDetail`). A ticket or interaction drill lists companies, not
+    records, so one 11px line under the header says so: companies with at
+    least one matching ticket (interaction), records not linked to a company
+    aren't listed, and one on a shared account counts for each of its
+    companies. Renewals' calendar and coverage-gap segments show the ARR the
+    segment draws, not an account count. A server drill that the backend itself truncated at 500
+    prints "Showing n of count". "Open as a list" appears only when the full
+    count is known, `<= 500` and not truncated, and goes to
+    `/organizations/list?ids=<comma ids>`.
 
 ### 4.8 Knowledge and @mentions
 

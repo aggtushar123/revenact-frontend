@@ -8,6 +8,7 @@ import { ArrBridgeChart } from './charts/ArrBridgeChart';
 import { ScenarioRange } from './charts/ScenarioRange';
 import { PipelineByStage } from './charts/PipelineByStage';
 import { SwingTable } from './charts/SwingTable';
+import { useDrill } from '../../drill/useDrill';
 
 /** The filter query string, handed down by ForecastContainer's own bar. */
 export interface ForecastContext {
@@ -29,6 +30,7 @@ export interface ForecastContext {
 export function ControlsView() {
   const dispatch = useAppDispatch();
   const { stats, isLoading, error } = useAppSelector((state) => state.forecast);
+  const { open } = useDrill();
 
   const context = useOutletContext<ForecastContext | undefined>();
   const query = context?.query ?? '';
@@ -94,6 +96,19 @@ export function ControlsView() {
             value={bridge ? money(bridge.churn + bridge.contraction) : '—'}
             detail="weighted churn and contraction"
             tone="loss"
+            onDrill={
+              bridge && !isLoading
+                ? (trigger) =>
+                    open(
+                      {
+                        title: 'At risk',
+                        figure: money(bridge.churn + bridge.contraction),
+                        source: { kind: 'server', path: '/customers/forecast/', query, segment: 'at_risk' },
+                      },
+                      trigger,
+                    )
+                : undefined
+            }
           />
         </KpiStrip>
 
@@ -104,6 +119,8 @@ export function ControlsView() {
                 bridge={bridge}
                 currency={currency}
                 horizonDays={stats?.horizon_days ?? 365}
+                query={query}
+                drillable={!isLoading}
               />
             )}
           </div>

@@ -3,6 +3,10 @@ import type { InteractionBucket } from '../../../../../features/interactions/int
 import { SOURCE_COLORS, FALLBACK_COLOR, percentOf } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { useDrill } from '../../../drill/useDrill';
+import { DrillTargets } from '../../../drill/DrillTargets';
+
+const PATH = '/interactions/stats/';
 
 /** Interactions by where they came from: email, call or ticket.
  *
@@ -10,12 +14,43 @@ import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
  * all three, and a donut whose segment disappears when a source goes quiet is
  * harder to read than one with an empty segment. Recharts draws nothing for a
  * zero, so the legend label still sits in the ring's order. */
-export function ActivityTypeDonut({ data }: { data: InteractionBucket[] }) {
+export function ActivityTypeDonut({
+  data,
+  query,
+  drillable = true,
+}: {
+  data: InteractionBucket[];
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
+}) {
+  const { open } = useDrill();
   const total = data.reduce((sum, item) => sum + item.value, 0);
+
+  const openSegment = (entry: InteractionBucket, trigger?: HTMLElement) => {
+    open(
+      {
+        title: entry.name,
+        figure: String(entry.value),
+        source: { kind: 'server', path: PATH, query, segment: `type:${entry.key}` },
+      },
+      trigger,
+    );
+  };
+
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (entry: InteractionBucket) => drillable && entry.value > 0;
+  const drillItems = data.filter(canDrill).map((entry) => ({
+    name: entry.name,
+    figure: String(entry.value),
+    onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
+  }));
 
   return (
     <div className="w-full h-full p-6 flex flex-col">
       <h3 className="text-[14px] font-bold text-ink mb-4">Activities By Type</h3>
+      <DrillTargets label="Activities By Type" items={drillItems} />
       <div className="flex-1 relative min-h-[300px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -49,7 +84,12 @@ export function ActivityTypeDonut({ data }: { data: InteractionBucket[] }) {
               }}
             >
               {data.map((entry) => (
-                <Cell key={entry.key} fill={SOURCE_COLORS[entry.name] ?? FALLBACK_COLOR} />
+                <Cell
+                  key={entry.key}
+                  fill={SOURCE_COLORS[entry.name] ?? FALLBACK_COLOR}
+                  cursor={canDrill(entry) ? 'pointer' : undefined}
+                  onClick={canDrill(entry) ? () => openSegment(entry) : undefined}
+                />
               ))}
             </Pie>
             <Tooltip

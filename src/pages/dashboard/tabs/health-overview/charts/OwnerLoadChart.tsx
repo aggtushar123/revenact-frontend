@@ -1,12 +1,18 @@
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import type { OwnerLoad } from '../renewal';
+import { useDrill } from '../../../drill/useDrill';
+import { fromHealthRows } from '../../../drill/rows';
 
 export interface OwnerLoadChartProps {
   load: OwnerLoad[];
   currency: CurrencyCode;
   /** The window `load` was built over, for the subtitle. */
   horizonDays: number;
+  /** False when `load` was built from a truncated book — a drill from it
+   *  would only ever show some of an owner's accounts. Defaults to `true` so
+   *  every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
 }
 
 /**
@@ -21,9 +27,43 @@ export interface OwnerLoadChartProps {
  * scale with a label on either side; a charting library would add an axis, a
  * tooltip and a container height for a layout that is two divs and a
  * percentage.
+ *
+ * Each row is a real `<button>` rather than a chart segment behind a hidden
+ * `DrillTargets` list — unlike the Recharts bars elsewhere on this tab, a
+ * plain HTML bar is already reachable by mouse and keyboard alike once it is
+ * an interactive element.
  */
-export function OwnerLoadChart({ load, currency, horizonDays }: OwnerLoadChartProps) {
+export function OwnerLoadChart({
+  load,
+  currency,
+  horizonDays,
+  drillable = true,
+}: OwnerLoadChartProps) {
+  const { open } = useDrill();
   const widest = Math.max(1, ...load.map((entry) => entry.arr));
+
+  // Two owners can share a display name (two CSMs both called "Sam Rivera"
+  // is an ordinary thing), and `load` is now keyed on `ownerKey`, not the
+  // name — so the accessible label has to disambiguate them too, or a
+  // keyboard/screen-reader user can't tell which bar is which.
+  const duplicateNames = new Set(
+    [...new Set(load.map((entry) => entry.owner))].filter(
+      (name) => load.filter((entry) => entry.owner === name).length > 1,
+    ),
+  );
+  const labelFor = (entry: OwnerLoad) =>
+    duplicateNames.has(entry.owner) ? `${entry.owner} (${entry.ownerKey})` : entry.owner;
+
+  const openOwner = (entry: OwnerLoad, trigger: HTMLElement) => {
+    open(
+      {
+        title: labelFor(entry),
+        figure: formatCompactMoney(entry.arr, currency),
+        source: { kind: 'rows', rows: fromHealthRows(entry.rows) },
+      },
+      trigger,
+    );
+  };
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -46,8 +86,8 @@ export function OwnerLoadChart({ load, currency, horizonDays }: OwnerLoadChartPr
             // much of that owner's book", which is the comparison being made.
             const atRisk = entry.arr > 0 ? (entry.exposure / entry.arr) * 100 : 0;
 
-            return (
-              <li key={entry.owner}>
+            const body = (
+              <>
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-[12px] font-medium text-ink truncate">{entry.owner}</span>
                   <span className="text-[11px] text-ink-muted tabular-nums shrink-0">
@@ -57,11 +97,8 @@ export function OwnerLoadChart({ load, currency, horizonDays }: OwnerLoadChartPr
                 </div>
                 <div
                   className="mt-[3px] h-[10px] rounded-[3px] bg-subtle overflow-hidden"
-                  role="img"
-                  aria-label={`${entry.owner}: ${formatMoney(entry.arr, currency)} renewing, ${formatMoney(
-                    entry.exposure,
-                    currency
-                  )} expected loss`}
+                  aria-hidden="true"
+                  title={`${formatMoney(entry.arr, currency)} renewing, ${formatMoney(entry.exposure, currency)} expected loss`}
                 >
                   <div
                     className="h-full rounded-[3px] bg-ink-faint flex"
@@ -70,6 +107,26 @@ export function OwnerLoadChart({ load, currency, horizonDays }: OwnerLoadChartPr
                     <div className="h-full bg-danger/80" style={{ width: `${atRisk}%` }} />
                   </div>
                 </div>
+              </>
+            );
+
+            return (
+              <li key={entry.ownerKey}>
+                {drillable ? (
+                  <button
+                    type="button"
+                    onClick={(event) => openOwner(entry, event.currentTarget)}
+                    aria-label={`${labelFor(entry)} ${formatCompactMoney(entry.arr, currency)}, show accounts`}
+                    className="w-full text-left rounded-md -m-1 p-1 cursor-pointer hover:bg-subtle transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  >
+                    {body}
+                  </button>
+                ) : (
+                  // A plain row, not a dead button — the book behind this
+                  // chart is truncated, so there is nothing a click here
+                  // could honestly open.
+                  <div className="w-full -m-1 p-1">{body}</div>
+                )}
               </li>
             );
           })}

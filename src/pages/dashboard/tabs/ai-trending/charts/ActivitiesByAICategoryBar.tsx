@@ -1,9 +1,13 @@
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, LabelList } from 'recharts';
+import { BarChart, Bar, Cell, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, LabelList } from 'recharts';
 import type { InteractionBucket } from '../../../../../features/interactions/interactionsSlice';
 import { niceMax } from '../chartTheme';
 import { UnclassifiedNote } from './UnclassifiedNote';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { useDrill } from '../../../drill/useDrill';
+import { DrillTargets } from '../../../drill/DrillTargets';
+
+const PATH = '/interactions/stats/';
 
 /** How many bars fit before the labels stop being readable. The API ranks
  *  biggest-first, so this keeps the head of the distribution — which is what a
@@ -20,6 +24,8 @@ export function ActivitiesByAICategoryBar({
   data,
   classified,
   total,
+  query,
+  drillable = true,
 }: {
   data: InteractionBucket[];
   /** The API's own count of classified interactions — what the note below is
@@ -27,9 +33,37 @@ export function ActivitiesByAICategoryBar({
    *  so summing them would understate the book and make the note a lie. */
   classified: number;
   total: number;
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
 }) {
+  const { open } = useDrill();
   const rows = data.slice(0, MAX_BARS).reverse();
   const max = niceMax(rows.map((r) => r.value));
+
+  const openSegment = (row: InteractionBucket, trigger?: HTMLElement) => {
+    open(
+      {
+        title: row.name,
+        figure: String(row.value),
+        source: { kind: 'server', path: PATH, query, segment: `category:${row.key}` },
+      },
+      trigger,
+    );
+  };
+
+  // One keyboard target per bar actually drawn — the same top-N cap the bars
+  // themselves are limited to, not the full `data` (a drilled segment is a
+  // complete server query regardless, but a keyboard target for a bar that
+  // isn't on screen would have nothing to point at).
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (row: InteractionBucket) => drillable && row.value > 0;
+  const drillItems = rows.filter(canDrill).map((row) => ({
+    name: row.name,
+    figure: String(row.value),
+    onSelect: (trigger: HTMLElement) => openSegment(row, trigger),
+  }));
 
   return (
     <div className="w-full h-full p-6 flex flex-col">
@@ -41,6 +75,8 @@ export function ActivitiesByAICategoryBar({
           </span>
         )}
       </div>
+
+      <DrillTargets label="Activities By AI Category" items={drillItems} />
 
       <div className="flex-1 w-full min-h-[300px] relative">
         <ResponsiveContainer width="100%" height="100%">
@@ -65,13 +101,21 @@ export function ActivitiesByAICategoryBar({
               cursor={{ fill: CURSOR_FILL }}
               contentStyle={TOOLTIP_STYLE}
             />
-            <Bar {...STATIC_SERIES} dataKey="value" fill={ROLE.ink} radius={[0, 4, 4, 0]} barSize={16}>
+            <Bar {...STATIC_SERIES} dataKey="value" radius={[0, 4, 4, 0]} barSize={16}>
               <LabelList
                 dataKey="value"
                 position="right"
                 fill="var(--text-secondary)"
                 fontSize={11}
               />
+              {rows.map((row) => (
+                <Cell
+                  key={row.key}
+                  fill={ROLE.ink}
+                  cursor={canDrill(row) ? 'pointer' : undefined}
+                  onClick={canDrill(row) ? () => openSegment(row) : undefined}
+                />
+              ))}
             </Bar>
           </BarChart>
         </ResponsiveContainer>

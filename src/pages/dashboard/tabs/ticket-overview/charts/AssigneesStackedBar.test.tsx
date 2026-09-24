@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { AssigneesStackedBar } from './AssigneesStackedBar';
 import { STATUS_ORDER } from '../chartTheme';
+import { DrillProvider } from '../../../drill/DrillContext';
 
 // Recharts' `ResponsiveContainer` measures its own box with
 // `getBoundingClientRect`/`clientWidth`/`clientHeight` before it draws
@@ -56,23 +57,54 @@ afterAll(() => {
 describe('AssigneesStackedBar', () => {
   it('renders a legend entry for every status, including the two that lost their in-segment count label', () => {
     render(
-      <AssigneesStackedBar
-        data={[
-          {
-            name: 'Busy',
-            Open: 16,
-            'In Progress': 21,
-            'On Hold': 10,
-            Resolved: 54,
-            Closed: 31,
-            total: 132,
-          },
-        ]}
-      />
+      <DrillProvider>
+        <AssigneesStackedBar
+          query=""
+          data={[
+            {
+              name: 'Busy',
+              Open: 16,
+              'In Progress': 21,
+              'On Hold': 10,
+              Resolved: 54,
+              Closed: 31,
+              total: 132,
+            },
+          ]}
+        />
+      </DrillProvider>
     );
 
     for (const status of STATUS_ORDER) {
       expect(screen.getByText(status)).toBeInTheDocument();
     }
+  });
+
+  it('offers no drill for a blank-assignee row', () => {
+    // The backend's `assignee:<name>` drill needs a real value; an empty
+    // assignee name has no such segment, so this row gets no keyboard target.
+    render(
+      <DrillProvider>
+        <AssigneesStackedBar
+          query=""
+          data={[
+            { name: '', Open: 2, 'In Progress': 0, 'On Hold': 0, Resolved: 0, Closed: 0, total: 2 },
+            {
+              name: 'Busy',
+              Open: 16,
+              'In Progress': 21,
+              'On Hold': 10,
+              Resolved: 54,
+              Closed: 31,
+              total: 132,
+            },
+          ]}
+        />
+      </DrillProvider>
+    );
+
+    expect(screen.getByRole('button', { name: 'Busy 132, show accounts' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '2, show accounts' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('button')).toHaveLength(1);
   });
 });

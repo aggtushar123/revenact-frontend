@@ -5,9 +5,13 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import portfolioReducer from '../../../../features/portfolio/portfolioSlice';
+import authReducer from '../../../../features/auth/authSlice';
 import { AreaLayout } from '../../AreaLayout';
 import { CustomerOverviewContainer } from '../CustomerOverviewContainer';
 import { ControlsView } from './ControlsView';
+import { DrillProvider } from '../../drill/DrillContext';
+import { DrillPanel } from '../../drill/DrillPanel';
+import { mockFetchRouted, drillResponse } from '../../drill/testDrill';
 
 // Integration tier: container + view + charts through the real router, with
 // only the fetch boundary mocked. The two Recharts charts need a sized
@@ -114,17 +118,26 @@ function mockFetch(body: unknown = stats, status = 200) {
 }
 
 function renderCustomerOverview(url = '/dashboard/revenue/customers') {
-  const store = configureStore({ reducer: { portfolio: portfolioReducer } });
+  // `auth` is here only so `useOrgCurrency` (read by the drill panel's row
+  // list) has a slice to select from — its default state has no user, which
+  // is exactly what falls back to 'USD', matching this file's fixtures.
+  // `DrillProvider` + `DrillPanel` mirror DashboardFrame's real, app-wide
+  // pairing so a click on a drillable Kpi opens a real dialog instead of
+  // throwing on a missing `useDrill()` provider.
+  const store = configureStore({ reducer: { portfolio: portfolioReducer, auth: authReducer } });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path="/dashboard/revenue" element={<AreaLayout area="revenue" />}>
-            <Route element={<CustomerOverviewContainer />}>
-              <Route path="customers" element={<ControlsView />} />
+        <DrillProvider>
+          <Routes>
+            <Route path="/dashboard/revenue" element={<AreaLayout area="revenue" />}>
+              <Route element={<CustomerOverviewContainer />}>
+                <Route path="customers" element={<ControlsView />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+          <DrillPanel />
+        </DrillProvider>
       </MemoryRouter>
     </Provider>,
   );
@@ -340,5 +353,101 @@ describe('Customer Overview', () => {
     renderCustomerOverview();
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/Server exploded|Could not load/);
+  });
+});
+
+// ── drill ─────────────────────────────────────────────────────────────
+
+describe('Customer Overview drill', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opens the churned-in-12-months drill against the server', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      churned_12m: drillResponse(
+        [{ id: 21, name: 'WeWork', owner: 'Unassigned', arr: 24_000, value: 24_000 }],
+        'ARR',
+      ),
+    });
+    const user = userEvent.setup();
+    renderCustomerOverview();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Churned in 12 months 3, show accounts' })
+    );
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/customers/overview/?drill=churned_12m')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'WeWork' })).toBeInTheDocument();
+  });
+
+  it('carries the current filters into the churned-in-12-months drill request', async () => {
+    const fetchMock = mockFetchRouted(stats, { churned_12m: drillResponse([], 'ARR') });
+    const user = userEvent.setup();
+    renderCustomerOverview('/dashboard/revenue/customers?owner=5');
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Churned in 12 months 3, show accounts' })
+    );
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain(
+        '/api/v1/customers/overview/?owner=5&drill=churned_12m'
+      )
+    );
+  });
+
+  it('opens the top-3 concentration as exactly those three accounts, client-side', async () => {
+    mockFetch();
+    const user = userEvent.setup();
+    renderCustomerOverview();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'Top 3 concentration 55.5%, show accounts' })
+    );
+
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'Shopify' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Stripe' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Uber' })).toBeInTheDocument();
+    expect(within(dialog).getByText('25.4% of ARR')).toBeInTheDocument();
+    expect(within(dialog).getByText('16.3% of ARR')).toBeInTheDocument();
+    expect(within(dialog).getByText('13.8% of ARR')).toBeInTheDocument();
+  });
+
+  it('offers no top-3 drill when there is no share or no accounts to list', async () => {
+    mockFetch({
+      ...stats,
+      concentration: { ...stats.concentration, rows: [], top_three_share: null },
+    });
+    renderCustomerOverview();
+
+    // Wait for the figures to land, not just the label (drawn before them).
+    await screen.findByText('69.2%');
+    expect(screen.queryByRole('button', { name: /Top 3 concentration/ })).not.toBeInTheDocument();
+  });
+
+  it('offers no top-3 drill when a share comes with no rows behind it', async () => {
+    mockFetch({
+      ...stats,
+      concentration: { ...stats.concentration, rows: [] },
+    });
+    renderCustomerOverview();
+
+    // Wait for the figures to land, not just the label (drawn before them).
+    await screen.findByText('69.2%');
+    expect(screen.queryByRole('button', { name: /Top 3 concentration/ })).not.toBeInTheDocument();
+  });
+
+  it('does not make a button of the non-drillable KPIs', async () => {
+    mockFetch();
+    renderCustomerOverview();
+
+    await screen.findAllByText('Customers');
+    expect(screen.getByText('9').closest('button')).toBeNull();
+    expect(screen.getByText('69.2%').closest('button')).toBeNull();
   });
 });

@@ -4,6 +4,42 @@ import { HealthEmpty, HealthError, HealthLoading, HealthTruncatedNotice } from '
 import { layOut, splitDivergent, summariseDivergence, DIVERGENCE_THRESHOLD } from './divergence';
 import { PulseDivergenceScatter } from './charts/PulseDivergenceScatter';
 import { DivergenceList } from './charts/DivergenceList';
+import { useDrill } from '../../drill/useDrill';
+import { fromHealthRows } from '../../drill/rows';
+
+/** Underlined, inline with the sentence, same colour as the number it
+ *  replaces — a drill trigger, not a link, so it gets an explicit
+ *  accessible name rather than relying on visible digits alone. */
+const NUMBER_BUTTON = 'underline underline-offset-2 rounded-sm hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+
+/** A drill trigger when the book behind it supports one, otherwise the same
+ *  number as plain text — an underlined, hoverable number that goes nowhere
+ *  would be its own small lie about a truncated book. */
+function DrillNumber({
+  drillable,
+  label,
+  value,
+  tone,
+  onOpen,
+}: {
+  drillable: boolean;
+  label: string;
+  value: number;
+  tone: string;
+  onOpen: (trigger: HTMLElement) => void;
+}) {
+  if (!drillable) return <span className={tone}>{value}</span>;
+  return (
+    <button
+      type="button"
+      aria-label={`${label} ${value}, show accounts`}
+      onClick={(e) => onOpen(e.currentTarget)}
+      className={`${tone} ${NUMBER_BUTTON}`}
+    >
+      {value}
+    </button>
+  );
+}
 
 /**
  * Health Overview asked the other way round: not how the book is doing, but
@@ -16,12 +52,30 @@ import { DivergenceList } from './charts/DivergenceList';
 export function DivergenceView() {
   // Pinned at mount so renewal countdowns don't drift between renders.
   const [now] = useState(() => new Date());
+  const { open } = useDrill();
 
   const { rows, error, truncated, isInitialLoad, hasLoaded } = useHealthOverview();
+
+  // A truncated book is a capped slice of a larger one — a drill from it
+  // would only ever show *some* of the accounts a number counted, so every
+  // number below stops offering one rather than quietly lying.
+  const drillable = !truncated;
 
   const laid = useMemo(() => layOut(rows, now), [rows, now]);
   const summary = useMemo(() => summariseDivergence(laid), [laid]);
   const { aiColder, csmColder } = useMemo(() => splitDivergent(laid), [laid]);
+
+  // Same three predicates the headline sentence counts, kept as row lists so
+  // each number can open exactly the accounts it counted.
+  const disagreeingRows = useMemo(
+    () => laid.filter((d) => d.kind === 'ai-colder' || d.kind === 'csm-colder'),
+    [laid],
+  );
+  const urgentBlindSpotRows = useMemo(
+    () => laid.filter((d) => d.kind === 'ai-colder' && d.daysToRenewal !== null && d.daysToRenewal <= 90),
+    [laid],
+  );
+  const unratedRows = useMemo(() => laid.filter((d) => d.kind === 'unrated'), [laid]);
 
   if (isInitialLoad) return <HealthLoading />;
   if (error) return <HealthError message={error} />;
@@ -31,12 +85,43 @@ export function DivergenceView() {
     <div className="w-full flex flex-col gap-4 pb-12">
       {truncated && <HealthTruncatedNotice />}
       <p className="px-2 text-[11.5px] text-ink-muted">
-        <span className="font-bold text-ink">{summary.disagreeing}</span> of {summary.total} accounts
-        have a CSM and AI pulse {DIVERGENCE_THRESHOLD}+ points apart
+        <DrillNumber
+          drillable={drillable}
+          label="Disagreeing"
+          value={summary.disagreeing}
+          tone="font-bold text-ink"
+          onOpen={(trigger) =>
+            open(
+              {
+                title: 'Disagreeing',
+                figure: String(summary.disagreeing),
+                source: { kind: 'rows', rows: fromHealthRows(disagreeingRows.map((d) => d.row)) },
+              },
+              trigger,
+            )
+          }
+        />{' '}
+        of {summary.total} accounts have a CSM and AI pulse {DIVERGENCE_THRESHOLD}+ points apart
         {summary.urgentBlindSpots > 0 && (
           <>
-            {' '}— <span className="font-bold text-danger">{summary.urgentBlindSpots}</span> of those
-            renew inside 90 days with the AI reading colder
+            {' '}—{' '}
+            <DrillNumber
+              drillable={drillable}
+              label="Urgent blind spots"
+              value={summary.urgentBlindSpots}
+              tone="font-bold text-danger"
+              onOpen={(trigger) =>
+                open(
+                  {
+                    title: 'Urgent blind spots',
+                    figure: String(summary.urgentBlindSpots),
+                    source: { kind: 'rows', rows: fromHealthRows(urgentBlindSpotRows.map((d) => d.row)) },
+                  },
+                  trigger,
+                )
+              }
+            />{' '}
+            of those renew inside 90 days with the AI reading colder
           </>
         )}
         .
@@ -44,7 +129,23 @@ export function DivergenceView() {
           <>
             {' '}
             <span className="text-ink-faint">
-              {summary.unrated} not plotted — one side hasn’t rated them.
+              <DrillNumber
+                drillable={drillable}
+                label="Unrated"
+                value={summary.unrated}
+                tone=""
+                onOpen={(trigger) =>
+                  open(
+                    {
+                      title: 'Unrated',
+                      figure: String(summary.unrated),
+                      source: { kind: 'rows', rows: fromHealthRows(unratedRows.map((d) => d.row)) },
+                    },
+                    trigger,
+                  )
+                }
+              />{' '}
+              not plotted — one side hasn’t rated them.
             </span>
           </>
         )}

@@ -8,6 +8,7 @@ import {
   coverageBands,
   ownerLoad,
   quarterColumns,
+  renewalDrillSets,
   renewalQueue,
   renewalRows,
   summarise,
@@ -16,6 +17,8 @@ import { RenewalQuarterChart } from './charts/RenewalQuarterChart';
 import { RenewalCoverageChart } from './charts/RenewalCoverageChart';
 import { OwnerLoadChart } from './charts/OwnerLoadChart';
 import { RenewalQueueTable } from './charts/RenewalQueueTable';
+import { useDrill } from '../../drill/useDrill';
+import { fromHealthRows } from '../../drill/rows';
 
 /** The window the owner-load chart covers — two quarters, which is as far
  *  ahead as a staffing decision is worth making. */
@@ -42,8 +45,15 @@ export function RenewalView() {
   // Pinned at mount so the windows don't shift mid-session — the same reason
   // MovementView pins its own clock.
   const [now] = useState(() => new Date());
+  const { open } = useDrill();
   const { rows, error, truncated, isInitialLoad, hasLoaded, currency, unconvertedCount } =
     useHealthOverview();
+
+  // A truncated book is a capped slice of a larger one — a drill from it
+  // would only ever show *some* of the accounts a tile or chart segment
+  // counted, so every drill on this view is switched off rather than
+  // quietly lying.
+  const drillable = !truncated;
 
   const { rows: scored, withoutDate } = useMemo(() => renewalRows(rows, now), [rows, now]);
   const summary = useMemo(() => summarise(scored), [scored]);
@@ -51,6 +61,13 @@ export function RenewalView() {
   const bands = useMemo(() => coverageBands(scored), [scored]);
   const load = useMemo(() => ownerLoad(scored, OWNER_HORIZON_DAYS), [scored]);
   const queue = useMemo(() => renewalQueue(scored), [scored]);
+
+  // Same four predicates `summarise` counted, kept as row lists so each tile
+  // can open exactly the accounts it counted — never re-filtered here.
+  const { upForRenewal, forecastAtRisk, noRecentContact, pastDue } = useMemo(
+    () => renewalDrillSets(scored),
+    [scored],
+  );
 
   if (isInitialLoad) return <HealthLoading />;
   if (error) return <HealthError message={error} />;
@@ -91,18 +108,70 @@ export function RenewalView() {
           detail={`${summary.count} ${summary.count === 1 ? 'account' : 'accounts'}${
             summary.unpriced > 0 ? ` · ${summary.unpriced} unpriced` : ''
           }`}
+          onDrill={
+            drillable
+              ? (trigger) =>
+                  open(
+                    {
+                      title: 'Up for renewal',
+                      figure: money(summary.arr),
+                      source: { kind: 'rows', rows: fromHealthRows(upForRenewal.map((r) => r.row)) },
+                    },
+                    trigger,
+                  )
+              : undefined
+          }
         />
         <Kpi
           label="Forecast at risk"
           value={money(summary.exposure)}
           detail={`${atRiskShare}% of the window, weighted by risk`}
           tone={atRiskShare >= 20 ? 'loss' : 'neutral'}
+          onDrill={
+            drillable
+              ? (trigger) => {
+                  // Same `risk`/`exposure` pair `summarise` summed into the
+                  // tile's own figure (Σ ARR × risk) — read here per row, not
+                  // recomputed, so each row's weighted amount visibly adds up
+                  // to it.
+                  const byId = new Map(forecastAtRisk.map((r) => [r.row.id, r]));
+                  open(
+                    {
+                      title: 'Forecast at risk',
+                      figure: money(summary.exposure),
+                      source: {
+                        kind: 'rows',
+                        rows: fromHealthRows(forecastAtRisk.map((r) => r.row), (row) => {
+                          const item = byId.get(row.id);
+                          const riskPct = Math.round((item?.risk ?? 0) * 100);
+                          return `${riskPct}% risk · ${money(item?.exposure ?? 0)} at risk`;
+                        }),
+                      },
+                    },
+                    trigger,
+                  );
+                }
+              : undefined
+          }
         />
         <Kpi
           label="No recent contact"
           value={money(summary.coldArr)}
           detail={`${summary.coldCount} renewing with nothing logged in 60 days`}
           tone={summary.coldCount > 0 ? 'loss' : 'neutral'}
+          onDrill={
+            drillable
+              ? (trigger) =>
+                  open(
+                    {
+                      title: 'No recent contact',
+                      figure: money(summary.coldArr),
+                      source: { kind: 'rows', rows: fromHealthRows(noRecentContact.map((r) => r.row)) },
+                    },
+                    trigger,
+                  )
+              : undefined
+          }
         />
         <Kpi
           label="Past due"
@@ -113,15 +182,36 @@ export function RenewalView() {
               : 'every renewal date is still ahead'
           }
           tone={summary.overdueCount > 0 ? 'loss' : 'neutral'}
+          onDrill={
+            drillable
+              ? (trigger) => {
+                  const daysById = new Map(pastDue.map((r) => [r.row.id, Math.abs(r.days)]));
+                  open(
+                    {
+                      title: 'Past due',
+                      figure: String(summary.overdueCount),
+                      source: {
+                        kind: 'rows',
+                        rows: fromHealthRows(
+                          pastDue.map((r) => r.row),
+                          (row) => `${daysById.get(row.id)} days overdue`,
+                        ),
+                      },
+                    },
+                    trigger,
+                  );
+                }
+              : undefined
+          }
         />
       </KpiStrip>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
-          <RenewalQuarterChart columns={quarters} currency={currency} />
+          <RenewalQuarterChart columns={quarters} currency={currency} drillable={drillable} />
         </div>
         <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
-          <RenewalCoverageChart bands={bands} currency={currency} />
+          <RenewalCoverageChart bands={bands} currency={currency} drillable={drillable} />
         </div>
       </div>
 
@@ -130,7 +220,12 @@ export function RenewalView() {
           <RenewalQueueTable queue={queue} currency={currency} />
         </div>
         <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden max-h-[420px]">
-          <OwnerLoadChart load={load} currency={currency} horizonDays={OWNER_HORIZON_DAYS} />
+          <OwnerLoadChart
+            load={load}
+            currency={currency}
+            horizonDays={OWNER_HORIZON_DAYS}
+            drillable={drillable}
+          />
         </div>
       </div>
     </div>

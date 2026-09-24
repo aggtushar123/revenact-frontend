@@ -2290,10 +2290,11 @@ const customersSlice = createSlice({
         // `action.meta.arg` is the exact URL this fetch was dispatched
         // with. A search-filtered fetch (this one, or a next/previous page
         // reached while a search is active — DRF's pagination links carry
-        // existing query params through) still has `search=` in it; only a
-        // plain listing fetch updates the "onboarded overall" total.
+        // existing query params through) still has `search=` in it; same
+        // for a dashboard drill's `ids=` — only a plain listing fetch
+        // updates the "onboarded overall" total.
         const url = action.meta.arg;
-        if (!url || !url.includes('search=')) {
+        if (!url || (!url.includes('search=') && !url.includes('ids='))) {
           state.totalCount = action.payload.count;
         }
       })

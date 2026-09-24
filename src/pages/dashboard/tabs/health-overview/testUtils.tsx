@@ -5,11 +5,14 @@ import type { ReactElement } from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import healthReducer, { NO_FILTERS } from '../../../../features/health/healthSlice';
 import type { HealthFilters } from '../../../../features/health/healthSlice';
+import authReducer from '../../../../features/auth/authSlice';
 import type { CurrencyCode } from '../../../../features/auth/authSlice';
 import type { HealthDataRow } from '../../../../features/health/types';
 import { AreaLayout } from '../../AreaLayout';
 import { HealthOverviewContainer } from '../HealthOverviewContainer';
 import { TriageView } from './TriageView';
+import { DrillProvider } from '../../drill/DrillContext';
+import { DrillPanel } from '../../drill/DrillPanel';
 
 /**
  * One `HealthDataRow` with sane defaults, overridable field by field.
@@ -90,7 +93,19 @@ export function renderWithHealth(
     },
   });
 
-  return { store, ...render(<Provider store={store}>{ui}</Provider>) };
+  // DrillProvider only — no DrillPanel. Health's Kpis and charts call
+  // useDrill() unconditionally now (DashboardFrame supplies the provider in
+  // the real app), so a plain render without one would throw the moment a
+  // view mounts, even in tests that never open a drill. Tests that need the
+  // panel itself (and so a click to actually assert on) use renderWithDrill.
+  return {
+    store,
+    ...render(
+      <Provider store={store}>
+        <DrillProvider>{ui}</DrillProvider>
+      </Provider>,
+    ),
+  };
 }
 
 /**
@@ -117,4 +132,105 @@ export function renderHealthAt(
     </MemoryRouter>,
     options,
   );
+}
+
+/**
+ * Render a Health Overview view with a real drill panel behind it.
+ *
+ * `DashboardFrame` mounts `DrillProvider` + `DrillPanel` once, app-wide — a
+ * test that renders a view in isolation (as every Health test does) has
+ * neither, so a click on a drillable Kpi or chart segment would call
+ * `useDrill()` outside any provider and throw. This wires the same pair
+ * around the view under test, so a click opens the real dialog and its
+ * accounts can be asserted on directly, not just the `open` call.
+ *
+ * `DrillPanel`'s row list reads `useOrgCurrency`
+ * (`state.auth.user.organisation.currency`), which `renderWithHealth`'s
+ * plain `{ health }` store doesn't carry — this store adds a minimal `auth`
+ * slice alongside it, and a `MemoryRouter` for the panel's account links.
+ */
+export function renderWithDrill(
+  ui: ReactElement,
+  {
+    rows = [],
+    isLoading = false,
+    error = null,
+    truncated = false,
+    loaded = true,
+    currency = 'USD',
+    unconvertedCount = 0,
+    filters = NO_FILTERS,
+  }: {
+    rows?: HealthDataRow[];
+    isLoading?: boolean;
+    error?: string | null;
+    truncated?: boolean;
+    loaded?: boolean;
+    currency?: CurrencyCode;
+    unconvertedCount?: number;
+    filters?: HealthFilters;
+  } = {},
+) {
+  const store = configureStore({
+    reducer: { health: healthReducer, auth: authReducer },
+    preloadedState: {
+      health: {
+        rows,
+        isLoading,
+        error,
+        historyMonths: 12,
+        truncated,
+        loadedAt: loaded ? '2026-09-11T00:00:00.000Z' : null,
+        currency,
+        unconvertedCount,
+        filters,
+      },
+      auth: {
+        user: {
+          id: 1,
+          email: 'alice@acme.io',
+          name: 'Alice',
+          avatar: '',
+          role: 'admin',
+          role_id: 1,
+          role_name: 'Admin',
+          permissions: [],
+          function: 'cs' as const,
+          function_display: 'Customer Success',
+          reports_to: null,
+          organisation: {
+            id: 1,
+            name: 'Acme Inc',
+            slug: 'acme-inc',
+            currency,
+            currency_display: currency,
+            default_lifecycle_stage: '',
+            ai_agent_enabled: true,
+            ai_agent_tone: 'professional' as const,
+            ai_agent_tone_display: 'Professional',
+          },
+          is_active: true,
+        },
+        accessToken: 'token',
+        refreshToken: 'refresh',
+        isAuthenticated: true,
+        isLoading: false,
+        error: null,
+      },
+    },
+  });
+
+  return {
+    store,
+    ...render(
+      <Provider store={store}>
+        <MemoryRouter>
+          <DrillProvider>
+            {ui}
+            <DrillPanel />
+          </DrillProvider>
+        </MemoryRouter>
+      </Provider>,
+    ),
+  };
 }

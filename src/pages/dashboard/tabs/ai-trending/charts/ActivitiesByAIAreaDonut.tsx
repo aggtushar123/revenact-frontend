@@ -4,6 +4,10 @@ import { AREA_COLORS, FALLBACK_COLOR, percentOf } from '../chartTheme';
 import { UnclassifiedNote } from './UnclassifiedNote';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { useDrill } from '../../../drill/useDrill';
+import { DrillTargets } from '../../../drill/DrillTargets';
+
+const PATH = '/interactions/stats/';
 
 /** Classified interactions by AI Area — which side of the business owns the
  *  conversation.
@@ -17,6 +21,8 @@ export function ActivitiesByAIAreaDonut({
   data,
   classified,
   total,
+  query,
+  drillable = true,
 }: {
   data: InteractionBucket[];
   /** How many interactions in scope carry a classification, from the API. Used
@@ -25,14 +31,39 @@ export function ActivitiesByAIAreaDonut({
   classified: number;
   /** Every interaction in scope, classified or not — for the note below. */
   total: number;
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
 }) {
+  const { open } = useDrill();
   const plotted = data.reduce((sum, item) => sum + item.value, 0);
+
+  const openSegment = (entry: InteractionBucket, trigger?: HTMLElement) => {
+    open(
+      {
+        title: entry.name,
+        figure: String(entry.value),
+        source: { kind: 'server', path: PATH, query, segment: `area:${entry.key}` },
+      },
+      trigger,
+    );
+  };
+
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (entry: InteractionBucket) => drillable && entry.value > 0;
+  const drillItems = data.filter(canDrill).map((entry) => ({
+    name: entry.name,
+    figure: String(entry.value),
+    onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
+  }));
 
   return (
     <div className="w-full h-full p-6 flex flex-col relative">
       <h3 className="text-[14px] font-bold text-ink mb-4">
         Activities By AI Area (Common Taxonomy)
       </h3>
+      <DrillTargets label="Activities By AI Area" items={drillItems} />
       <div className="flex-1 min-h-[300px] relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -73,7 +104,12 @@ export function ActivitiesByAIAreaDonut({
               labelLine={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
             >
               {data.map((entry) => (
-                <Cell key={entry.key} fill={AREA_COLORS[entry.name] ?? FALLBACK_COLOR} />
+                <Cell
+                  key={entry.key}
+                  fill={AREA_COLORS[entry.name] ?? FALLBACK_COLOR}
+                  cursor={canDrill(entry) ? 'pointer' : undefined}
+                  onClick={canDrill(entry) ? () => openSegment(entry) : undefined}
+                />
               ))}
             </Pie>
             <Tooltip

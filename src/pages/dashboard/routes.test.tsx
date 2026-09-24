@@ -57,18 +57,35 @@ describe('dashboard routes', () => {
 
 describe('dashboard frame', () => {
   // The layout's <main> is overflow-hidden, so the dashboard has to own its
-  // own scroll — without it a long view is simply cut off.
+  // own scroll — without it a long view is simply cut off. The drill panel
+  // sits beside that scroll area (see DashboardFrame's own comment), so the
+  // frame is now two elements deep, but exactly one of them still owns the
+  // scroll.
   it.each(['/dashboard/overview', '/dashboard/health/triage', '/dashboard/support/tickets'])(
-    '%s renders inside a scroll container with page padding',
+    '%s renders inside a scroll container that shrinks to fit',
     (url) => {
-      render(
+      const { container } = render(
         <MemoryRouter initialEntries={[url]}>
           <Routes>{dashboardRoutes(stub)}</Routes>
         </MemoryRouter>,
       );
       const scroller = screen.getByTestId('where').closest('.overflow-y-auto');
       expect(scroller).not.toBeNull();
-      expect(scroller).toHaveClass('p-4', 'min-h-0');
+      expect(scroller).toHaveClass('min-h-0');
+      expect(container.querySelectorAll('.overflow-y-auto')).toHaveLength(1);
     },
   );
+
+  it('keeps the page padding on the frame around the scroll area', () => {
+    const { container } = render(
+      <MemoryRouter initialEntries={['/dashboard/overview']}>
+        <Routes>{dashboardRoutes(stub)}</Routes>
+      </MemoryRouter>,
+    );
+    const scroller = screen.getByTestId('where').closest('.overflow-y-auto');
+    const frame = container.firstElementChild;
+    expect(frame).toHaveClass('p-4');
+    expect(frame).not.toBe(scroller);
+    expect(frame).toContainElement(scroller as HTMLElement);
+  });
 });

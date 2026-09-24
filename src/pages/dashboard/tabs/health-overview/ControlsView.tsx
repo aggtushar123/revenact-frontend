@@ -7,7 +7,6 @@ import { HealthByOwnerStackedBar } from './charts/HealthByOwnerStackedBar';
 import { CSMPulseBar } from './charts/CSMPulseBar';
 import { AIPulseBar } from './charts/AIPulseBar';
 import { AccountHealthDetailTable } from './charts/AccountHealthDetailTable';
-import { AccountsLastTouchLine } from './charts/AccountsLastTouchLine';
 import { AccountHealthByRecruiters } from './charts/AccountHealthByRecruiters';
 import { HealthChangeOverTimeStacked } from './charts/HealthChangeOverTimeStacked';
 import { AccountsByRenewalDateBar } from './charts/AccountsByRenewalDateBar';
@@ -16,6 +15,12 @@ export function ControlsView() {
   const [activeFilter, setActiveFilter] = useState<HealthStatus | null>(null);
 
   const { rows, error, truncated, isInitialLoad, hasLoaded } = useHealthOverview();
+
+  // A truncated book is a capped slice of a larger one — a drill from it
+  // would only ever show *some* of the accounts a chart segment counted, so
+  // every drill on this view's charts is switched off rather than quietly
+  // lying.
+  const drillable = !truncated;
 
   // Derived filtered dataset for all child charts
   const filteredData = useMemo(() => {
@@ -62,26 +67,20 @@ export function ControlsView() {
 
             {/* Column 2: Health by Owner */}
             <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
-              <HealthByOwnerStackedBar data={filteredData} />
+              <HealthByOwnerStackedBar data={filteredData} drillable={drillable} />
             </div>
           </div>
-
-          {/* Bottom Row inside Left Column (Accounts by Last Touch) */}
-          <div className="bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden h-[280px]">
-            <AccountsLastTouchLine data={filteredData} />
-          </div>
-
         </div>
 
         {/* RIGHT COLUMN */}
         <div className="flex-[1] flex flex-col gap-4">
            {/* CSM Pulse */}
            <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden min-h-[280px]">
-            <CSMPulseBar data={filteredData} />
+            <CSMPulseBar data={filteredData} drillable={drillable} />
           </div>
            {/* AI Pulse */}
            <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden min-h-[280px]">
-            <AIPulseBar data={filteredData} />
+            <AIPulseBar data={filteredData} drillable={drillable} />
           </div>
         </div>
 
@@ -89,7 +88,7 @@ export function ControlsView() {
 
       {/* Full Width Renewal Graph */}
       <div className="w-full bg-surface border border-line-subtle shadow-sm rounded-lg flex flex-col overflow-hidden min-h-[300px]">
-        <AccountsByRenewalDateBar data={filteredData} />
+        <AccountsByRenewalDateBar data={filteredData} drillable={drillable} />
       </div>
 
       {/* Analytics Insights Row */}

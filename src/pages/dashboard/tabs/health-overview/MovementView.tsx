@@ -1,12 +1,29 @@
 import { useMemo, useState } from 'react';
+import type { HealthDataRow } from '../../../../features/health/types';
 import { useHealthOverview } from './useHealthOverview';
 import { HealthEmpty, HealthError, HealthLoading, HealthTruncatedNotice } from './HealthDataState';
-import { buildFlow, netMovement, renewalBuckets, WINDOW_OPTIONS } from './movement';
-import type { WindowMonths } from './movement';
+import { buildFlow, moveCounts, movedRows, netMovement, renewalBuckets, WINDOW_OPTIONS } from './movement';
+import type { MoveCounts, WindowMonths } from './movement';
 import { HealthFlowChart } from './charts/HealthFlowChart';
 import { RenewalRunwayChart } from './charts/RenewalRunwayChart';
+import { Kpi, KpiStrip } from '../../shared/Kpi';
+import { useDrill } from '../../drill/useDrill';
+import { fromHealthRows } from '../../drill/rows';
 
 const DEFAULT_WINDOW: WindowMonths = 6;
+
+/**
+ * "N downgrade(s)"/"N upgrade(s)" for one row — how many of the tile's own
+ * figure (which counts moves, not accounts) this particular account
+ * accounts for. Summing this across a tile's drilled rows always equals the
+ * figure itself: both come from `moveCounts`, never re-derived separately.
+ */
+function moveDetail(counts: Map<string, MoveCounts>, direction: keyof MoveCounts, noun: string) {
+  return (row: HealthDataRow) => {
+    const n = counts.get(row.id)?.[direction] ?? 0;
+    return `${n} ${noun}${n === 1 ? '' : 's'}`;
+  };
+}
 
 /**
  * Health Overview read as movement rather than as a snapshot.
@@ -20,8 +37,15 @@ export function MovementView() {
   const [windowMonths, setWindowMonths] = useState<WindowMonths>(DEFAULT_WINDOW);
   // Pinned at mount so renewal buckets don't shift mid-session.
   const [now] = useState(() => new Date());
+  const { open } = useDrill();
 
   const { rows, error, truncated, isInitialLoad, hasLoaded } = useHealthOverview();
+
+  // A truncated book is a capped slice of a larger one — a drill from it
+  // would only ever show *some* of the accounts a tile or chart segment
+  // counted, so every drill on this view is switched off rather than
+  // quietly lying.
+  const drillable = !truncated;
 
   const flow = useMemo(() => buildFlow(rows, windowMonths), [rows, windowMonths]);
   const net = useMemo(() => netMovement(flow), [flow]);
@@ -67,44 +91,68 @@ export function MovementView() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm px-[13px] py-[11px] border-l-[3px] border-l-danger">
-          <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">
-            Downgrades
-          </div>
-          <div className="text-[25px] font-semibold leading-tight tracking-tight mt-[3px] tabular-nums text-danger">
-            {net.declined}
-          </div>
-          <div className="text-[11px] text-ink-muted mt-[1px]">account-months lost a grade</div>
-        </div>
-
-        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm px-[13px] py-[11px] border-l-[3px] border-l-success">
-          <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">
-            Upgrades
-          </div>
-          <div className="text-[25px] font-semibold leading-tight tracking-tight mt-[3px] tabular-nums text-success">
-            {net.improved}
-          </div>
-          <div className="text-[11px] text-ink-muted mt-[1px]">account-months gained a grade</div>
-        </div>
-
-        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm px-[13px] py-[11px]">
-          <div className="text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">
-            Net movement
-          </div>
-          <div
-            className={`text-[25px] font-semibold leading-tight tracking-tight mt-[3px] tabular-nums ${
-              net.net > 0 ? 'text-success' : net.net < 0 ? 'text-danger' : 'text-ink'
-            }`}
-          >
-            {net.net > 0 ? '+' : ''}
-            {net.net}
-          </div>
-          <div className="text-[11px] text-ink-muted mt-[1px]">
-            {net.held} held steady across the window
-          </div>
-        </div>
-      </div>
+      <KpiStrip columns={3}>
+        <Kpi
+          label="Downgrades"
+          value={String(net.declined)}
+          detail="account-months lost a grade"
+          tone="loss"
+          onDrill={
+            drillable
+              ? (trigger) => {
+                  const counts = moveCounts(rows, windowMonths);
+                  open(
+                    {
+                      title: 'Downgrades',
+                      figure: String(net.declined),
+                      source: {
+                        kind: 'rows',
+                        rows: fromHealthRows(
+                          movedRows(rows, windowMonths, 'declined'),
+                          moveDetail(counts, 'declined', 'downgrade'),
+                        ),
+                      },
+                    },
+                    trigger,
+                  );
+                }
+              : undefined
+          }
+        />
+        <Kpi
+          label="Upgrades"
+          value={String(net.improved)}
+          detail="account-months gained a grade"
+          tone="gain"
+          onDrill={
+            drillable
+              ? (trigger) => {
+                  const counts = moveCounts(rows, windowMonths);
+                  open(
+                    {
+                      title: 'Upgrades',
+                      figure: String(net.improved),
+                      source: {
+                        kind: 'rows',
+                        rows: fromHealthRows(
+                          movedRows(rows, windowMonths, 'improved'),
+                          moveDetail(counts, 'improved', 'upgrade'),
+                        ),
+                      },
+                    },
+                    trigger,
+                  );
+                }
+              : undefined
+          }
+        />
+        <Kpi
+          label="Net movement"
+          value={net.net > 0 ? `+${net.net}` : String(net.net)}
+          detail={`${net.held} held steady across the window`}
+          tone={net.net > 0 ? 'gain' : net.net < 0 ? 'loss' : 'neutral'}
+        />
+      </KpiStrip>
 
       <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
         <div className="flex items-start justify-between gap-3 px-4 pt-3">
@@ -139,7 +187,7 @@ export function MovementView() {
       </div>
 
       <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[300px] flex flex-col">
-        <RenewalRunwayChart buckets={buckets} />
+        <RenewalRunwayChart buckets={buckets} drillable={drillable} />
       </div>
     </div>
   );

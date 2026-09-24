@@ -159,40 +159,57 @@ export interface RenewalSummary {
   overdueArr: number;
 }
 
-export function summarise(scored: RenewalRow[]): RenewalSummary {
-  const summary: RenewalSummary = {
-    count: 0,
-    arr: 0,
-    unpriced: 0,
-    exposure: 0,
-    coldCount: 0,
-    coldArr: 0,
-    overdueCount: 0,
-    overdueArr: 0,
+export interface RenewalDrillSets {
+  /** Behind "Up for renewal" — inside the headline horizon, dated or not. */
+  upForRenewal: RenewalRow[];
+  /** Of those, the ones with a convertible ARR — behind "Forecast at risk". */
+  forecastAtRisk: RenewalRow[];
+  /** Of those, the ones nobody has logged an activity on recently — behind
+   *  "No recent contact". */
+  noRecentContact: RenewalRow[];
+  /** Renewal dates already passed — behind "Past due". */
+  pastDue: RenewalRow[];
+}
+
+/**
+ * The four account sets behind the Renewal tab's headline tiles.
+ *
+ * `summarise`'s totals and each tile's drill both read this — one predicate
+ * per figure, defined once, so a tile's number and the accounts a click on it
+ * opens can never quietly diverge.
+ */
+export function renewalDrillSets(scored: RenewalRow[]): RenewalDrillSets {
+  const upForRenewal = scored.filter(
+    (item) => item.days >= 0 && item.days <= HEADLINE_HORIZON_DAYS,
+  );
+
+  return {
+    upForRenewal,
+    // Priced and actually carrying some weighted exposure: a row at $0 adds
+    // nothing to the tile's sum, so listing it would only read "$0 at risk".
+    forecastAtRisk: upForRenewal.filter((item) => item.exposure !== null && item.exposure > 0),
+    noRecentContact: upForRenewal.filter((item) => item.coverage === "cold"),
+    pastDue: scored.filter((item) => item.days < 0),
   };
+}
 
-  for (const item of scored) {
-    if (item.days < 0) {
-      summary.overdueCount += 1;
-      summary.overdueArr += item.row.arr ?? 0;
-      continue;
-    }
-    if (item.days > HEADLINE_HORIZON_DAYS) continue;
+export function summarise(scored: RenewalRow[]): RenewalSummary {
+  const { upForRenewal, forecastAtRisk, noRecentContact, pastDue } =
+    renewalDrillSets(scored);
 
-    summary.count += 1;
-    if (item.row.arr === null) {
-      summary.unpriced += 1;
-    } else {
-      summary.arr += item.row.arr;
-      summary.exposure += item.exposure ?? 0;
-    }
-    if (item.coverage === "cold") {
-      summary.coldCount += 1;
-      summary.coldArr += item.row.arr ?? 0;
-    }
-  }
+  const sumArr = (items: RenewalRow[]) =>
+    items.reduce((sum, item) => sum + (item.row.arr ?? 0), 0);
 
-  return summary;
+  return {
+    count: upForRenewal.length,
+    arr: sumArr(upForRenewal),
+    unpriced: upForRenewal.filter((item) => item.row.arr === null).length,
+    exposure: forecastAtRisk.reduce((sum, item) => sum + (item.exposure ?? 0), 0),
+    coldCount: noRecentContact.length,
+    coldArr: sumArr(noRecentContact),
+    overdueCount: pastDue.length,
+    overdueArr: sumArr(pastDue),
+  };
 }
 
 export interface QuarterColumn {
@@ -203,6 +220,11 @@ export interface QuarterColumn {
   arr: Record<HealthStatus, number>;
   total: number;
   count: number;
+  /** The exact accounts behind each of `arr` — what the calendar chart's
+   *  quarter × health segment drills into. Always the same length as the
+   *  matching `arr` entry would suggest (one row per renewing account, not
+   *  per dollar). */
+  rows: Record<HealthStatus, HealthDataRow[]>;
 }
 
 const QUARTER_OF = (date: Date) => Math.floor(date.getMonth() / 3) + 1;
@@ -241,6 +263,7 @@ export function quarterColumns(
       arr: { Good: 0, Average: 0, Poor: 0 },
       total: 0,
       count: 0,
+      rows: { Good: [], Average: [], Poor: [] },
     });
   }
 
@@ -258,6 +281,7 @@ export function quarterColumns(
     const arr = item.row.arr ?? 0;
     column.arr[item.row.healthStatus] += arr;
     column.total += arr;
+    column.rows[item.row.healthStatus].push(item.row);
   }
 
   return columns;
@@ -272,6 +296,9 @@ export interface CoverageBand {
   unknown: number;
   total: number;
   count: number;
+  /** The exact accounts behind each contact-age figure — what the coverage
+   *  chart's window × contact-age segment drills into. */
+  rows: Record<Coverage, HealthDataRow[]>;
 }
 
 /**
@@ -294,6 +321,7 @@ export function coverageBands(scored: RenewalRow[]): CoverageBand[] {
       unknown: 0,
       total: 0,
       count: 0,
+      rows: { fresh: [], ageing: [], cold: [], unknown: [] },
     };
 
     for (const item of scored) {
@@ -302,6 +330,7 @@ export function coverageBands(scored: RenewalRow[]): CoverageBand[] {
       band[item.coverage] += arr;
       band.total += arr;
       band.count += 1;
+      band.rows[item.coverage].push(item.row);
     }
 
     return band;
@@ -310,11 +339,19 @@ export function coverageBands(scored: RenewalRow[]): CoverageBand[] {
 
 export interface OwnerLoad {
   owner: string;
+  /** What the grouping actually keys on — two CSMs who happen to share a
+   *  display name stay two separate entries here, same reason `owner`/
+   *  `ownerKey` are split on `HealthDataRow` itself. */
+  ownerKey: string;
   /** ARR renewing inside the horizon. */
   arr: number;
   /** Σ ARR × risk for the same set — the part of that book at risk. */
   exposure: number;
   count: number;
+  /** The exact accounts behind `arr`/`count` — what a click on this owner's
+   *  bar drills into. Same `0 <= days <= horizonDays` filter that built the
+   *  totals, never re-filtered separately. */
+  rows: HealthDataRow[];
 }
 
 /**
@@ -324,6 +361,10 @@ export interface OwnerLoad {
  * quarter, and is anyone carrying more exposure than one person can work".
  * Exposure rather than a simple at-risk count, because six shaky small
  * accounts and one shaky large one are not the same amount of trouble.
+ *
+ * Grouped by `ownerKey`, not by the display name: two CSMs named the same
+ * thing are a real, if rare, thing in an org this size, and keying on the
+ * label would silently merge their books.
  */
 export function ownerLoad(
   scored: RenewalRow[],
@@ -333,16 +374,20 @@ export function ownerLoad(
 
   for (const item of scored) {
     if (item.days < 0 || item.days > horizonDays) continue;
-    const entry = byOwner.get(item.row.owner) ?? {
+    const key = item.row.ownerKey;
+    const entry = byOwner.get(key) ?? {
       owner: item.row.owner,
+      ownerKey: key,
       arr: 0,
       exposure: 0,
       count: 0,
+      rows: [],
     };
     entry.arr += item.row.arr ?? 0;
     entry.exposure += item.exposure ?? 0;
     entry.count += 1;
-    byOwner.set(item.row.owner, entry);
+    entry.rows.push(item.row);
+    byOwner.set(key, entry);
   }
 
   return [...byOwner.values()].sort(

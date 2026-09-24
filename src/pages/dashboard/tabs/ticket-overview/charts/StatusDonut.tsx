@@ -1,17 +1,60 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { TicketBucket } from '../../../../../features/tickets/ticketsSlice';
-import { STATUS_COLORS, FALLBACK_COLOR } from '../chartTheme';
+import { STATUS_COLORS, STATUS_VALUES, FALLBACK_COLOR } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { useDrill } from '../../../drill/useDrill';
+import { DrillTargets } from '../../../drill/DrillTargets';
 
-export function StatusDonut({ data }: { data: TicketBucket[] }) {
+const PATH = '/tickets/stats/';
+
+export function StatusDonut({
+  data,
+  query,
+  drillable = true,
+}: {
+  data: TicketBucket[];
+  query: string;
+  /** False while the view refetches: the figures on screen are the old
+   *  ones, but a drill would send the new query, so nothing opens. */
+  drillable?: boolean;
+}) {
+  const { open } = useDrill();
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (entry: TicketBucket) =>
+    drillable && entry.value > 0 && Boolean(STATUS_VALUES[entry.name]);
+
+  const openSegment = (entry: TicketBucket, trigger?: HTMLElement) => {
+    const value = STATUS_VALUES[entry.name];
+    if (!value || !canDrill(entry)) return;
+    open(
+      {
+        title: entry.name,
+        figure: String(entry.value),
+        source: { kind: 'server', path: PATH, query, segment: `status:${value}` },
+      },
+      trigger,
+    );
+  };
+
+  // One keyboard target per slice the server recognises — same
+  // ignore-the-unmapped-name convention the pointer handler follows.
+  const drillItems = data
+    .filter(canDrill)
+    .map((entry) => ({
+      name: entry.name,
+      figure: String(entry.value),
+      onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
+    }));
 
   return (
     <div className="w-full h-full p-4 flex flex-col relative h-[280px]">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-[13px] font-bold text-ink">Ticket Status Distribution</h3>
       </div>
+
+      <DrillTargets label="Ticket Status Distribution" items={drillItems} />
 
       <div className="flex-1 w-full relative">
         <ResponsiveContainer width="100%" height="100%">
@@ -56,7 +99,12 @@ export function StatusDonut({ data }: { data: TicketBucket[] }) {
               labelLine={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
             >
               {data.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] ?? FALLBACK_COLOR} />
+                <Cell
+                  key={`cell-${index}`}
+                  fill={STATUS_COLORS[entry.name] ?? FALLBACK_COLOR}
+                  cursor={canDrill(entry) ? 'pointer' : undefined}
+                  onClick={canDrill(entry) ? () => openSegment(entry) : undefined}
+                />
               ))}
             </Pie>
             <Tooltip

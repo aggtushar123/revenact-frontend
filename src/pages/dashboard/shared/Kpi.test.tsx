@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Kpi, KpiStrip } from './Kpi';
 
 describe('Kpi', () => {
@@ -22,6 +23,20 @@ describe('Kpi', () => {
   it('has no coloured left border', () => {
     const { container } = render(<Kpi label="x" value="1" tone="loss" />);
     expect(container.innerHTML).not.toMatch(/border-l-(danger|success|info)/);
+  });
+
+  it('a drillable figure keeps its detail as the button\'s description and holds only phrasing content', () => {
+    render(<Kpi label="At risk" value="$114.5K" detail="weighted churn and contraction" onDrill={() => {}} />);
+    const button = screen.getByRole('button', { name: 'At risk $114.5K, show accounts' });
+    expect(button).toHaveAccessibleDescription('weighted churn and contraction');
+    expect(button.querySelector('div')).toBeNull();
+    expect(screen.getByText('weighted churn and contraction')).toBeVisible();
+  });
+
+  it('a drillable figure with no detail has no description', () => {
+    render(<Kpi label="At risk" value="$114.5K" onDrill={() => {}} />);
+    const button = screen.getByRole('button', { name: 'At risk $114.5K, show accounts' });
+    expect(button).not.toHaveAttribute('aria-describedby');
   });
 
   it('KpiStrip lays out children in a list', () => {
@@ -57,6 +72,19 @@ describe('Kpi', () => {
     const list = container.querySelector('ul')!;
     expect(list.className).toContain('md:grid-cols-3');
     expect(list.className).not.toContain('md:grid-cols-4');
+  });
+
+  it('becomes a button with a full accessible name when drillable', async () => {
+    const onDrill = vi.fn();
+    render(<Kpi label="At risk" value="$114.5K" onDrill={onDrill} />);
+    const button = screen.getByRole('button', { name: 'At risk $114.5K, show accounts' });
+    await userEvent.click(button);
+    expect(onDrill).toHaveBeenCalledWith(button);
+  });
+
+  it('stays a plain figure without onDrill', () => {
+    render(<Kpi label="NRR" value="99.6%" />);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
 

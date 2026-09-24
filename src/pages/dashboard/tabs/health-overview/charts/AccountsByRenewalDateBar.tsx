@@ -1,9 +1,13 @@
 import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
-import type { HealthDataRow } from '../mockData';
+import type { HealthDataRow, HealthStatus } from '../mockData';
 import { renewalMonths } from '../movement';
+import type { RenewalMonth } from '../movement';
 import { HEALTH_STACK, makeStackedTotalLabel } from './stackedTotalLabel';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { useDrill } from '../../../drill/useDrill';
+import { fromHealthRows } from '../../../drill/rows';
+import { DrillTargets } from '../../../drill/DrillTargets';
 
 const STATUS_COLORS = {
   Poor: 'var(--danger)',
@@ -23,10 +27,21 @@ const STATUS_COLORS = {
  * renewal count in the data to draw one from, and a line with nothing behind it
  * is what this chart is being fixed for.
  */
-export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
+export function AccountsByRenewalDateBar({
+  data,
+  drillable = true,
+}: {
+  data: HealthDataRow[];
+  /** False when `data` is a truncated book — a drill from it would only ever
+   *  show some of the accounts a segment counted. Defaults to `true` so
+   *  every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
+}) {
+  const { open } = useDrill();
+  const months = useMemo(() => renewalMonths(data), [data]);
   const chartData = useMemo(
     () =>
-      renewalMonths(data).map((m) => ({
+      months.map((m) => ({
         name: m.short,
         full: m.label,
         Good: m.counts.Good,
@@ -34,7 +49,7 @@ export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
         Poor: m.counts.Poor,
         total: m.total,
       })),
-    [data],
+    [months],
   );
 
   const busiest = useMemo(
@@ -44,6 +59,33 @@ export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
     ),
     [chartData],
   );
+
+  const openSegment = (month: RenewalMonth, status: HealthStatus, trigger?: HTMLElement) => {
+    const picked = month.rows[status];
+    open(
+      {
+        title: `${month.label} · ${status}`,
+        figure: String(picked.length),
+        source: { kind: 'rows', rows: fromHealthRows(picked) },
+      },
+      trigger,
+    );
+  };
+
+  // One button per month × status that actually has an account in it — a
+  // keyboard user (and this chart's own test) can't reach a recharts <Bar>'s
+  // SVG segments, so this is the real drill target; the Bar's own onClick
+  // below is the pointer shortcut to the same thing. None at all when the
+  // book is truncated — see `drillable`.
+  const drillItems = drillable
+    ? months.flatMap((month) =>
+        HEALTH_STACK.filter((status) => month.rows[status].length > 0).map((status) => ({
+          name: `${month.label} · ${status}`,
+          figure: String(month.rows[status].length),
+          onSelect: (trigger: HTMLElement) => openSegment(month, status, trigger),
+        })),
+      )
+    : [];
 
   return (
     <div className="w-full h-[280px] p-6 flex flex-col">
@@ -55,6 +97,8 @@ export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
           </span>
         )}
       </div>
+
+      <DrillTargets label="Accounts by Renewal Date" items={drillItems} />
 
       <div className="flex-1 w-full relative">
         {chartData.length === 0 ? (
@@ -96,6 +140,8 @@ export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
                   stackId="renewal"
                   fill={STATUS_COLORS[status]}
                   barSize={24}
+                  cursor={drillable ? 'pointer' : undefined}
+                  onClick={drillable ? (_, index) => openSegment(months[index], status) : undefined}
                 >
                   <LabelList content={makeStackedTotalLabel(status, chartData)} />
                 </Bar>

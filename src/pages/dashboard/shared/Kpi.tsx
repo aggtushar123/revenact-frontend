@@ -1,4 +1,4 @@
-import { Children, type ReactNode } from 'react';
+import { Children, useId, type ReactNode } from 'react';
 
 const FIGURE_TONE = {
   neutral: 'text-ink',
@@ -14,20 +14,44 @@ export function Kpi({
   value,
   detail,
   tone = 'neutral',
+  onDrill,
 }: {
   label: string;
   value: string;
   detail?: string;
   tone?: keyof typeof FIGURE_TONE;
+  onDrill?: (trigger: HTMLElement) => void;
 }) {
-  return (
-    <div className="min-w-0">
-      <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{label}</div>
-      <div className={`font-mono-brand tabular-nums text-[22px] leading-tight mt-1 ${FIGURE_TONE[tone]}`}>
+  const detailId = useId();
+  // Spans (made block) rather than divs so the drill button holds only
+  // phrasing content. The button's aria-label replaces its text as the
+  // accessible name, so the detail line is wired back in as the
+  // description — otherwise a screen reader would never hear it.
+  const body = (
+    <>
+      <span className="block text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{label}</span>
+      <span className={`block font-mono-brand tabular-nums text-[22px] leading-tight mt-1 ${FIGURE_TONE[tone]}`}>
         {value}
-      </div>
-      {detail && <div className="text-[11px] text-ink-muted mt-0.5">{detail}</div>}
-    </div>
+      </span>
+      {detail && (
+        <span id={detailId} className="block text-[11px] text-ink-muted mt-0.5">
+          {detail}
+        </span>
+      )}
+    </>
+  );
+
+  if (!onDrill) return <div className="min-w-0">{body}</div>;
+  return (
+    <button
+      type="button"
+      onClick={(event) => onDrill(event.currentTarget)}
+      aria-label={`${label} ${value}, show accounts`}
+      aria-describedby={detail ? detailId : undefined}
+      className="min-w-0 w-full text-left rounded-lg -m-1 p-1 cursor-pointer hover:bg-subtle transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      {body}
+    </button>
   );
 }
 

@@ -4,6 +4,7 @@ import {
   coverageOf,
   ownerLoad,
   quarterColumns,
+  renewalDrillSets,
   renewalQueue,
   renewalRows,
   riskOfLoss,
@@ -204,6 +205,28 @@ describe('quarterColumns', () => {
 
     expect(quarterColumns(rows, NOW, 4).every((c) => c.total === 0)).toBe(true);
   });
+
+  it('carries the exact accounts behind each quarter × health segment', () => {
+    // Near misses: a different quarter, and a different health status within
+    // the same quarter — neither should land in the drilled segment.
+    const { rows } = renewalRows(
+      [
+        renewingIn(5, { id: 'poor-now', account: 'PoorNow', arr: 80_000, healthStatus: 'Poor' }),
+        renewingIn(6, { id: 'good-now', account: 'GoodNow', arr: 20_000, healthStatus: 'Good' }),
+        renewingIn(200, { id: 'poor-later', account: 'PoorLater', arr: 40_000, healthStatus: 'Poor' }),
+        renewingIn(-10, { id: 'overdue', account: 'Overdue', arr: 5_000, healthStatus: 'Poor' }),
+      ],
+      NOW
+    );
+
+    const [current] = quarterColumns(rows, NOW, 4);
+
+    expect(current.rows.Poor.map((r) => r.account)).toEqual(['PoorNow']);
+    expect(current.rows.Good.map((r) => r.account)).toEqual(['GoodNow']);
+    // Every segment's row count matches the length its own `arr`/`count`
+    // figures imply — the two never computed separately.
+    expect(current.rows.Poor).toHaveLength(1);
+  });
 });
 
 describe('coverageBands', () => {
@@ -233,15 +256,33 @@ describe('coverageBands', () => {
     const overdue = coverageBands(rows).find((b) => b.key === 'overdue')!;
     expect(overdue.total).toBe(1_000);
   });
+
+  it('carries the exact accounts behind each window × contact-age segment', () => {
+    const { rows } = renewalRows(
+      [
+        renewingIn(10, { id: '1', account: 'FreshSoon', arr: 10_000, daysSinceTouch: 2 }),
+        // Near miss: same window, a different contact age.
+        renewingIn(20, { id: '2', account: 'ColdSoon', arr: 20_000, daysSinceTouch: 200 }),
+        // Near miss: same contact age, a different window.
+        renewingIn(70, { id: '3', account: 'ColdLater', arr: 5_000, daysSinceTouch: 200 }),
+      ],
+      NOW
+    );
+
+    const band30 = coverageBands(rows).find((b) => b.key === '30')!;
+
+    expect(band30.rows.fresh.map((r) => r.account)).toEqual(['FreshSoon']);
+    expect(band30.rows.cold.map((r) => r.account)).toEqual(['ColdSoon']);
+  });
 });
 
 describe('ownerLoad', () => {
   it('ranks owners by the ARR they are carrying, heaviest first', () => {
     const { rows } = renewalRows(
       [
-        renewingIn(10, { id: '1', owner: 'Ada', arr: 300_000 }),
-        renewingIn(20, { id: '2', owner: 'Grace', arr: 100_000 }),
-        renewingIn(30, { id: '3', owner: 'Grace', arr: 50_000 }),
+        renewingIn(10, { id: '1', owner: 'Ada', ownerKey: 'ada', arr: 300_000 }),
+        renewingIn(20, { id: '2', owner: 'Grace', ownerKey: 'grace', arr: 100_000 }),
+        renewingIn(30, { id: '3', owner: 'Grace', ownerKey: 'grace', arr: 50_000 }),
       ],
       NOW
     );
@@ -251,12 +292,118 @@ describe('ownerLoad', () => {
     expect(load.map((l) => l.owner)).toEqual(['Ada', 'Grace']);
     expect(load[1].count).toBe(2);
     expect(load[1].arr).toBe(150_000);
+    expect(load[1].rows.map((r) => r.id)).toEqual(['2', '3']);
   });
 
   it('ignores renewals beyond the horizon', () => {
-    const { rows } = renewalRows([renewingIn(400, { owner: 'Ada', arr: 1_000_000 })], NOW);
+    const { rows } = renewalRows(
+      [renewingIn(400, { owner: 'Ada', ownerKey: 'ada', arr: 1_000_000 })],
+      NOW
+    );
 
     expect(ownerLoad(rows, 180)).toEqual([]);
+  });
+
+  it('keeps two owners with the same name separate when their ownerKey differs', () => {
+    // Two CSMs called "Sam Rivera" is an ordinary thing in a real org; keying
+    // on the label instead of `ownerKey` would silently merge their books.
+    const { rows } = renewalRows(
+      [
+        renewingIn(10, { id: '1', owner: 'Sam Rivera', ownerKey: 'sam-1', arr: 200_000 }),
+        renewingIn(15, { id: '2', owner: 'Sam Rivera', ownerKey: 'sam-2', arr: 50_000 }),
+      ],
+      NOW
+    );
+
+    const load = ownerLoad(rows);
+
+    expect(load).toHaveLength(2);
+    const byKey = Object.fromEntries(load.map((l) => [l.ownerKey, l]));
+    expect(byKey['sam-1'].arr).toBe(200_000);
+    expect(byKey['sam-2'].arr).toBe(50_000);
+    expect(byKey['sam-1'].rows.map((r) => r.id)).toEqual(['1']);
+    expect(byKey['sam-2'].rows.map((r) => r.id)).toEqual(['2']);
+  });
+});
+
+describe('renewalDrillSets', () => {
+  const book = () =>
+    renewalRows(
+      [
+        renewingIn(10, {
+          id: '1',
+          account: 'Poor90',
+          arr: 100_000,
+          healthStatus: 'Poor',
+          daysSinceTouch: 90,
+          riskOfLoss: 0.6,
+        }),
+        renewingIn(80, {
+          id: '2',
+          account: 'Good90',
+          arr: 50_000,
+          healthStatus: 'Good',
+          daysSinceTouch: 5,
+          riskOfLoss: 0.05,
+        }),
+        // Near miss: renews beyond the 90-day horizon.
+        renewingIn(200, { id: '3', account: 'Beyond90', arr: 900_000, healthStatus: 'Poor' }),
+        // Overdue — behind "Past due", not "Up for renewal".
+        renewingIn(-12, { id: '4', account: 'Overdue', arr: 30_000 }),
+        // Inside the horizon but unpriced — in "Up for renewal", not
+        // "Forecast at risk".
+        renewingIn(20, { id: '5', account: 'Unpriced', arr: null }),
+      ],
+      NOW
+    ).rows;
+
+  it('lists accounts inside the headline horizon, dated or not', () => {
+    const { upForRenewal } = renewalDrillSets(book());
+    expect(upForRenewal.map((r) => r.row.account).sort()).toEqual(
+      ['Good90', 'Poor90', 'Unpriced'].sort()
+    );
+  });
+
+  it('narrows to a convertible ARR for "forecast at risk"', () => {
+    const { forecastAtRisk } = renewalDrillSets(book());
+    expect(forecastAtRisk.map((r) => r.row.account).sort()).toEqual(['Good90', 'Poor90'].sort());
+  });
+
+  it('leaves out an account with nothing at risk, without changing the sum or the unpriced count', () => {
+    // A priced account whose weighted exposure is 0 (a $0 contract) adds
+    // nothing to the tile, so listing it under "Forecast at risk" would
+    // show a row with "$0 at risk".
+    const withZero = [
+      ...book(),
+      ...renewalRows([renewingIn(30, { id: '6', account: 'ZeroArr', arr: 0 })], NOW).rows,
+    ];
+    const { forecastAtRisk } = renewalDrillSets(withZero);
+    expect(forecastAtRisk.map((r) => r.row.account).sort()).toEqual(['Good90', 'Poor90'].sort());
+
+    const before = summarise(book());
+    const after = summarise(withZero);
+    expect(after.exposure).toBe(before.exposure);
+    expect(after.unpriced).toBe(before.unpriced);
+  });
+
+  it('narrows to accounts with no recent contact', () => {
+    const { noRecentContact } = renewalDrillSets(book());
+    expect(noRecentContact.map((r) => r.row.account)).toEqual(['Poor90']);
+  });
+
+  it('lists overdue accounts separately from the horizon', () => {
+    const { pastDue } = renewalDrillSets(book());
+    expect(pastDue.map((r) => r.row.account)).toEqual(['Overdue']);
+  });
+
+  it('sums back to the same totals summarise reports', () => {
+    const scored = book();
+    const drills = renewalDrillSets(scored);
+    const summary = summarise(scored);
+
+    expect(drills.upForRenewal).toHaveLength(summary.count);
+    expect(drills.noRecentContact).toHaveLength(summary.coldCount);
+    expect(drills.pastDue).toHaveLength(summary.overdueCount);
   });
 });
 

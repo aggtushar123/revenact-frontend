@@ -8,6 +8,7 @@ import { ConcentrationChart } from './charts/ConcentrationChart';
 import { CohortChart } from './charts/CohortChart';
 import { ChurnReasonList } from './charts/ChurnReasonList';
 import { CompositionSplit } from './charts/CompositionSplit';
+import { useDrill } from '../../drill/useDrill';
 
 /** The filter query string, handed down by CustomerOverviewContainer's bar. */
 export interface CustomerOverviewContext {
@@ -27,6 +28,7 @@ export interface CustomerOverviewContext {
 export function ControlsView() {
   const dispatch = useAppDispatch();
   const { stats, isLoading, error } = useAppSelector((state) => state.portfolio);
+  const { open } = useDrill();
 
   const context = useOutletContext<CustomerOverviewContext | undefined>();
   const query = context?.query ?? '';
@@ -93,6 +95,24 @@ export function ControlsView() {
                 : 'loading'
             }
             tone={kpis && kpis.churned_12m > 0 ? 'loss' : 'neutral'}
+            onDrill={
+              kpis && !isLoading
+                ? (trigger) =>
+                    open(
+                      {
+                        title: 'Churned in 12 months',
+                        figure: String(kpis.churned_12m),
+                        source: {
+                          kind: 'server',
+                          path: '/customers/overview/',
+                          query,
+                          segment: 'churned_12m',
+                        },
+                      },
+                      trigger,
+                    )
+                : undefined
+            }
           />
           <Kpi
             label="Top 3 concentration"
@@ -103,6 +123,34 @@ export function ControlsView() {
                 : `${stats.concentration.top_three_share}%`
             }
             detail="of ARR in the three largest accounts"
+            onDrill={
+              // Only when there is a share to explain and accounts behind it.
+              stats && stats.concentration.top_three_share !== null && stats.concentration.rows.length > 0
+                ? (trigger) =>
+                    open(
+                      {
+                        title: 'Top 3 concentration',
+                        figure:
+                          stats.concentration.top_three_share === null
+                            ? '—'
+                            : `${stats.concentration.top_three_share}%`,
+                        source: {
+                          kind: 'rows',
+                          // Exactly the three accounts the share sums over —
+                          // complete by construction, never the whole ranked list.
+                          rows: stats.concentration.rows.slice(0, 3).map((row) => ({
+                            id: String(row.id),
+                            name: row.name,
+                            owner: row.owner,
+                            arr: row.arr,
+                            detail: `${row.share}% of ARR`,
+                          })),
+                        },
+                      },
+                      trigger,
+                    )
+                : undefined
+            }
           />
         </KpiStrip>
 

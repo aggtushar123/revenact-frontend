@@ -5,9 +5,13 @@ import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import activityReducer from '../../../../features/activity/activitySlice';
+import authReducer from '../../../../features/auth/authSlice';
 import { AreaLayout } from '../../AreaLayout';
 import { ActivityContainer } from '../ActivityContainer';
 import { ControlsView } from './ControlsView';
+import { DrillProvider } from '../../drill/DrillContext';
+import { DrillPanel } from '../../drill/DrillPanel';
+import { mockFetchRouted, drillResponse } from '../../drill/testDrill';
 
 // Integration tier: container + view + charts through the real router, with
 // only the fetch boundary mocked. The two Recharts charts need a sized
@@ -96,17 +100,26 @@ function mockFetch(body: unknown = stats, status = 200) {
 }
 
 function renderActivity(url = '/dashboard/health/activity') {
-  const store = configureStore({ reducer: { activity: activityReducer } });
+  // `auth` is here only so `useOrgCurrency` (read by the drill panel's row
+  // list) has a slice to select from — its default state has no user, which
+  // is exactly what falls back to 'USD', matching this file's fixtures.
+  // `DrillProvider` + `DrillPanel` mirror DashboardFrame's real, app-wide
+  // pairing so a click on a drillable Kpi opens a real dialog instead of
+  // throwing on a missing `useDrill()` provider.
+  const store = configureStore({ reducer: { activity: activityReducer, auth: authReducer } });
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
-        <Routes>
-          <Route path="/dashboard/health" element={<AreaLayout area="health" />}>
-            <Route element={<ActivityContainer />}>
-              <Route path="activity" element={<ControlsView />} />
+        <DrillProvider>
+          <Routes>
+            <Route path="/dashboard/health" element={<AreaLayout area="health" />}>
+              <Route element={<ActivityContainer />}>
+                <Route path="activity" element={<ControlsView />} />
+              </Route>
             </Route>
-          </Route>
-        </Routes>
+          </Routes>
+          <DrillPanel />
+        </DrillProvider>
       </MemoryRouter>
     </Provider>,
   );
@@ -311,5 +324,62 @@ describe('Activity Tracking', () => {
 
     await screen.findByRole('alert');
     expect(screen.getByText('75%')).toBeInTheDocument();
+  });
+});
+
+// ── drill (server) ──────────────────────────────────────────────────
+
+describe('Activity Tracking drill', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('opens the gone-quiet drill against the server, carrying the window', async () => {
+    const fetchMock = mockFetchRouted(stats, {
+      gone_quiet: drillResponse(
+        [
+          { id: 21, name: 'WeWork', owner: 'Unassigned', arr: 24_000, value: null },
+          { id: 14, name: 'Pizza Hut', owner: 'Carl CSM', arr: 69_600, value: 84 },
+        ],
+        'days since contact',
+      ),
+    });
+    const user = userEvent.setup();
+    renderActivity();
+
+    await user.click(await screen.findByRole('button', { name: 'Gone quiet 2, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain('/api/v1/customers/activity/?days=90&drill=gone_quiet')
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('link', { name: 'WeWork' })).toBeInTheDocument();
+    expect(within(dialog).getByText('never contacted')).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+    expect(within(dialog).getByText('84 days since contact')).toBeInTheDocument();
+  });
+
+  it('carries the current filters into the gone-quiet drill request', async () => {
+    const fetchMock = mockFetchRouted(stats, { gone_quiet: drillResponse([], 'days since contact') });
+    const user = userEvent.setup();
+    renderActivity('/dashboard/health/activity?owner=5');
+
+    await user.click(await screen.findByRole('button', { name: 'Gone quiet 2, show accounts' }));
+
+    await waitFor(() =>
+      expect(lastUrl(fetchMock)).toContain(
+        '/api/v1/customers/activity/?owner=5&days=90&drill=gone_quiet'
+      )
+    );
+  });
+
+  it('does not make a button of the non-drillable KPIs', async () => {
+    mockFetchRouted(stats, {});
+    renderActivity();
+
+    await screen.findByText('Touches logged');
+    expect(screen.getByText('144').closest('button')).toBeNull();
+    expect(screen.getByText('75%').closest('button')).toBeNull();
+    expect(screen.getByText('25').closest('button')).toBeNull();
   });
 });

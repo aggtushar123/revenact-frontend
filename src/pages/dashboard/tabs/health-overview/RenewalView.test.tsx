@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { screen, within } from '@testing-library/react';
-import { healthRow, renderWithHealth } from './testUtils';
+import userEvent from '@testing-library/user-event';
+import { healthRow, renderWithHealth, renderWithDrill } from './testUtils';
 import { RenewalView } from './RenewalView';
 
 // Integration tier. The two Recharts charts need a sized container jsdom won't
@@ -28,6 +29,7 @@ const BOOK = [
     id: '1',
     account: 'Nova Enterprises',
     owner: 'Gerry Hill',
+    ownerKey: 'gerry',
     arr: 240_000,
     healthStatus: 'Poor',
     daysSinceTouch: 95,
@@ -42,6 +44,7 @@ const BOOK = [
     id: '2',
     account: 'Hyatt Hotels',
     owner: 'Ada Lovelace',
+    ownerKey: 'ada',
     arr: 120_000,
     healthStatus: 'Good',
     daysSinceTouch: 4,
@@ -52,6 +55,7 @@ const BOOK = [
     id: '3',
     account: 'Far Future Co',
     owner: 'Ada Lovelace',
+    ownerKey: 'ada',
     arr: 600_000,
     healthStatus: 'Average',
     daysSinceTouch: 20,
@@ -154,10 +158,10 @@ describe('RenewalView', () => {
     // name also appears in the work list, so this asserts on the bar's own
     // label rather than on the text.
     expect(
-      screen.getByRole('img', { name: /Ada Lovelace: \$120,000\.00 renewing/ })
+      screen.getByRole('button', { name: /Ada Lovelace \$120\.0K, show accounts/ })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('img', { name: /Gerry Hill: \$240,000\.00 renewing/ })
+      screen.getByRole('button', { name: /Gerry Hill \$240\.0K, show accounts/ })
     ).toBeInTheDocument();
   });
 
@@ -204,4 +208,116 @@ describe('RenewalView', () => {
   // nav's job — `DashboardToolbar`, fed by `AREAS` in `areas.ts` — which has
   // its own tests; the container no longer renders a tab bar of its own for
   // this suite to reach through.
+});
+
+describe('RenewalView drill', () => {
+  const drillBook = [
+    // Up for renewal, forecast at risk (priced), fresh contact.
+    renewingIn(10, {
+      id: '1',
+      account: 'PricedSoon',
+      arr: 100_000,
+      daysSinceTouch: 2,
+      riskOfLoss: 0.4,
+    }),
+    // Up for renewal, but unpriced — not in "forecast at risk".
+    renewingIn(20, { id: '2', account: 'UnpricedSoon', arr: null, daysSinceTouch: 2 }),
+    // Up for renewal and cold — behind "No recent contact" too.
+    renewingIn(30, { id: '3', account: 'ColdSoon', arr: 50_000, daysSinceTouch: 90 }),
+    // Near miss: renews well beyond the 90-day horizon.
+    renewingIn(200, { id: '4', account: 'FarOut', arr: 900_000 }),
+    // Overdue — behind "Past due", not "Up for renewal".
+    renewingIn(-9, { id: '5', account: 'SlippedLtd', arr: 80_000 }),
+  ];
+
+  it('Up for renewal opens exactly the accounts inside the 90-day horizon', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<RenewalView />, { rows: drillBook });
+
+    await user.click(screen.getByRole('button', { name: /Up for renewal \$150\.0K, show accounts/ }));
+    const dialog = screen.getByRole('dialog');
+
+    ['PricedSoon', 'UnpricedSoon', 'ColdSoon'].forEach((name) =>
+      expect(within(dialog).getByRole('link', { name })).toBeInTheDocument(),
+    );
+    ['FarOut', 'SlippedLtd'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
+  });
+
+  it('Forecast at risk opens only the priced accounts, with their risk and weighted exposure as the detail', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<RenewalView />, { rows: drillBook });
+
+    await user.click(screen.getByRole('button', { name: /Forecast at risk/ }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'PricedSoon' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'ColdSoon' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'UnpricedSoon' })).not.toBeInTheDocument();
+
+    // PricedSoon: $100K x 40% risk = $40.0K at risk. ColdSoon: $50K x the
+    // default 5% risk = $2.5K. Each row's own weighted figure, not just the
+    // percentage, so the rows visibly add up to the tile's $42.5K.
+    const pricedRow = within(dialog).getByRole('link', { name: 'PricedSoon' }).closest('li') as HTMLElement;
+    expect(pricedRow).toHaveTextContent('40% risk · $40.0K at risk');
+    const coldRow = within(dialog).getByRole('link', { name: 'ColdSoon' }).closest('li') as HTMLElement;
+    expect(coldRow).toHaveTextContent('5% risk · $2.5K at risk');
+  });
+
+  it('Forecast at risk: each row\'s weighted exposure sums (within rounding) to the tile\'s own figure', async () => {
+    const user = userEvent.setup();
+    const twoAccounts = [
+      renewingIn(10, { id: '1', account: 'BigRisk', arr: 200_000, riskOfLoss: 0.3 }),
+      renewingIn(20, { id: '2', account: 'SmallRisk', arr: 100_000, riskOfLoss: 0.1 }),
+    ];
+    renderWithDrill(<RenewalView />, { rows: twoAccounts });
+
+    // 200_000 x 0.3 + 100_000 x 0.1 = 60_000 + 10_000 = $70.0K.
+    await user.click(screen.getByRole('button', { name: /Forecast at risk \$70\.0K, show accounts/ }));
+    const dialog = screen.getByRole('dialog');
+
+    const bigRow = within(dialog).getByRole('link', { name: 'BigRisk' }).closest('li') as HTMLElement;
+    const smallRow = within(dialog).getByRole('link', { name: 'SmallRisk' }).closest('li') as HTMLElement;
+    expect(bigRow).toHaveTextContent('30% risk · $60.0K at risk');
+    expect(smallRow).toHaveTextContent('10% risk · $10.0K at risk');
+  });
+
+  it('No recent contact opens only the accounts with nothing logged in 60 days', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<RenewalView />, { rows: drillBook });
+
+    await user.click(screen.getByRole('button', { name: /No recent contact/ }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'ColdSoon' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'PricedSoon' })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'UnpricedSoon' })).not.toBeInTheDocument();
+  });
+
+  it('Past due opens the overdue accounts, each with how many days overdue', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<RenewalView />, { rows: drillBook });
+
+    await user.click(screen.getByRole('button', { name: /Past due 1, show accounts/ }));
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'SlippedLtd' })).toBeInTheDocument();
+    ['PricedSoon', 'UnpricedSoon', 'ColdSoon', 'FarOut'].forEach((name) =>
+      expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
+    );
+    const slippedRow = within(dialog).getByRole('link', { name: 'SlippedLtd' }).closest('li') as HTMLElement;
+    expect(slippedRow).toHaveTextContent('9 days overdue');
+  });
+
+  it('offers no drill on any tile or chart when the book is truncated', () => {
+    renderWithDrill(<RenewalView />, { rows: drillBook, truncated: true });
+
+    expect(screen.queryByRole('button', { name: /Up for renewal/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Forecast at risk/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /No recent contact/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Past due/ })).not.toBeInTheDocument();
+    // The renewal calendar's per-segment keyboard targets, gone too.
+    expect(screen.queryByRole('button', { name: /show accounts/ })).not.toBeInTheDocument();
+  });
 });

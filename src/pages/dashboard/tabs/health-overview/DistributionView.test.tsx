@@ -8,6 +8,9 @@ import authReducer from '../../../../features/auth/authSlice';
 import healthReducer, { NO_FILTERS } from '../../../../features/health/healthSlice';
 import { ALL_CAPABILITIES } from '../../../../test/capabilities';
 import { DistributionView } from './DistributionView';
+import { DrillProvider } from '../../drill/DrillContext';
+import { healthRow } from './testUtils';
+import type { HealthDataRow } from '../../../../features/health/types';
 
 // Integration tier: DistributionView is `ControlsView` (the old "Controls"
 // portfolio mix, reading `state.health`) stacked over `HealthDistribution`
@@ -43,7 +46,7 @@ function fetchMock() {
   });
 }
 
-function renderDistribution() {
+function renderDistribution({ rows = [], truncated = false }: { rows?: HealthDataRow[]; truncated?: boolean } = {}) {
   const store = configureStore({
     reducer: { customers: customersReducer, auth: authReducer, health: healthReducer },
     preloadedState: {
@@ -83,11 +86,11 @@ function renderDistribution() {
       // doesn't fire its own fetch thunk — this test is about the two
       // halves rendering together, not about loading either one's data.
       health: {
-        rows: [],
+        rows,
         isLoading: false,
         error: null,
         historyMonths: 12,
-        truncated: false,
+        truncated,
         loadedAt: '2026-09-11T00:00:00.000Z',
         currency: 'USD' as const,
         unconvertedCount: 0,
@@ -99,7 +102,9 @@ function renderDistribution() {
   return render(
     <Provider store={store}>
       <MemoryRouter>
-        <DistributionView />
+        <DrillProvider>
+          <DistributionView />
+        </DrillProvider>
       </MemoryRouter>
     </Provider>
   );
@@ -116,5 +121,38 @@ describe('DistributionView', () => {
 
     expect(screen.getByRole('button', { name: /organizations/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /accounts/i })).toBeInTheDocument();
+  });
+
+  it('no longer draws the invented "Accounts by Last Touch" curve', async () => {
+    // That chart scaled a hardcoded twelve-month shape by the row count
+    // rather than reading `daysSinceTouch` at all — removed rather than
+    // fixed, since there was no real per-month touch date to draw it from.
+    vi.stubGlobal('fetch', fetchMock());
+    renderDistribution();
+
+    expect(screen.queryByText(/Accounts by Last Touch/i)).not.toBeInTheDocument();
+  });
+
+  const book = [
+    healthRow({ id: '1', account: 'Acme', csmPulseScore: 3, aiPulseScore: 2, renewalDate: 'Dec 31, 2026', healthStatus: 'Good' }),
+    healthRow({ id: '2', account: 'Globex', csmPulseScore: 1, aiPulseScore: 1, renewalDate: 'Jan 15, 2027', healthStatus: 'Poor' }),
+  ];
+
+  it('offers drills from the mix when the book is complete', () => {
+    vi.stubGlobal('fetch', fetchMock());
+    renderDistribution({ rows: book });
+
+    expect(screen.getAllByRole('button', { name: /, show accounts$/ }).length).toBeGreaterThan(0);
+  });
+
+  it('offers no drill anywhere in the mix when the book is truncated', () => {
+    vi.stubGlobal('fetch', fetchMock());
+    renderDistribution({ rows: book, truncated: true });
+
+    expect(screen.queryAllByRole('button', { name: /, show accounts$/ })).toHaveLength(0);
+    // No DrillTargets list at all — not just empty buttons.
+    for (const label of ['Health by owner', 'CSM Pulse', 'AI Pulse', 'Accounts by renewal date']) {
+      expect(screen.queryByRole('list', { name: new RegExp(label, 'i') })).not.toBeInTheDocument();
+    }
   });
 });
