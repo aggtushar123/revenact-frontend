@@ -66,6 +66,9 @@ export function OriginBar({
   // clipped any bar above 400.
   const max = niceMax(ranked.map((d) => d.value));
 
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (row: TicketOrigin) => drillable && row.value > 0;
+
   const openSegment = (row: (typeof ranked)[number], trigger?: HTMLElement) => {
     const segment = row.connector_id === null ? 'origin:none' : `origin:${row.connector_id}`;
     open(
@@ -80,7 +83,7 @@ export function OriginBar({
 
   // Every origin drills, including the null-connector "Revenact" bucket —
   // the backend's own `origin:none` segment.
-  const drillItems = (drillable ? ranked : []).map((row) => ({
+  const drillItems = ranked.filter(canDrill).map((row) => ({
     key: String(row.connector_id ?? 'none'),
     name: row.label,
     figure: String(row.value),
@@ -138,8 +141,8 @@ export function OriginBar({
                   <Cell
                     key={row.connector_id ?? 'none'}
                     fill={ROLE.ink}
-                    cursor={drillable ? 'pointer' : undefined}
-                    onClick={drillable ? () => openSegment(row) : undefined}
+                    cursor={canDrill(row) ? 'pointer' : undefined}
+                    onClick={canDrill(row) ? () => openSegment(row) : undefined}
                   />
                 ))}
               </Bar>

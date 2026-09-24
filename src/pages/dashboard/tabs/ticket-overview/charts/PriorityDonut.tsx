@@ -21,7 +21,9 @@ export function PriorityDonut({
 }) {
   const { open } = useDrill();
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
-  const canDrill = (entry: TicketBucket) => drillable && Boolean(PRIORITY_VALUES[entry.name]);
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (entry: TicketBucket) =>
+    drillable && entry.value > 0 && Boolean(PRIORITY_VALUES[entry.name]);
 
   const openSegment = (entry: TicketBucket, trigger?: HTMLElement) => {
     const value = PRIORITY_VALUES[entry.name];

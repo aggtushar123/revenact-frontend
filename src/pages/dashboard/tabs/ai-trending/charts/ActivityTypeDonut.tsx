@@ -39,7 +39,9 @@ export function ActivityTypeDonut({
     );
   };
 
-  const drillItems = (drillable ? data : []).map((entry) => ({
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (entry: InteractionBucket) => drillable && entry.value > 0;
+  const drillItems = data.filter(canDrill).map((entry) => ({
     name: entry.name,
     figure: String(entry.value),
     onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
@@ -85,8 +87,8 @@ export function ActivityTypeDonut({
                 <Cell
                   key={entry.key}
                   fill={SOURCE_COLORS[entry.name] ?? FALLBACK_COLOR}
-                  cursor={drillable ? 'pointer' : undefined}
-                  onClick={drillable ? () => openSegment(entry) : undefined}
+                  cursor={canDrill(entry) ? 'pointer' : undefined}
+                  onClick={canDrill(entry) ? () => openSegment(entry) : undefined}
                 />
               ))}
             </Pie>

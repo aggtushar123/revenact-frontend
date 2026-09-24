@@ -51,7 +51,9 @@ export function ActivitiesByAISubCategoryBar({
     );
   };
 
-  const drillItems = (drillable ? rows : []).map((row) => ({
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (row: InteractionBucket) => drillable && row.value > 0;
+  const drillItems = rows.filter(canDrill).map((row) => ({
     name: row.name,
     figure: String(row.value),
     onSelect: (trigger: HTMLElement) => openSegment(row, trigger),
@@ -104,8 +106,8 @@ export function ActivitiesByAISubCategoryBar({
                 <Cell
                   key={row.key}
                   fill={ROLE.ink}
-                  cursor={drillable ? 'pointer' : undefined}
-                  onClick={drillable ? () => openSegment(row) : undefined}
+                  cursor={canDrill(row) ? 'pointer' : undefined}
+                  onClick={canDrill(row) ? () => openSegment(row) : undefined}
                 />
               ))}
             </Bar>

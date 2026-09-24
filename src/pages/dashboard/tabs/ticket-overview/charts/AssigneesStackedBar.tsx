@@ -53,7 +53,8 @@ export function AssigneesStackedBar({
   // one isn't a real choice, and `parse_segment` ignores it the same way it
   // ignores every other malformed filter. So this bar alone gets no click,
   // no cursor and no keyboard target.
-  const canDrill = (row: TicketAssigneeRow) => drillable && Boolean(row.name);
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (row: TicketAssigneeRow) => drillable && row.total > 0 && Boolean(row.name);
   const openSegment = (row: TicketAssigneeRow, trigger?: HTMLElement) => {
     if (!canDrill(row)) return;
     open(

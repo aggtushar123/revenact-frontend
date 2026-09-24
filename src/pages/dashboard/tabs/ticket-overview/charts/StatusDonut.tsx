@@ -21,7 +21,9 @@ export function StatusDonut({
 }) {
   const { open } = useDrill();
   const total = data.reduce((acc, curr) => acc + curr.value, 0);
-  const canDrill = (entry: TicketBucket) => drillable && Boolean(STATUS_VALUES[entry.name]);
+  // An empty bucket has no accounts behind it, so it offers no drill.
+  const canDrill = (entry: TicketBucket) =>
+    drillable && entry.value > 0 && Boolean(STATUS_VALUES[entry.name]);
 
   const openSegment = (entry: TicketBucket, trigger?: HTMLElement) => {
     const value = STATUS_VALUES[entry.name];
