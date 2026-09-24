@@ -418,6 +418,30 @@ describe('Customer Overview drill', () => {
     expect(within(dialog).getByText('13.8% of ARR')).toBeInTheDocument();
   });
 
+  it('offers no top-3 drill when there is no share or no accounts to list', async () => {
+    mockFetch({
+      ...stats,
+      concentration: { ...stats.concentration, rows: [], top_three_share: null },
+    });
+    renderCustomerOverview();
+
+    // Wait for the figures to land, not just the label (drawn before them).
+    await screen.findByText('69.2%');
+    expect(screen.queryByRole('button', { name: /Top 3 concentration/ })).not.toBeInTheDocument();
+  });
+
+  it('offers no top-3 drill when a share comes with no rows behind it', async () => {
+    mockFetch({
+      ...stats,
+      concentration: { ...stats.concentration, rows: [] },
+    });
+    renderCustomerOverview();
+
+    // Wait for the figures to land, not just the label (drawn before them).
+    await screen.findByText('69.2%');
+    expect(screen.queryByRole('button', { name: /Top 3 concentration/ })).not.toBeInTheDocument();
+  });
+
   it('does not make a button of the non-drillable KPIs', async () => {
     mockFetch();
     renderCustomerOverview();

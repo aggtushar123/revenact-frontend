@@ -124,7 +124,8 @@ export function ControlsView() {
             }
             detail="of ARR in the three largest accounts"
             onDrill={
-              stats
+              // Only when there is a share to explain and accounts behind it.
+              stats && stats.concentration.top_three_share !== null && stats.concentration.rows.length > 0
                 ? (trigger) =>
                     open(
                       {
