@@ -256,8 +256,9 @@ for the whole dashboard, not one per view.
   (`focus-within:not-sr-only`), so a sighted mouse user still sees only the
   chart.
 - **Shape.** `role="dialog"`, `aria-labelledby` the title. From `1024px`
-  (`lg`) it is a static 360px panel docked beside the dashboard's own scroll
-  area, `border border-line rounded-xl`; below `1024px` there is nowhere
+  (`lg`) it is a 360px panel laid over the Ask rail (`lg:absolute` at the
+  frame's right edge, `border border-line rounded-xl shadow-md`), so the
+  figures never narrow; below `1024px` there is nowhere
   useful for focus to go beside it, so it becomes a full-screen sheet
   (`fixed inset-0`, `aria-modal="true"`) with its own Tab/Shift+Tab focus
   trap. Either shape slides in over 180ms `ease-out` (`.animate-slide-in-right`,
@@ -293,6 +294,59 @@ for the whole dashboard, not one per view.
   Health view) or only partly loaded (Usage, until its full scatter has
   arrived) — a partial list can only ever show *some* of what a figure
   counted.
+
+### Ask rail
+
+`src/components/copilot/CopilotRail.tsx`, shared by Communications (variant
+`glass`, its documented exception) and the Dashboard (variant `plain`: one
+`border-line rounded-xl bg-surface` column, no card inside it).
+
+- **Dashboard shape.**
+  - `xl` and wider: a 360px column beside the scroll area, open by default.
+  - Below `xl`: a 40px "Ask" tab (vertical 11px label), until opened.
+  - Below `sm`: a full-screen sheet from an "Ask" button (`min-h-11`).
+  - Header: "Ask Revenact" at 15px, with New chat, History and
+    Collapse/Close as `min-h-9 min-w-9` icon buttons, each named.
+- **Chips.**
+  - The composer's chip says what the next question is about ("Revenue ›
+    Forecast · Owner: Priya · 2 accounts"). Its × removes only a focus, never
+    the screen.
+  - Each user question carries its own 11px `bg-subtle` chip above its bubble,
+    on the dashboard only (a dashboard conversation reopened in Communications
+    or `/copilot` shows no chip, since only the dashboard passes `names`).
+- **Empty.** Three suggested questions as full-width `border-line` buttons (13px)
+  under an 11px "Ask about what is on screen." line.
+- **Answers.** Rendered as plain text (`whitespace-pre-wrap`), not the
+  Markdown formatting `/copilot`'s `AnswerText` applies. A reply withheld from
+  a reader with narrower visibility in a shared session renders the same way,
+  as plain text — the rail never special-cases it.
+- **States.**
+  - In flight: a three-line `bg-subtle animate-pulse` skeleton shaped like an
+    answer (`role="status"`, "Thinking…" for screen readers).
+  - Budget spent (`429`): an `ink-muted` line, "This month's AI budget is used
+    up.", with no action.
+  - Any other failure, including a `400` (a malformed context): a
+    `text-danger` line with a Retry button; the question stays on screen.
+    Retry resends the question exactly as first asked — its own context and
+    focus, from the chip on the failed bubble — never the current screen.
+  - Focus returns to the input after every send.
+- **Entry points.**
+  - Drill panel: "Ask about these" (secondary button, Sparkles icon), enabled
+    only for a complete list of 200 accounts or fewer; above that it is
+    disabled with an 11px note ("Ask about up to 200 accounts at a time.
+    Narrow the filters to ask."). Clicking it closes the drill panel first —
+    the drill sits over the rail from `lg` — then opens the rail with an
+    editable, unsent draft.
+  - Attention row: "Why?", a quiet button after Done, named "Ask why <title>
+    is on my list". Unlike the drill's draft, it sends at once.
+  - Every entry point opens the rail (or the phone sheet) for that visit
+    only; only the header's own expand/collapse (or Close) toggle persists
+    the open/closed choice to `localStorage`. Sending at once (`ask()`)
+    replaces any earlier drafted question and focus, so only one is ever
+    pending.
+- **History.** An 11px origin tag (LayoutDashboard icon + "Revenue › Forecast")
+  on dashboard conversations — the area and view only, never the filters it
+  was asked with; a question's own chip is what carries those.
 
 ### Overlays
 
@@ -431,11 +485,11 @@ inputs; labelled pagination buttons; the global reduced-motion override.
 2. **No focus trap or focus return in almost any dialog.** Fifteen modals
    plus several other floating ones declare `role="dialog"`
    (`ComposeEmailModal`, `PlatformOrganisations`, `PipelinesPage`,
-   `EditNodePane`, `OnboardingCarousel`, Communications' `CopilotRail`
-   history popover, the dashboard's drill panel) — of all of them, only the
-   drill panel traps focus, and only in its full-screen sheet below
-   `1024px`; it is also the only one that returns focus to its trigger on
-   close.
+   `EditNodePane`, `OnboardingCarousel`, the shared `CopilotRail`
+   history popover, the dashboard's drill panel, the dashboard's Ask sheet) —
+   of all of them, only the drill panel (in its sheet below `1024px`) and the
+   Ask sheet (below `640px`) trap focus, and only those two return focus to
+   their trigger on close.
 3. **Escape closes almost nothing.** Only the mention list, one inline
    rename, the dashboard's drill panel and the Copilot history popover
    handle it.
@@ -455,6 +509,9 @@ No horizontal page scroll is acceptable.
 One standing violation: the layout root uses `h-screen w-screen`, where the rule
 is `min-h-[100dvh]`, which matters on mobile browsers whose toolbars change the
 viewport height.
+
+The dashboard's Ask rail changes shape at `sm` (sheet below it) and `xl` (open
+by default from it); the drill panel lies over the rail from `lg`.
 
 ---
 

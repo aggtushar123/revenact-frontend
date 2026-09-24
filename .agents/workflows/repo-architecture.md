@@ -254,7 +254,7 @@ number replaces what the first was showing.
 |---|---|
 | `types.ts` | `DrillRow`, `DrillSource` (`{kind: 'rows', rows}` for a list already computed client-side, or `{kind: 'server', path, query, segment}` for one fetched on open), `DrillRequest` (`title`, `figure`, `source`) |
 | `context.ts`, `DrillContext.tsx`, `useDrill.ts` | `DrillProvider` — mounted once by `DashboardFrame`, outside `AreaLayout` — holds the one open `DrillRequest` plus the trigger element to return focus to on close; `useDrill()` exposes `open(request, trigger)` / `close()` |
-| `DrillPanel.tsx` | The panel itself: `role="dialog"`, `aria-labelledby` the title. A static 360px panel beside the scroll area from `lg` (1024px); a full-screen `aria-modal="true"` sheet with its own Tab/Shift+Tab focus trap below it. Escape and the close button both call `close()`; focus is moved to the close button on open and returns to the trigger on close. Renders a `RowList` for a `rows` source, or fetches and renders a `server` one — showing "Showing n of count" when the backend's own response is truncated |
+| `DrillPanel.tsx` | The panel itself: `role="dialog"`, `aria-labelledby` the title. A 360px panel over the Ask rail (`lg:absolute`, right edge of the frame) from `lg` (1024px), so it never narrows the figures; a full-screen `aria-modal="true"` sheet with its own Tab/Shift+Tab focus trap below it. Escape and the close button both call `close()`; focus is moved to the close button on open and returns to the trigger on close. Renders a `RowList` for a `rows` source, or fetches and renders a `server` one — showing "Showing n of count" when the backend's own response is truncated |
 | `drillApi.ts` | `fetchDrill` — `GET <path>?<query>&drill=<segment>` — and `formatDetail`, which words one line per row for the segment's `value_label` (tickets, interactions, ARR, downside, expected expansion, days since contact) |
 | `DrillTargets.tsx` | A `sr-only` (visible on focus) list of real `<button>`s standing in for a Recharts segment's own click handler, since the SVG it draws isn't keyboard-reachable |
 | `rows.ts` | `fromHealthRows` / `fromUsageRows` — the one place a `HealthDataRow`/`UsageAccount` becomes a `DrillRow`, so every Health and Usage view maps the same fields the same way |
@@ -273,6 +273,19 @@ Organisations' own list (`pages/organizations/List.tsx`) reads a drill's
 dashboard" with a "Show all" that clears the param, and probes the
 unfiltered `/customers/` count separately so `MetricsPanel` keeps showing
 the whole book's population rather than the filtered page's.
+
+#### Ask Revenact (`pages/dashboard/ask/`, `components/copilot/`)
+
+| File | What it does |
+|---|---|
+| `components/copilot/CopilotRail.tsx` | The shared rail (`CopilotRail`) and `HistoryPopover`. `context: RailContext` (`railContext.ts`) is `{kind:'label'}` (Communications: `[About: …]` text prefix) or `{kind:'dashboard'}` (structured `context` field). Props for `variant`, `top`, `thread`, `names`, `suggestions`, `draft`, `onSent`. Assistant replies always render as plain text, never the Markdown `AnswerText` formatting `/copilot` uses — including a reply withheld from a reader with narrower visibility in a shared session |
+| `components/copilot/useCopilotThread.ts` | Sending on one conversation: pending, failed (`budget` on 429, any other status including 400 shown the same way with Retry), `retry` (resends the question's own context and focus, not the current screen) |
+| `components/copilot/dashboardLabels.ts`, `suggestions.ts` | Chip text (`viewLabel` for the history tag, `contextLabel` for a message's own chip), three questions per area |
+| `ask/useDashboardContext.ts` | Route + `SHARED_KEYS` → `DashboardContext` and its chip, read at send time |
+| `ask/filterNames.ts`, `FilterNamesProvider.tsx` | `DashboardToolbar` reports the shared filters' option names for chips |
+| `ask/context.ts`, `useAsk.ts`, `AskProvider.tsx` | The dashboard's one conversation and thread, open state (`askPreference.ts`, written only by the rail's own toggle — an entry point opens the rail for that visit without touching it), focus, prefilled draft (`draft()`; a later `ask()` replaces it and its focus), history restore (`originPath.ts`); `useAsk()` is null outside the frame, so entry points hide in isolated view tests |
+| `ask/AskRail.tsx` | Rail header, collapsed tab, phone sheet (focus trap, Escape/Close return focus to the Ask button) |
+| `ask/testAsk.tsx`, `components/copilot/testCopilot.ts` | `renderDashboard(url, view, width)`, `stubCopilot`, `postedBodies` |
 
 #### Ticket Overview (`tabs/ticket-overview/`)
 Charts: `StatusDonut`, `PriorityDonut`, `AssigneesStackedBar`, `OriginBar`, `SentimentLineChart`, `KPIGrid`. The four countable KPIs (Total, On Hold, Positive/Negative sentiment) and every donut/bar's segments drill into `/tickets/stats/`; average lifetime and resolution rate stay plain — a rate isn't a set of tickets.
@@ -377,6 +390,9 @@ The Copilot is the AI intelligence layer of the platform — a conversational in
 | `ChatView.tsx` (5 KB) | Conversational AI response view |
 | `CockpitView.tsx` (14 KB) | Deep analytics cockpit with charts |
 | `CopilotSidebar.tsx` (6 KB) | Left sidebar — New Chat, Built-in Skills list, Chat History |
+
+`components/copilot/CopilotRail` is the rail version used by Communications
+and the Dashboard; history items show a dashboard `origin` tag.
 
 #### Layout Structure
 
@@ -504,11 +520,12 @@ App.tsx
   │     └── Navbar
   │
   ├── pages/dashboard/routes.tsx (dashboardRoutes) — areas.ts lists areas + sub-views
-  │     ├── DashboardFrame → DrillProvider + DrillPanel, then AreaLayout (hands sub-views via outlet context; read with useSubViews)
+  │     ├── DashboardFrame → FilterNamesProvider + AskProvider + DrillProvider, then [scroll area → AreaLayout …][AskRail][DrillPanel over the rail]
   │     ├── <Area>Container → shared/DashboardToolbar (sub-view switch + URL filters, useDashboardFilters)
   │     │     └── the view (tabs/<section>/ControlsView or a health-overview view) → charts/*, each reading useDrill() to open DrillPanel
   │     ├── shared/ — DashboardToolbar, useDashboardFilters (SHARED_KEYS), Kpi (button when given onDrill), Panel, DataState, chartPalette (ROLE)
   │     ├── drill/ — DrillContext/useDrill, DrillPanel (panel/sheet), DrillTargets, drillApi, rows.ts
+  │     ├── ask/ — AskProvider/useAsk, AskRail, useDashboardContext, filterNames
   │     └── redirects.tsx — Keep / LegacyRedirect for old /dashboard/advance/* links
   │
   ├── pages/organizations/Details.tsx & pages/accounts/Details.tsx
