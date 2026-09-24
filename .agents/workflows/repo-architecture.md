@@ -40,6 +40,8 @@ react-ts-app/
 │   ├── lib/                    ← apiClient.ts — fetch wrapper to revenact-backend
 │   ├── features/               ← Redux slices & business logic
 │   │   ├── auth/               ← Auth state, thunks, Zod schema
+│   │   ├── attention/          ← attentionApi.ts — plain fetch wrappers (no slice) for the
+│   │   │                          Overview's attention list: fetch, snooze, unsnooze
 │   │   ├── tasks/              ← Tasks slice (create task from CallSense AI actions)
 │   │   └── counter/            ← Legacy counter slice (unused)
 │   ├── layouts/                ← Shell layouts
@@ -80,7 +82,7 @@ react-ts-app/
 /  (DashboardLayout + ProtectedRoute)
 ├── dashboard/                 → DashboardFrame (scroll + p-4); tree in pages/dashboard/routes.tsx
 │   ├── (index)                → Redirects to /dashboard/overview
-│   ├── overview               → Overview (links to each area)
+│   ├── overview               → Overview (attention list + Revenue/Health/Support headline cards)
 │   ├── revenue/               → AreaLayout area="revenue" (index → forecast)
 │   │   ├── forecast           → ForecastContainer → forecast/ControlsView
 │   │   ├── customers          → CustomerOverviewContainer → customer-overview/ControlsView
@@ -225,6 +227,23 @@ lists them, `routes.tsx` renders them; see the Route Map above for the full
 tree and Component Dependency Graph below for how the pieces wire together).
 Health alone carries seven sub-views (Triage, Divergence, Movement, Renewals,
 Usage, Activity, Distribution) off three containers.
+
+#### Overview (`pages/dashboard/overview/`, `features/attention/`)
+
+The landing page at `/dashboard/overview`, not an area itself: a ranked
+attention list beside a headline card per area.
+
+| File | What it holds |
+|---|---|
+| `features/attention/attentionApi.ts` | Plain `apiFetch` wrappers, no slice: `fetchAttention(query)` (`GET /dashboard/attention/`), `snooze(key, {days} \| {done: true})`, `unsnooze(key)` (`DELETE`, key URL-encoded) |
+| `overview/AttentionList.tsx` | The "Needs attention" panel — renewal, risk, going-quiet, support and anomaly rows in the server's order. Snooze/Done are optimistic, held in local state keyed by item so an Undo line outlives a reload of the same filters; `Overview.tsx` keys the whole list by the query string so a filter change starts it clean |
+| `overview/HeadlineCards.tsx` | Revenue, Health and Support cards, each reading the same slice/endpoint its area page does (`forecastSlice`, `healthSlice`, `ticketsSlice`) so the Overview can never disagree with the area it links to |
+| `overview/fixtures.ts` | `mockOverviewFetch` — a URL-routed fetch stub across the four endpoints the page touches, used by all three overview test suites |
+
+`Overview.tsx` itself owns the attention fetch (`useDashboardFilters` →
+`fetchAttention`), keeps the last good list on screen dimmed during a
+refetch, and renders `DashboardToolbar` with no sub-views alongside the
+`AttentionList` / `HeadlineCards` grid.
 
 #### Drill-down (`pages/dashboard/drill/`)
 

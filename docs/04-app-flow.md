@@ -4,7 +4,7 @@ description: App flow reference — every route, guard and user journey through 
 
 # Revenact — App Flow
 
-Current as of 2026-09-18, read from `src/App.tsx`, the layout, the 27 Redux
+Current as of 2026-09-24, read from `src/App.tsx`, the layout, the 27 Redux
 slices and the page components. Written in the style of this repo's
 `.agents/workflows/*-flow.md` notes: real file paths, real endpoint names, no
 abstract description.
@@ -58,7 +58,7 @@ closing it on unmount or token change.
 | `/platform`, `/platform/organisations`, `/platform/organisations/:id`, `/platform/staff` | `PlatformLayout` (its own shell) with `PlatformOverview`, `PlatformOrganisations`, `PlatformOrganisationDetail`, `PlatformStaff` | auth + `RequirePlatform` |
 | `/platform/account` | `PlatformAccount`: the staff member's password and second factor. Reachable without an MFA session, because it is where MFA is set up | auth + `RequirePlatform` (staff only) |
 | `/dashboard`, `/dashboard/custom` | `Keep` → `/dashboard/overview` | auth |
-| `/dashboard/overview` | `Overview`, a placeholder linking the three areas until the attention list lands | auth |
+| `/dashboard/overview` | `Overview` — the ranked attention list plus a Revenue/Health/Support headline card each | auth |
 | `/dashboard/revenue/{forecast,customers,products}` | `AreaLayout` (area: revenue) wrapping `ForecastContainer`, `CustomerOverviewContainer`, `ProductUsageContainer` | auth |
 | `/dashboard/health/{triage,divergence,movement,renewals,distribution}` | `AreaLayout` (area: health) wrapping `HealthOverviewContainer` and its five views | auth |
 | `/dashboard/health/{usage,activity}` | `AreaLayout` (area: health) wrapping `UsageOverviewContainer`, `ActivityContainer` | auth |
@@ -378,7 +378,7 @@ under one route tree, defined once in `src/pages/dashboard/areas.ts` (`AREAS`)
 and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
 
 ```
-/dashboard/overview                                  Overview (placeholder)
+/dashboard/overview                                  Overview (attention list + headline cards)
 /dashboard/revenue/{forecast,customers,products}      Revenue
 /dashboard/health/{triage,divergence,movement,
                     renewals,usage,activity,
@@ -386,9 +386,46 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
 /dashboard/support/{tickets,topics}                   Support
 ```
 
-- **Overview** (`Overview.tsx`) is a placeholder — a card per area linking to
-  the area (`/dashboard/<area>`, which redirects to its first view) — until
-  the attention list lands.
+- **Overview** (`Overview.tsx`) is the dashboard's landing page: a ranked
+  "Needs attention" list beside a headline card per area, filtered by the
+  same three book filters as the areas.
+  - **The list** (`overview/AttentionList.tsx`, `GET /dashboard/attention/`)
+    holds five kinds — renewal, risk, going quiet, support, anomaly — ranked
+    by money at stake × urgency (the server's own `score`; the client never
+    re-ranks). Each row shows a kind chip, a title (a link to
+    `/organizations/<id>` for every kind but anomaly), a reason line and the
+    amount at stake. An **anomaly** row's title is a button, not a link — it
+    opens the drill panel over its list of companies (`"<n> companies"`),
+    since one anomaly can span several.
+  - **Snooze 7 days** and **Done** are optimistic: the row is replaced at
+    once by a "Snoozed · `<title>`" / "Marked done · `<title>`" line with an
+    **Undo** button in the same place; a failed call restores the row and
+    shows an alert. Undo lasts through a reload of the same filters — it's
+    held in the list's own state, keyed by item and spliced back into the
+    server's list at the position it was acted on, so a background refetch
+    can't make it vanish — and resets the moment a filter changes, since
+    `Overview.tsx` keys the whole `AttentionList` by the query string.
+  - A snoozed or done item comes back on its own once it **gets worse** than
+    it was when acted on (its risk score rising, an overdue count growing, a
+    new ticket opening) or once a **new episode starts** for it (a different
+    renewal date, a different last-contact gap) — never merely because 7
+    days passed or the calendar moved on.
+  - **The three headline cards** (`overview/HeadlineCards.tsx`) — Revenue,
+    Health, Support — each read the same slice/endpoint their area page
+    does, so the Overview can never disagree with the page its
+    "Open `<Area>` →" link goes to (which carries only the shared filters).
+    Revenue shows "ARR today" and "At risk" (churn + contraction, 12 months)
+    off `fetchForecast`; Health mirrors the shared filters into
+    `state.health.filters` exactly as `HealthOverviewContainer` does
+    (clearing them on unmount) and shows "Book at Good x/y" and "Needs
+    action n" off the same triage summary the Triage view uses; Support
+    shows "Open tickets" and its oldest-open-day count off
+    `fetchTicketStats` — Support/Tickets has no lifecycle filter, so only
+    owner and account travel to it.
+  - Each card shows a skeleton in place of its figures until the data it
+    holds actually answers the current filters — a stale answer for a
+    previous query (a different horizon, a filter changed mid-flight) counts
+    as not loaded yet, not shown as if it were current.
 - **`DashboardFrame`** is the `dashboard` route's element: the scroll
   container (`overflow-y-auto`, `p-4`) for Overview and every area, since
   `DashboardLayout`'s `<main>` is `overflow-hidden`.
@@ -616,7 +653,6 @@ as a query parameter because a WebSocket handshake cannot carry a header.
 | Route or control | What happens |
 |---|---|
 | Sidebar: Product Feedbacks, Segments, Project Management | "Under Construction" |
-| `/dashboard/overview` | A placeholder linking the three areas, until the attention list lands |
 | Settings: Activities, Connect Widget | Placeholder |
 | Success Plans tab on both detail pages | "Coming Soon" |
 | Activity feed: Pulse, Conversations, Revenact Support | "coming soon" |
