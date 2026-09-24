@@ -464,6 +464,30 @@ describe('Organizations List page — dashboard drill (?ids=)', () => {
     expect(screen.getByTitle('Number of organizations')).toHaveTextContent('—');
   });
 
+  it('the drill banner hides its number while the ids fetch is loading', async () => {
+    let resolveIds: (value: unknown) => void = () => {};
+    const idsPending = new Promise((resolve) => {
+      resolveIds = resolve;
+    });
+    const base = makeDrillFetchMock({
+      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
+      bareResult: { count: 12, next: null, previous: null, results: [] },
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => (typeof url === 'string' && url.includes('ids=') ? idsPending : base(url))),
+    );
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    const banner = screen.getByRole('button', { name: 'Show all' }).parentElement as HTMLElement;
+    expect(banner).toHaveTextContent('Showing accounts from the dashboard');
+    expect(banner.textContent).not.toMatch(/\d/);
+
+    resolveIds(jsonResponse(200, { count: 2, next: null, previous: null, results: [globex, initech] }));
+    await waitFor(() => expect(banner).toHaveTextContent('Showing 2 accounts from the dashboard'));
+  });
+
   it('a normal visit (no drill) still shows the list fetch\'s own count in MetricsPanel', async () => {
     const fetchMock = makeFetchMock({
       customers: [{ status: 200, body: { count: 7, next: null, previous: null, results: [globex] } }],

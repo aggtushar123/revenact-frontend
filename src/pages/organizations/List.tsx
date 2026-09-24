@@ -205,9 +205,17 @@ export function List() {
 
         {drillIds && (
           <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-line-subtle bg-subtle px-3 py-2 text-[13px] text-ink">
+            {/* The slice's `count` is the previous list's until the ids
+                fetch lands, so no number is shown while it loads. */}
             <span>
-              Showing <span className="font-mono-brand tabular-nums">{count}</span> accounts from the
-              dashboard
+              {isLoading ? (
+                'Showing accounts from the dashboard'
+              ) : (
+                <>
+                  Showing <span className="font-mono-brand tabular-nums">{count}</span> accounts from
+                  the dashboard
+                </>
+              )}
             </span>
             <button
               type="button"
