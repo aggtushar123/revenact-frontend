@@ -216,9 +216,10 @@ for the whole dashboard, not one per view.
   area, `border border-line rounded-xl`; below `1024px` there is nowhere
   useful for focus to go beside it, so it becomes a full-screen sheet
   (`fixed inset-0`, `aria-modal="true"`) with its own Tab/Shift+Tab focus
-  trap. Either shape slides in within `--dur-base` on `ease-out` (skipped
-  under reduced motion), moves focus to its close button on open, and closes
-  on Escape or the close button, returning focus to whatever triggered it.
+  trap. Either shape slides in over 180ms `ease-out` (`.animate-slide-in-right`,
+  skipped under reduced motion), moves focus to its close button on open, and
+  closes on Escape or the close button, returning focus to whatever triggered
+  it.
 - **Rows.** A company name linking to `/organizations/<id>`, its ARR in
   `font-mono-brand tabular-nums`, and one small `text-ink-muted` detail line
   underneath worded for what the number counted — a risk score ("risk 62"),
@@ -364,15 +365,21 @@ inputs; labelled pagination buttons; the global reduced-motion override.
 
 **Not met, in priority order:**
 
-1. **Almost no `focus-visible` styles.** Inputs use
+1. **Inconsistent `focus-visible` styling.** Newer surfaces (Dashboard,
+   Communications, Copilot, Brain, Settings) declare `focus-visible:outline`
+   widely, but inputs across the app still use
    `focus:outline-none focus:border-accent`, which removes the keyboard
-   indicator on non-input controls entirely; the dashboard's drill panel and
-   its triggers are the one place that adds one (`focus-visible:outline`).
-2. **No focus trap or focus return in almost any modal.** Fifteen modals, and
-   only four elements in the whole app declare `role="dialog"` — the dashboard
-   drill panel is the one that traps focus below `1024px` and always returns
-   it on close; the other three do neither.
-3. **Escape closes almost nothing.** Only the mention list and one inline rename
+   indicator on them entirely, and older controls elsewhere have neither.
+2. **No focus trap or focus return in almost any dialog.** Fifteen modals
+   plus several other floating ones declare `role="dialog"`
+   (`ComposeEmailModal`, `PlatformOrganisations`, `PipelinesPage`,
+   `EditNodePane`, `OnboardingCarousel`, Communications' `CopilotRail`
+   history popover, the dashboard's drill panel) — of all of them, only the
+   drill panel traps focus, and only in its full-screen sheet below
+   `1024px`; it is also the only one that returns focus to its trigger on
+   close.
+3. **Escape closes almost nothing.** Only the mention list, one inline
+   rename, the dashboard's drill panel and the Copilot history popover
    handle it.
 4. Navbar Search, Plus, Help and Message buttons have neither labels nor
    handlers.
@@ -433,9 +440,9 @@ Ranked by leverage. Each is a task in the
 | # | Debt | Evidence |
 |---|---|---|
 | 1 | Body text is still on the system stack (display and mono are wired) | `src/index.css` has no `body` font rule; DM Serif Display and DM Mono apply via `.font-display` / `.font-mono-brand` |
-| 2 | Almost no `focus-visible` styling | The dashboard's drill panel and its triggers are the only occurrences |
+| 2 | `focus-visible` styling is inconsistent | Newer surfaces declare it widely; inputs everywhere still use `focus:outline-none focus:border-accent`, which removes the indicator entirely |
 | 3 | 108 raw hex values in components | Worst offenders: `Integrations.tsx` (11, vendor logos), `SurveysTab.tsx` (4), the recurring `text-[#0D0F0E]` on accent backgrounds |
-| 4 | No modal focus management outside the dashboard, four `role="dialog"` in fifteen modals | The dashboard's drill panel traps and returns focus; the other three declare the role without either |
+| 4 | No focus trap or return in almost any `role="dialog"` | Of the app's several floating dialogs, only the dashboard's drill panel traps focus (and only in its sheet below `1024px`) and returns it on close |
 | 5 | Loading states are text lines, not skeletons | Only `HeadlinesTab` shows a text-line affordance; `ChatView` uses a layout-matching skeleton since 2026-09-22 |
 | 6 | `h-screen` in `DashboardLayout` | Rule says `min-h-[100dvh]` |
 | 7 | `rounded-2xl` and `rounded-3xl` outside the scale | Contact detail, Account placeholder |
