@@ -195,9 +195,45 @@ used to be copied into every dashboard tab.
 | Component | Rule |
 |---|---|
 | `DashboardToolbar` | The one row under the area tabs: a sub-view switch (`NavLink`s, hidden when there is only one view) on the left, `FilterSelect`s on the right, reading and writing the URL through `useDashboardFilters`. A period control (e.g. Forecast's horizon) is marked `clearable: false` and survives "Clear n"; the rest of the active filters do not. A chip shows as active only when its value differs from that filter's default, so a period on its default does not look filtered. An option may carry a short `display` label for the chip (Health's chips show the name; the count stays in the dropdown). The visible chip shows the focus ring of the invisible native `<select>` over it |
-| `Kpi` / `KpiStrip` | `Kpi` is one label/value/detail figure; colour is reserved for `tone="loss"`/`"gain"`, never decorative. `KpiStrip` lays a row of them out four across from `md` (`columns={3}` for a three-figure summary, `columns={2}` inside a card; `stackFromLg` for a quarter-width card such as Tickets' KPIs, keeping every label to two lines), divided by hairlines rather than boxed — replaced six local `Tile`s that tinted a border by tone and coloured numbers that meant nothing |
+| `Kpi` / `KpiStrip` | `Kpi` is one label/value/detail figure; colour is reserved for `tone="loss"`/`"gain"`, never decorative. Given an `onDrill`, it renders as a `<button>` instead of a `<div>` — same type, size and layout, with `hover:bg-subtle` and a focus ring added, and an explicit `aria-label="<label> <value>, show accounts"` rather than relying on the visible digits. `KpiStrip` lays a row of them out four across from `md` (`columns={3}` for a three-figure summary, `columns={2}` inside a card; `stackFromLg` for a quarter-width card such as Tickets' KPIs, keeping every label to two lines), divided by hairlines rather than boxed — replaced six local `Tile`s that tinted a border by tone and coloured numbers that meant nothing |
 | `Panel` | The one container on the dashboard: `bg-surface border border-line rounded-xl p-4`, an optional title/action header. Never nest one inside another — group inside with `divide-y` or whitespace instead |
 | `DataState` (`Loading`, `ErrorState`, `Empty`, `TruncatedNotice`) | One wording for loading, error, empty and truncated, generalised from Health's own set so eight views stop describing the same outage eight different ways |
+
+### Drill panel
+
+`src/pages/dashboard/drill/`, mounted once by `DashboardFrame` — one panel
+for the whole dashboard, not one per view.
+
+- **Trigger.** A `Kpi` with `onDrill` set (see above). A Recharts segment
+  drawn as SVG can't be reached by keyboard or read by a screen reader on its
+  own, so a chart that drills also renders `DrillTargets`: a labelled list of
+  ordinary `<button>`s, one per segment, each named "`<name> <figure>, show
+  accounts`" and hidden with `sr-only` until one of them receives focus
+  (`focus-within:not-sr-only`), so a sighted mouse user still sees only the
+  chart.
+- **Shape.** `role="dialog"`, `aria-labelledby` the title. From `1024px`
+  (`lg`) it is a static 360px panel docked beside the dashboard's own scroll
+  area, `border border-line rounded-xl`; below `1024px` there is nowhere
+  useful for focus to go beside it, so it becomes a full-screen sheet
+  (`fixed inset-0`, `aria-modal="true"`) with its own Tab/Shift+Tab focus
+  trap. Either shape slides in within `--dur-base` on `ease-out` (skipped
+  under reduced motion), moves focus to its close button on open, and closes
+  on Escape or the close button, returning focus to whatever triggered it.
+- **Rows.** A company name linking to `/organizations/<id>`, its ARR in
+  `font-mono-brand tabular-nums`, and one small `text-ink-muted` detail line
+  underneath worded for what the number counted — a risk score ("risk 62"),
+  a day count ("45 days overdue" / "never contacted"), a share ("38% of
+  ARR"), or a segment's own unit ("3 tickets", "62% used"). A server drill
+  the backend itself capped at 500 shows "Showing n of count" above the
+  list. "Open as a list" (`/organizations/list?ids=...`) appears only when
+  the full count is known, 500 or fewer, and not truncated. A drill never
+  opens at all from a list the view itself only shows a capped preview of
+  (Forecast's `swing` table, Activity's `going_dark` table, Customer
+  Overview's `concentration` beyond its own top three, Topics' `recent`
+  table), or from a book a view has already flagged `truncated` (every
+  Health view) or only partly loaded (Usage, until its full scatter has
+  arrived) — a partial list can only ever show *some* of what a figure
+  counted.
 
 ### Overlays
 
@@ -328,11 +364,14 @@ inputs; labelled pagination buttons; the global reduced-motion override.
 
 **Not met, in priority order:**
 
-1. **Zero `focus-visible` styles anywhere.** Inputs use
+1. **Almost no `focus-visible` styles.** Inputs use
    `focus:outline-none focus:border-accent`, which removes the keyboard
-   indicator on non-input controls entirely.
-2. **No focus trap or focus return in any modal.** Fifteen modals, and only three
-   elements in the whole app declare `role="dialog"`.
+   indicator on non-input controls entirely; the dashboard's drill panel and
+   its triggers are the one place that adds one (`focus-visible:outline`).
+2. **No focus trap or focus return in almost any modal.** Fifteen modals, and
+   only four elements in the whole app declare `role="dialog"` — the dashboard
+   drill panel is the one that traps focus below `1024px` and always returns
+   it on close; the other three do neither.
 3. **Escape closes almost nothing.** Only the mention list and one inline rename
    handle it.
 4. Navbar Search, Plus, Help and Message buttons have neither labels nor
@@ -394,9 +433,9 @@ Ranked by leverage. Each is a task in the
 | # | Debt | Evidence |
 |---|---|---|
 | 1 | Body text is still on the system stack (display and mono are wired) | `src/index.css` has no `body` font rule; DM Serif Display and DM Mono apply via `.font-display` / `.font-mono-brand` |
-| 2 | No `focus-visible` styling anywhere | Grep returns zero occurrences |
+| 2 | Almost no `focus-visible` styling | The dashboard's drill panel and its triggers are the only occurrences |
 | 3 | 108 raw hex values in components | Worst offenders: `Integrations.tsx` (11, vendor logos), `SurveysTab.tsx` (4), the recurring `text-[#0D0F0E]` on accent backgrounds |
-| 4 | No modal focus management, three `role="dialog"` in fifteen modals | |
+| 4 | No modal focus management outside the dashboard, four `role="dialog"` in fifteen modals | The dashboard's drill panel traps and returns focus; the other three declare the role without either |
 | 5 | Loading states are text lines, not skeletons | Only `HeadlinesTab` shows a text-line affordance; `ChatView` uses a layout-matching skeleton since 2026-09-22 |
 | 6 | `h-screen` in `DashboardLayout` | Rule says `min-h-[100dvh]` |
 | 7 | `rounded-2xl` and `rounded-3xl` outside the scale | Contact detail, Account placeholder |

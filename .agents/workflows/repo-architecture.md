@@ -220,33 +220,45 @@ same org).
 
 ### 2. Dashboard (`pages/dashboard/`)
 
-Three-tab analytics dashboard with live chart interactivity.
+Three areas — Revenue, Health, Support — under one route tree (`areas.ts`
+lists them, `routes.tsx` renders them; see the Route Map above for the full
+tree and Component Dependency Graph below for how the pieces wire together).
+Health alone carries seven sub-views (Triage, Divergence, Movement, Renewals,
+Usage, Activity, Distribution) off three containers.
 
-#### Health Overview (`tabs/health-overview/`)
-Main dashboard showing portfolio health across all accounts.
+#### Drill-down (`pages/dashboard/drill/`)
 
-**Charts rendered in `ControlsView.tsx`:**
-| Component | What it shows |
+One drill panel for the whole dashboard, not one per view — opening a second
+number replaces what the first was showing.
+
+| File | What it holds |
 |---|---|
-| `CurrentHealthDonut` | Donut with clickable segments — filters the entire dashboard |
-| `HealthByOwnerStackedBar` | Health status breakdown per CSM |
-| `AccountsLastTouchLine` | Line chart: accounts by last touch date |
-| `CSMPulseBar` | CSM activity pulse horizontal bar |
-| `AIPulseBar` | AI-scored pulse ratings |
-| `AccountsByRenewalDateBar` | Renewal date distribution bar chart |
-| `AccountHealthByRecruiters` | Sub-table: health by recruiter |
-| `HealthChangeOverTimeStacked` | Stacked bar showing health shifts over time |
-| `AccountHealthDetailTable` | Detailed filterable account table |
+| `types.ts` | `DrillRow`, `DrillSource` (`{kind: 'rows', rows}` for a list already computed client-side, or `{kind: 'server', path, query, segment}` for one fetched on open), `DrillRequest` (`title`, `figure`, `source`) |
+| `context.ts`, `DrillContext.tsx`, `useDrill.ts` | `DrillProvider` — mounted once by `DashboardFrame`, outside `AreaLayout` — holds the one open `DrillRequest` plus the trigger element to return focus to on close; `useDrill()` exposes `open(request, trigger)` / `close()` |
+| `DrillPanel.tsx` | The panel itself: `role="dialog"`, `aria-labelledby` the title. A static 360px panel beside the scroll area from `lg` (1024px); a full-screen `aria-modal="true"` sheet with its own Tab/Shift+Tab focus trap below it. Escape and the close button both call `close()`; focus is moved to the close button on open and returns to the trigger on close. Renders a `RowList` for a `rows` source, or fetches and renders a `server` one — showing "Showing n of count" when the backend's own response is truncated |
+| `drillApi.ts` | `fetchDrill` — `GET <path>?<query>&drill=<segment>` — and `formatDetail`, which words one line per row for the segment's `value_label` (tickets, interactions, ARR, downside, expected expansion, days since contact) |
+| `DrillTargets.tsx` | A `sr-only` (visible on focus) list of real `<button>`s standing in for a Recharts segment's own click handler, since the SVG it draws isn't keyboard-reachable |
+| `rows.ts` | `fromHealthRows` / `fromUsageRows` — the one place a `HealthDataRow`/`UsageAccount` becomes a `DrillRow`, so every Health and Usage view maps the same fields the same way |
+| `testDrill.ts` | Shared test doubles (`mockFetchRouted`, `drillResponse`) for a view's own server-drill tests |
 
-> **Key interaction**: Clicking a donut segment sets `activeFilter` (health status), which propagates via `filteredData` prop to ALL child charts simultaneously.
-
-Data: `mockData.ts` — 20 mock org rows with health status, CSM, ARR, renewal date.
+`Kpi` (`shared/Kpi.tsx`) takes an optional `onDrill`; given one, it renders as
+a `<button aria-label="<label> <figure>, show accounts">` instead of a plain
+`<div>`. A drill only ever opens where the list behind the figure is
+complete: every Health view turns every drill off on a `truncated` book,
+Usage's three seat tiles and its band chart stay off until
+`stats.scatter.length >= kpis.measured_count`, and Product Usage
+(`product-usage/ControlsView.tsx`) has no drill at all — every figure there
+is an aggregate across a product's own customers, never a set of accounts.
+Organisations' own list (`pages/organizations/List.tsx`) reads a drill's
+"Open as a list" as `?ids=3,7`, banners "Showing n accounts from the
+dashboard" with a "Show all" that clears the param, and probes the
+unfiltered `/customers/` count separately so `MetricsPanel` keeps showing
+the whole book's population rather than the filtered page's.
 
 #### Ticket Overview (`tabs/ticket-overview/`)
-Charts: `StatusDonut`, `PriorityDonut`, `AssigneesStackedBar`, `OriginBar`, `SentimentLineChart`, `KPIGrid`
+Charts: `StatusDonut`, `PriorityDonut`, `AssigneesStackedBar`, `OriginBar`, `SentimentLineChart`, `KPIGrid`. The four countable KPIs (Total, On Hold, Positive/Negative sentiment) and every donut/bar's segments drill into `/tickets/stats/`; average lifetime and resolution rate stay plain — a rate isn't a set of tickets.
 
 #### AI Trending Topics (`tabs/ai-trending/`)
-Analytics on AI topic distribution across account activity.
 
 **Charts rendered (3 rows):**
 | Row | Components |
@@ -255,9 +267,7 @@ Analytics on AI topic distribution across account activity.
 | Row 2 | `ActivitySentimentDonut` (1/3) + `SentimentOverTimeLine` (2/3) |
 | Row 3 | `ActivitiesByAIAreaDonut` + `ActivitiesByAICategoryBar` + `ActivitiesByAISubCategoryBar` |
 
-> All 6 donut charts use standardized `innerRadius={45}` / `outerRadius={60}` to prevent label clipping.
-
-Chart components live in `src/components/dashboard/charts/`.
+> All 6 donut charts use standardized `innerRadius={45}` / `outerRadius={60}` to prevent label clipping. Every donut/bar here carries a `DrillTargets` row into `/interactions/stats/`.
 
 ---
 
@@ -475,10 +485,11 @@ App.tsx
   │     └── Navbar
   │
   ├── pages/dashboard/routes.tsx (dashboardRoutes) — areas.ts lists areas + sub-views
-  │     ├── DashboardFrame → AreaLayout (hands sub-views via outlet context; read with useSubViews)
+  │     ├── DashboardFrame → DrillProvider + DrillPanel, then AreaLayout (hands sub-views via outlet context; read with useSubViews)
   │     ├── <Area>Container → shared/DashboardToolbar (sub-view switch + URL filters, useDashboardFilters)
-  │     │     └── the view (tabs/<section>/ControlsView or a health-overview view) → charts/*
-  │     ├── shared/ — DashboardToolbar, useDashboardFilters (SHARED_KEYS), Kpi, Panel, DataState, chartPalette (ROLE)
+  │     │     └── the view (tabs/<section>/ControlsView or a health-overview view) → charts/*, each reading useDrill() to open DrillPanel
+  │     ├── shared/ — DashboardToolbar, useDashboardFilters (SHARED_KEYS), Kpi (button when given onDrill), Panel, DataState, chartPalette (ROLE)
+  │     ├── drill/ — DrillContext/useDrill, DrillPanel (panel/sheet), DrillTargets, drillApi, rows.ts
   │     └── redirects.tsx — Keep / LegacyRedirect for old /dashboard/advance/* links
   │
   ├── pages/organizations/Details.tsx & pages/accounts/Details.tsx
@@ -530,10 +541,13 @@ App.tsx
 
 ## Adding a New Chart to a Dashboard — Checklist
 
-1. Create the chart in `src/components/dashboard/charts/` or `src/pages/dashboard/tabs/<section>/charts/`
+1. Create the chart in `src/pages/dashboard/tabs/<section>/charts/`
 2. Use **Recharts** with standardized donut params: `innerRadius={45}` `outerRadius={60}` to prevent label clipping
 3. Import and place it in the appropriate `ControlsView.tsx`
-4. Add a unit test for the chart component — see the `testing` skill.
+4. If a segment can name the accounts behind it and the list it reads is
+   complete (see `pages/dashboard/drill/` above), give it a `DrillTargets`
+   row so a keyboard user gets the same drill a pointer click does
+5. Add a unit test for the chart component — see the `testing` skill.
 
 ---
 
