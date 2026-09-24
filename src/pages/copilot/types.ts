@@ -3,6 +3,36 @@
 
 export type MessageRole = 'user' | 'assistant';
 
+/** The dashboard areas a question can be asked from. Mirrors the backend's
+ *  DASHBOARD_VIEWS keys and src/pages/dashboard/areas.ts plus the Overview. */
+export type DashboardArea = 'overview' | 'revenue' | 'health' | 'support';
+
+/** What a dashboard question is narrowed to: the accounts behind a drilled
+ *  number, or one item on the viewer's own attention list. */
+export type DashboardFocus = { kind: 'companies'; ids: number[] } | { kind: 'attention'; key: string };
+
+/** The three shared book filters; '' means "All". */
+export interface DashboardFilters {
+  owner: string;
+  lifecycle: string;
+  customer: string;
+}
+
+/** Where a dashboard question was asked. The server recomputes what that
+ *  screen shows; the client never sends figures. */
+export interface DashboardContext {
+  surface: 'dashboard';
+  area: DashboardArea;
+  /** One of the area's sub-views; null on the Overview. */
+  view: string | null;
+  filters: DashboardFilters;
+  focus: DashboardFocus | null;
+}
+
+/** A conversation's first dashboard context without its focus. Set once by
+ *  the server, never overwritten. */
+export type DashboardOrigin = Omit<DashboardContext, 'focus'>;
+
 /** A record an answer was built from. A snapshot taken when the
  * answer was written, not a live reference — see the backend's
  * `_source_ref` for why. `id` is kept so the UI can still offer a link,
@@ -39,6 +69,10 @@ export interface CopilotMessage {
   ask_suggestions?: AskSuggestion[];
   /** Who wrote a user turn; null on assistant turns. */
   author?: { id: number; name: string; function: string } | null;
+  /** User turns asked on the dashboard: the context as the server validated
+   *  it (focus ids already intersected with the viewer's book). Null or
+   *  absent everywhere else. */
+  context?: DashboardContext | null;
   created_at: string;
 }
 
@@ -58,6 +92,8 @@ export interface ConversationSummary {
   title: string;
   created_at: string;
   updated_at: string;
+  /** Where a dashboard conversation started; null for every other one. */
+  origin?: DashboardOrigin | null;
 }
 
 // Adds `messages` — the shape `fetchConversation`/`sendMessage` return.
