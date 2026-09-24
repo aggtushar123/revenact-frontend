@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -208,6 +208,77 @@ describe('DrillPanel', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Other area' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+  });
+
+  it('at lg, Escape only closes the panel when focus is inside it', async () => {
+    stubMatchMedia(true);
+    renderPanel();
+    const trigger = screen.getByRole('button', { name: 'At risk' });
+    await userEvent.click(trigger);
+
+    // Focus back on the page: Escape there belongs to the page, not the panel.
+    trigger.focus();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+    screen.getByRole('button', { name: 'Close' }).focus();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('at lg, leaves an Escape something else already handled alone', async () => {
+    stubMatchMedia(true);
+    renderPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'At risk' }));
+    const swallow = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') event.preventDefault();
+    };
+    document.addEventListener('keydown', swallow);
+    try {
+      screen.getByRole('button', { name: 'Close' }).focus();
+      await userEvent.keyboard('{Escape}');
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+    } finally {
+      document.removeEventListener('keydown', swallow);
+    }
+  });
+
+  it('below lg, Escape closes the sheet wherever focus is', async () => {
+    stubMatchMedia(false);
+    renderPanel();
+    const trigger = screen.getByRole('button', { name: 'At risk' });
+    await userEvent.click(trigger);
+    (document.activeElement as HTMLElement).blur();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('does not pull focus back to Close when the viewport crosses lg', async () => {
+    const listeners = new Set<() => void>();
+    let large = false;
+    window.matchMedia = ((query: string) => ({
+      get matches() {
+        return large;
+      },
+      media: query,
+      onchange: null,
+      addEventListener: (_: string, fn: () => void) => listeners.add(fn),
+      removeEventListener: (_: string, fn: () => void) => listeners.delete(fn),
+      addListener: () => {},
+      removeListener: () => {},
+      dispatchEvent: () => false,
+    })) as unknown as typeof window.matchMedia;
+
+    renderPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'At risk' }));
+    const uber = screen.getByRole('link', { name: 'Uber' });
+    uber.focus();
+
+    large = true;
+    act(() => listeners.forEach((fn) => fn()));
+
+    expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-modal');
+    expect(uber).toHaveFocus();
   });
 
   it('leaves focus free between the panel and the page at lg', async () => {

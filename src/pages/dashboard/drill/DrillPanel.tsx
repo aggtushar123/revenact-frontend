@@ -49,11 +49,27 @@ export function DrillPanel() {
   const isLargeScreen = useIsLargeScreen();
   const isSheet = !isLargeScreen;
 
+  // Focus moves in when a drill opens (or is replaced), not when the
+  // viewport merely crosses `lg` — that would yank focus off whatever row
+  // the user was on.
+  useEffect(() => {
+    if (current) closeRef.current?.focus();
+  }, [current]);
+
   useEffect(() => {
     if (!current) return;
-    closeRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        // The sheet covers the page, so Escape always closes it. At `lg` the
+        // panel sits beside the page, whose own controls (a menu, a combobox)
+        // may want Escape: only close when focus is in the panel and nothing
+        // else has already handled the key.
+        if (isSheet) {
+          close();
+          return;
+        }
+        const root = panelRef.current;
+        if (event.defaultPrevented || !root || !root.contains(document.activeElement)) return;
         close();
         return;
       }
