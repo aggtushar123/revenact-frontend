@@ -3,6 +3,7 @@ import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link } from 'react-router-dom';
 import { useDrill } from '../drill/useDrill';
+import { useAsk } from './useAsk';
 import { resetViewport } from '../../../test/viewport';
 import { postedBodies, stubCopilot } from '../../../components/copilot/testCopilot';
 import { renderDashboard, Where } from './testAsk';
@@ -20,6 +21,20 @@ function Probe() {
         Open drill
       </button>
       <Where />
+    </div>
+  );
+}
+
+function EntryProbe() {
+  const ask = useAsk();
+  return (
+    <div>
+      <button type="button" onClick={() => ask?.draft('Why these?', { kind: 'companies', ids: [3] })}>
+        Draft A
+      </button>
+      <button type="button" onClick={() => ask?.ask('What about this?', { kind: 'attention', key: 'renewal:9' })}>
+        Ask B
+      </button>
     </div>
   );
 }
@@ -94,5 +109,28 @@ describe('the Ask rail on the dashboard', () => {
     expect(drill).toHaveClass('lg:absolute');
     expect(drill).not.toHaveClass('lg:static');
     expect(rail()).toBeInTheDocument();
+  });
+
+  it('an entry point opens the rail without changing the remembered choice', async () => {
+    stubCopilot();
+    localStorage.setItem(ASK_PREFERENCE_KEY, 'closed');
+    renderDashboard('/dashboard/overview', () => <EntryProbe />, 1440);
+    expect(rail()).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Draft A' }));
+    expect(rail()).toBeInTheDocument();
+    expect(localStorage.getItem(ASK_PREFERENCE_KEY)).toBe('closed');
+  });
+
+  it('an ask replaces an earlier draft focus, and leaves no focus behind', async () => {
+    const { spy } = stubCopilot();
+    renderDashboard('/dashboard/overview', () => <EntryProbe />, 1440);
+    await userEvent.click(screen.getByRole('button', { name: 'Draft A' }));
+    expect(within(rail()!).getByRole('button', { name: 'Remove focus' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Ask B' }));
+    await screen.findByText('Answer to: What about this?');
+    const [sent] = postedBodies(spy);
+    expect((sent.context as { focus: unknown }).focus).toEqual({ kind: 'attention', key: 'renewal:9' });
+    expect(within(rail()!).queryByRole('button', { name: 'Remove focus' })).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Ask Revenact')).toHaveValue('');
   });
 });

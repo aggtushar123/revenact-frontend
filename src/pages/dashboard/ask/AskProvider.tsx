@@ -49,6 +49,14 @@ export function AskProvider({ children }: { children: ReactNode }) {
     [isSm],
   );
 
+  // Entry points (a drill's "Ask about these", an attention row's "Why?")
+  // open the rail for this visit only; the saved choice is the person's own
+  // toggle, so one click never overwrites a remembered "collapsed".
+  const reveal = useCallback(() => {
+    if (isSm) setChoice(true);
+    else setSheetOpen(true);
+  }, [isSm]);
+
   const clearFocus = useCallback(() => setFocus(null), []);
   const markSent = useCallback(() => {
     setFocus(null);
@@ -71,19 +79,23 @@ export function AskProvider({ children }: { children: ReactNode }) {
         // A new nonce remounts the composer with the new text. After markSent
         // the key is 0, so restarting at 1 still differs from the last key.
         setPendingDraft((prev) => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
-        setOpen(true);
+        reveal();
       },
       ask: (question, nextFocus) => {
         if (!context) return;
-        setOpen(true);
+        reveal();
         void thread.send({ text: question, content: question, context: { ...context, focus: nextFocus } });
+        // The send above carries its own focus; an earlier draft's focus and
+        // text are spent, or the chip would name accounts nobody asked about.
+        setFocus(null);
+        setPendingDraft(null);
       },
       openFromHistory: (next) => {
         setConversation(next);
-        setOpen(true);
+        reveal();
       },
     }),
-    [open, setOpen, conversation, thread, focus, clearFocus, markSent, pendingDraft, context],
+    [open, setOpen, reveal, conversation, thread, focus, clearFocus, markSent, pendingDraft, context],
   );
 
   return <AskContext.Provider value={value}>{children}</AskContext.Provider>;
