@@ -83,7 +83,10 @@ describe('dashboard frame', () => {
     },
   );
 
-  it('keeps the page padding on the frame around the scroll area', () => {
+  // Communications' body, class for class: no top padding (the top bar
+  // above gives the space), px-4 pb-4 and a gap-3 between the column and
+  // the rail, which start at the same top.
+  it('keeps the page padding on the frame around the scroll area, as Communications has it', () => {
     const { container } = render(
       <MemoryRouter initialEntries={['/dashboard/overview']}>
         <Routes>{dashboardRoutes(stub)}</Routes>
@@ -91,7 +94,9 @@ describe('dashboard frame', () => {
     );
     const scroller = screen.getByTestId('where').closest('.overflow-y-auto');
     const frame = container.firstElementChild;
-    expect(frame).toHaveClass('p-4');
+    expect(frame).toHaveClass('flex-1', 'min-h-0', 'flex', 'gap-3', 'px-4', 'pb-4');
+    expect(frame).not.toHaveClass('p-4');
+    expect(frame).not.toHaveClass('flex-col');
     expect(frame).not.toBe(scroller);
     expect(frame).toContainElement(scroller as HTMLElement);
   });

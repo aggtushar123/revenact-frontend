@@ -234,6 +234,7 @@ function renderNavbar(
         </NavActionsSlotContext.Provider>
         <Routes>
           <Route path="/dashboard" element={<div>Dashboard Marker</div>} />
+          <Route path="/organizations/list" element={<div>Organizations Marker</div>} />
           <Route path="/profile" element={<div>Profile Marker</div>} />
           <Route path="/login" element={<div>Login Marker</div>} />
           <Route path="/organizations/:id" element={<div>Details Marker</div>} />
@@ -246,19 +247,20 @@ function renderNavbar(
 }
 
 describe('Navbar account menu', () => {
+  // Off the dashboard: the dashboard's top bar has no avatar (the sidebar's does the job).
   beforeEach(() => {
     vi.unstubAllGlobals();
   });
 
   it('is closed by default', () => {
-    renderNavbar();
+    renderNavbar('/organizations/list');
     expect(screen.queryByText('My Profile')).not.toBeInTheDocument();
     expect(screen.queryByText('Sign out')).not.toBeInTheDocument();
   });
 
   it('opens on avatar click and shows the real logged-in user', async () => {
     const user = userEvent.setup();
-    renderNavbar();
+    renderNavbar('/organizations/list');
 
     await user.click(screen.getByAltText('Alice Admin'));
 
@@ -270,7 +272,7 @@ describe('Navbar account menu', () => {
 
   it('navigates to /profile and closes the menu', async () => {
     const user = userEvent.setup();
-    renderNavbar();
+    renderNavbar('/organizations/list');
 
     await user.click(screen.getByAltText('Alice Admin'));
     await user.click(screen.getByText('My Profile'));
@@ -285,7 +287,7 @@ describe('Navbar account menu', () => {
       vi.fn().mockResolvedValue({ ok: true, status: 205, json: async () => null })
     );
     const user = userEvent.setup();
-    renderNavbar();
+    renderNavbar('/organizations/list');
 
     await user.click(screen.getByAltText('Alice Admin'));
     await user.click(screen.getByText('Sign out'));
@@ -295,12 +297,12 @@ describe('Navbar account menu', () => {
 
   it('closes when clicking outside the menu', async () => {
     const user = userEvent.setup();
-    renderNavbar();
+    renderNavbar('/organizations/list');
 
     await user.click(screen.getByAltText('Alice Admin'));
     expect(screen.getByText('My Profile')).toBeInTheDocument();
 
-    await user.click(screen.getByText('Dashboard Marker'));
+    await user.click(screen.getByText('Organizations Marker'));
 
     await waitFor(() => expect(screen.queryByText('My Profile')).not.toBeInTheDocument());
   });
@@ -563,7 +565,23 @@ describe('Navbar actions on the dashboard', () => {
     expect(document.querySelectorAll(DECORATIVE)).toHaveLength(0);
     expect(setSlot).toHaveBeenCalledWith(expect.any(HTMLElement));
     expect(screen.getByRole('button', { name: 'Notifications' })).toBeInTheDocument();
-    expect(screen.getByAltText('Alice Admin')).toBeInTheDocument();
+  });
+
+  // The dashboard's top bar is Communications' header: transparent, h-16,
+  // px-4, the pill then the bell on the right, no avatar (the sidebar has it).
+  it('is shaped like Communications\' header on /dashboard/*, with no avatar', () => {
+    renderNavbar('/dashboard/overview');
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('h-16', 'shrink-0', 'flex', 'items-center', 'gap-3', 'px-4');
+    for (const cls of ['bg-surface', 'border-b', 'shadow-sm', 'px-6', 'h-[64px]']) expect(header).not.toHaveClass(cls);
+    expect(screen.queryByAltText('Alice Admin')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Dashboard areas' })).toBeInTheDocument();
+    // The pill slot comes before the bell.
+    const bell = screen.getByRole('button', { name: 'Notifications' });
+    const slot = header!.querySelector('[data-nav-actions-slot]');
+    expect(slot).not.toBeNull();
+    expect(slot!.compareDocumentPosition(bell) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('keeps the other pages as they were, with no slot', () => {
@@ -571,5 +589,7 @@ describe('Navbar actions on the dashboard', () => {
     renderNavbar('/organizations/list', null, null, [], setSlot);
     expect(document.querySelectorAll(DECORATIVE)).toHaveLength(4);
     expect(setSlot).not.toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(document.querySelector('header')).toHaveClass('h-[64px]', 'border-b', 'bg-surface', 'shadow-sm', 'px-6');
+    expect(screen.getByAltText('Alice Admin')).toBeInTheDocument();
   });
 });

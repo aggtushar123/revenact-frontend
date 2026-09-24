@@ -52,8 +52,9 @@ describe('Ask Revenact on the dashboard', () => {
     renderDashboard('/dashboard/overview', () => <Screen />, 1440);
     const log = () => screen.getByRole('log', { name: 'Ask Revenact messages' });
 
-    // 1. Ask on the Overview, from a suggestion.
-    await userEvent.click(screen.getByRole('button', { name: 'What should I act on first?' }));
+    // 1. Ask on the Overview, from the empty rail (Communications' empty state).
+    expect(within(log()).getByText('Ask about what is in front of you. Answers use your accounts, mail and tickets.')).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'What should I act on first?{enter}');
     await screen.findByText('Answer to: What should I act on first?');
     expect(within(log()).getByText('Overview')).toBeInTheDocument();
 

@@ -256,8 +256,9 @@ for the whole dashboard, not one per view.
   (`focus-within:not-sr-only`), so a sighted mouse user still sees only the
   chart.
 - **Shape.** `role="dialog"`, `aria-labelledby` the title. From `1024px`
-  (`lg`) it is a 360px panel laid over the Ask rail (`lg:absolute` at the
-  frame's right edge, `border border-line rounded-xl shadow-md`), so the
+  (`lg`) it is a 360px panel laid over the Ask rail (`lg:absolute` in the
+  rail's own box, `lg:top-0 lg:right-4 lg:bottom-4`, `border border-line
+  rounded-xl shadow-md`), so the
   figures never narrow; below `1024px` there is nowhere
   useful for focus to go beside it, so it becomes a full-screen sheet
   (`fixed inset-0`, `aria-modal="true"`) with its own Tab/Shift+Tab focus
@@ -302,7 +303,19 @@ Dashboard, both variant `glass` at `w-[320px]` (the Dashboard's glass is the
 owner's decision of 2026-09-24; `plain`, a bordered `bg-surface` column, is
 left for the phone sheet).
 
-- **Dashboard shape.**
+- **Dashboard shape.** The frame is Communications', class for class (owner's
+  decision, 2026-09-24):
+  - Top bar: the Navbar on `/dashboard/*` is Communications' header, `h-16
+    shrink-0 flex items-center gap-3 px-4`, transparent (no `bg-surface`,
+    border or shadow). Left: "Dashboard" and the area tabs. Right
+    (`ml-auto`): the Ask pill, then the notification bell. No avatar or
+    account menu there; the sidebar's avatar at the bottom carries it. Every
+    other page's Navbar is unchanged.
+  - Body: `DashboardFrame` is Communications' body, `flex-1 min-h-0 flex
+    gap-3 px-4 pb-4` (`<main>` adds no padding on `/dashboard/*`), so the
+    content column (filters toolbar and views, its own scroll) and the rail
+    start at the same top and run the full height below the top bar. Hidden,
+    the content takes the full width.
   - Controls: the same pill as Communications' top bar (`rounded-xl
     bg-surface/70 border-line p-1`, three `w-9 h-9` icon buttons: New chat,
     History, Sparkles "Show/Hide Copilot" with `bg-accent text-on-accent`
@@ -322,8 +335,10 @@ left for the phone sheet).
   - Each user question carries its own 11px `bg-subtle` chip above its bubble,
     on the dashboard only (a dashboard conversation reopened in Communications
     or `/copilot` shows no chip, since only the dashboard passes `names`).
-- **Empty.** Three suggested questions as full-width `border-line` buttons (13px)
-  under an 11px "Ask about what is on screen." line.
+- **Empty.** Communications' empty state on both surfaces: one centred 13px
+  `ink-faint` line, "Ask about what is in front of you. Answers use your
+  accounts, mail and tickets." The dashboard's suggested questions were
+  removed on 2026-09-24 at the owner's request, to match Communications.
 - **Answers.** Rendered as plain text (`whitespace-pre-wrap`), not the
   Markdown formatting `/copilot`'s `AnswerText` applies. A reply withheld from
   a reader with narrower visibility in a shared session renders the same way,

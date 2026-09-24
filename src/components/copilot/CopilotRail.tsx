@@ -36,8 +36,6 @@ export interface CopilotRailProps {
   /** Names for filter values. Per-message chips render only when given, so a
    *  dashboard conversation reopened elsewhere reads as plain text. */
   names?: FilterNames;
-  /** Shown while the conversation is empty; clicking one sends it. */
-  suggestions?: readonly string[];
   /** Prefills the composer; a new nonce replaces what is typed. */
   draft?: { text: string; nonce: number } | null;
   /** Called as a question is sent. */
@@ -65,9 +63,6 @@ function Thinking() {
   );
 }
 
-const SUGGESTION =
-  'w-full text-left min-h-9 px-3 py-2 rounded-lg border border-line bg-surface text-[13px] text-ink enabled:hover:bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50 disabled:cursor-not-allowed';
-
 export function CopilotRail({
   context,
   onClearContext,
@@ -79,7 +74,6 @@ export function CopilotRail({
   top,
   thread: given,
   names,
-  suggestions,
   draft,
   onSent,
 }: CopilotRailProps) {
@@ -105,8 +99,8 @@ export function CopilotRail({
     onSent?.();
     await thread.send(turn);
     // Back to the input only if the person hasn't moved on while the answer
-    // loaded. Focus on body means the control they used (Retry, a
-    // suggestion) unmounted, which still counts as staying in the rail.
+    // loaded. Focus on body means the control they used (Retry)
+    // unmounted, which still counts as staying in the rail.
     const active = document.activeElement;
     if (!active || active === document.body || railRef.current?.contains(active)) inputRef.current?.focus();
   }
@@ -120,20 +114,7 @@ export function CopilotRail({
       {top}
       <section className={`flex-1 min-h-0 flex flex-col overflow-hidden ${glass ? 'rv-card-glass' : ''}`} aria-label={`${label} conversation`}>
         <div role="log" aria-label={`${label} messages`} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-3">
-          {empty && suggestions?.length ? (
-            <div className="m-auto w-full flex flex-col gap-2">
-              <p className="text-[11px] text-ink-muted text-center">Ask about what is on screen.</p>
-              <ul aria-label="Suggested questions" className="flex flex-col gap-1.5">
-                {suggestions.map((question) => (
-                  <li key={question}>
-                    <button type="button" onClick={() => void send(question)} disabled={Boolean(pending)} className={SUGGESTION}>
-                      {question}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : empty ? (
+          {empty ? (
             <p className="m-auto text-[13px] text-ink-faint text-center max-w-[24ch]">
               Ask about what is in front of you. Answers use your accounts, mail and tickets.
             </p>

@@ -97,7 +97,10 @@ Campaigns, Canvas), KNOWLEDGE BRAIN (seven items, whole section hidden without
 and entity identity on detail pages, a title plus sub-navigation on list pages.
 On the right: the rose "AI Copilot" button, four unwired icon buttons, the
 notification bell with an unread badge and popover, and the avatar menu with My
-Profile and Sign out.
+Profile and Sign out. On `/dashboard/*` the Navbar is Communications' header
+instead (transparent `h-16 px-4`, no border or shadow): "Dashboard" and the area
+tabs on the left, the Ask pill then the bell on the right, and no avatar menu
+(the sidebar's avatar carries it).
 
 ---
 
@@ -461,7 +464,15 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     `/copilot` uses; a reply withheld from a reader with narrower visibility in
     a shared session renders the same way, as plain text.
   - **Layout.** Shaped like Communications' Copilot rail: a 320px glass
-    column (`CopilotRail variant="glass"`), no header row of its own. Its
+    column (`CopilotRail variant="glass"`), no header row of its own. The
+    frame is Communications' too: `DashboardFrame` is `flex gap-3 px-4 pb-4`
+    under the transparent top bar (`<main>` unpadded on `/dashboard/*`), so
+    the content column (filters toolbar and views, its own scroll) and the
+    rail share a top and run the full remaining height; hidden, the content
+    takes the full width. The empty rail shows Communications' line ("Ask
+    about what is in front of you. Answers use your accounts, mail and
+    tickets."); the suggested questions were removed on 2026-09-24 at the
+    owner's request. Its
     controls are a pill in the Navbar, where the four decorative icons were
     (`/dashboard/*` only): New chat, History (its popover anchored in the
     pill) and the Sparkles switch ("Show Copilot"/"Hide Copilot",
@@ -475,8 +486,6 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     Close button, Escape/Close return focus to the switch).
   - **Entry points.**
     - Typing.
-    - Three suggested questions per area while the conversation is empty
-      (`components/copilot/suggestions.ts`, no model call).
     - "Ask about these" in the drill panel: it closes the drill first, because
       the drill sits over the rail at `lg` and up, then opens the rail and
       prefills "Why are these in <segment>?" with focus `{kind:'companies',
@@ -576,8 +585,8 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     anywhere: every figure there is an aggregate across a product's own
     customers, never a set of accounts.
   - **Panel.** `role="dialog"`, `aria-labelledby` the title. From `1024px`
-    (`lg`) it is a 360px panel positioned over the Ask rail (absolute, right
-    edge of the frame), so opening it never narrows the figures; below that it
+    (`lg`) it is a 360px panel positioned over the Ask rail (absolute, in the
+    rail's box: `lg:top-0 lg:right-4 lg:bottom-4`), so opening it never narrows the figures; below that it
     is a full-screen sheet (`aria-modal="true"`) with
     its own Tab/Shift+Tab focus trap, since there's nowhere else useful for
     focus to go. Escape and the close button both close it from either

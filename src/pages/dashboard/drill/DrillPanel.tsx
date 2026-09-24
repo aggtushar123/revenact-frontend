@@ -115,7 +115,7 @@ export function DrillPanel() {
       role="dialog"
       aria-labelledby={titleId}
       aria-modal={isSheet ? true : undefined}
-      className="animate-slide-in-right fixed inset-0 z-40 bg-surface lg:absolute lg:inset-auto lg:top-4 lg:bottom-4 lg:right-4 lg:z-30 lg:w-[360px] lg:border lg:border-line lg:rounded-xl lg:shadow-md flex flex-col min-h-0"
+      className="animate-slide-in-right fixed inset-0 z-40 bg-surface lg:absolute lg:inset-auto lg:top-0 lg:bottom-4 lg:right-4 lg:z-30 lg:w-[360px] lg:border lg:border-line lg:rounded-xl lg:shadow-md flex flex-col min-h-0"
     >
       <header className="flex items-start justify-between gap-3 p-4 border-b border-line">
         <h2 id={titleId} className="text-[15px] font-semibold text-ink">

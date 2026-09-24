@@ -3,7 +3,6 @@ import { X } from 'lucide-react';
 import { CopilotRail } from '../../../components/copilot/CopilotRail';
 import { contextLabel } from '../../../components/copilot/dashboardLabels';
 import type { RailContext } from '../../../components/copilot/railContext';
-import { SUGGESTIONS } from '../../../components/copilot/suggestions';
 import { trapTab } from '../../../lib/focusTrap';
 import { SM, useMediaQuery } from '../../../lib/useMediaQuery';
 import { AskControls } from './AskControls';
@@ -91,7 +90,6 @@ export function AskRail() {
     onConversation: ask.setConversation,
     thread: ask.thread,
     names,
-    suggestions: context ? SUGGESTIONS[context.area] : undefined,
     draft: ask.pendingDraft,
     onSent: ask.markSent,
   };

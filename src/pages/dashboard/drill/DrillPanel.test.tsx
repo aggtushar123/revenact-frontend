@@ -289,6 +289,17 @@ describe('DrillPanel', () => {
     expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-modal');
   });
 
+  // The frame is Communications' body (px-4 pb-4, no top padding), so the
+  // rail's box starts at the frame's top; the panel sits in that same box.
+  it('at lg, sits in the Ask rail\'s box: same top, right and height', async () => {
+    stubMatchMedia(true);
+    renderPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'At risk' }));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('lg:absolute', 'lg:top-0', 'lg:right-4', 'lg:bottom-4');
+    expect(dialog).not.toHaveClass('lg:top-4');
+  });
+
   it('offers no "Ask about these" outside the dashboard frame', async () => {
     renderPanel();
     await userEvent.click(screen.getByRole('button', { name: 'At risk' }));

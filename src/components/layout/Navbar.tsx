@@ -207,7 +207,16 @@ export function Navbar() {
   }
 
   return (
-    <header className="h-[64px] border-b border-line-subtle bg-surface flex items-center justify-between px-6 shrink-0 z-20 transition-all duration-300 shadow-sm">
+    // The dashboard's top bar is Communications' header, class for class:
+    // transparent on the canvas, the Ask pill then the bell on the right, and
+    // no avatar (the sidebar carries the account menu).
+    <header
+      className={
+        isDashboard
+          ? 'h-16 shrink-0 flex items-center gap-3 px-4'
+          : 'h-[64px] border-b border-line-subtle bg-surface flex items-center justify-between px-6 shrink-0 z-20 transition-all duration-300 shadow-sm'
+      }
+    >
       <div className="flex items-center gap-8 h-full">
         {account ? (
           <div className="flex items-center gap-4">
@@ -398,14 +407,14 @@ export function Navbar() {
         )}
       </div>
       
-      <div className="flex items-center gap-4">
+      <div className={isDashboard ? 'ml-auto flex items-center gap-3' : 'flex items-center gap-4'}>
         {/* Right side actions. The Copilot is the home page now, first in
             the sidebar; it no longer needs a button on every other page. */}
-        <div className="flex items-center gap-1.5 text-ink-faint ml-1">
+        <div className={isDashboard ? 'flex items-center gap-3 text-ink-faint' : 'flex items-center gap-1.5 text-ink-faint ml-1'}>
           {/* The dashboard puts its Ask controls here (portaled from
               DashboardFrame) in place of the decorative icons. */}
           {isDashboard ? (
-            <div ref={setSlot} className="flex items-center" />
+            <div ref={setSlot} data-nav-actions-slot="" className="flex items-center" />
           ) : (
             <>
               <IconButton icon={<Search className="w-4 h-4" />} />
@@ -477,7 +486,8 @@ export function Navbar() {
           </div>
         </div>
 
-        {/* User avatar + account menu */}
+        {/* User avatar + account menu (not on the dashboard; see the header) */}
+        {isDashboard ? null : (
         <div className="relative ml-1" ref={accountMenuRef}>
           <button
             onClick={() => setIsAccountMenuOpen((open) => !open)}
@@ -537,6 +547,7 @@ export function Navbar() {
             </div>
           )}
         </div>
+        )}
       </div>
     </header>
   );

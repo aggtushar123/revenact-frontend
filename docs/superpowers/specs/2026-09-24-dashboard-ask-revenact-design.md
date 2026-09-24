@@ -18,7 +18,7 @@ behind them.
 | History | One history across Communications, Copilot and Dashboard; each dashboard conversation is tagged with where it started. |
 | Tab or filter change mid-conversation | Follows the screen: each question is grounded in what is on screen when it is sent, and shows that as a chip. |
 | Layout | Collapsible rail; the drill panel opens over it. |
-| Entry points | Typing; "Ask about these" in the drill panel; "Why?" on attention rows; three suggested questions per area. |
+| Entry points | Typing; "Ask about these" in the drill panel; "Why?" on attention rows; ~~three suggested questions per area~~ (see the amendment below). |
 | Grounding approach | A: the client sends *where* it is; the server computes *what* is there. The client never sends figures. |
 
 ## 1. Contract
@@ -163,9 +163,11 @@ message shows its own chip, from `message.context`.
 - **Attention row, "Why?":** a quiet button beside Done. It sends "Why is
   this on my list?" with focus `{kind:'attention', key}` immediately. Its
   accessible name is "Ask why <title> is on my list".
-- **Suggested questions:** when the conversation is empty, show three fixed
+- ~~**Suggested questions:** when the conversation is empty, show three fixed
   questions for the current area from `components/copilot/suggestions.ts`
-  (no model call). Clicking one sends it.
+  (no model call). Clicking one sends it.~~ Amended 2026-09-24: suggestions
+  removed at the user's request to match Communications. The empty rail
+  shows Communications' line instead.
 
 **States.**
 - In flight: a "Thinking…" message skeleton. There is no streaming.
@@ -199,7 +201,7 @@ message shows its own chip, from `message.context`.
 - A follow-up after a filter change carries the new filters.
 - The history tag is shown, and reopening navigates to its view.
 - The drill and "Why?" entry points send the right focus.
-- The suggestions for each area.
+- ~~The suggestions for each area.~~ (removed with the suggestions, 2026-09-24)
 - Collapse is remembered, and storage failure falls back safely.
 - The phone sheet and its focus handling.
 - The 429 message.

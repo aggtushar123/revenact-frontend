@@ -159,15 +159,15 @@ describe('CopilotRail', () => {
     expect(within(screen.getByRole('log', { name: 'Copilot messages' })).queryByText('Revenue › Forecast')).not.toBeInTheDocument();
   });
 
-  it('offers the suggestions while the conversation is empty and sends one on click', async () => {
-    const { spy } = stubCopilot();
-    renderRail({ suggestions: ['What should I act on first?', 'B?', 'C?'], context: { kind: 'dashboard', context: { ...DASH, area: 'overview', view: null }, label: 'Overview' } });
-    const list = screen.getByRole('list', { name: 'Suggested questions' });
-    await userEvent.click(within(list).getByRole('button', { name: 'What should I act on first?' }));
-    expect(await screen.findByText('Answer to: What should I act on first?')).toBeInTheDocument();
+  it('shows Communications\' empty line on a dashboard rail too, and no suggestions', async () => {
+    stubCopilot();
+    renderRail({ context: { kind: 'dashboard', context: { ...DASH, area: 'overview', view: null }, label: 'Overview' } });
+    const log = screen.getByRole('log', { name: 'Copilot messages' });
+    expect(within(log).getByText('Ask about what is in front of you. Answers use your accounts, mail and tickets.')).toHaveClass('m-auto', 'text-center');
     expect(screen.queryByRole('list', { name: 'Suggested questions' })).not.toBeInTheDocument();
-    expect(postedBodies(spy)[0].content).toBe('What should I act on first?');
-    expect(screen.getByPlaceholderText('Ask Revenact')).toHaveFocus();
+    await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'What should I act on first?{enter}');
+    expect(await screen.findByText('Answer to: What should I act on first?')).toBeInTheDocument();
+    expect(within(log).queryByText('Ask about what is in front of you. Answers use your accounts, mail and tickets.')).not.toBeInTheDocument();
   });
 
   it('prefills a draft, focused and editable, and sends nothing until asked', async () => {

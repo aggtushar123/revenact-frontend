@@ -55,7 +55,9 @@ describe('the Ask rail on the dashboard', () => {
     renderDashboard('/dashboard/overview', () => <Probe />, 1440);
     expect(rail()).toBeInTheDocument();
     expect(within(rail()!).getByText('Overview')).toBeInTheDocument();
-    expect(within(rail()!).getByRole('list', { name: 'Suggested questions' })).toBeInTheDocument();
+    // The empty state is Communications': the same line, no suggestions.
+    expect(within(rail()!).getByText('Ask about what is in front of you. Answers use your accounts, mail and tickets.')).toBeInTheDocument();
+    expect(within(rail()!).queryByRole('list', { name: 'Suggested questions' })).not.toBeInTheDocument();
     // No header row of its own: the controls live in the top bar.
     expect(within(rail()!).queryByRole('heading', { name: 'Ask Revenact' })).not.toBeInTheDocument();
     expect(within(rail()!).queryByRole('button', { name: 'New chat' })).not.toBeInTheDocument();
@@ -137,7 +139,7 @@ describe('the Ask rail on the dashboard', () => {
     await screen.findByText('Answer to: What needs me?');
     await userEvent.click(screen.getByRole('button', { name: 'New chat' }));
     await waitFor(() => expect(screen.queryByText('Answer to: What needs me?')).not.toBeInTheDocument());
-    expect(within(rail()!).getByRole('list', { name: 'Suggested questions' })).toBeInTheDocument();
+    expect(within(rail()!).getByText('Ask about what is in front of you. Answers use your accounts, mail and tickets.')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: 'Hide Copilot' }));
     await waitFor(() => expect(rail()).not.toBeInTheDocument());
