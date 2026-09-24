@@ -93,4 +93,16 @@ export interface HealthDataRow {
   riskFactors: { label: string; points: number }[];
   /** Oldest month first. Empty when nothing has been recorded. */
   history: HealthHistoryEntry[];
+  /**
+   * The Triage view's risk score, 0–155 — **not capped at 100**. Computed by
+   * the backend (a Python port of `triage.ts`'s old scoring) rather than in
+   * the browser, so the Renewal Forecast and this screen can never disagree
+   * about the same account. Higher is worse.
+   */
+  triageScore: number;
+  /** Every factor behind `triageScore`, highest points first. Empty when the
+   *  account carries no risk at all — not a missing value. */
+  triageFactors: { label: string; points: number }[];
+  /** Which way the server reads this account's recent trajectory. */
+  triageDirection: 'declining' | 'improving' | 'flat' | 'unknown';
 }

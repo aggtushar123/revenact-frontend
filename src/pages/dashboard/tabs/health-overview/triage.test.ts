@@ -64,97 +64,76 @@ describe('trajectoryOf', () => {
 });
 
 describe('scoreRow', () => {
-  it('scores a healthy, distant, agreed-on account at zero', () => {
-    const t = scoreRow(makeRow({ renewalDate: 'Dec 31, 2026' }), NOW);
-    expect(t.score).toBe(0);
-    expect(t.factors).toEqual([]);
+  // The weighting itself moved server-side (a Python port of this file's old
+  // scoring, served on /customers/health/ as triage_score / triage_factors /
+  // triage_direction) so the Renewal Forecast and this screen can never
+  // disagree about the same account. scoreRow's job now is just to carry
+  // that verbatim alongside what's still computed here.
+
+  it('reads the score, factors and direction the server sent, verbatim', () => {
+    const factors = [
+      { label: 'Health is Poor', points: 66 },
+      { label: 'Renews in 30d', points: 18 },
+    ];
+    const t = scoreRow(
+      makeRow({ triageScore: 84, triageFactors: factors, triageDirection: 'declining' }),
+      NOW,
+    );
+    expect(t.score).toBe(84);
+    expect(t.factors).toEqual(factors);
+    expect(t.direction).toBe('declining');
   });
 
-  it('always adds up to the sum of its factors', () => {
+  it('does not invent a score or factors when the server sent none', () => {
+    const t = scoreRow(makeRow({ triageScore: 0, triageFactors: [], triageDirection: 'unknown' }), NOW);
+    expect(t.score).toBe(0);
+    expect(t.factors).toEqual([]);
+    expect(t.direction).toBe('unknown');
+  });
+
+  it('still computes daysToRenewal, pulseGap and trail itself', () => {
     const t = scoreRow(
       makeRow({
-        healthStatus: 'Poor',
-        csmPulseScore: 4,
-        aiPulseScore: 1,
         renewalDate: 'Jul 15, 2026',
-        lifecycleStage: 'Pilot',
+        csmPulseScore: 5,
+        aiPulseScore: 2,
         history: history('Good', 'Average', 'Poor'),
+        triageScore: 0,
+        triageFactors: [],
+        // The server's own direction may disagree with what a naive
+        // first-vs-last read of `trail` would say — this pins that `trail`
+        // is still read locally even while `direction` comes from the row.
+        triageDirection: 'flat',
       }),
       NOW,
     );
-    expect(t.score).toBe(t.factors.reduce((sum, f) => sum + f.points, 0));
-    expect(t.factors.length).toBe(5);
+    expect(t.daysToRenewal).toBe(30);
+    expect(t.pulseGap).toBe(3);
+    expect(t.trail).toEqual(['Good', 'Average', 'Poor']);
+    expect(t.direction).toBe('flat');
   });
 
-  it('ranks a worse health status higher', () => {
-    const good = scoreRow(makeRow({ healthStatus: 'Good' }), NOW).score;
-    const average = scoreRow(makeRow({ healthStatus: 'Average' }), NOW).score;
-    const poor = scoreRow(makeRow({ healthStatus: 'Poor' }), NOW).score;
-    expect(poor).toBeGreaterThan(average);
-    expect(average).toBeGreaterThan(good);
-  });
-
-  it('only charges for a colder AI read, not a colder CSM read', () => {
-    const aiColder = scoreRow(makeRow({ csmPulseScore: 5, aiPulseScore: 2 }), NOW);
-    const csmColder = scoreRow(makeRow({ csmPulseScore: 2, aiPulseScore: 5 }), NOW);
-
-    expect(aiColder.pulseGap).toBe(3);
-    expect(aiColder.score).toBeGreaterThan(0);
-    // The CSM seeing risk first is a signal, but it isn't account risk.
-    expect(csmColder.pulseGap).toBe(-3);
-    expect(csmColder.score).toBe(0);
-  });
-
-  it('weights a near renewal above a merely upcoming one', () => {
-    const urgent = scoreRow(makeRow({ renewalDate: 'Jul 15, 2026' }), NOW).score; // 30d
-    const near = scoreRow(makeRow({ renewalDate: 'Oct 15, 2026' }), NOW).score; // 122d
-    const distant = scoreRow(makeRow({ renewalDate: 'Dec 31, 2026' }), NOW).score; // 199d
-    expect(urgent).toBeGreaterThan(near);
-    expect(near).toBeGreaterThan(distant);
-    expect(distant).toBe(0);
-  });
-
-  it('charges a steeper fall more than a shallow one', () => {
-    const toAverage = scoreRow(makeRow({ history: history('Good', 'Good', 'Average') }), NOW);
-    const toPoor = scoreRow(makeRow({ history: history('Good', 'Good', 'Poor') }), NOW);
-    expect(toPoor.score).toBeGreaterThan(toAverage.score);
-  });
-
-  it('names every factor it charged for', () => {
-    const t = scoreRow(
-      makeRow({ healthStatus: 'Average', csmPulseScore: 4, aiPulseScore: 2, lifecycleStage: 'Pilot' }),
-      NOW,
-    );
-    const labels = t.factors.map((f) => f.label);
-    expect(labels).toContain('Health is Average');
-    expect(labels).toContain("AI Pulse 2 below CSM's");
-    expect(labels).toContain('Still in pilot');
-    // Largest contributor first, so the row's tooltip leads with the real reason.
-    expect(t.factors[0].points).toBeGreaterThanOrEqual(t.factors[1].points);
-  });
-
-  it('scores a row with no history without throwing', () => {
-    const t = scoreRow(makeRow({ history: [], healthStatus: 'Poor' }), NOW);
-    expect(t.direction).toBe('unknown');
-    expect(Number.isFinite(t.score)).toBe(true);
+  it('reads a null pulse gap when either side has not rated the account', () => {
+    expect(scoreRow(makeRow({ csmPulseScore: null, aiPulseScore: 4 }), NOW).pulseGap).toBeNull();
+    expect(scoreRow(makeRow({ csmPulseScore: 4, aiPulseScore: null }), NOW).pulseGap).toBeNull();
   });
 });
 
 describe('triage', () => {
-  it('ranks worst first', () => {
+  it('ranks worst first, by the score the server computed', () => {
     const rows = [
-      makeRow({ id: '1', account: 'Calm', healthStatus: 'Good' }),
-      makeRow({ id: '2', account: 'Burning', healthStatus: 'Poor', renewalDate: 'Jul 1, 2026' }),
-      makeRow({ id: '3', account: 'Wobbly', healthStatus: 'Average' }),
+      makeRow({ id: '1', account: 'Calm', triageScore: 0 }),
+      makeRow({ id: '2', account: 'Burning', triageScore: 90 }),
+      makeRow({ id: '3', account: 'Wobbly', triageScore: 22 }),
     ];
     expect(triage(rows, NOW).map((t) => t.row.account)).toEqual(['Burning', 'Wobbly', 'Calm']);
   });
 
   it('breaks ties on account name so the order is stable', () => {
     const rows = [
-      makeRow({ id: '1', account: 'Zeta', healthStatus: 'Average' }),
-      makeRow({ id: '2', account: 'Alpha', healthStatus: 'Average' }),
-      makeRow({ id: '3', account: 'Mid', healthStatus: 'Average' }),
+      makeRow({ id: '1', account: 'Zeta', triageScore: 22 }),
+      makeRow({ id: '2', account: 'Alpha', triageScore: 22 }),
+      makeRow({ id: '3', account: 'Mid', triageScore: 22 }),
     ];
     const once = triage(rows, NOW).map((t) => t.row.account);
     const again = triage([...rows].reverse(), NOW).map((t) => t.row.account);
@@ -172,9 +151,25 @@ describe('summarise', () => {
         healthStatus: 'Poor',
         renewalDate: 'Jul 1, 2026',
         history: history('Good', 'Average', 'Poor'),
+        triageScore: 66,
+        triageDirection: 'declining',
       }),
-      makeRow({ id: '2', account: 'B', healthStatus: 'Good', csmPulseScore: 5, aiPulseScore: 2 }),
-      makeRow({ id: '3', account: 'C', healthStatus: 'Good', history: history('Good', 'Good', 'Good') }),
+      makeRow({
+        id: '2',
+        account: 'B',
+        healthStatus: 'Good',
+        csmPulseScore: 5,
+        aiPulseScore: 2,
+        triageScore: 0,
+      }),
+      makeRow({
+        id: '3',
+        account: 'C',
+        healthStatus: 'Good',
+        history: history('Good', 'Good', 'Good'),
+        triageScore: 0,
+        triageDirection: 'flat',
+      }),
     ];
     const s = summarise(triage(rows, NOW));
 
@@ -194,13 +189,11 @@ describe('summarise', () => {
   });
 
   it('counts needsAction against the exported threshold', () => {
-    const justUnder = summarise(triage([makeRow({ healthStatus: 'Average' })], NOW));
+    const justUnder = summarise(triage([makeRow({ triageScore: ACTION_THRESHOLD - 1 })], NOW));
     expect(justUnder.needsAction).toBe(0);
-    const over = summarise(
-      triage([makeRow({ healthStatus: 'Poor', renewalDate: 'Jul 1, 2026' })], NOW),
-    );
+    const over = summarise(triage([makeRow({ triageScore: ACTION_THRESHOLD })], NOW));
     expect(over.needsAction).toBe(1);
-    expect(triage([makeRow({ healthStatus: 'Poor' })], NOW)[0].score)
+    expect(triage([makeRow({ triageScore: ACTION_THRESHOLD })], NOW)[0].score)
       .toBeGreaterThanOrEqual(ACTION_THRESHOLD);
   });
 });
@@ -215,11 +208,18 @@ describe('triageDrillSets', () => {
       id: '1',
       account: 'A',
       healthStatus: 'Poor',
-      renewalDate: 'Jul 1, 2026',
-      history: history('Good', 'Average', 'Poor'),
+      triageScore: 66,
+      triageDirection: 'declining',
     }),
-    makeRow({ id: '2', account: 'B', healthStatus: 'Good', csmPulseScore: 5, aiPulseScore: 2 }),
-    makeRow({ id: '3', account: 'C', healthStatus: 'Good', history: history('Good', 'Good', 'Good') }),
+    makeRow({
+      id: '2',
+      account: 'B',
+      healthStatus: 'Good',
+      csmPulseScore: 5,
+      aiPulseScore: 2,
+      triageScore: 0,
+    }),
+    makeRow({ id: '3', account: 'C', healthStatus: 'Good', triageScore: 0, triageDirection: 'flat' }),
   ];
   const scored = triage(rows, NOW);
 
@@ -242,21 +242,13 @@ describe('triageDrillSets', () => {
 });
 
 describe('overdue renewals', () => {
-  // Real books carry renewal dates in the past. The scoring has always handled
-  // them (a negative day count is inside every urgency window); these pin that
-  // it stays that way, since the display now words them differently.
-  it('counts a past renewal as urgent, not as distant', () => {
-    const overdue = scoreRow(makeRow({ renewalDate: 'Jan 1, 2026' }), NOW); // 165d ago
-    const soon = scoreRow(makeRow({ renewalDate: 'Jul 1, 2026' }), NOW); // 16d away
+  // Real books carry renewal dates in the past. `daysToRenewal` has always
+  // handled them (see the `daysToRenewal` suite above); this pins that a
+  // negative day count still flows through scoreRow onto the drill detail
+  // without upsetting the (now server-driven) score.
+  it('carries a negative daysToRenewal through scoreRow without throwing', () => {
+    const overdue = scoreRow(makeRow({ renewalDate: 'Jan 1, 2026', triageScore: 40 }), NOW); // 165d ago
     expect(overdue.daysToRenewal).toBeLessThan(0);
-    expect(overdue.score).toBe(soon.score);
-  });
-
-  it('ranks an overdue renewal alongside an imminent one', () => {
-    const rows = [
-      makeRow({ id: '1', account: 'Overdue', renewalDate: 'Jan 1, 2026' }),
-      makeRow({ id: '2', account: 'Distant', renewalDate: 'Dec 31, 2026' }),
-    ];
-    expect(triage(rows, NOW)[0].row.account).toBe('Overdue');
+    expect(overdue.score).toBe(40);
   });
 });

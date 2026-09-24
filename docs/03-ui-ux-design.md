@@ -4,7 +4,7 @@ description: UI/UX design reference for the Revenact frontend — tokens, type, 
 
 # Revenact — UI/UX Design
 
-Current as of 2026-09-18. The authority for any visual change is
+Current as of 2026-09-24. The authority for any visual change is
 `.claude/skills/revenact-design/SKILL.md`, the repo's own design skill, which
 also routes to the twenty vendored design skills and settles the conflicts
 between them. This document is the readable version of that truth plus a survey
@@ -198,6 +198,50 @@ used to be copied into every dashboard tab.
 | `Kpi` / `KpiStrip` | `Kpi` is one label/value/detail figure; colour is reserved for `tone="loss"`/`"gain"`, never decorative. Given an `onDrill`, it renders as a `<button>` instead of a `<div>` — same type, size and layout, with `hover:bg-subtle` and a focus ring added, and an explicit `aria-label="<label> <value>, show accounts"` rather than relying on the visible digits; the detail line stays in the accessible description through `aria-describedby`, and the inner lines are block `<span>`s so the button holds only phrasing content. `KpiStrip` lays a row of them out four across from `md` (`columns={3}` for a three-figure summary, `columns={2}` inside a card; `stackFromLg` for a quarter-width card such as Tickets' KPIs, keeping every label to two lines), divided by hairlines rather than boxed — replaced six local `Tile`s that tinted a border by tone and coloured numbers that meant nothing |
 | `Panel` | The one container on the dashboard: `bg-surface border border-line rounded-xl p-4`, an optional title/action header. Never nest one inside another — group inside with `divide-y` or whitespace instead |
 | `DataState` (`Loading`, `ErrorState`, `Empty`, `TruncatedNotice`) | One wording for loading, error, empty and truncated, generalised from Health's own set so eight views stop describing the same outage eight different ways |
+
+### Attention list
+
+`src/pages/dashboard/overview/`, the Overview's landing content: one `Panel`
+titled "Needs attention" beside a stack of three headline `Panel`s.
+
+- **Row anatomy.** A `bg-subtle` kind chip (Renewal, Risk, Going quiet,
+  Support, Anomaly — text only, no colour by severity), then the title: a
+  `Link` to `/organizations/<id>` for every kind but anomaly, or, for an
+  anomaly (which can span several companies), a left-aligned `<button>` that
+  opens the drill panel over its company list. Below the title is an 11px
+  `text-ink-muted` reason line. On the right, the at-stake figure
+  (`font-mono-brand tabular-nums text-ink`, no colour — money at risk is
+  never a severity cue) with a small "at stake" label under it, then
+  **Snooze 7 days** and **Done**, both `min-h-9` with hover, focus-visible
+  and disabled styling. Every action carries its own accessible name rather
+  than relying on the visible word — `aria-label="Snooze <title> for 7
+  days"`, `"Mark <title> done"`, `"Undo: <title>"` — since two rows can
+  otherwise share a button's visible text. Acting on a row swaps it in place
+  for a "Snoozed · `<title>`" / "Marked done · `<title>`" line with the Undo
+  button; both the acted-on row's buttons and its own Undo disable while
+  their request is in flight.
+- **States.**
+  - *Loading* (first load only): five rows shaped like the real row —
+    chip-and-title, reason line and action-button placeholders as
+    `animate-pulse` `bg-subtle` blocks — inside a `role="status"
+    aria-busy="true"` wrapper, no spinner.
+  - *Empty*: `Empty` — "Nothing needs you right now."
+  - *Full error* (no rows to show at all, first load failed): `ErrorState` —
+    "Could not load what needs attention."
+  - *Stale rows plus a failed refetch*: the large `ErrorState` does not
+    replace the list — a compact `role="alert"` line ("Could not load for
+    these filters. Showing the last list.") sits above the old rows instead,
+    so a filter change that fails never blanks a list the viewer was already
+    reading.
+  - A failed Snooze/Done/Undo shows its own `role="alert"` line in the panel
+    header and restores the row, distinct from the load-error line above.
+- **Headline cards** (`overview/HeadlineCards.tsx`): three stacked `Panel`s
+  — Revenue, Health, Support — each with an "Open `<Area>` →" link in its
+  header and a two-across `Kpi` row inside, no drill (the Overview only
+  summarises; the area page is where a figure opens a list). Each shows a
+  skeleton shaped like its own `Kpi`s (a label line over a figure line) until
+  its data actually answers the current filters, and "—" in place of a
+  figure on error.
 
 ### Drill panel
 

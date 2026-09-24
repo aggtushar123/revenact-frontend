@@ -50,6 +50,11 @@ export interface TicketKpis {
   resolution_rate: number;
   positive_sentiment: number;
   negative_sentiment: number;
+  /** Unresolved tickets in scope (backend PR #62). Optional so a fixture
+   *  written before the field existed still type-checks. */
+  open_count?: number;
+  /** Age of the oldest unresolved ticket; null when none is open. */
+  oldest_open_days?: number | null;
 }
 
 export interface TicketFilterOptions {
@@ -77,12 +82,20 @@ interface TicketsState {
   stats: TicketStats | null;
   statsLoading: boolean;
   statsError: string | null;
+  /** The query `stats` answers ('' for none); null before the first load.
+   *  A reader showing a different query treats `stats` as not yet loaded. */
+  statsQuery: string | null;
+  /** The latest request. An older one landing late is ignored, so a slow
+   *  answer to a previous filter never overwrites the current one. */
+  statsRequestId: string | null;
 }
 
 const initialState: TicketsState = {
   stats: null,
   statsLoading: false,
   statsError: null,
+  statsQuery: null,
+  statsRequestId: null,
 };
 
 /** Takes a raw query string (`priority=high&from=2026-01-01`) rather
@@ -110,15 +123,19 @@ const ticketsSlice = createSlice({
       // `stats` is deliberately left in place while a refetch runs, so
       // changing a filter dims the existing charts rather than
       // blanking the dashboard and reflowing it.
-      .addCase(fetchTicketStats.pending, (state) => {
+      .addCase(fetchTicketStats.pending, (state, action) => {
         state.statsLoading = true;
         state.statsError = null;
+        state.statsRequestId = action.meta.requestId;
       })
       .addCase(fetchTicketStats.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.statsRequestId) return;
         state.statsLoading = false;
         state.stats = action.payload;
+        state.statsQuery = action.meta.arg ?? '';
       })
       .addCase(fetchTicketStats.rejected, (state, action) => {
+        if (action.meta.requestId !== state.statsRequestId) return;
         state.statsLoading = false;
         state.statsError = action.payload ?? 'Could not load ticket stats.';
       });

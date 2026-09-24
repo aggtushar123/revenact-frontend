@@ -42,6 +42,9 @@ export function healthRow(overrides: Partial<HealthDataRow> = {}): HealthDataRow
     riskFactors: [{ label: 'Good health', points: 0.05 }],
     activeSeats: 20,
     history: [],
+    triageScore: 0,
+    triageFactors: [],
+    triageDirection: 'unknown',
     ...overrides,
   };
 }

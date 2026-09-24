@@ -4,6 +4,7 @@
 // features/health/types.ts, where the domain modules read it from.
 export type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
 import type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
+import { trajectoryOf } from './triage';
 
 export type Owner = 'Melak Anbessa' | 'Justin Middleton' | 'Joey Gilkey' | 'Gerry Hill';
 
@@ -111,6 +112,16 @@ const renewalDateIn = (days: number): string => {
   return `${MONTH_ABBR[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
 };
 
+/**
+ * A stand-in for the backend's `triage_score` / `triage_factors`, keyed on
+ * health status alone — same simplification as `riskOfLoss` above: this
+ * generator is a test fixture, not a second copy of the server's scoring.
+ */
+const triageStandInFor = (status: HealthStatus): { score: number; factors: { label: string; points: number }[] } => {
+  const score = status === 'Poor' ? 90 : status === 'Average' ? 40 : 5;
+  return { score, factors: [{ label: `${status} health`, points: score }] };
+};
+
 // Generate ~50 diverse mock rows with varied health distributions
 const generateMockData = (): HealthDataRow[] => {
   const data: HealthDataRow[] = [];
@@ -158,6 +169,8 @@ const generateMockData = (): HealthDataRow[] => {
 
     const owner = MOCK_OWNERS[Math.floor(Math.random() * MOCK_OWNERS.length)];
     const account = accounts[Math.floor(Math.random() * accounts.length)];
+    const history = historyEndingAt(status);
+    const triage = triageStandInFor(status);
 
     data.push({
       id: `${i}`,
@@ -185,7 +198,10 @@ const generateMockData = (): HealthDataRow[] => {
       riskOfLoss: status === 'Poor' ? 0.5 : status === 'Average' ? 0.25 : 0.05,
       riskFactors: [{ label: `${status} health`, points: status === 'Poor' ? 0.5 : status === 'Average' ? 0.25 : 0.05 }],
       activeSeats: Math.floor(Math.random() * 50) + 10,
-      history: historyEndingAt(status)
+      history,
+      triageScore: triage.score,
+      triageFactors: triage.factors,
+      triageDirection: trajectoryOf({ history } as HealthDataRow).direction,
     });
   }
 
@@ -218,7 +234,10 @@ const generateMockData = (): HealthDataRow[] => {
     activeSeats: 38,
     // Deliberately empty: this hand-written row is the one account with no
     // pulse history, which keeps the "no trajectory" path exercised on screen.
-    history: []
+    history: [],
+    triageScore: 90,
+    triageFactors: [{ label: 'Poor health', points: 90 }],
+    triageDirection: 'unknown',
   });
 
   return data;

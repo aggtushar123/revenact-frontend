@@ -11,7 +11,7 @@ import { MOCK_HEALTH_DATA } from './mockData';
  *  themselves read `state.health`, which the real app fills from
  *  /customers/health/. */
 const BOOK = MOCK_HEALTH_DATA;
-import { scoreRow } from './triage';
+import { ACTION_THRESHOLD, scoreRow } from './triage';
 
 // Integration tier: view + queue + glyphs, and the container's routing into
 // them. MOCK_HEALTH_DATA is generated with Math.random() at import time, so
@@ -116,57 +116,28 @@ describe('TriageView', () => {
 });
 
 describe('TriageView drill', () => {
-  // Renewal always distant, so a row's score comes only from the factor
-  // under test — a default `renewalDate` close enough to trigger the
-  // renewal-proximity weighting would contaminate every row identically.
+  // Renewal always distant: `daysToRenewal` is still read off the row
+  // locally, and a near renewal would light up "renews inside 90 days" on
+  // rows this suite doesn't mean to put there.
   const FAR = 'Dec 31, 2099';
 
   it('"Needs action now" opens exactly the accounts scoring at or above the threshold', async () => {
     const user = userEvent.setup();
     const rows = [
-      // Poor alone already clears the threshold (severity 3 * 22 = 66).
-      healthRow({ id: '1', account: 'ActionPoor', healthStatus: 'Poor', renewalDate: FAR }),
-      // Average (22) + a 2-point AI-colder gap (2 * 11 = 22) = 44.
-      healthRow({
-        id: '2',
-        account: 'ActionGap',
-        healthStatus: 'Average',
-        csmPulseScore: 5,
-        aiPulseScore: 3,
-        renewalDate: FAR,
-      }),
-      // Average (22) + pilot (6) + a 2-point gap (22) = 50.
-      healthRow({
-        id: '3',
-        account: 'ActionCombo',
-        healthStatus: 'Average',
-        csmPulseScore: 4,
-        aiPulseScore: 2,
-        lifecycleStage: 'Pilot',
-        renewalDate: FAR,
-      }),
-      // Near miss: Average alone is only 22 — well short of 40.
-      healthRow({ id: '4', account: 'BelowThreshold', healthStatus: 'Average', renewalDate: FAR }),
-      // Near miss: pilot (6) + a 1-point gap (11) on an otherwise Good
-      // account is 17 — nowhere near the threshold.
-      healthRow({
-        id: '5',
-        account: 'BelowThresholdGood',
-        healthStatus: 'Good',
-        lifecycleStage: 'Pilot',
-        csmPulseScore: 4,
-        aiPulseScore: 3,
-        renewalDate: FAR,
-      }),
-      // Near miss, right at the boundary: Average (22) + a 1-point gap
-      // (11) = 33 — the closest a row gets to 40 without clearing it.
+      // The server already decided these clear ACTION_THRESHOLD (40) —
+      // the view has no say in it, only in what it does with the number.
+      healthRow({ id: '1', account: 'ActionPoor', healthStatus: 'Poor', renewalDate: FAR, triageScore: 66 }),
+      healthRow({ id: '2', account: 'ActionGap', healthStatus: 'Average', renewalDate: FAR, triageScore: 44 }),
+      healthRow({ id: '3', account: 'ActionCombo', healthStatus: 'Average', renewalDate: FAR, triageScore: 40 }),
+      // Near misses: all below the threshold.
+      healthRow({ id: '4', account: 'BelowThreshold', healthStatus: 'Average', renewalDate: FAR, triageScore: 22 }),
+      healthRow({ id: '5', account: 'BelowThresholdGood', healthStatus: 'Good', renewalDate: FAR, triageScore: 17 }),
       healthRow({
         id: '6',
         account: 'AlmostThere',
         healthStatus: 'Average',
-        csmPulseScore: 4,
-        aiPulseScore: 3,
         renewalDate: FAR,
+        triageScore: ACTION_THRESHOLD - 1,
       }),
     ];
 
@@ -188,12 +159,16 @@ describe('TriageView drill', () => {
     const trail = (...statuses: ('Good' | 'Average' | 'Poor')[]) =>
       statuses.map((status, i) => ({ month: `M${i}`, status }));
     const rows = [
+      // The server's own direction call decides the drill, not the trail a
+      // row happens to carry — DownTrend's history matches its direction
+      // here, but nothing re-derives one from the other.
       healthRow({
         id: '1',
         account: 'DownTrend',
         healthStatus: 'Poor',
         renewalDate: FAR,
         history: trail('Good', 'Average', 'Poor'),
+        triageDirection: 'declining',
       }),
       // Near miss: flat, never moves.
       healthRow({
@@ -202,6 +177,7 @@ describe('TriageView drill', () => {
         healthStatus: 'Good',
         renewalDate: FAR,
         history: trail('Good', 'Good', 'Good'),
+        triageDirection: 'flat',
       }),
       // Near miss: the opposite direction.
       healthRow({
@@ -210,14 +186,16 @@ describe('TriageView drill', () => {
         healthStatus: 'Good',
         renewalDate: FAR,
         history: trail('Poor', 'Average', 'Good'),
+        triageDirection: 'improving',
       }),
-      // Near miss: one data point is 'unknown', not 'declining'.
+      // Near miss: too little history for the server to call a direction.
       healthRow({
         id: '4',
         account: 'ShortHistory',
         healthStatus: 'Poor',
         renewalDate: FAR,
         history: trail('Poor'),
+        triageDirection: 'unknown',
       }),
     ];
 

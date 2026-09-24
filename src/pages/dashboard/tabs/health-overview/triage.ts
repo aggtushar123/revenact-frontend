@@ -21,18 +21,10 @@ export const RENEWAL_NEAR_DAYS = 180;
  */
 export const TRAJECTORY_WINDOW_MONTHS = 3;
 
-/** How much worse each state is than Good. Drives both the base score and
- *  the trajectory delta, so a Good→Poor fall counts for more than Good→Average. */
+/** How much worse each state is than Good. Drives the trajectory delta that
+ *  decides `trajectoryOf`'s own direction, so a Good→Poor fall counts for
+ *  more than Good→Average. */
 const SEVERITY: Record<HealthStatus, number> = { Good: 0, Average: 1, Poor: 3 };
-
-const WEIGHT = {
-  severity: 22,
-  pulseGap: 11,
-  renewalUrgent: 18,
-  renewalNear: 8,
-  decline: 9,
-  pilot: 6,
-} as const;
 
 export type TrajectoryDirection = 'declining' | 'improving' | 'flat' | 'unknown';
 
@@ -110,22 +102,20 @@ export function trajectoryOf(
 }
 
 /**
- * Score one account for triage.
+ * Read one account's triage score.
  *
- * The weighting is deliberately flat and readable rather than learned: this
- * has to be arguable in a QBR, so every point an account carries is traceable
- * back to a named factor in `factors`.
+ * The score, factors and direction are computed server-side now — a Python
+ * port of this function's old weighting, served on `/customers/health/` as
+ * `triage_score` / `triage_factors` / `triage_direction` — so the Renewal
+ * Forecast and this screen can never quietly disagree about the same
+ * account. This just carries them onto `TriageRow` alongside the fields nothing
+ * else needs served: `daysToRenewal` and `pulseGap` are cheap local reads of
+ * the row itself, and `trail` is `trajectoryOf`'s own read of `history` (kept
+ * separately from `direction`, which is the server's call, not a re-derivation
+ * of the same trail).
  */
 export function scoreRow(row: HealthDataRow, now: Date = new Date()): TriageRow {
-  const factors: RiskFactor[] = [];
-
-  const severity = SEVERITY[row.healthStatus] ?? 0;
-  if (severity > 0) {
-    factors.push({
-      label: `Health is ${row.healthStatus}`,
-      points: severity * WEIGHT.severity,
-    });
-  }
+  const days = daysToRenewal(row, now);
 
   // Only a *colder* AI read counts. The reverse (CSM below AI) is worth
   // surfacing too, but it isn't risk — it's the CSM catching something first.
@@ -134,37 +124,18 @@ export function scoreRow(row: HealthDataRow, now: Date = new Date()): TriageRow 
     row.csmPulseScore === null || row.aiPulseScore === null
       ? null
       : row.csmPulseScore - row.aiPulseScore;
-  if (pulseGap !== null && pulseGap > 0) {
-    factors.push({
-      label: `AI Pulse ${pulseGap} below CSM's`,
-      points: pulseGap * WEIGHT.pulseGap,
-    });
-  }
 
-  const days = daysToRenewal(row, now);
-  if (days !== null && days <= RENEWAL_URGENT_DAYS) {
-    factors.push({ label: `Renews in ${days}d`, points: WEIGHT.renewalUrgent });
-  } else if (days !== null && days <= RENEWAL_NEAR_DAYS) {
-    factors.push({ label: `Renews in ${days}d`, points: WEIGHT.renewalNear });
-  }
+  const { trail } = trajectoryOf(row);
 
-  const { direction, trail } = trajectoryOf(row);
-  if (direction === 'declining') {
-    const drop = SEVERITY[trail[trail.length - 1]] - SEVERITY[trail[0]];
-    factors.push({
-      label: `Fell ${trail[0]} → ${trail[trail.length - 1]}`,
-      points: drop * WEIGHT.decline,
-    });
-  }
-
-  if (row.lifecycleStage === 'Pilot') {
-    factors.push({ label: 'Still in pilot', points: WEIGHT.pilot });
-  }
-
-  factors.sort((a, b) => b.points - a.points);
-  const score = factors.reduce((sum, f) => sum + f.points, 0);
-
-  return { row, score, factors, daysToRenewal: days, pulseGap, direction, trail };
+  return {
+    row,
+    score: row.triageScore,
+    factors: row.triageFactors,
+    daysToRenewal: days,
+    pulseGap,
+    direction: row.triageDirection,
+    trail,
+  };
 }
 
 /**

@@ -156,6 +156,42 @@ States: loading renders skeleton rows shaped like the list; empty says
 "Nothing needs you right now"; an error says the list failed to load and
 never renders as an empty list.
 
+### Amendments (2026-09-24, before PR 3)
+
+Mapping the code before planning PR 3 changed these details; where they
+differ from the text above, these win.
+
+- **One Triage score, computed on the backend.** The "Needs action now"
+  score (risk ≥ 40) used to exist only in the frontend (`triage.ts`). It
+  moves to `services/customers/triage.py`, is served on every
+  `/customers/health/` row (`triage_score`, `triage_factors`,
+  `triage_direction`), and the Triage view reads it. The attention list's
+  `risk` kind uses the same function, so the tile and the list can never
+  disagree.
+- **Going quiet is 60 days** (the Activity rule, `GOING_DARK_DAYS =
+  CONTACT_COLD_DAYS`), not 30. Never-contacted accounts count.
+- **Support means unresolved High or Critical tickets** (there is no
+  "Urgent" priority). Unresolved = not in `Ticket.RESOLVED_STATUSES`.
+- **Anomalies are `live` ones** with evidence the viewer may read. There is
+  no per-anomaly page (the Anomalies page is leadership-only), so an anomaly
+  item opens the drill panel listing its visible companies instead of
+  linking. Its ARR is converted to the organisation currency.
+- **Urgency per kind** (1.0 = act now, 0.25 = floor):
+  - renewal and risk: days to renewal; overdue or ≤ 14 days → 1.0,
+    linear to 0.25 at 90 days; risk with no renewal date → 0.5; risk
+    renewing after 90 days → 0.25.
+  - going_quiet: never contacted → 1.0; otherwise 0.25 at 60 days,
+    linear to 1.0 at 120 days.
+  - support: age of the oldest matching ticket; 0.25 at 0 days, linear to
+    1.0 at 14 days.
+  - anomaly: days since first seen; ≤ 7 days → 1.0, linear to 0.25 at
+    90 days.
+- **Filters.** The attention endpoint takes the same `owner`, `lifecycle`
+  and `customer` params as the areas and returns the same `filters`
+  options, so the Overview renders the shared filter bar.
+- **Support headline card** needs `open_count` and `oldest_open_days`,
+  which `/tickets/stats/` gains in its `kpis`.
+
 ## 3. Area pages, visual system and drill-down
 
 Shared components (under `src/pages/dashboard/shared/`):

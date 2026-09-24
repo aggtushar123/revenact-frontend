@@ -23,6 +23,13 @@ export interface CustomerHealthApiRow {
   risk_of_loss: number;
   risk_factors: { label: string; points: number }[];
   total_active_seats: number | null;
+  /** 0–155, not capped at 100. Optional so a fixture written before this
+   *  field existed still parses — `toHealthDataRow` defaults it to 0. */
+  triage_score?: number;
+  /** Highest points first. Optional for the same reason as `triage_score`. */
+  triage_factors?: { label: string; points: number }[];
+  /** Optional for the same reason as `triage_score`; defaults to 'unknown'. */
+  triage_direction?: 'declining' | 'improving' | 'flat' | 'unknown';
   history: {
     captured_on: string;
     health_score: string;
@@ -105,6 +112,9 @@ export function toHealthDataRow(row: CustomerHealthApiRow): HealthDataRow {
     riskFactors: row.risk_factors ?? [],
     activeSeats: row.total_active_seats,
     history: toHistory(row.history),
+    triageScore: row.triage_score ?? 0,
+    triageFactors: row.triage_factors ?? [],
+    triageDirection: row.triage_direction ?? 'unknown',
   };
 }
 
