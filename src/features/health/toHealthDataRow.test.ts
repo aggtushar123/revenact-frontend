@@ -124,4 +124,27 @@ describe('toHealthDataRow', () => {
     const rows = toHealthDataRows([apiRow({ id: 1 }), apiRow({ id: 2 })]);
     expect(rows.map((r) => r.id)).toEqual(['1', '2']);
   });
+
+  it('maps the server-computed triage fields', () => {
+    const row = toHealthDataRow(
+      apiRow({
+        triage_score: 82,
+        triage_factors: [{ label: 'Health is Poor', points: 66 }],
+        triage_direction: 'declining',
+      }),
+    );
+    expect(row.triageScore).toBe(82);
+    expect(row.triageFactors).toEqual([{ label: 'Health is Poor', points: 66 }]);
+    expect(row.triageDirection).toBe('declining');
+  });
+
+  it('defaults the triage fields for a fixture written before they existed', () => {
+    // triage_score/triage_factors/triage_direction are optional on the API
+    // type precisely so an old fixture like the plain `apiRow()` above still
+    // parses — this pins what it gets instead of `undefined` leaking through.
+    const row = toHealthDataRow(apiRow());
+    expect(row.triageScore).toBe(0);
+    expect(row.triageFactors).toEqual([]);
+    expect(row.triageDirection).toBe('unknown');
+  });
 });
