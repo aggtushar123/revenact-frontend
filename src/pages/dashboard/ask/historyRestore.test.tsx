@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { resetViewport } from '../../../test/viewport';
 import { stubCopilot } from '../../../components/copilot/testCopilot';
@@ -28,8 +28,8 @@ describe('reopening from history on the dashboard', () => {
     await userEvent.click(screen.getByRole('button', { name: 'History' }));
     const panel = screen.getByRole('dialog', { name: 'History' });
     await userEvent.click(await within(panel).findByRole('button', { name: /Why is at-risk ARR up\?/ }));
-    expect(screen.getByTestId('where')).toHaveTextContent('/dashboard/revenue/forecast?owner=2');
     expect(await screen.findByText('Two renewals slipped.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/dashboard/revenue/forecast?owner=2'));
   });
 
   it('opens a conversation from elsewhere where you are', async () => {
@@ -41,6 +41,6 @@ describe('reopening from history on the dashboard', () => {
     await userEvent.click(screen.getByRole('button', { name: 'History' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Pizza Hut mail' }));
     expect(await screen.findByText('They replied.')).toBeInTheDocument();
-    expect(screen.getByTestId('where')).toHaveTextContent('/dashboard/health/triage');
+    await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/dashboard/health/triage'));
   });
 });
