@@ -9,7 +9,7 @@ import forecastReducer from '../../features/forecast/forecastSlice';
 import healthReducer from '../../features/health/healthSlice';
 import ticketsReducer from '../../features/tickets/ticketsSlice';
 import { dashboardRoutes } from './routes';
-import { mockOverviewFetch, urlsFor } from './overview/fixtures';
+import { attentionBody, mockOverviewFetch, urlsFor } from './overview/fixtures';
 
 // End-to-end tier (DOM-level): the real dashboard route tree — frame, drill
 // provider, Overview, toolbar, list and cards — with only fetch mocked.
@@ -67,5 +67,39 @@ describe('Overview', () => {
     renderOverview('/dashboard/overview');
     expect(await screen.findByText('Could not load what needs attention.')).toBeInTheDocument();
     expect(screen.queryByText('Nothing needs you right now.')).not.toBeInTheDocument();
+  });
+
+  it('keeps an Undo to the filter it was made under', async () => {
+    const spy = mockOverviewFetch();
+    const base = spy.getMockImplementation()!;
+    const lyft = { ...attentionBody.items[0], key: 'risk:3', kind: 'risk', title: 'Lyft', customer_id: 3 };
+    const filters = { ...attentionBody.filters, owners: [...attentionBody.filters.owners, { value: '3', name: 'Dana CSM' }] };
+    let snoozed = false;
+    spy.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/dashboard/attention/snooze/')) {
+        snoozed = true;
+        return { ok: true, status: 201, json: async () => ({ key: 'renewal:12', until: null }) };
+      }
+      if (!url.includes('/dashboard/attention/')) return base(url, init);
+      // owner=3 holds a disjoint set; owner=2 omits Uber once it is snoozed.
+      const owner3 = url.includes('owner=3');
+      const items = owner3 ? [lyft] : snoozed ? [] : attentionBody.items;
+      return { ok: true, status: 200, json: async () => ({ ...attentionBody, filters, items }) };
+    });
+
+    renderOverview('/dashboard/overview?owner=2');
+    await screen.findByRole('link', { name: 'Uber' });
+    await userEvent.click(screen.getByRole('button', { name: 'Snooze Uber for 7 days' }));
+    expect(await screen.findByText(/Snoozed/)).toBeInTheDocument();
+
+    await userEvent.selectOptions(screen.getByLabelText('Primary Owner'), '3');
+    expect(await screen.findByRole('link', { name: 'Lyft' })).toBeInTheDocument();
+    expect(screen.queryByText(/Snoozed/)).not.toBeInTheDocument();
+    expect(within(screen.getByRole('list', { name: 'Needs attention' })).getAllByRole('listitem')).toHaveLength(1);
+
+    await userEvent.selectOptions(screen.getByLabelText('Primary Owner'), '2');
+    expect(await screen.findByText('Nothing needs you right now.')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Uber' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Snoozed/)).not.toBeInTheDocument();
   });
 });

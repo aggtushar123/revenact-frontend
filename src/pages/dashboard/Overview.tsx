@@ -47,7 +47,12 @@ export function Overview() {
       <DashboardToolbar subViews={[]} filters={bookFilters(data?.filters)} />
       <div className="grid gap-3 lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] items-start">
         <div className={`min-w-0 transition-opacity duration-[var(--dur-fast)] ${status === 'loading' && data ? 'opacity-60' : ''}`}>
+          {/* Keyed by the query: a snooze and its Undo belong to the list it
+              was made on, so another filter starts clean. The rows shown
+              while a refetch runs come from here, not the list, so they
+              survive the remount. */}
           <AttentionList
+            key={query}
             items={data?.items ?? null}
             currency={data?.currency ?? 'USD'}
             loading={status === 'loading'}
