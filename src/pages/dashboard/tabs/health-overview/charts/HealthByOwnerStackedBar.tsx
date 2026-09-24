@@ -23,7 +23,16 @@ const STATUS_COLORS: Record<HealthStatus, string> = {
  * the argument for counting accounts rather than reporting a share of each
  * book. This file is the drawing.
  */
-export function HealthByOwnerStackedBar({ data }: { data: HealthDataRow[] }) {
+export function HealthByOwnerStackedBar({
+  data,
+  drillable = true,
+}: {
+  data: HealthDataRow[];
+  /** False when `data` is a truncated book — a drill from it would only ever
+   *  show some of the accounts a segment counted. Defaults to `true` so
+   *  every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
   const chartData = useMemo(() => healthByOwner(data), [data]);
 
@@ -56,14 +65,17 @@ export function HealthByOwnerStackedBar({ data }: { data: HealthDataRow[] }) {
   // One button per owner × status that actually has an account in it — a
   // keyboard user (and this chart's own test) can't reach a recharts <Bar>'s
   // SVG segments, so this is the real drill target; the Bar's own onClick
-  // below is the pointer shortcut to the same thing.
-  const drillItems = chartData.flatMap((owner) =>
-    HEALTH_ORDER.filter((status) => owner.rows[status].length > 0).map((status) => ({
-      name: `${labelFor(owner)} · ${status}`,
-      figure: String(owner.rows[status].length),
-      onSelect: (trigger: HTMLElement) => openSegment(owner, status, trigger),
-    })),
-  );
+  // below is the pointer shortcut to the same thing. None at all when the
+  // book is truncated — see `drillable`.
+  const drillItems = drillable
+    ? chartData.flatMap((owner) =>
+        HEALTH_ORDER.filter((status) => owner.rows[status].length > 0).map((status) => ({
+          name: `${labelFor(owner)} · ${status}`,
+          figure: String(owner.rows[status].length),
+          onSelect: (trigger: HTMLElement) => openSegment(owner, status, trigger),
+        })),
+      )
+    : [];
 
   return (
     <div className="w-full h-full p-4 flex flex-col relative h-[300px]">
@@ -123,8 +135,10 @@ export function HealthByOwnerStackedBar({ data }: { data: HealthDataRow[] }) {
                   dataKey={status}
                   stackId="a"
                   fill={STATUS_COLORS[status]}
-                  cursor="pointer"
-                  onClick={(_, dataIndex) => openSegment(chartData[dataIndex], status)}
+                  cursor={drillable ? 'pointer' : undefined}
+                  onClick={
+                    drillable ? (_, dataIndex) => openSegment(chartData[dataIndex], status) : undefined
+                  }
                 >
                   {/* The book size rides outside the end of the bar, not
                       inside the slices: on a real book most owners hold one or

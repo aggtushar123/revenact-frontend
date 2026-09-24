@@ -51,4 +51,15 @@ describe('OwnerLoadChart drill', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
     expect(screen.getByText(/Nothing renews in this window/i)).toBeInTheDocument();
   });
+
+  it('renders plain rows, not buttons, when told the book is not drillable', () => {
+    const ada = healthRow({ id: '1', account: 'AdaAcct', owner: 'Ada Lovelace', ownerKey: 'ada', renewalDate: 'Jul 1, 2026', arr: 120_000 });
+    const { rows } = renewalRows([ada], NOW);
+    const load = ownerLoad(rows);
+
+    renderWithDrill(<OwnerLoadChart load={load} currency="USD" horizonDays={180} drillable={false} />);
+
+    expect(screen.getByText('Ada Lovelace')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 });

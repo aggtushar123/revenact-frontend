@@ -161,6 +161,17 @@ describe('DivergenceView drill', () => {
       expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
     );
   });
+
+  it('offers no drill when the book is truncated', () => {
+    renderWithDrill(<DivergenceView />, { rows, truncated: true });
+
+    // Plain numbers, not dead buttons that promise a "show accounts" nobody
+    // gets — the underline/hover styling goes with the button.
+    expect(screen.queryByRole('button', { name: /Disagreeing/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Urgent blind spots/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Unrated/ })).not.toBeInTheDocument();
+    expect(screen.getByText('3').closest('button')).toBeNull();
+  });
 });
 
 describe('Health Overview routing with Divergence', () => {

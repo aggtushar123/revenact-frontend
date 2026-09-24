@@ -10,7 +10,16 @@ import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
 
-export function AIPulseBar({ data }: { data: HealthDataRow[] }) {
+export function AIPulseBar({
+  data,
+  drillable = true,
+}: {
+  data: HealthDataRow[];
+  /** False when `data` is a truncated book — a drill from it would only ever
+   *  show some of the accounts a segment counted. Defaults to `true` so
+   *  every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
   const buckets = useMemo(() => pulseBuckets(data, 'aiPulseScore'), [data]);
   const chartData = useMemo(
@@ -38,13 +47,15 @@ export function AIPulseBar({ data }: { data: HealthDataRow[] }) {
   };
 
   const HEALTH_STACK: HealthStatus[] = ['Poor', 'Average', 'Good'];
-  const drillItems = buckets.flatMap((bucket) =>
-    HEALTH_STACK.filter((status) => bucket.rows[status].length > 0).map((status) => ({
-      name: `AI Pulse ${bucket.score} · ${status}`,
-      figure: String(bucket.rows[status].length),
-      onSelect: (trigger: HTMLElement) => openSegment(bucket, status, trigger),
-    })),
-  );
+  const drillItems = drillable
+    ? buckets.flatMap((bucket) =>
+        HEALTH_STACK.filter((status) => bucket.rows[status].length > 0).map((status) => ({
+          name: `AI Pulse ${bucket.score} · ${status}`,
+          figure: String(bucket.rows[status].length),
+          onSelect: (trigger: HTMLElement) => openSegment(bucket, status, trigger),
+        })),
+      )
+    : [];
 
   return (
     <div className="w-full h-full p-4 flex flex-col relative h-[140px]">
@@ -80,8 +91,8 @@ export function AIPulseBar({ data }: { data: HealthDataRow[] }) {
               stackId="a"
               fill="var(--danger)"
               label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }}
-              cursor="pointer"
-              onClick={(_, index) => openSegment(buckets[index], 'Poor')}
+              cursor={drillable ? 'pointer' : undefined}
+              onClick={drillable ? (_, index) => openSegment(buckets[index], 'Poor') : undefined}
             />
             <Bar
               {...STATIC_SERIES}
@@ -89,8 +100,8 @@ export function AIPulseBar({ data }: { data: HealthDataRow[] }) {
               stackId="a"
               fill="var(--warning)"
               label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }}
-              cursor="pointer"
-              onClick={(_, index) => openSegment(buckets[index], 'Average')}
+              cursor={drillable ? 'pointer' : undefined}
+              onClick={drillable ? (_, index) => openSegment(buckets[index], 'Average') : undefined}
             />
             <Bar
               {...STATIC_SERIES}
@@ -98,8 +109,8 @@ export function AIPulseBar({ data }: { data: HealthDataRow[] }) {
               stackId="a"
               fill="var(--success)"
               label={{ position: 'top', fill: 'var(--text-secondary)', fontSize: 10 }}
-              cursor="pointer"
-              onClick={(_, index) => openSegment(buckets[index], 'Good')}
+              cursor={drillable ? 'pointer' : undefined}
+              onClick={drillable ? (_, index) => openSegment(buckets[index], 'Good') : undefined}
             />
           </BarChart>
         </ResponsiveContainer>

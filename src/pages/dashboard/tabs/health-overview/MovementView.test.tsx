@@ -180,6 +180,15 @@ describe('MovementView drill', () => {
 
     expect(2 + 1).toBe(improved);
   });
+
+  it('offers no drill on any tile or chart when the book is truncated', () => {
+    renderWithDrill(<MovementView />, { rows, truncated: true });
+
+    expect(screen.queryByRole('button', { name: /Downgrades/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Upgrades/ })).not.toBeInTheDocument();
+    // The renewal runway chart's per-segment keyboard targets, gone too.
+    expect(screen.queryByRole('button', { name: /show accounts/ })).not.toBeInTheDocument();
+  });
 });
 
 describe('HealthFlowChart', () => {

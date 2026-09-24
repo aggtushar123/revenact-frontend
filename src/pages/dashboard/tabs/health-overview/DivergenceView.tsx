@@ -12,6 +12,35 @@ import { fromHealthRows } from '../../drill/rows';
  *  accessible name rather than relying on visible digits alone. */
 const NUMBER_BUTTON = 'underline underline-offset-2 rounded-sm hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
+/** A drill trigger when the book behind it supports one, otherwise the same
+ *  number as plain text — an underlined, hoverable number that goes nowhere
+ *  would be its own small lie about a truncated book. */
+function DrillNumber({
+  drillable,
+  label,
+  value,
+  tone,
+  onOpen,
+}: {
+  drillable: boolean;
+  label: string;
+  value: number;
+  tone: string;
+  onOpen: (trigger: HTMLElement) => void;
+}) {
+  if (!drillable) return <span className={tone}>{value}</span>;
+  return (
+    <button
+      type="button"
+      aria-label={`${label} ${value}, show accounts`}
+      onClick={(e) => onOpen(e.currentTarget)}
+      className={`${tone} ${NUMBER_BUTTON}`}
+    >
+      {value}
+    </button>
+  );
+}
+
 /**
  * Health Overview asked the other way round: not how the book is doing, but
  * where the team's read on it might be wrong.
@@ -26,6 +55,11 @@ export function DivergenceView() {
   const { open } = useDrill();
 
   const { rows, error, truncated, isInitialLoad, hasLoaded } = useHealthOverview();
+
+  // A truncated book is a capped slice of a larger one — a drill from it
+  // would only ever show *some* of the accounts a number counted, so every
+  // number below stops offering one rather than quietly lying.
+  const drillable = !truncated;
 
   const laid = useMemo(() => layOut(rows, now), [rows, now]);
   const summary = useMemo(() => summariseDivergence(laid), [laid]);
@@ -51,44 +85,42 @@ export function DivergenceView() {
     <div className="w-full flex flex-col gap-4 pb-12">
       {truncated && <HealthTruncatedNotice />}
       <p className="px-2 text-[11.5px] text-ink-muted">
-        <button
-          type="button"
-          aria-label={`Disagreeing ${summary.disagreeing}, show accounts`}
-          onClick={(e) =>
+        <DrillNumber
+          drillable={drillable}
+          label="Disagreeing"
+          value={summary.disagreeing}
+          tone="font-bold text-ink"
+          onOpen={(trigger) =>
             open(
               {
                 title: 'Disagreeing',
                 figure: String(summary.disagreeing),
                 source: { kind: 'rows', rows: fromHealthRows(disagreeingRows.map((d) => d.row)) },
               },
-              e.currentTarget,
+              trigger,
             )
           }
-          className={`font-bold text-ink ${NUMBER_BUTTON}`}
-        >
-          {summary.disagreeing}
-        </button>{' '}
+        />{' '}
         of {summary.total} accounts have a CSM and AI pulse {DIVERGENCE_THRESHOLD}+ points apart
         {summary.urgentBlindSpots > 0 && (
           <>
             {' '}—{' '}
-            <button
-              type="button"
-              aria-label={`Urgent blind spots ${summary.urgentBlindSpots}, show accounts`}
-              onClick={(e) =>
+            <DrillNumber
+              drillable={drillable}
+              label="Urgent blind spots"
+              value={summary.urgentBlindSpots}
+              tone="font-bold text-danger"
+              onOpen={(trigger) =>
                 open(
                   {
                     title: 'Urgent blind spots',
                     figure: String(summary.urgentBlindSpots),
                     source: { kind: 'rows', rows: fromHealthRows(urgentBlindSpotRows.map((d) => d.row)) },
                   },
-                  e.currentTarget,
+                  trigger,
                 )
               }
-              className={`font-bold text-danger ${NUMBER_BUTTON}`}
-            >
-              {summary.urgentBlindSpots}
-            </button>{' '}
+            />{' '}
             of those renew inside 90 days with the AI reading colder
           </>
         )}
@@ -97,23 +129,22 @@ export function DivergenceView() {
           <>
             {' '}
             <span className="text-ink-faint">
-              <button
-                type="button"
-                aria-label={`Unrated ${summary.unrated}, show accounts`}
-                onClick={(e) =>
+              <DrillNumber
+                drillable={drillable}
+                label="Unrated"
+                value={summary.unrated}
+                tone=""
+                onOpen={(trigger) =>
                   open(
                     {
                       title: 'Unrated',
                       figure: String(summary.unrated),
                       source: { kind: 'rows', rows: fromHealthRows(unratedRows.map((d) => d.row)) },
                     },
-                    e.currentTarget,
+                    trigger,
                   )
                 }
-                className={NUMBER_BUTTON}
-              >
-                {summary.unrated}
-              </button>{' '}
+              />{' '}
               not plotted — one side hasn’t rated them.
             </span>
           </>

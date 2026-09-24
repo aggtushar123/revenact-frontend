@@ -22,6 +22,10 @@ const STACK: HealthStatus[] = ['Poor', 'Average', 'Good'];
 export interface RenewalQuarterChartProps {
   columns: QuarterColumn[];
   currency: CurrencyCode;
+  /** False when `columns` were built from a truncated book — a drill from it
+   *  would only ever show some of the accounts a segment counted. Defaults
+   *  to `true` so every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
 }
 
 /**
@@ -31,7 +35,11 @@ export interface RenewalQuarterChartProps {
  * so "a big quarter" and "a big quarter that is mostly shaky" can't look the
  * same, which is exactly what a chart of account counts does to them.
  */
-export function RenewalQuarterChart({ columns, currency }: RenewalQuarterChartProps) {
+export function RenewalQuarterChart({
+  columns,
+  currency,
+  drillable = true,
+}: RenewalQuarterChartProps) {
   const { open } = useDrill();
 
   const data = useMemo(
@@ -65,14 +73,17 @@ export function RenewalQuarterChart({ columns, currency }: RenewalQuarterChartPr
   // One button per quarter × status that actually has an account in it — a
   // keyboard user (and this chart's own test) can't reach a recharts <Bar>'s
   // SVG segments, so this is the real drill target; the Bar's own onClick
-  // below is the pointer shortcut to the same thing.
-  const drillItems = columns.flatMap((column) =>
-    STACK.filter((status) => column.rows[status].length > 0).map((status) => ({
-      name: `${column.label} · ${status}`,
-      figure: String(column.rows[status].length),
-      onSelect: (trigger: HTMLElement) => openSegment(column, status, trigger),
-    })),
-  );
+  // below is the pointer shortcut to the same thing. None at all when the
+  // book is truncated — see `drillable`.
+  const drillItems = drillable
+    ? columns.flatMap((column) =>
+        STACK.filter((status) => column.rows[status].length > 0).map((status) => ({
+          name: `${column.label} · ${status}`,
+          figure: String(column.rows[status].length),
+          onSelect: (trigger: HTMLElement) => openSegment(column, status, trigger),
+        })),
+      )
+    : [];
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -131,8 +142,8 @@ export function RenewalQuarterChart({ columns, currency }: RenewalQuarterChartPr
                 dataKey={status}
                 stackId="arr"
                 fill={STATUS_COLORS[status]}
-                cursor="pointer"
-                onClick={(_, index) => openSegment(columns[index], status)}
+                cursor={drillable ? 'pointer' : undefined}
+                onClick={drillable ? (_, index) => openSegment(columns[index], status) : undefined}
               />
             ))}
           </BarChart>

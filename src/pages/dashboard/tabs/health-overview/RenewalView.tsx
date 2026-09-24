@@ -49,6 +49,12 @@ export function RenewalView() {
   const { rows, error, truncated, isInitialLoad, hasLoaded, currency, unconvertedCount } =
     useHealthOverview();
 
+  // A truncated book is a capped slice of a larger one — a drill from it
+  // would only ever show *some* of the accounts a tile or chart segment
+  // counted, so every drill on this view is switched off rather than
+  // quietly lying.
+  const drillable = !truncated;
+
   const { rows: scored, withoutDate } = useMemo(() => renewalRows(rows, now), [rows, now]);
   const summary = useMemo(() => summarise(scored), [scored]);
   const quarters = useMemo(() => quarterColumns(scored, now), [scored, now]);
@@ -102,15 +108,18 @@ export function RenewalView() {
           detail={`${summary.count} ${summary.count === 1 ? 'account' : 'accounts'}${
             summary.unpriced > 0 ? ` · ${summary.unpriced} unpriced` : ''
           }`}
-          onDrill={(trigger) =>
-            open(
-              {
-                title: 'Up for renewal',
-                figure: money(summary.arr),
-                source: { kind: 'rows', rows: fromHealthRows(upForRenewal.map((r) => r.row)) },
-              },
-              trigger,
-            )
+          onDrill={
+            drillable
+              ? (trigger) =>
+                  open(
+                    {
+                      title: 'Up for renewal',
+                      figure: money(summary.arr),
+                      source: { kind: 'rows', rows: fromHealthRows(upForRenewal.map((r) => r.row)) },
+                    },
+                    trigger,
+                  )
+              : undefined
           }
         />
         <Kpi
@@ -118,42 +127,50 @@ export function RenewalView() {
           value={money(summary.exposure)}
           detail={`${atRiskShare}% of the window, weighted by risk`}
           tone={atRiskShare >= 20 ? 'loss' : 'neutral'}
-          onDrill={(trigger) => {
-            // Same `risk`/`exposure` pair `summarise` summed into the tile's
-            // own figure (Σ ARR × risk) — read here per row, not recomputed,
-            // so each row's weighted amount visibly adds up to it.
-            const byId = new Map(forecastAtRisk.map((r) => [r.row.id, r]));
-            open(
-              {
-                title: 'Forecast at risk',
-                figure: money(summary.exposure),
-                source: {
-                  kind: 'rows',
-                  rows: fromHealthRows(forecastAtRisk.map((r) => r.row), (row) => {
-                    const item = byId.get(row.id);
-                    const riskPct = Math.round((item?.risk ?? 0) * 100);
-                    return `${riskPct}% risk · ${money(item?.exposure ?? 0)} at risk`;
-                  }),
-                },
-              },
-              trigger,
-            );
-          }}
+          onDrill={
+            drillable
+              ? (trigger) => {
+                  // Same `risk`/`exposure` pair `summarise` summed into the
+                  // tile's own figure (Σ ARR × risk) — read here per row, not
+                  // recomputed, so each row's weighted amount visibly adds up
+                  // to it.
+                  const byId = new Map(forecastAtRisk.map((r) => [r.row.id, r]));
+                  open(
+                    {
+                      title: 'Forecast at risk',
+                      figure: money(summary.exposure),
+                      source: {
+                        kind: 'rows',
+                        rows: fromHealthRows(forecastAtRisk.map((r) => r.row), (row) => {
+                          const item = byId.get(row.id);
+                          const riskPct = Math.round((item?.risk ?? 0) * 100);
+                          return `${riskPct}% risk · ${money(item?.exposure ?? 0)} at risk`;
+                        }),
+                      },
+                    },
+                    trigger,
+                  );
+                }
+              : undefined
+          }
         />
         <Kpi
           label="No recent contact"
           value={money(summary.coldArr)}
           detail={`${summary.coldCount} renewing with nothing logged in 60 days`}
           tone={summary.coldCount > 0 ? 'loss' : 'neutral'}
-          onDrill={(trigger) =>
-            open(
-              {
-                title: 'No recent contact',
-                figure: money(summary.coldArr),
-                source: { kind: 'rows', rows: fromHealthRows(noRecentContact.map((r) => r.row)) },
-              },
-              trigger,
-            )
+          onDrill={
+            drillable
+              ? (trigger) =>
+                  open(
+                    {
+                      title: 'No recent contact',
+                      figure: money(summary.coldArr),
+                      source: { kind: 'rows', rows: fromHealthRows(noRecentContact.map((r) => r.row)) },
+                    },
+                    trigger,
+                  )
+              : undefined
           }
         />
         <Kpi
@@ -165,32 +182,36 @@ export function RenewalView() {
               : 'every renewal date is still ahead'
           }
           tone={summary.overdueCount > 0 ? 'loss' : 'neutral'}
-          onDrill={(trigger) => {
-            const daysById = new Map(pastDue.map((r) => [r.row.id, Math.abs(r.days)]));
-            open(
-              {
-                title: 'Past due',
-                figure: String(summary.overdueCount),
-                source: {
-                  kind: 'rows',
-                  rows: fromHealthRows(
-                    pastDue.map((r) => r.row),
-                    (row) => `${daysById.get(row.id)} days overdue`,
-                  ),
-                },
-              },
-              trigger,
-            );
-          }}
+          onDrill={
+            drillable
+              ? (trigger) => {
+                  const daysById = new Map(pastDue.map((r) => [r.row.id, Math.abs(r.days)]));
+                  open(
+                    {
+                      title: 'Past due',
+                      figure: String(summary.overdueCount),
+                      source: {
+                        kind: 'rows',
+                        rows: fromHealthRows(
+                          pastDue.map((r) => r.row),
+                          (row) => `${daysById.get(row.id)} days overdue`,
+                        ),
+                      },
+                    },
+                    trigger,
+                  );
+                }
+              : undefined
+          }
         />
       </KpiStrip>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
-          <RenewalQuarterChart columns={quarters} currency={currency} />
+          <RenewalQuarterChart columns={quarters} currency={currency} drillable={drillable} />
         </div>
         <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
-          <RenewalCoverageChart bands={bands} currency={currency} />
+          <RenewalCoverageChart bands={bands} currency={currency} drillable={drillable} />
         </div>
       </div>
 
@@ -199,7 +220,12 @@ export function RenewalView() {
           <RenewalQueueTable queue={queue} currency={currency} />
         </div>
         <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden max-h-[420px]">
-          <OwnerLoadChart load={load} currency={currency} horizonDays={OWNER_HORIZON_DAYS} />
+          <OwnerLoadChart
+            load={load}
+            currency={currency}
+            horizonDays={OWNER_HORIZON_DAYS}
+            drillable={drillable}
+          />
         </div>
       </div>
     </div>

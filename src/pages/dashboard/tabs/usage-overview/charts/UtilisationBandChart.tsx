@@ -18,6 +18,10 @@ export interface UtilisationBandChartProps {
   /** Accounts with no seat data — named under the chart rather than left out
    *  of it silently. */
   unmeasured: number;
+  /** False when `scatter` is a truncated slice of the full measured book —
+   *  a drill from it would only ever show some of the accounts behind a bar.
+   *  Defaults to `true` so every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
 }
 
 /**
@@ -32,6 +36,7 @@ export function UtilisationBandChart({
   scatter,
   currency,
   unmeasured,
+  drillable = true,
 }: UtilisationBandChartProps) {
   const { open } = useDrill();
 
@@ -70,14 +75,17 @@ export function UtilisationBandChart({
   // One button per non-empty band — a keyboard user can't reach a recharts
   // <Bar>'s SVG cells (neither can this chart's own test), so this is the
   // real drill target; the Cell's own onClick below is the pointer shortcut
-  // to the same thing.
-  const drillItems = data
-    .filter((row) => row.accounts > 0)
-    .map((row) => ({
-      name: row.full,
-      figure: formatCompactMoney(row.arr, currency),
-      onSelect: (trigger: HTMLElement) => openBand(row, trigger),
-    }));
+  // to the same thing. None at all when the book is truncated — see
+  // `drillable`.
+  const drillItems = drillable
+    ? data
+        .filter((row) => row.accounts > 0)
+        .map((row) => ({
+          name: row.full,
+          figure: formatCompactMoney(row.arr, currency),
+          onSelect: (trigger: HTMLElement) => openBand(row, trigger),
+        }))
+    : [];
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -124,12 +132,17 @@ export function UtilisationBandChart({
                 item?.payload?.full ?? '',
               ]}
             />
-            <Bar {...STATIC_SERIES} dataKey="arr" radius={[4, 4, 0, 0]} cursor="pointer">
+            <Bar
+              {...STATIC_SERIES}
+              dataKey="arr"
+              radius={[4, 4, 0, 0]}
+              cursor={drillable ? 'pointer' : undefined}
+            >
               {data.map((row) => (
                 <Cell
                   key={row.key}
                   fill={BAND_COLORS[row.key] ?? FALLBACK_COLOR}
-                  onClick={() => openBand(row)}
+                  onClick={drillable ? () => openBand(row) : undefined}
                 />
               ))}
             </Bar>

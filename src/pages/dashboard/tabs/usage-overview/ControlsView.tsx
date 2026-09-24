@@ -40,6 +40,17 @@ export function ControlsView() {
   const currency = stats?.currency ?? 'USD';
   const money = (value: number) => formatCompactMoney(value, currency);
 
+  // The backend caps `scatter` at 500 rows while the KPIs above cover every
+  // measured account — there's no `truncated` flag on this payload, but
+  // `kpis.measured_count` (always the real, untruncated total) says the same
+  // thing when it's larger than the list we actually got. A drill from a
+  // short list would only ever show *some* of the accounts a figure counted,
+  // so every Kpi/chart drill on this view stays off until we know the list
+  // is the whole story — "not yet loaded" counts as "don't know", not as
+  // "complete", so a loading tile never renders a button that a moment
+  // later, once truncation is known, would have to un-render.
+  const scatterComplete = !!stats && !!kpis && stats.scatter.length >= kpis.measured_count;
+
   return (
     <div className="w-full flex flex-col gap-4 pb-12">
       {error && (
@@ -69,29 +80,27 @@ export function ControlsView() {
                 ? `${kpis.active_seats.toLocaleString()} of ${kpis.contracted_seats.toLocaleString()} seats active`
                 : 'loading'
             }
-            onDrill={(trigger) => {
-              // Always attached, guarded inside, rather than swapped on and
-              // off with `stats`/`kpis` — a Kpi with an `onDrill` renders as
-              // a `<button>` and one without as a `<div>`, so toggling it on
-              // load would remount the tile's DOM node out from under a test
-              // (or a screen reader) that grabbed a reference to it while it
-              // was still loading.
-              if (!stats || !kpis || kpis.utilisation === null) return;
-              open(
-                {
-                  title: 'Seat utilisation',
-                  figure: `${kpis.utilisation}%`,
-                  source: {
-                    kind: 'rows',
-                    // The whole book, not a threshold — the figure is a
-                    // ratio computed over every measured account, so that's
-                    // the population that explains it.
-                    rows: fromUsageRows(stats.scatter, (r) => `${r.utilisation ?? 0}% used`),
-                  },
-                },
-                trigger,
-              );
-            }}
+            onDrill={
+              scatterComplete
+                ? (trigger) => {
+                    if (!stats || !kpis || kpis.utilisation === null) return;
+                    open(
+                      {
+                        title: 'Seat utilisation',
+                        figure: `${kpis.utilisation}%`,
+                        source: {
+                          kind: 'rows',
+                          // The whole book, not a threshold — the figure is a
+                          // ratio computed over every measured account, so
+                          // that's the population that explains it.
+                          rows: fromUsageRows(stats.scatter, (r) => `${r.utilisation ?? 0}% used`),
+                        },
+                      },
+                      trigger,
+                    );
+                  }
+                : undefined
+            }
           />
           <Kpi
             label="Shelfware"
@@ -99,27 +108,31 @@ export function ControlsView() {
             detail={
               kpis ? `${kpis.idle_seats.toLocaleString()} idle seats, below 75% used` : 'loading'
             }
-            onDrill={(trigger) => {
-              if (!stats || !kpis) return;
-              open(
-                {
-                  title: 'Shelfware',
-                  figure: money(kpis.shelfware_arr),
-                  source: {
-                    kind: 'rows',
-                    rows: fromUsageRows(
-                      stats.scatter.filter((r) => r.shelfware_arr > 0),
-                      // The figure is idle ARR, which a row's own trailing
-                      // (contract) ARR doesn't add up to — so the detail
-                      // carries the number that does.
-                      (r) =>
-                        `${money(r.shelfware_arr)} idle · ${r.idle_seats.toLocaleString()} idle seat${r.idle_seats === 1 ? '' : 's'}`,
-                    ),
-                  },
-                },
-                trigger,
-              );
-            }}
+            onDrill={
+              scatterComplete
+                ? (trigger) => {
+                    if (!stats || !kpis) return;
+                    open(
+                      {
+                        title: 'Shelfware',
+                        figure: money(kpis.shelfware_arr),
+                        source: {
+                          kind: 'rows',
+                          rows: fromUsageRows(
+                            stats.scatter.filter((r) => r.shelfware_arr > 0),
+                            // The figure is idle ARR, which a row's own
+                            // trailing (contract) ARR doesn't add up to — so
+                            // the detail carries the number that does.
+                            (r) =>
+                              `${money(r.shelfware_arr)} idle · ${r.idle_seats.toLocaleString()} idle seat${r.idle_seats === 1 ? '' : 's'}`,
+                          ),
+                        },
+                      },
+                      trigger,
+                    );
+                  }
+                : undefined
+            }
           />
           <Kpi
             label="At capacity"
@@ -129,23 +142,27 @@ export function ControlsView() {
                 ? `${kpis.at_capacity_count} ${kpis.at_capacity_count === 1 ? 'account is' : 'accounts are'} out of room`
                 : 'loading'
             }
-            onDrill={(trigger) => {
-              if (!stats || !kpis) return;
-              open(
-                {
-                  title: 'At capacity',
-                  figure: money(kpis.at_capacity_arr),
-                  source: {
-                    kind: 'rows',
-                    rows: fromUsageRows(
-                      stats.scatter.filter((r) => (r.utilisation ?? 0) >= 90),
-                      (r) => `${r.utilisation}% used`,
-                    ),
-                  },
-                },
-                trigger,
-              );
-            }}
+            onDrill={
+              scatterComplete
+                ? (trigger) => {
+                    if (!stats || !kpis) return;
+                    open(
+                      {
+                        title: 'At capacity',
+                        figure: money(kpis.at_capacity_arr),
+                        source: {
+                          kind: 'rows',
+                          rows: fromUsageRows(
+                            stats.scatter.filter((r) => (r.utilisation ?? 0) >= 90),
+                            (r) => `${r.utilisation}% used`,
+                          ),
+                        },
+                      },
+                      trigger,
+                    );
+                  }
+                : undefined
+            }
           />
           <Kpi
             label="No seat data"
@@ -168,6 +185,7 @@ export function ControlsView() {
               scatter={stats?.scatter ?? []}
               currency={currency}
               unmeasured={kpis?.unmeasured_count ?? 0}
+              drillable={scatterComplete}
             />
           </div>
           <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">

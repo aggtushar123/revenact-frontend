@@ -24,6 +24,10 @@ const COVERAGE_SERIES = [
 export interface RenewalCoverageChartProps {
   bands: CoverageBand[];
   currency: CurrencyCode;
+  /** False when `bands` were built from a truncated book — a drill from it
+   *  would only ever show some of the accounts a segment counted. Defaults
+   *  to `true` so every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
 }
 
 /**
@@ -38,7 +42,11 @@ export interface RenewalCoverageChartProps {
  * and reading down a list of windows is how the question is asked out loud:
  * "what's in the next thirty days, and who's on it?"
  */
-export function RenewalCoverageChart({ bands, currency }: RenewalCoverageChartProps) {
+export function RenewalCoverageChart({
+  bands,
+  currency,
+  drillable = true,
+}: RenewalCoverageChartProps) {
   const { open } = useDrill();
 
   // Recharts draws the first row at the bottom, so the nearest window would
@@ -82,14 +90,17 @@ export function RenewalCoverageChart({ bands, currency }: RenewalCoverageChartPr
   // One button per window × contact-age series that actually has an account
   // in it — a keyboard user (and this chart's own test) can't reach a
   // recharts <Bar>'s SVG segments, so this is the real drill target; the
-  // Bar's own onClick below is the pointer shortcut to the same thing.
-  const drillItems = reversedBands.flatMap((band) =>
-    COVERAGE_SERIES.filter((series) => band.rows[series.key].length > 0).map((series) => ({
-      name: `${band.label} · ${series.label}`,
-      figure: String(band.rows[series.key].length),
-      onSelect: (trigger: HTMLElement) => openSegment(band, series.key, trigger),
-    })),
-  );
+  // Bar's own onClick below is the pointer shortcut to the same thing. None
+  // at all when the book is truncated — see `drillable`.
+  const drillItems = drillable
+    ? reversedBands.flatMap((band) =>
+        COVERAGE_SERIES.filter((series) => band.rows[series.key].length > 0).map((series) => ({
+          name: `${band.label} · ${series.label}`,
+          figure: String(band.rows[series.key].length),
+          onSelect: (trigger: HTMLElement) => openSegment(band, series.key, trigger),
+        })),
+      )
+    : [];
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -152,8 +163,10 @@ export function RenewalCoverageChart({ bands, currency }: RenewalCoverageChartPr
                 dataKey={series.key}
                 stackId="arr"
                 fill={series.color}
-                cursor="pointer"
-                onClick={(_, index) => openSegment(reversedBands[index], series.key)}
+                cursor={drillable ? 'pointer' : undefined}
+                onClick={
+                  drillable ? (_, index) => openSegment(reversedBands[index], series.key) : undefined
+                }
               />
             ))}
           </BarChart>

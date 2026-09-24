@@ -36,6 +36,11 @@ export function TriageView() {
 
   const { rows, error, truncated, isInitialLoad, hasLoaded } = useHealthOverview();
 
+  // A `truncated` book is a capped slice of a larger one — a drill from it
+  // would only ever show *some* of the accounts behind a tile's number, so
+  // every drill on this view is switched off rather than quietly lying.
+  const drillable = !truncated;
+
   // Score the whole book once, then filter — so a row's rank is its rank in
   // the book, not a position that changes meaning when you narrow the view.
   const scored = useMemo(() => triage(rows, now), [rows, now]);
@@ -92,7 +97,7 @@ export function TriageView() {
         </span>
       </div>
 
-      <TriageTiles scored={scored} />
+      <TriageTiles scored={scored} drillable={drillable} />
 
       <TriageQueue scored={visible} limit={expanded ? visible.length : INITIAL_LIMIT} />
 

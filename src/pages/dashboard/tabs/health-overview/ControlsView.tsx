@@ -16,6 +16,12 @@ export function ControlsView() {
 
   const { rows, error, truncated, isInitialLoad, hasLoaded } = useHealthOverview();
 
+  // A truncated book is a capped slice of a larger one — a drill from it
+  // would only ever show *some* of the accounts a chart segment counted, so
+  // every drill on this view's charts is switched off rather than quietly
+  // lying.
+  const drillable = !truncated;
+
   // Derived filtered dataset for all child charts
   const filteredData = useMemo(() => {
     if (!activeFilter) return rows;
@@ -61,7 +67,7 @@ export function ControlsView() {
 
             {/* Column 2: Health by Owner */}
             <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
-              <HealthByOwnerStackedBar data={filteredData} />
+              <HealthByOwnerStackedBar data={filteredData} drillable={drillable} />
             </div>
           </div>
         </div>
@@ -70,11 +76,11 @@ export function ControlsView() {
         <div className="flex-[1] flex flex-col gap-4">
            {/* CSM Pulse */}
            <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden min-h-[280px]">
-            <CSMPulseBar data={filteredData} />
+            <CSMPulseBar data={filteredData} drillable={drillable} />
           </div>
            {/* AI Pulse */}
            <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden min-h-[280px]">
-            <AIPulseBar data={filteredData} />
+            <AIPulseBar data={filteredData} drillable={drillable} />
           </div>
         </div>
 
@@ -82,7 +88,7 @@ export function ControlsView() {
 
       {/* Full Width Renewal Graph */}
       <div className="w-full bg-surface border border-line-subtle shadow-sm rounded-lg flex flex-col overflow-hidden min-h-[300px]">
-        <AccountsByRenewalDateBar data={filteredData} />
+        <AccountsByRenewalDateBar data={filteredData} drillable={drillable} />
       </div>
 
       {/* Analytics Insights Row */}

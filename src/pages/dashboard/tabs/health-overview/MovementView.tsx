@@ -41,6 +41,12 @@ export function MovementView() {
 
   const { rows, error, truncated, isInitialLoad, hasLoaded } = useHealthOverview();
 
+  // A truncated book is a capped slice of a larger one — a drill from it
+  // would only ever show *some* of the accounts a tile or chart segment
+  // counted, so every drill on this view is switched off rather than
+  // quietly lying.
+  const drillable = !truncated;
+
   const flow = useMemo(() => buildFlow(rows, windowMonths), [rows, windowMonths]);
   const net = useMemo(() => netMovement(flow), [flow]);
   const buckets = useMemo(() => renewalBuckets(rows, now), [rows, now]);
@@ -91,46 +97,54 @@ export function MovementView() {
           value={String(net.declined)}
           detail="account-months lost a grade"
           tone="loss"
-          onDrill={(trigger) => {
-            const counts = moveCounts(rows, windowMonths);
-            open(
-              {
-                title: 'Downgrades',
-                figure: String(net.declined),
-                source: {
-                  kind: 'rows',
-                  rows: fromHealthRows(
-                    movedRows(rows, windowMonths, 'declined'),
-                    moveDetail(counts, 'declined', 'downgrade'),
-                  ),
-                },
-              },
-              trigger,
-            );
-          }}
+          onDrill={
+            drillable
+              ? (trigger) => {
+                  const counts = moveCounts(rows, windowMonths);
+                  open(
+                    {
+                      title: 'Downgrades',
+                      figure: String(net.declined),
+                      source: {
+                        kind: 'rows',
+                        rows: fromHealthRows(
+                          movedRows(rows, windowMonths, 'declined'),
+                          moveDetail(counts, 'declined', 'downgrade'),
+                        ),
+                      },
+                    },
+                    trigger,
+                  );
+                }
+              : undefined
+          }
         />
         <Kpi
           label="Upgrades"
           value={String(net.improved)}
           detail="account-months gained a grade"
           tone="gain"
-          onDrill={(trigger) => {
-            const counts = moveCounts(rows, windowMonths);
-            open(
-              {
-                title: 'Upgrades',
-                figure: String(net.improved),
-                source: {
-                  kind: 'rows',
-                  rows: fromHealthRows(
-                    movedRows(rows, windowMonths, 'improved'),
-                    moveDetail(counts, 'improved', 'upgrade'),
-                  ),
-                },
-              },
-              trigger,
-            );
-          }}
+          onDrill={
+            drillable
+              ? (trigger) => {
+                  const counts = moveCounts(rows, windowMonths);
+                  open(
+                    {
+                      title: 'Upgrades',
+                      figure: String(net.improved),
+                      source: {
+                        kind: 'rows',
+                        rows: fromHealthRows(
+                          movedRows(rows, windowMonths, 'improved'),
+                          moveDetail(counts, 'improved', 'upgrade'),
+                        ),
+                      },
+                    },
+                    trigger,
+                  );
+                }
+              : undefined
+          }
         />
         <Kpi
           label="Net movement"
@@ -173,7 +187,7 @@ export function MovementView() {
       </div>
 
       <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[300px] flex flex-col">
-        <RenewalRunwayChart buckets={buckets} />
+        <RenewalRunwayChart buckets={buckets} drillable={drillable} />
       </div>
     </div>
   );

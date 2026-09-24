@@ -253,6 +253,18 @@ describe('TriageView drill', () => {
       expect(within(dialog).queryByRole('link', { name })).not.toBeInTheDocument(),
     );
   });
+
+  it('offers no drill when the book is truncated', () => {
+    // `truncated` means the server capped the book below its real size — a
+    // drill from what's on screen would only ever show some of the accounts
+    // a tile counted, so every tile here stays a plain figure.
+    renderWithDrill(<TriageView />, { rows: BOOK, truncated: true });
+
+    expect(screen.queryByRole('button', { name: /needs action now/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^declining/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /book at good/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/needs action now/i).closest('button')).toBeNull();
+  });
 });
 
 describe('Health Overview routing', () => {

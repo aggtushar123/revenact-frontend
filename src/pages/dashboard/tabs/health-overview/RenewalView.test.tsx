@@ -309,4 +309,15 @@ describe('RenewalView drill', () => {
     const slippedRow = within(dialog).getByRole('link', { name: 'SlippedLtd' }).closest('li') as HTMLElement;
     expect(slippedRow).toHaveTextContent('9 days overdue');
   });
+
+  it('offers no drill on any tile or chart when the book is truncated', () => {
+    renderWithDrill(<RenewalView />, { rows: drillBook, truncated: true });
+
+    expect(screen.queryByRole('button', { name: /Up for renewal/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Forecast at risk/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /No recent contact/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Past due/ })).not.toBeInTheDocument();
+    // The renewal calendar's per-segment keyboard targets, gone too.
+    expect(screen.queryByRole('button', { name: /show accounts/ })).not.toBeInTheDocument();
+  });
 });

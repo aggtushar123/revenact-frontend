@@ -346,12 +346,12 @@ describe('Usage Overview', () => {
   });
 });
 
-describe('Usage Overview drill', () => {
-  // A small, hand-picked book rather than the shared `stats` fixture above —
-  // every threshold this suite exercises (90% at-capacity, >0 shelfware ARR)
-  // needs a near miss sitting just the wrong side of it, and the shared
-  // fixture wasn't built with those in mind.
-  const acct = (over: Partial<UsageAccount> = {}): UsageAccount => ({
+// A small, hand-picked account builder, shared by the "drill" suites below —
+// every threshold they exercise (90% at-capacity, >0 shelfware ARR, a
+// truncated `scatter`) needs a near miss sitting just the wrong side of it,
+// and the top-of-file `stats` fixture wasn't built with those in mind.
+function acct(over: Partial<UsageAccount> = {}): UsageAccount {
+  return {
     id: 1,
     name: 'Acct',
     owner: 'Carl',
@@ -367,8 +367,10 @@ describe('Usage Overview drill', () => {
     renewal_date: null,
     band: 'fair',
     ...over,
-  });
+  };
+}
 
+describe('Usage Overview drill', () => {
   const atCap = acct({
     id: 1,
     name: 'AtCap',
@@ -379,16 +381,27 @@ describe('Usage Overview drill', () => {
     arr: 50_000,
     band: 'at_capacity',
   });
-  // Near miss: one point under the At capacity threshold.
+  // Near miss: just under the At capacity threshold (89.x%, not 90%).
   const nearMissAtCap = acct({
     id: 2,
     name: 'NearMissAtCap',
     owner: 'Carl',
-    utilisation: 89,
+    utilisation: 89.9,
     active_seats: 890,
     idle_seats: 110,
     arr: 40_000,
     band: 'healthy',
+  });
+  // Boundary, included: exactly 90% clears the `>= 90` line.
+  const atNinety = acct({
+    id: 5,
+    name: 'AtNinety',
+    owner: 'Eve',
+    utilisation: 90,
+    active_seats: 900,
+    idle_seats: 100,
+    arr: 25_000,
+    band: 'at_capacity',
   });
   const shelfy = acct({
     id: 3,
@@ -414,20 +427,20 @@ describe('Usage Overview drill', () => {
     band: 'healthy',
   });
 
-  const scatter = [atCap, nearMissAtCap, shelfy, nearMissShelf];
+  const scatter = [atCap, nearMissAtCap, shelfy, nearMissShelf, atNinety];
 
   const drillStats = {
     kpis: {
-      accounts: 5,
-      contracted_seats: 4000,
-      active_seats: 2910,
-      utilisation: 72.75,
-      idle_seats: 1090,
+      accounts: 6,
+      contracted_seats: 5000,
+      active_seats: 3810,
+      utilisation: 76.2,
+      idle_seats: 1190,
       shelfware_arr: 42_000,
-      at_capacity_arr: 50_000,
-      at_capacity_count: 1,
+      at_capacity_arr: 75_000,
+      at_capacity_count: 2,
       unmeasured_count: 1,
-      measured_count: 4,
+      measured_count: 5,
       unpriced_count: 0,
     },
     bands: [
@@ -435,13 +448,13 @@ describe('Usage Overview drill', () => {
       { key: 'low', name: 'Low (25–50%)', accounts: 1, arr: 60_000, idle_seats: 700 },
       { key: 'fair', name: 'Fair (50–75%)', accounts: 0, arr: 0, idle_seats: 0 },
       { key: 'healthy', name: 'Healthy (75–90%)', accounts: 2, arr: 70_000, idle_seats: 310 },
-      { key: 'at_capacity', name: 'At capacity (90–100%)', accounts: 1, arr: 50_000, idle_seats: 80 },
+      { key: 'at_capacity', name: 'At capacity (90–100%)', accounts: 2, arr: 75_000, idle_seats: 180 },
       { key: 'over', name: 'Over-deployed (100%+)', accounts: 0, arr: 0, idle_seats: 0 },
     ],
     adoption: [],
     scatter,
     shelfware: [shelfy],
-    at_capacity: [atCap],
+    at_capacity: [atCap, atNinety],
     currency: 'USD' as const,
     filters: { owners: [], lifecycles: [], customers: [] },
   };
@@ -458,7 +471,7 @@ describe('Usage Overview drill', () => {
     renderDrill();
 
     await user.click(
-      await screen.findByRole('button', { name: 'Seat utilisation 72.75%, show accounts' })
+      await screen.findByRole('button', { name: 'Seat utilisation 76.2%, show accounts' })
     );
     const dialog = screen.getByRole('dialog');
 
@@ -466,6 +479,7 @@ describe('Usage Overview drill', () => {
     expect(within(dialog).getByRole('link', { name: 'NearMissAtCap' })).toBeInTheDocument();
     expect(within(dialog).getByRole('link', { name: 'Shelfy' })).toBeInTheDocument();
     expect(within(dialog).getByRole('link', { name: 'NearMissShelf' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'AtNinety' })).toBeInTheDocument();
     // The figure is a book-wide ratio, not a count of these rows — each row's
     // own detail is what ties it back to that ratio.
     expect(within(dialog).getByText('92% used')).toBeInTheDocument();
@@ -488,19 +502,22 @@ describe('Usage Overview drill', () => {
     expect(within(dialog).getByText('$42.0K idle · 700 idle seats')).toBeInTheDocument();
   });
 
-  it('opens the at-capacity drill with only accounts at or above 90% utilisation', async () => {
+  it('opens the at-capacity drill with only accounts at or above 90% utilisation, boundary included', async () => {
     const user = userEvent.setup();
     renderDrill();
 
     await user.click(
-      await screen.findByRole('button', { name: 'At capacity $50.0K, show accounts' })
+      await screen.findByRole('button', { name: 'At capacity $75.0K, show accounts' })
     );
     const dialog = screen.getByRole('dialog');
 
     expect(within(dialog).getByRole('link', { name: 'AtCap' })).toBeInTheDocument();
-    // The near miss: one point under the 90% line.
+    // Boundary, included: exactly 90%.
+    expect(within(dialog).getByRole('link', { name: 'AtNinety' })).toBeInTheDocument();
+    // Boundary, excluded: 89.9%, just short of the line.
     expect(within(dialog).queryByRole('link', { name: 'NearMissAtCap' })).not.toBeInTheDocument();
     expect(within(dialog).getByText('92% used')).toBeInTheDocument();
+    expect(within(dialog).getByText('90% used')).toBeInTheDocument();
   });
 
   it('does not offer a drill for accounts with no seat data at all', async () => {
@@ -544,6 +561,20 @@ describe('Usage Overview drill', () => {
     expect(within(dialog).queryByRole('link', { name: 'NearMissAtCap' })).not.toBeInTheDocument();
   });
 
+  it('includes the exact-90% boundary account in the at-capacity band target', async () => {
+    const user = userEvent.setup();
+    renderDrill();
+
+    await user.click(
+      await screen.findByRole('button', { name: 'At capacity (90–100%) $75.0K, show accounts' })
+    );
+    const dialog = screen.getByRole('dialog');
+
+    expect(within(dialog).getByRole('link', { name: 'AtCap' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('link', { name: 'AtNinety' })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('link', { name: 'NearMissAtCap' })).not.toBeInTheDocument();
+  });
+
   it('offers no keyboard target for a band with no accounts in it', async () => {
     renderDrill();
 
@@ -551,6 +582,91 @@ describe('Usage Overview drill', () => {
     expect(screen.queryByRole('button', { name: /Dormant/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Fair/ })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Over-deployed/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('Usage Overview drill — truncated scatter', () => {
+  // The backend caps `scatter` at 500 rows with no `truncated` flag of its
+  // own — `measured_count` (3) being larger than `scatter.length` (2) here
+  // is what stands in for that cap. A drill from this list would only ever
+  // show 2 of the 3 measured accounts a figure counted, so nothing on this
+  // screen should offer one.
+  const a = acct({
+    id: 1,
+    name: 'TruncA',
+    utilisation: 92,
+    shelfware_arr: 5_000,
+    idle_seats: 50,
+    arr: 10_000,
+    band: 'at_capacity',
+  });
+  const b = acct({
+    id: 2,
+    name: 'TruncB',
+    utilisation: 40,
+    shelfware_arr: 0,
+    idle_seats: 100,
+    arr: 20_000,
+    band: 'low',
+  });
+
+  const truncatedStats = {
+    kpis: {
+      accounts: 4,
+      contracted_seats: 3000,
+      active_seats: 1250,
+      utilisation: 41.7,
+      idle_seats: 500,
+      shelfware_arr: 5_000,
+      at_capacity_arr: 10_000,
+      at_capacity_count: 1,
+      unmeasured_count: 1,
+      measured_count: 3, // one measured account isn't in `scatter` below
+      unpriced_count: 0,
+    },
+    bands: [
+      { key: 'dormant', name: 'Dormant (<25%)', accounts: 0, arr: 0, idle_seats: 0 },
+      { key: 'low', name: 'Low (25–50%)', accounts: 1, arr: 20_000, idle_seats: 100 },
+      { key: 'fair', name: 'Fair (50–75%)', accounts: 0, arr: 0, idle_seats: 0 },
+      { key: 'healthy', name: 'Healthy (75–90%)', accounts: 0, arr: 0, idle_seats: 0 },
+      { key: 'at_capacity', name: 'At capacity (90–100%)', accounts: 1, arr: 10_000, idle_seats: 50 },
+      { key: 'over', name: 'Over-deployed (100%+)', accounts: 0, arr: 0, idle_seats: 0 },
+    ],
+    adoption: [],
+    scatter: [a, b], // only 2 of the 3 measured accounts — a truncated page
+    shelfware: [a],
+    at_capacity: [a],
+    currency: 'USD' as const,
+    filters: { owners: [], lifecycles: [], customers: [] },
+  };
+
+  function renderTruncated() {
+    mockFetch(truncatedStats);
+    return renderUsageOverview();
+  }
+
+  it('offers no Kpi drill once loaded, when scatter is shorter than measured_count', async () => {
+    renderTruncated();
+
+    // Waits for the real, post-fetch figure — not just the static label,
+    // which is on screen from the very first render and would make this
+    // assertion pass for the wrong reason (too soon to mean anything).
+    await screen.findByText('41.7%');
+
+    expect(screen.queryByRole('button', { name: /Seat utilisation/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Shelfware/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /At capacity/ })).not.toBeInTheDocument();
+    // Still a plain figure, not a dead button.
+    expect(screen.getByText('41.7%').closest('button')).toBeNull();
+  });
+
+  it('offers no band DrillTargets once loaded, when scatter is shorter than measured_count', async () => {
+    renderTruncated();
+
+    await screen.findByText('41.7%');
+
+    expect(screen.queryByRole('button', { name: /Low \(/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /At capacity \(/ })).not.toBeInTheDocument();
   });
 });
 

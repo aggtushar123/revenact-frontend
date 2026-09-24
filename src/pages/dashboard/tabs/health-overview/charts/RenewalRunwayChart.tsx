@@ -16,6 +16,10 @@ const STATUS_COLORS: Record<HealthStatus, string> = {
 
 export interface RenewalRunwayChartProps {
   buckets: RenewalBucket[];
+  /** False when `buckets` were built from a truncated book — a drill from it
+   *  would only ever show some of the accounts a segment counted. Defaults
+   *  to `true` so every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
 }
 
 /**
@@ -25,7 +29,7 @@ export interface RenewalRunwayChartProps {
  * Controls tab's `AccountsByRenewalDateBar` reads the same `renewalDate` field
  * but groups by calendar month, for planning rather than triage.
  */
-export function RenewalRunwayChart({ buckets }: RenewalRunwayChartProps) {
+export function RenewalRunwayChart({ buckets, drillable = true }: RenewalRunwayChartProps) {
   const { open } = useDrill();
 
   const data = useMemo(
@@ -58,14 +62,17 @@ export function RenewalRunwayChart({ buckets }: RenewalRunwayChartProps) {
   // One button per bucket × status that actually has an account in it — a
   // keyboard user (and this chart's own test) can't reach a recharts <Bar>'s
   // SVG segments, so this is the real drill target; the Bar's own onClick
-  // below is the pointer shortcut to the same thing.
-  const drillItems = buckets.flatMap((bucket) =>
-    HEALTH_STACK.filter((status) => bucket.counts[status] > 0).map((status) => ({
-      name: `${bucket.label} · ${status}`,
-      figure: String(bucket.counts[status]),
-      onSelect: (trigger: HTMLElement) => openSegment(bucket, status, trigger),
-    })),
-  );
+  // below is the pointer shortcut to the same thing. None at all when the
+  // book is truncated — see `drillable`.
+  const drillItems = drillable
+    ? buckets.flatMap((bucket) =>
+        HEALTH_STACK.filter((status) => bucket.counts[status] > 0).map((status) => ({
+          name: `${bucket.label} · ${status}`,
+          figure: String(bucket.counts[status]),
+          onSelect: (trigger: HTMLElement) => openSegment(bucket, status, trigger),
+        })),
+      )
+    : [];
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -112,8 +119,8 @@ export function RenewalRunwayChart({ buckets }: RenewalRunwayChartProps) {
                 dataKey={status}
                 stackId="renewal"
                 fill={STATUS_COLORS[status]}
-                cursor="pointer"
-                onClick={(_, index) => openSegment(buckets[index], status)}
+                cursor={drillable ? 'pointer' : undefined}
+                onClick={drillable ? (_, index) => openSegment(buckets[index], status) : undefined}
               >
                 <LabelList content={makeStackedTotalLabel(status, data, 11)} />
               </Bar>

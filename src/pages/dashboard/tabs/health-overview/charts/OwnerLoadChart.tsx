@@ -9,6 +9,10 @@ export interface OwnerLoadChartProps {
   currency: CurrencyCode;
   /** The window `load` was built over, for the subtitle. */
   horizonDays: number;
+  /** False when `load` was built from a truncated book — a drill from it
+   *  would only ever show some of an owner's accounts. Defaults to `true` so
+   *  every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
 }
 
 /**
@@ -29,7 +33,12 @@ export interface OwnerLoadChartProps {
  * plain HTML bar is already reachable by mouse and keyboard alike once it is
  * an interactive element.
  */
-export function OwnerLoadChart({ load, currency, horizonDays }: OwnerLoadChartProps) {
+export function OwnerLoadChart({
+  load,
+  currency,
+  horizonDays,
+  drillable = true,
+}: OwnerLoadChartProps) {
   const { open } = useDrill();
   const widest = Math.max(1, ...load.map((entry) => entry.arr));
 
@@ -77,34 +86,47 @@ export function OwnerLoadChart({ load, currency, horizonDays }: OwnerLoadChartPr
             // much of that owner's book", which is the comparison being made.
             const atRisk = entry.arr > 0 ? (entry.exposure / entry.arr) * 100 : 0;
 
+            const body = (
+              <>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-[12px] font-medium text-ink truncate">{entry.owner}</span>
+                  <span className="text-[11px] text-ink-muted tabular-nums shrink-0">
+                    {formatCompactMoney(entry.arr, currency)} · {entry.count}{' '}
+                    {entry.count === 1 ? 'renewal' : 'renewals'}
+                  </span>
+                </div>
+                <div
+                  className="mt-[3px] h-[10px] rounded-[3px] bg-subtle overflow-hidden"
+                  aria-hidden="true"
+                  title={`${formatMoney(entry.arr, currency)} renewing, ${formatMoney(entry.exposure, currency)} expected loss`}
+                >
+                  <div
+                    className="h-full rounded-[3px] bg-ink-faint flex"
+                    style={{ width: `${width}%` }}
+                  >
+                    <div className="h-full bg-danger/80" style={{ width: `${atRisk}%` }} />
+                  </div>
+                </div>
+              </>
+            );
+
             return (
               <li key={entry.ownerKey}>
-                <button
-                  type="button"
-                  onClick={(event) => openOwner(entry, event.currentTarget)}
-                  aria-label={`${labelFor(entry)} ${formatCompactMoney(entry.arr, currency)}, show accounts`}
-                  className="w-full text-left rounded-md -m-1 p-1 cursor-pointer hover:bg-subtle transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className="text-[12px] font-medium text-ink truncate">{entry.owner}</span>
-                    <span className="text-[11px] text-ink-muted tabular-nums shrink-0">
-                      {formatCompactMoney(entry.arr, currency)} · {entry.count}{' '}
-                      {entry.count === 1 ? 'renewal' : 'renewals'}
-                    </span>
-                  </div>
-                  <div
-                    className="mt-[3px] h-[10px] rounded-[3px] bg-subtle overflow-hidden"
-                    aria-hidden="true"
-                    title={`${formatMoney(entry.arr, currency)} renewing, ${formatMoney(entry.exposure, currency)} expected loss`}
+                {drillable ? (
+                  <button
+                    type="button"
+                    onClick={(event) => openOwner(entry, event.currentTarget)}
+                    aria-label={`${labelFor(entry)} ${formatCompactMoney(entry.arr, currency)}, show accounts`}
+                    className="w-full text-left rounded-md -m-1 p-1 cursor-pointer hover:bg-subtle transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
                   >
-                    <div
-                      className="h-full rounded-[3px] bg-ink-faint flex"
-                      style={{ width: `${width}%` }}
-                    >
-                      <div className="h-full bg-danger/80" style={{ width: `${atRisk}%` }} />
-                    </div>
-                  </div>
-                </button>
+                    {body}
+                  </button>
+                ) : (
+                  // A plain row, not a dead button — the book behind this
+                  // chart is truncated, so there is nothing a click here
+                  // could honestly open.
+                  <div className="w-full -m-1 p-1">{body}</div>
+                )}
               </li>
             );
           })}

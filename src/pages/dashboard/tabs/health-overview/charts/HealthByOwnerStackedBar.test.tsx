@@ -44,4 +44,10 @@ describe('HealthByOwnerStackedBar drill', () => {
     renderWithDrill(<HealthByOwnerStackedBar data={data} />);
     expect(screen.queryByRole('button', { name: /Carl CSM · Good/ })).not.toBeInTheDocument();
   });
+
+  it('offers no DrillTargets at all when told the book is not drillable', () => {
+    const data = [healthRow({ id: '1', account: 'CarlPoor', owner: 'Carl CSM', ownerKey: 'carl', healthStatus: 'Poor' })];
+    renderWithDrill(<HealthByOwnerStackedBar data={data} drillable={false} />);
+    expect(screen.queryByRole('button', { name: /Carl CSM/ })).not.toBeInTheDocument();
+  });
 });

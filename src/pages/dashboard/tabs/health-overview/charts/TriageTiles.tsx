@@ -16,7 +16,16 @@ import { fromHealthRows } from '../../../drill/rows';
  * tile can open the exact accounts it counted — the summary alone has no
  * way back to which accounts they were.
  */
-export function TriageTiles({ scored }: { scored: TriageRow[] }) {
+export function TriageTiles({
+  scored,
+  drillable = true,
+}: {
+  scored: TriageRow[];
+  /** False when the book behind `scored` is a truncated slice of a larger
+   *  one — a drill would only ever show some of the accounts a tile counted.
+   *  Defaults to `true` so every existing caller (and test) keeps drilling. */
+  drillable?: boolean;
+}) {
   const { open } = useDrill();
   const summary = useMemo(() => summarise(scored), [scored]);
   const { needsAction, needsActionRenewingSoon, declining, atGood, total, atGoodPreviousMonth } = summary;
@@ -45,52 +54,62 @@ export function TriageTiles({ scored }: { scored: TriageRow[] }) {
         label="Needs action now"
         value={String(needsAction)}
         detail={`risk ≥ ${ACTION_THRESHOLD} · ${needsActionRenewingSoon} renew inside ${RENEWAL_URGENT_DAYS} days`}
-        onDrill={(trigger) => {
-          const scoreById = new Map(needsActionRows.map((t) => [t.row.id, t.score]));
-          open(
-            {
-              title: 'Needs action now',
-              figure: String(needsAction),
-              source: {
-                kind: 'rows',
-                rows: fromHealthRows(
-                  needsActionRows.map((t) => t.row),
-                  (row) => `risk ${scoreById.get(row.id)}`,
-                ),
-              },
-            },
-            trigger,
-          );
-        }}
+        onDrill={
+          drillable
+            ? (trigger) => {
+                const scoreById = new Map(needsActionRows.map((t) => [t.row.id, t.score]));
+                open(
+                  {
+                    title: 'Needs action now',
+                    figure: String(needsAction),
+                    source: {
+                      kind: 'rows',
+                      rows: fromHealthRows(
+                        needsActionRows.map((t) => t.row),
+                        (row) => `risk ${scoreById.get(row.id)}`,
+                      ),
+                    },
+                  },
+                  trigger,
+                );
+              }
+            : undefined
+        }
       />
       <Kpi
         label="Declining"
         value={String(declining)}
         detail="worse than three months ago"
-        onDrill={(trigger) =>
-          open(
-            {
-              title: 'Declining',
-              figure: String(declining),
-              source: { kind: 'rows', rows: fromHealthRows(decliningRows.map((t) => t.row)) },
-            },
-            trigger,
-          )
+        onDrill={
+          drillable
+            ? (trigger) =>
+                open(
+                  {
+                    title: 'Declining',
+                    figure: String(declining),
+                    source: { kind: 'rows', rows: fromHealthRows(decliningRows.map((t) => t.row)) },
+                  },
+                  trigger,
+                )
+            : undefined
         }
       />
       <Kpi
         label="Book at Good"
         value={`${atGood}/${total}`}
         detail={goodSub}
-        onDrill={(trigger) =>
-          open(
-            {
-              title: 'Book at Good',
-              figure: `${atGood}/${total}`,
-              source: { kind: 'rows', rows: fromHealthRows(atGoodRows.map((t) => t.row)) },
-            },
-            trigger,
-          )
+        onDrill={
+          drillable
+            ? (trigger) =>
+                open(
+                  {
+                    title: 'Book at Good',
+                    figure: `${atGood}/${total}`,
+                    source: { kind: 'rows', rows: fromHealthRows(atGoodRows.map((t) => t.row)) },
+                  },
+                  trigger,
+                )
+            : undefined
         }
       />
     </KpiStrip>
