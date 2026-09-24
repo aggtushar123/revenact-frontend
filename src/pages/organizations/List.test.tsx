@@ -365,6 +365,60 @@ describe('Organizations List page — dashboard drill (?ids=)', () => {
     );
     expect(String(customersCalls[0][0])).not.toContain('ids=');
   });
+
+  it('landing straight on a drill link still shows the real book-wide total, not 0', async () => {
+    // Fix round 1: a fresh visit to /organizations/list?ids=3,7 never runs
+    // an unfiltered fetchCustomers, so totalCount (populated only by that)
+    // would stay 0. MetricsPanel now sums its own independent
+    // GET /customers/stats/ fetch instead — dispatched unconditionally on
+    // mount, so it can't be skipped by a drill link.
+    const BOOK_STATS = {
+      health: {
+        good: { count: 5, mrr: 0, arr: 0 },
+        average: { count: 3, mrr: 0, arr: 0 },
+        poor: { count: 2, mrr: 0, arr: 0 },
+      },
+      nps: { promoters: 0, passives: 0, detractors: 0, score: 0 },
+      lifecycle: Object.fromEntries(
+        ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'churn', 'expansion', 'other'].map((s) => [
+          s,
+          { count: 0, mrr: 0, arr: 0 },
+        ])
+      ),
+    };
+    const fetchMock = makeFetchMock({
+      customers: [{ status: 200, body: { count: 2, next: null, previous: null, results: [globex, initech] } }],
+      stats: BOOK_STATS,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    // 10 = 5+3+2 (the book-wide stats total) — not 0 (the bug) and not 2
+    // (the drilled-down table's own, filtered count).
+    expect(screen.getByTitle('Number of organizations')).toHaveTextContent('10');
+  });
+
+  it('"Show all" moves focus to the search input, not <body>', async () => {
+    const fetchMock = makeFetchMock({
+      customers: [
+        { status: 200, body: { count: 2, next: null, previous: null, results: [globex, initech] } },
+        { status: 200, body: { count: 1, next: null, previous: null, results: [globex] } },
+      ],
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+
+    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
+    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Show all' }));
+
+    await waitFor(() =>
+      expect(screen.getByPlaceholderText('Search by name, Revenact ID or External ID')).toHaveFocus()
+    );
+  });
 });
 
 // A tiny in-memory "backend" for POST/PATCH so these tests exercise the

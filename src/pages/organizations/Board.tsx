@@ -88,7 +88,7 @@ function OrgCardContent(entity: OrgCardEntity) {
 export function Board() {
   const dispatch = useDispatch<AppDispatch>();
   const navigate = useNavigate();
-  const { customers, totalCount, isLoading, error } = useSelector((state: RootState) => state.customers);
+  const { customers, isLoading, error } = useSelector((state: RootState) => state.customers);
 
   // Same debounced-search convention as List.tsx's own — a separate
   // fetch of every (unpaginated in spirit, but see below) matching
@@ -146,7 +146,7 @@ export function Board() {
   return (
     <div className="flex flex-col h-full w-full bg-surface text-ink">
       <div className="px-6 pt-5 pb-4">
-        <MetricsPanel totalCount={totalCount} />
+        <MetricsPanel />
       </div>
 
       <div className="flex flex-col flex-1 overflow-hidden px-6 pb-4">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { forwardRef, useState } from 'react';
 import { Search, Download, CloudUpload, Filter, Settings } from 'lucide-react';
 import { RowActionsPopover } from './RowActionsPopover';
 import { OrganizationFormModal } from './OrganizationFormModal';
@@ -16,14 +16,17 @@ interface ActionBarProps {
   onArchiveRequest: (ids: number[], names: string[]) => void;
 }
 
-export function ActionBar({
+// Forwards a ref to the search input so callers (List.tsx, after "Show
+// all" clears a dashboard drill) can move focus back into it instead of
+// dropping focus to <body>.
+export const ActionBar = forwardRef<HTMLInputElement, ActionBarProps>(function ActionBar({
   searchQuery,
   setSearchQuery,
   selectedOrganizations,
   onEditRequest,
   onChurnRequest,
   onArchiveRequest,
-}: ActionBarProps) {
+}, searchInputRef) {
   const [showSettingsPopup, setShowSettingsPopup] = useState<{ style: React.CSSProperties } | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const selectedCount = selectedOrganizations.length;
@@ -46,6 +49,7 @@ export function ActionBar({
       <div className="relative w-[400px]">
         <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2" />
         <input
+          ref={searchInputRef}
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
@@ -144,4 +148,4 @@ export function ActionBar({
       </div>
     </div>
   );
-}
+});

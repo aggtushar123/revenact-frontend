@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
 import { MetricsPanel } from '../../components/organizations/MetricsPanel';
@@ -13,7 +13,7 @@ import type { AppDispatch, RootState } from '../../store';
 
 export function List() {
   const dispatch = useDispatch<AppDispatch>();
-  const { customers, count, totalCount, next, previous, isLoading, error } = useSelector(
+  const { customers, count, next, previous, isLoading, error } = useSelector(
     (state: RootState) => state.customers
   );
 
@@ -24,12 +24,15 @@ export function List() {
   const rawDrillIds = searchParams.get('ids');
   const drillIds = rawDrillIds && rawDrillIds.trim() !== '' ? rawDrillIds : null;
 
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const handleShowAll = () => {
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       next.delete('ids');
       return next;
     });
+    // Otherwise the removed button leaves focus stranded on <body>.
+    searchInputRef.current?.focus();
   };
   // Index (0-based) of the first row in the currently-loaded page, for the
   // "Showing X-Y of Z" footer. Tracked from how many rows each fetched page
@@ -148,12 +151,13 @@ export function List() {
     <div className="flex flex-col h-full w-full bg-surface text-ink">
       {/* Glass Metrics Banner */}
       <div className="px-6 pt-5 pb-4">
-        <MetricsPanel totalCount={totalCount} />
+        <MetricsPanel />
       </div>
 
       {/* Search and Table Area */}
       <div className="flex flex-col flex-1 overflow-hidden px-6">
         <ActionBar
+          ref={searchInputRef}
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           selectedOrganizations={selectedOrganizations}
