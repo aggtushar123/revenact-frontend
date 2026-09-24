@@ -88,6 +88,7 @@ export function CopilotRail({
   const { pending, failed } = thread;
   const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const railRef = useRef<HTMLElement>(null);
   const messages: CopilotMessage[] = conversation?.messages ?? [];
   const empty = messages.length === 0 && !pending && !failed;
   const chipOf = (asked: DashboardContext | null | undefined) => (names && asked ? contextLabel(asked, names) : undefined);
@@ -103,7 +104,11 @@ export function CopilotRail({
         : { text, content: (context ? `[About: ${context.label}] ` : '') + text };
     onSent?.();
     await thread.send(turn);
-    inputRef.current?.focus();
+    // Back to the input only if the person hasn't moved on while the answer
+    // loaded. Focus on body means the control they used (Retry, a
+    // suggestion) unmounted, which still counts as staying in the rail.
+    const active = document.activeElement;
+    if (!active || active === document.body || railRef.current?.contains(active)) inputRef.current?.focus();
   }
 
   // A label context can be dropped; on the dashboard only a focus can, never the screen.
@@ -111,7 +116,7 @@ export function CopilotRail({
   const glass = variant === 'glass';
 
   return (
-    <aside aria-label={label} className={`${className} shrink-0 flex flex-col h-full min-h-0 ${glass ? 'gap-3' : 'rounded-xl border border-line bg-surface'}`}>
+    <aside ref={railRef} aria-label={label} className={`${className} shrink-0 flex flex-col h-full min-h-0 ${glass ? 'gap-3' : 'rounded-xl border border-line bg-surface'}`}>
       {top}
       <section className={`flex-1 min-h-0 flex flex-col overflow-hidden ${glass ? 'rv-card-glass' : ''}`} aria-label={`${label} conversation`}>
         <div role="log" aria-label={`${label} messages`} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-3">

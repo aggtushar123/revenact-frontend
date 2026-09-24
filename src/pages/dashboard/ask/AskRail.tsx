@@ -189,7 +189,7 @@ export function AskRail() {
 
   return (
     <div ref={railRef} className="shrink-0 flex min-h-0">
-      {/* eslint-disable-next-line react-hooks/refs -- toggle(false) only reads toggled.current inside its own event-handler body, on click; the compiler can't see through renderRail's forwarding of onClose to RailHeader's button. */}
+      {/* eslint-disable-next-line react-hooks/refs -- toggle(false) only writes toggled.current inside its own event-handler body, on click; the compiler can't see through renderRail's forwarding of onClose to RailHeader's button. */}
       {renderRail('w-[360px]', 'Collapse Ask Revenact', <PanelRightClose className="w-4 h-4" aria-hidden="true" />, () => toggle(false))}
     </div>
   );

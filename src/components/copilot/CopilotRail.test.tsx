@@ -183,4 +183,28 @@ describe('CopilotRail', () => {
     await screen.findByText('Answer to: Why are these in At risk?');
     expect(onSent).toHaveBeenCalledOnce();
   });
+
+  it('shows a 400 as the generic error with Retry, not the budget message', async () => {
+    stubCopilot({ statuses: [400] });
+    renderRail({ context: { kind: 'dashboard', context: DASH, label: 'Revenue › Forecast' } });
+    await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'Why is at-risk ARR up?{enter}');
+    const alert = await screen.findByRole('alert');
+    expect(alert).not.toHaveTextContent("This month's AI budget is used up.");
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('leaves focus where the person moved it while the answer was on its way', async () => {
+    const { release } = stubCopilot({ hold: true });
+    render(
+      <MemoryRouter>
+        <button type="button">Elsewhere</button>
+        <Harness context={null} />
+      </MemoryRouter>,
+    );
+    await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'What is waiting?{enter}');
+    await userEvent.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    release();
+    await screen.findByText('Answer to: What is waiting?');
+    expect(screen.getByRole('button', { name: 'Elsewhere' })).toHaveFocus();
+  });
 });

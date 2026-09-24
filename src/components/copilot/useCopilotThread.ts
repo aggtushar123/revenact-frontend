@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../lib/apiClient';
 import { sendMessage } from '../../pages/copilot/copilotApi';
 import type { Conversation, DashboardContext } from '../../pages/copilot/types';
@@ -42,20 +42,36 @@ export function useCopilotThread(
   if (threadId !== id) {
     setThreadId(id);
     setFailed(null);
+    setPending(null);
   }
+
+  // Which conversation is on screen now, for a send that outlives it: an
+  // answer that lands after New chat or a History pick belongs to the
+  // conversation it was asked in, not the one the person moved to.
+  const liveId = useRef(id);
+  useEffect(() => {
+    liveId.current = id;
+  }, [id]);
+  // The latest send, so an earlier one finishing late can't clear its pending.
+  const latest = useRef(0);
 
   async function send(turn: Turn) {
     if (pending) return;
+    const askedIn = conversation?.id ?? null;
+    const mine = ++latest.current;
+    const stillHere = () => liveId.current === askedIn;
     setFailed(null);
     setPending(turn);
     try {
-      onConversation(await sendMessage({ conversationId: conversation?.id, content: turn.content, context: turn.context }));
+      const answered = await sendMessage({ conversationId: conversation?.id, content: turn.content, context: turn.context });
+      if (stillHere()) onConversation(answered);
     } catch (err) {
+      if (!stillHere()) return;
       const budget = err instanceof ApiError && err.status === 429;
       const message = budget ? BUDGET_MESSAGE : err instanceof ApiError ? err.message : 'The Copilot did not answer.';
       setFailed({ ...turn, budget, message });
     } finally {
-      setPending(null);
+      if (latest.current === mine) setPending(null);
     }
   }
 

@@ -318,7 +318,10 @@ export function AttentionList({
                         aria-label={`Ask why ${item.title} is on my list`}
                         className={QUIET}
                         disabled={stale}
-                        onClick={() => ask.ask('Why is this on my list?', { kind: 'attention', key: item.key })}
+                        aria-disabled={Boolean(ask.thread.pending) || pending[item.key] || undefined}
+                        onClick={() =>
+                          !ask.thread.pending && !pending[item.key] && ask.ask('Why is this on my list?', { kind: 'attention', key: item.key })
+                        }
                       >
                         Why?
                       </button>

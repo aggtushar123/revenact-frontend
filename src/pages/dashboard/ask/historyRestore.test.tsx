@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { resetViewport } from '../../../test/viewport';
-import { stubCopilot } from '../../../components/copilot/testCopilot';
+import { postedBodies, stubCopilot } from '../../../components/copilot/testCopilot';
 import { renderDashboard, Where } from './testAsk';
+import { ASK_PREFERENCE_KEY } from './askPreference';
 
 const origin = { surface: 'dashboard', area: 'revenue', view: 'forecast', filters: { owner: '2', lifecycle: '', customer: '' } };
 
@@ -42,5 +43,37 @@ describe('reopening from history on the dashboard', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Pizza Hut mail' }));
     expect(await screen.findByText('They replied.')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/dashboard/health/triage'));
+  });
+
+  const pizza = {
+    conversations: [{ id: 4, title: 'Pizza Hut mail', created_at: '', updated_at: '', origin: null }],
+    conversationById: { 4: { id: 4, title: 'Pizza Hut mail', created_at: '', updated_at: '', origin: null, messages: [{ id: 1, role: 'assistant', content: 'They replied.', sources: [], questions: [], created_at: '' }] } },
+  };
+
+  it('opens from History without saving the open choice', async () => {
+    stubCopilot(pizza);
+    renderDashboard('/dashboard/overview', () => <Where />, 1440);
+    await userEvent.click(screen.getByRole('button', { name: 'History' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Pizza Hut mail' }));
+    expect(await screen.findByText('They replied.')).toBeInTheDocument();
+    expect(localStorage.getItem(ASK_PREFERENCE_KEY)).toBeNull();
+  });
+
+  it('keeps a conversation picked while an answer was in flight when that answer lands', async () => {
+    const { spy, release } = stubCopilot({ ...pizza, hold: true });
+    renderDashboard('/dashboard/overview', () => <Where />, 1440);
+    await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'What needs me?{enter}');
+    expect(await screen.findByRole('status')).toHaveTextContent('Thinking…');
+    await userEvent.click(screen.getByRole('button', { name: 'History' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Pizza Hut mail' }));
+    expect(await screen.findByText('They replied.')).toBeInTheDocument();
+    // Let the held answer land: one macrotask drains every microtask in its chain.
+    await act(async () => {
+      release();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(postedBodies(spy)).toHaveLength(1);
+    expect(screen.queryByText('Answer to: What needs me?')).not.toBeInTheDocument();
+    expect(screen.getByText('They replied.')).toBeInTheDocument();
   });
 });

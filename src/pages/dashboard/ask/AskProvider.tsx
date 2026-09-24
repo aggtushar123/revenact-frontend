@@ -84,7 +84,9 @@ export function AskProvider({ children }: { children: ReactNode }) {
         reveal();
       },
       ask: (question, nextFocus) => {
-        if (!context) return;
+        // One question at a time: while an answer is on its way the thread
+        // would drop this send, so leave the draft and its focus as they are.
+        if (!context || thread.pending) return;
         reveal();
         void thread.send({ text: question, content: question, context: { ...context, focus: nextFocus } });
         // The send above carries its own focus; an earlier draft's focus and
@@ -97,7 +99,7 @@ export function AskProvider({ children }: { children: ReactNode }) {
         // answer sits beside the figures it was about.
         if (next.origin) navigate(originPath(next.origin));
         setConversation(next);
-        setOpen(true);
+        reveal();
       },
     }),
     [open, setOpen, reveal, conversation, thread, focus, clearFocus, markSent, pendingDraft, context, navigate],
