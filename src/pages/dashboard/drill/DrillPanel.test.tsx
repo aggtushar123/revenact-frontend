@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -179,5 +179,123 @@ describe('DrillPanel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'At risk' }));
 
     expect(screen.getByRole('dialog')).not.toHaveAttribute('aria-modal');
+  });
+});
+
+// Server drill source (Task 3) — same fetch-stubbing pattern as
+// src/components/shared/CustomObjectsTab.test.tsx: only the fetch boundary
+// is mocked, drillApi.ts (and apiFetch under it) do the rest.
+function jsonResponse(status: number, body: unknown) {
+  return { ok: status >= 200 && status < 300, status, json: async () => body };
+}
+
+function stubFetch(handler: (url: string) => ReturnType<typeof jsonResponse> | undefined) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => Promise.resolve(handler(url) ?? jsonResponse(404, { detail: 'unhandled in test' }))),
+  );
+}
+
+function ServerOpener() {
+  const { open } = useDrill();
+  return (
+    <button
+      onClick={() =>
+        open({
+          title: 'Open tickets',
+          figure: '42',
+          source: { kind: 'server', path: '/tickets/summary', query: 'window=30d', segment: 'priority:high' },
+        })
+      }
+    >
+      Open tickets
+    </button>
+  );
+}
+
+function renderServerPanel() {
+  const store = authStore();
+  return render(
+    <Provider store={store}>
+      <MemoryRouter>
+        <DrillProvider>
+          <ServerOpener />
+          <DrillPanel />
+        </DrillProvider>
+      </MemoryRouter>
+    </Provider>,
+  );
+}
+
+describe('DrillPanel server source', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('requests the query plus segment, shows Loading then the rows', async () => {
+    stubFetch((url) => {
+      expect(url).toContain('window=30d');
+      expect(url).toContain('drill=priority%3Ahigh');
+      return jsonResponse(200, {
+        drill: {
+          segment: 'priority:high',
+          value_label: 'tickets',
+          count: 1,
+          truncated: false,
+          companies: [{ id: 9, name: 'Wayne Enterprises', owner: 'Carl CSM', arr: 50000, value: 4 }],
+        },
+        currency: 'USD',
+      });
+    });
+
+    renderServerPanel();
+    // fireEvent (not userEvent) so the click's `act` flush happens before
+    // the fetch promise settles — otherwise the loading state is already
+    // gone by the time we assert on it.
+    fireEvent.click(screen.getByRole('button', { name: 'Open tickets' }));
+
+    expect(screen.getByText('Loading the accounts behind this number…')).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: 'Wayne Enterprises' })).toHaveAttribute(
+      'href',
+      '/organizations/9',
+    );
+    expect(screen.getByText('4 tickets')).toBeInTheDocument();
+  });
+
+  it('shows an error message when the fetch fails', async () => {
+    stubFetch(() => jsonResponse(500, { detail: 'boom' }));
+
+    renderServerPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Open tickets' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the accounts behind this number.');
+  });
+
+  it('shows the truncated count and hides Open as a list', async () => {
+    stubFetch(() =>
+      jsonResponse(200, {
+        drill: {
+          segment: 'priority:high',
+          value_label: 'tickets',
+          count: 812,
+          truncated: true,
+          companies: Array.from({ length: 500 }, (_, i) => ({
+            id: i + 1,
+            name: `Company ${i + 1}`,
+            owner: 'Carl CSM',
+            arr: 1000,
+            value: 1,
+          })),
+        },
+        currency: 'USD',
+      }),
+    );
+
+    renderServerPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Open tickets' }));
+
+    const dialog = await screen.findByRole('dialog');
+    await waitFor(() => expect(dialog).toHaveTextContent('Showing 500 of 812'));
+    expect(screen.queryByRole('link', { name: /Open as a list/ })).not.toBeInTheDocument();
   });
 });

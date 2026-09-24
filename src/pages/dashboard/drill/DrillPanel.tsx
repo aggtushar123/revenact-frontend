@@ -4,6 +4,8 @@ import { X } from 'lucide-react';
 import { useOrgCurrency } from '../../../hooks';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 import { useDrill } from './useDrill';
+import { fetchDrill } from './drillApi';
+import { Loading, ErrorState } from '../shared/DataState';
 import type { DrillRow } from './types';
 
 const LIST_LIMIT = 500;
@@ -98,7 +100,14 @@ export function DrillPanel() {
           <X className="w-4 h-4" aria-hidden="true" />
         </button>
       </header>
-      {current.source.kind === 'rows' ? <RowList rows={current.source.rows} /> : <ServerRows />}
+      {current.source.kind === 'rows' ? (
+        <RowList rows={current.source.rows} />
+      ) : (
+        <ServerRows
+          key={`${current.source.path}::${current.source.query}::${current.source.segment}`}
+          {...current.source}
+        />
+      )}
     </aside>
   );
 }
@@ -149,7 +158,45 @@ function RowList({ rows, total }: { rows: DrillRow[]; total?: number }) {
   );
 }
 
-// Replaced in Task 3.
-function ServerRows() {
-  return null;
+function ServerRows({ path, query, segment }: { path: string; query: string; segment: string }) {
+  const currency = useOrgCurrency();
+  const [state, setState] = useState<
+    | { status: 'loading' }
+    | { status: 'error' }
+    | { status: 'done'; rows: DrillRow[]; count: number; truncated: boolean }
+  >({ status: 'loading' });
+
+  useEffect(() => {
+    let live = true;
+    fetchDrill(path, query, segment, currency)
+      .then((result) => live && setState({ status: 'done', ...result }))
+      .catch(() => live && setState({ status: 'error' }));
+    return () => {
+      live = false;
+    };
+    // `path`/`query`/`segment` changing remounts this component (DrillPanel
+    // keys it on those three), so this effect only ever runs once per
+    // mount — it doesn't need to reset `state` back to loading itself.
+  }, [path, query, segment, currency]);
+
+  if (state.status === 'loading') return <Loading label="Loading the accounts behind this number…" />;
+  if (state.status === 'error') {
+    return (
+      <ErrorState
+        message="Could not load the accounts behind this number."
+        detail="Try again, or open the area's full view."
+      />
+    );
+  }
+  return (
+    <>
+      {state.truncated && (
+        <p className="mx-4 mt-3 text-[11px] text-ink-muted">
+          Showing <span className="font-mono-brand tabular-nums">{state.rows.length}</span> of{' '}
+          <span className="font-mono-brand tabular-nums">{state.count}</span>
+        </p>
+      )}
+      <RowList rows={state.rows} total={state.count} />
+    </>
+  );
 }
