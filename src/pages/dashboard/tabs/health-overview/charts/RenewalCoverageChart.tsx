@@ -80,7 +80,9 @@ export function RenewalCoverageChart({
     open(
       {
         title: `${band.label} · ${seriesLabel}`,
-        figure: String(picked.length),
+        // The money the segment draws, not how many accounts are in it —
+        // the bars are stacked ARR.
+        figure: formatCompactMoney(band[series], currency),
         source: { kind: 'rows', rows: fromHealthRows(picked) },
       },
       trigger
@@ -96,7 +98,7 @@ export function RenewalCoverageChart({
     ? reversedBands.flatMap((band) =>
         COVERAGE_SERIES.filter((series) => band.rows[series.key].length > 0).map((series) => ({
           name: `${band.label} · ${series.label}`,
-          figure: String(band.rows[series.key].length),
+          figure: formatCompactMoney(band[series.key], currency),
           onSelect: (trigger: HTMLElement) => openSegment(band, series.key, trigger),
         })),
       )

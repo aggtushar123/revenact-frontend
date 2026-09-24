@@ -63,7 +63,9 @@ export function RenewalQuarterChart({
     open(
       {
         title: `${column.label} · ${status}`,
-        figure: String(picked.length),
+        // The money the segment draws, not how many accounts are in it —
+        // the bars are stacked ARR.
+        figure: formatCompactMoney(column.arr[status], currency),
         source: { kind: 'rows', rows: fromHealthRows(picked) },
       },
       trigger
@@ -79,7 +81,7 @@ export function RenewalQuarterChart({
     ? columns.flatMap((column) =>
         STACK.filter((status) => column.rows[status].length > 0).map((status) => ({
           name: `${column.label} · ${status}`,
-          figure: String(column.rows[status].length),
+          figure: formatCompactMoney(column.arr[status], currency),
           onSelect: (trigger: HTMLElement) => openSegment(column, status, trigger),
         })),
       )

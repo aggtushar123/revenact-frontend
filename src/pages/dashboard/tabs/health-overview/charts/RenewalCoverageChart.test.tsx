@@ -22,8 +22,10 @@ describe('RenewalCoverageChart drill', () => {
     const user = userEvent.setup();
     renderWithDrill(<RenewalCoverageChart bands={bands} currency="USD" />);
 
-    await user.click(screen.getByRole('button', { name: 'Next 30 days · Contacted <30d 1, show accounts' }));
+    await user.click(screen.getByRole('button', { name: 'Next 30 days · Contacted <30d $10.0K, show accounts' }));
     const dialog = screen.getByRole('dialog');
+    // The figure is the money the bar segment shows, not a count of accounts.
+    expect(dialog).toHaveTextContent('Next 30 days · Contacted <30d $10.0K');
 
     expect(within(dialog).getByRole('link', { name: 'FreshSoon' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('link', { name: 'ColdSoon' })).not.toBeInTheDocument();
@@ -34,7 +36,7 @@ describe('RenewalCoverageChart drill', () => {
     const user = userEvent.setup();
     renderWithDrill(<RenewalCoverageChart bands={bands} currency="USD" />);
 
-    await user.click(screen.getByRole('button', { name: 'Next 30 days · No contact 60d+ 1, show accounts' }));
+    await user.click(screen.getByRole('button', { name: 'Next 30 days · No contact 60d+ $20.0K, show accounts' }));
     const dialog = screen.getByRole('dialog');
 
     expect(within(dialog).getByRole('link', { name: 'ColdSoon' })).toBeInTheDocument();

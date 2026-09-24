@@ -28,8 +28,10 @@ describe('RenewalQuarterChart drill', () => {
     const user = userEvent.setup();
     renderWithDrill(<RenewalQuarterChart columns={columns} currency="USD" />);
 
-    await user.click(screen.getByRole('button', { name: "Q3 '26 · Poor 1, show accounts" }));
+    await user.click(screen.getByRole('button', { name: "Q3 '26 · Poor $10.0K, show accounts" }));
     const dialog = screen.getByRole('dialog');
+    // The figure is the money the bar segment shows, not a count of accounts.
+    expect(dialog).toHaveTextContent("Q3 '26 · Poor $10.0K");
 
     expect(within(dialog).getByRole('link', { name: 'SoonPoor' })).toBeInTheDocument();
     expect(within(dialog).queryByRole('link', { name: 'SoonGood' })).not.toBeInTheDocument();
@@ -40,7 +42,7 @@ describe('RenewalQuarterChart drill', () => {
     const user = userEvent.setup();
     renderWithDrill(<RenewalQuarterChart columns={columns} currency="USD" />);
 
-    await user.click(screen.getByRole('button', { name: "Q1 '27 · Poor 1, show accounts" }));
+    await user.click(screen.getByRole('button', { name: "Q1 '27 · Poor $5.0K, show accounts" }));
     const dialog = screen.getByRole('dialog');
 
     expect(within(dialog).getByRole('link', { name: 'LaterPoor' })).toBeInTheDocument();
