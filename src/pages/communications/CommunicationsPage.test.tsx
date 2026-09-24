@@ -212,6 +212,18 @@ describe('CommunicationsPage', () => {
     expect(screen.getByText(/nothing between you and the rest of the day/i)).toBeInTheDocument();
   });
 
+  it('regression: the rail still sends the source as a text prefix and no structured context', async () => {
+    const spy = mockApi();
+    renderPage('/communications?source=connector%3A5');
+    const copilot = await screen.findByRole('complementary', { name: /copilot/i });
+    expect(await within(copilot).findByText('Support desk')).toBeInTheDocument();
+    expect(within(copilot).getByText('Nothing scheduled')).toBeInTheDocument();
+    await userEvent.type(within(copilot).getByPlaceholderText('Ask Revenact'), 'What is waiting?{enter}');
+    expect(await within(copilot).findByText('Two tickets and one reply.')).toBeInTheDocument();
+    const call = spy.mock.calls.find(([url, init]) => String(url).includes('/copilot/messages/') && init?.method === 'POST');
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ content: '[About: Support desk] What is waiting?' });
+  });
+
   it('explains a failure rather than showing half a picture', async () => {
     vi.stubGlobal(
       'fetch',

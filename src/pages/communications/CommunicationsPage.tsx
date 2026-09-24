@@ -41,7 +41,9 @@ import { InboxList, InboxZero } from './InboxList';
 import { InboxPanel } from './InboxPanel';
 import { MailboxView } from './MailboxView';
 import { sourcesFrom } from './sources';
-import { CopilotRail, HistoryPopover } from './CopilotRail';
+import { CopilotRail, HistoryPopover } from '../../components/copilot/CopilotRail';
+import type { RailContext } from '../../components/copilot/railContext';
+import { NextEventCard } from './NextEventCard';
 
 const COPILOT_KEY = 'revenact_comms_copilot';
 
@@ -113,7 +115,10 @@ export default function CommunicationsPage() {
     if (source !== 'all') setParams({});
   }
 
-  const context = activeSource && activeSource.id !== 'all' && !contextCleared ? { label: activeSource.label, icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center [&>svg]:w-3.5 [&>svg]:h-3.5">{activeSource.icon}</span> } : null;
+  const context: RailContext | null =
+    activeSource && activeSource.id !== 'all' && !contextCleared
+      ? { kind: 'label', label: activeSource.label, icon: <span className="w-3.5 h-3.5 inline-flex items-center justify-center [&>svg]:w-3.5 [&>svg]:h-3.5">{activeSource.icon}</span> }
+      : null;
 
   return (
     <div className="h-full min-h-0 flex flex-col">
@@ -277,7 +282,7 @@ export default function CommunicationsPage() {
         )}
 
         {copilotOpen ? (
-          <CopilotRail context={context} onClearContext={() => setContextCleared(true)} conversation={conversation} onConversation={setConversation} />
+          <CopilotRail top={<NextEventCard />} context={context} onClearContext={() => setContextCleared(true)} conversation={conversation} onConversation={setConversation} />
         ) : null}
       </div>
 
