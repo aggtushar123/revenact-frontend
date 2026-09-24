@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { HealthDataRow, HealthStatus } from '../../../../features/health/types';
-import { buildFlow, monthsOf, movedRows, netMovement, renewalBuckets, renewalMonths } from './movement';
+import { buildFlow, monthsOf, moveCounts, movedRows, netMovement, renewalBuckets, renewalMonths } from './movement';
 import { healthRow } from './testUtils';
 
 /** Local midnight, matching the other suites, so calendar maths is stable. */
@@ -163,6 +163,70 @@ describe('movedRows', () => {
   it('never throws on a row with fewer than two months of history', () => {
     expect(movedRows([oneMonth, makeRow([], { id: '7' })], 3, 'declined')).toEqual([]);
     expect(movedRows([oneMonth, makeRow([], { id: '7' })], 3, 'improved')).toEqual([]);
+  });
+});
+
+describe('moveCounts', () => {
+  it('counts every drop or rise inside the window, per account', () => {
+    // Fix round 1: the tile counts moves, not accounts — an account that
+    // drops twice must show 2, not 1.
+    const twice = makeRow(['Good', 'Average', 'Poor'], { id: '1' }); // two declines
+    const once = makeRow(['Good', 'Average', 'Good'], { id: '2' }); // one decline, one rise
+    const never = makeRow(['Good', 'Good', 'Good'], { id: '3' });
+
+    const counts = moveCounts([twice, once, never], 3);
+    expect(counts.get('1')).toEqual({ declined: 2, improved: 0 });
+    expect(counts.get('2')).toEqual({ declined: 1, improved: 1 });
+    expect(counts.get('3')).toEqual({ declined: 0, improved: 0 });
+  });
+
+  it('windows by the same canonical month labels buildFlow and netMovement use — not by slicing a row’s own history', () => {
+    // A book where one account's history is shorter and offset from the
+    // other's, same shape as buildFlow's own "matches accounts to months by
+    // label, not by position" test. If `moveCounts` sliced each row's own
+    // history positionally instead of aligning by label, this account's
+    // two-entry history would be read as its *first* two months rather than
+    // its real (later) ones, and the two computations below would disagree.
+    const full = makeRow(['Good', 'Good', 'Average'], { id: '1' });
+    const lateArrival = {
+      ...makeRow(['Good'], { id: '2' }),
+      history: [
+        { month: M[1], status: 'Average' as const },
+        { month: M[2], status: 'Poor' as const },
+      ],
+    };
+    const rows = [full, lateArrival];
+
+    const net = netMovement(buildFlow(rows, 3));
+    const counts = moveCounts(rows, 3);
+    const summed = [...counts.values()].reduce(
+      (sum, c) => ({ declined: sum.declined + c.declined, improved: sum.improved + c.improved }),
+      { declined: 0, improved: 0 },
+    );
+
+    expect(summed).toEqual({ declined: net.declined, improved: net.improved });
+    // Concretely: full declines once (Good -> Average); lateArrival declines
+    // once (Average -> Poor, in the months it actually has).
+    expect(summed).toEqual({ declined: 2, improved: 0 });
+  });
+
+  it('sums to netMovement’s totals across the whole book, for every window the view offers', () => {
+    const book = [
+      makeRow(['Good', 'Average', 'Poor'], { id: '1' }),
+      makeRow(['Poor', 'Average', 'Good'], { id: '2' }),
+      makeRow(['Good', 'Average', 'Good'], { id: '3' }),
+      makeRow(['Average', 'Average', 'Average'], { id: '4' }),
+    ];
+
+    for (const window of [1, 2, 3, 12]) {
+      const net = netMovement(buildFlow(book, window));
+      const counts = moveCounts(book, window);
+      const summed = [...counts.values()].reduce(
+        (sum, c) => ({ declined: sum.declined + c.declined, improved: sum.improved + c.improved }),
+        { declined: 0, improved: 0 },
+      );
+      expect(summed).toEqual({ declined: net.declined, improved: net.improved });
+    }
   });
 });
 

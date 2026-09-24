@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
+import type { HealthDataRow } from '../../../../features/health/types';
 import { useHealthOverview } from './useHealthOverview';
 import { HealthEmpty, HealthError, HealthLoading, HealthTruncatedNotice } from './HealthDataState';
-import { buildFlow, movedRows, netMovement, renewalBuckets, WINDOW_OPTIONS } from './movement';
-import type { WindowMonths } from './movement';
+import { buildFlow, moveCounts, movedRows, netMovement, renewalBuckets, WINDOW_OPTIONS } from './movement';
+import type { MoveCounts, WindowMonths } from './movement';
 import { HealthFlowChart } from './charts/HealthFlowChart';
 import { RenewalRunwayChart } from './charts/RenewalRunwayChart';
 import { Kpi, KpiStrip } from '../../shared/Kpi';
@@ -10,6 +11,19 @@ import { useDrill } from '../../drill/useDrill';
 import { fromHealthRows } from '../../drill/rows';
 
 const DEFAULT_WINDOW: WindowMonths = 6;
+
+/**
+ * "N downgrade(s)"/"N upgrade(s)" for one row — how many of the tile's own
+ * figure (which counts moves, not accounts) this particular account
+ * accounts for. Summing this across a tile's drilled rows always equals the
+ * figure itself: both come from `moveCounts`, never re-derived separately.
+ */
+function moveDetail(counts: Map<string, MoveCounts>, direction: keyof MoveCounts, noun: string) {
+  return (row: HealthDataRow) => {
+    const n = counts.get(row.id)?.[direction] ?? 0;
+    return `${n} ${noun}${n === 1 ? '' : 's'}`;
+  };
+}
 
 /**
  * Health Overview read as movement rather than as a snapshot.
@@ -77,38 +91,46 @@ export function MovementView() {
           value={String(net.declined)}
           detail="account-months lost a grade"
           tone="loss"
-          onDrill={(trigger) =>
+          onDrill={(trigger) => {
+            const counts = moveCounts(rows, windowMonths);
             open(
               {
                 title: 'Downgrades',
                 figure: String(net.declined),
                 source: {
                   kind: 'rows',
-                  rows: fromHealthRows(movedRows(rows, windowMonths, 'declined')),
+                  rows: fromHealthRows(
+                    movedRows(rows, windowMonths, 'declined'),
+                    moveDetail(counts, 'declined', 'downgrade'),
+                  ),
                 },
               },
               trigger,
-            )
-          }
+            );
+          }}
         />
         <Kpi
           label="Upgrades"
           value={String(net.improved)}
           detail="account-months gained a grade"
           tone="gain"
-          onDrill={(trigger) =>
+          onDrill={(trigger) => {
+            const counts = moveCounts(rows, windowMonths);
             open(
               {
                 title: 'Upgrades',
                 figure: String(net.improved),
                 source: {
                   kind: 'rows',
-                  rows: fromHealthRows(movedRows(rows, windowMonths, 'improved')),
+                  rows: fromHealthRows(
+                    movedRows(rows, windowMonths, 'improved'),
+                    moveDetail(counts, 'improved', 'upgrade'),
+                  ),
                 },
               },
               trigger,
-            )
-          }
+            );
+          }}
         />
         <Kpi
           label="Net movement"

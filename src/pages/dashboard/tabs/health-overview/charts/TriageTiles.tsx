@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ACTION_THRESHOLD, RENEWAL_URGENT_DAYS, summarise } from '../triage';
+import { ACTION_THRESHOLD, RENEWAL_URGENT_DAYS, summarise, triageDrillSets } from '../triage';
 import type { TriageRow } from '../triage';
 import { Kpi, KpiStrip } from '../../../shared/Kpi';
 import { useDrill } from '../../../drill/useDrill';
@@ -30,11 +30,14 @@ export function TriageTiles({ scored }: { scored: TriageRow[] }) {
           ? `down from ${atGoodPreviousMonth} last month`
           : `up from ${atGoodPreviousMonth} last month`;
 
-  // Same predicates `summarise` counts, kept alongside their source `TriageRow`
-  // so a click can hand the drill panel the accounts, not just the count.
-  const needsActionRows = useMemo(() => scored.filter((t) => t.score >= ACTION_THRESHOLD), [scored]);
-  const decliningRows = useMemo(() => scored.filter((t) => t.direction === 'declining'), [scored]);
-  const atGoodRows = useMemo(() => scored.filter((t) => t.row.healthStatus === 'Good'), [scored]);
+  // The same three sets `summarise` counted, from the one predicate each
+  // lives in (`triageDrillSets`) — not re-filtered here, so a tile's number
+  // and the accounts a click on it opens can never quietly disagree.
+  const {
+    needsAction: needsActionRows,
+    declining: decliningRows,
+    atGood: atGoodRows,
+  } = useMemo(() => triageDrillSets(scored), [scored]);
 
   return (
     <KpiStrip columns={3}>

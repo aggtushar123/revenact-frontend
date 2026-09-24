@@ -138,6 +138,48 @@ describe('MovementView drill', () => {
     renderWithDrill(<MovementView />, { rows });
     expect(screen.queryByRole('button', { name: /Net movement/ })).not.toBeInTheDocument();
   });
+
+  // Fix round 1: the tile's figure counts moves, not accounts (an account
+  // that fell twice is one row but two of the "Downgrades" figure), so the
+  // panel must say, per row, how many of that figure it accounts for — and
+  // those per-row counts must sum back to the figure itself.
+  it('Downgrades: each row shows its own move count (singular/plural), summing to the figure', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<MovementView />, { rows });
+
+    const declined = netMovement(buildFlow(rows, 6)).declined;
+    await user.click(screen.getByRole('button', { name: `Downgrades ${declined}, show accounts` }));
+    const dialog = screen.getByRole('dialog');
+
+    const downRow = within(dialog).getByRole('link', { name: 'DownAcct' }).closest('li') as HTMLElement;
+    const roundTripRow = within(dialog).getByRole('link', { name: 'RoundTripAcct' }).closest('li') as HTMLElement;
+
+    expect(downRow).toHaveTextContent('2 downgrades');
+    expect(roundTripRow).toHaveTextContent('1 downgrade');
+    expect(roundTripRow).not.toHaveTextContent('1 downgrades');
+
+    // DownAcct dropped twice, RoundTripAcct once — the rows visibly add up
+    // to the tile's own figure.
+    expect(2 + 1).toBe(declined);
+  });
+
+  it('Upgrades: each row shows its own move count (singular/plural), summing to the figure', async () => {
+    const user = userEvent.setup();
+    renderWithDrill(<MovementView />, { rows });
+
+    const improved = netMovement(buildFlow(rows, 6)).improved;
+    await user.click(screen.getByRole('button', { name: `Upgrades ${improved}, show accounts` }));
+    const dialog = screen.getByRole('dialog');
+
+    const upRow = within(dialog).getByRole('link', { name: 'UpAcct' }).closest('li') as HTMLElement;
+    const roundTripRow = within(dialog).getByRole('link', { name: 'RoundTripAcct' }).closest('li') as HTMLElement;
+
+    expect(upRow).toHaveTextContent('2 upgrades');
+    expect(roundTripRow).toHaveTextContent('1 upgrade');
+    expect(roundTripRow).not.toHaveTextContent('1 upgrades');
+
+    expect(2 + 1).toBe(improved);
+  });
 });
 
 describe('HealthFlowChart', () => {

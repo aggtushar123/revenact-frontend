@@ -8,6 +8,7 @@ import {
   summarise,
   trajectoryOf,
   triage,
+  triageDrillSets,
 } from './triage';
 
 // Unit tier: the scoring is the product decision behind the Triage view, so
@@ -201,6 +202,42 @@ describe('summarise', () => {
     expect(over.needsAction).toBe(1);
     expect(triage([makeRow({ healthStatus: 'Poor' })], NOW)[0].score)
       .toBeGreaterThanOrEqual(ACTION_THRESHOLD);
+  });
+});
+
+describe('triageDrillSets', () => {
+  // Fix round 1: TriageTiles used to re-filter `scored` itself for its
+  // drills, duplicating these three predicates outside of triage.ts. This
+  // pins that `summarise`'s counts and `triageDrillSets`' row sets are the
+  // same predicates, so the two can never drift apart.
+  const rows = [
+    makeRow({
+      id: '1',
+      account: 'A',
+      healthStatus: 'Poor',
+      renewalDate: 'Jul 1, 2026',
+      history: history('Good', 'Average', 'Poor'),
+    }),
+    makeRow({ id: '2', account: 'B', healthStatus: 'Good', csmPulseScore: 5, aiPulseScore: 2 }),
+    makeRow({ id: '3', account: 'C', healthStatus: 'Good', history: history('Good', 'Good', 'Good') }),
+  ];
+  const scored = triage(rows, NOW);
+
+  it('returns exactly the rows behind each of summarise’s counts', () => {
+    const sets = triageDrillSets(scored);
+
+    expect(sets.needsAction.map((t) => t.row.account)).toEqual(['A']);
+    expect(sets.declining.map((t) => t.row.account)).toEqual(['A']);
+    expect(sets.atGood.map((t) => t.row.account).sort()).toEqual(['B', 'C']);
+  });
+
+  it('agrees numerically with summarise for the same book', () => {
+    const sets = triageDrillSets(scored);
+    const summary = summarise(scored);
+
+    expect(sets.needsAction.length).toBe(summary.needsAction);
+    expect(sets.declining.length).toBe(summary.declining);
+    expect(sets.atGood.length).toBe(summary.atGood);
   });
 });
 

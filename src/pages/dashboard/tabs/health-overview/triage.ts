@@ -196,23 +196,46 @@ export interface TriageSummary {
   atGoodPreviousMonth: number | null;
 }
 
+export interface TriageDrillSets {
+  /** Accounts at or above ACTION_THRESHOLD — behind the "Needs action now" tile. */
+  needsAction: TriageRow[];
+  /** Accounts whose history ends worse than it started — behind "Declining". */
+  declining: TriageRow[];
+  /** Accounts currently at Good — behind "Book at Good". */
+  atGood: TriageRow[];
+}
+
+/**
+ * The three account sets behind Triage's headline figures.
+ *
+ * `summarise`'s counts and the Triage tiles' drills both read this — one
+ * predicate per figure, defined once, so a tile's number and the accounts a
+ * click on it opens can never quietly diverge (they used to be two separate
+ * `scored.filter(...)` calls, one in this file and one in `TriageTiles.tsx`).
+ */
+export function triageDrillSets(scored: TriageRow[]): TriageDrillSets {
+  return {
+    needsAction: scored.filter((t) => t.score >= ACTION_THRESHOLD),
+    declining: scored.filter((t) => t.direction === 'declining'),
+    atGood: scored.filter((t) => t.row.healthStatus === 'Good'),
+  };
+}
+
 export function summarise(scored: TriageRow[]): TriageSummary {
   const withTwoMonths = scored.filter((t) => t.trail.length >= 2);
+  const { needsAction, declining, atGood } = triageDrillSets(scored);
 
   return {
     total: scored.length,
     atGoodPreviousMonth: withTwoMonths.length
       ? withTwoMonths.filter((t) => t.trail[t.trail.length - 2] === 'Good').length
       : null,
-    needsAction: scored.filter((t) => t.score >= ACTION_THRESHOLD).length,
-    needsActionRenewingSoon: scored.filter(
-      (t) =>
-        t.score >= ACTION_THRESHOLD &&
-        t.daysToRenewal !== null &&
-        t.daysToRenewal <= RENEWAL_URGENT_DAYS,
+    needsAction: needsAction.length,
+    needsActionRenewingSoon: needsAction.filter(
+      (t) => t.daysToRenewal !== null && t.daysToRenewal <= RENEWAL_URGENT_DAYS,
     ).length,
-    declining: scored.filter((t) => t.direction === 'declining').length,
+    declining: declining.length,
     blindSpots: scored.filter((t) => t.pulseGap !== null && t.pulseGap >= 2).length,
-    atGood: scored.filter((t) => t.row.healthStatus === 'Good').length,
+    atGood: atGood.length,
   };
 }

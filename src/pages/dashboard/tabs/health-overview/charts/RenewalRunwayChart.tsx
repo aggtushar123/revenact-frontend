@@ -112,6 +112,7 @@ export function RenewalRunwayChart({ buckets }: RenewalRunwayChartProps) {
                 dataKey={status}
                 stackId="renewal"
                 fill={STATUS_COLORS[status]}
+                cursor="pointer"
                 onClick={(_, index) => openSegment(buckets[index], status)}
               >
                 <LabelList content={makeStackedTotalLabel(status, data, 11)} />
