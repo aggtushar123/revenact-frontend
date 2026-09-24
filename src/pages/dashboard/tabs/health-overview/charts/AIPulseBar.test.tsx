@@ -33,4 +33,10 @@ describe('AIPulseBar drill', () => {
     renderWithDrill(<AIPulseBar data={data} />);
     expect(screen.queryByRole('button', { name: /AI Pulse 1/ })).not.toBeInTheDocument();
   });
+
+  it('offers no target at all when drillable is false (a truncated book)', () => {
+    const data = [healthRow({ id: '1', aiPulseScore: 2, healthStatus: 'Good' })];
+    renderWithDrill(<AIPulseBar data={data} drillable={false} />);
+    expect(screen.queryAllByRole('button', { name: /show accounts/ })).toHaveLength(0);
+  });
 });

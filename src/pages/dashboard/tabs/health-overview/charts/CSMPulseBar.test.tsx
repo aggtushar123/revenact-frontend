@@ -33,4 +33,10 @@ describe('CSMPulseBar drill', () => {
     renderWithDrill(<CSMPulseBar data={data} />);
     expect(screen.queryByRole('button', { name: /CSM Pulse 5/ })).not.toBeInTheDocument();
   });
+
+  it('offers no target at all when drillable is false (a truncated book)', () => {
+    const data = [healthRow({ id: '1', csmPulseScore: 3, healthStatus: 'Average' })];
+    renderWithDrill(<CSMPulseBar data={data} drillable={false} />);
+    expect(screen.queryAllByRole('button', { name: /show accounts/ })).toHaveLength(0);
+  });
 });

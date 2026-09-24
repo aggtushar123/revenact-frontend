@@ -94,6 +94,11 @@ describe('AccountsByRenewalDateBar drill', () => {
     expect(within(dialog).queryByRole('link', { name: 'JulyPoor' })).not.toBeInTheDocument();
   });
 
+  it('offers no target at all when drillable is false (a truncated book)', () => {
+    renderWithDrill(<AccountsByRenewalDateBar data={[julyGood, julyPoor]} drillable={false} />);
+    expect(screen.queryAllByRole('button', { name: /show accounts/ })).toHaveLength(0);
+  });
+
   it('offers no target for an empty month-status segment', () => {
     renderWithDrill(<AccountsByRenewalDateBar data={[julyGood]} />);
     expect(screen.queryByRole('button', { name: /Jul 2026 · Poor/ })).not.toBeInTheDocument();
