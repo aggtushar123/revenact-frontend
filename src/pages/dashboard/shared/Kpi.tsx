@@ -14,20 +14,34 @@ export function Kpi({
   value,
   detail,
   tone = 'neutral',
+  onDrill,
 }: {
   label: string;
   value: string;
   detail?: string;
   tone?: keyof typeof FIGURE_TONE;
+  onDrill?: (trigger: HTMLElement) => void;
 }) {
-  return (
-    <div className="min-w-0">
+  const body = (
+    <>
       <div className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{label}</div>
       <div className={`font-mono-brand tabular-nums text-[22px] leading-tight mt-1 ${FIGURE_TONE[tone]}`}>
         {value}
       </div>
       {detail && <div className="text-[11px] text-ink-muted mt-0.5">{detail}</div>}
-    </div>
+    </>
+  );
+
+  if (!onDrill) return <div className="min-w-0">{body}</div>;
+  return (
+    <button
+      type="button"
+      onClick={(event) => onDrill(event.currentTarget)}
+      aria-label={`${label} ${value}, show accounts`}
+      className="min-w-0 w-full text-left rounded-lg -m-1 p-1 cursor-pointer hover:bg-subtle transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+    >
+      {body}
+    </button>
   );
 }
 

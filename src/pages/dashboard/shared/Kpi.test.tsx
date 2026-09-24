@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Kpi, KpiStrip } from './Kpi';
 
 describe('Kpi', () => {
@@ -57,6 +58,19 @@ describe('Kpi', () => {
     const list = container.querySelector('ul')!;
     expect(list.className).toContain('md:grid-cols-3');
     expect(list.className).not.toContain('md:grid-cols-4');
+  });
+
+  it('becomes a button with a full accessible name when drillable', async () => {
+    const onDrill = vi.fn();
+    render(<Kpi label="At risk" value="$114.5K" onDrill={onDrill} />);
+    const button = screen.getByRole('button', { name: 'At risk $114.5K, show accounts' });
+    await userEvent.click(button);
+    expect(onDrill).toHaveBeenCalledWith(button);
+  });
+
+  it('stays a plain figure without onDrill', () => {
+    render(<Kpi label="NRR" value="99.6%" />);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
 
