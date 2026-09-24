@@ -8,6 +8,7 @@ import {
   coverageBands,
   ownerLoad,
   quarterColumns,
+  renewalDrillSets,
   renewalQueue,
   renewalRows,
   summarise,
@@ -16,6 +17,8 @@ import { RenewalQuarterChart } from './charts/RenewalQuarterChart';
 import { RenewalCoverageChart } from './charts/RenewalCoverageChart';
 import { OwnerLoadChart } from './charts/OwnerLoadChart';
 import { RenewalQueueTable } from './charts/RenewalQueueTable';
+import { useDrill } from '../../drill/useDrill';
+import { fromHealthRows } from '../../drill/rows';
 
 /** The window the owner-load chart covers — two quarters, which is as far
  *  ahead as a staffing decision is worth making. */
@@ -42,6 +45,7 @@ export function RenewalView() {
   // Pinned at mount so the windows don't shift mid-session — the same reason
   // MovementView pins its own clock.
   const [now] = useState(() => new Date());
+  const { open } = useDrill();
   const { rows, error, truncated, isInitialLoad, hasLoaded, currency, unconvertedCount } =
     useHealthOverview();
 
@@ -51,6 +55,13 @@ export function RenewalView() {
   const bands = useMemo(() => coverageBands(scored), [scored]);
   const load = useMemo(() => ownerLoad(scored, OWNER_HORIZON_DAYS), [scored]);
   const queue = useMemo(() => renewalQueue(scored), [scored]);
+
+  // Same four predicates `summarise` counted, kept as row lists so each tile
+  // can open exactly the accounts it counted — never re-filtered here.
+  const { upForRenewal, forecastAtRisk, noRecentContact, pastDue } = useMemo(
+    () => renewalDrillSets(scored),
+    [scored],
+  );
 
   if (isInitialLoad) return <HealthLoading />;
   if (error) return <HealthError message={error} />;
@@ -91,18 +102,55 @@ export function RenewalView() {
           detail={`${summary.count} ${summary.count === 1 ? 'account' : 'accounts'}${
             summary.unpriced > 0 ? ` · ${summary.unpriced} unpriced` : ''
           }`}
+          onDrill={(trigger) =>
+            open(
+              {
+                title: 'Up for renewal',
+                figure: money(summary.arr),
+                source: { kind: 'rows', rows: fromHealthRows(upForRenewal.map((r) => r.row)) },
+              },
+              trigger,
+            )
+          }
         />
         <Kpi
           label="Forecast at risk"
           value={money(summary.exposure)}
           detail={`${atRiskShare}% of the window, weighted by risk`}
           tone={atRiskShare >= 20 ? 'loss' : 'neutral'}
+          onDrill={(trigger) => {
+            const riskById = new Map(forecastAtRisk.map((r) => [r.row.id, r.risk]));
+            open(
+              {
+                title: 'Forecast at risk',
+                figure: money(summary.exposure),
+                source: {
+                  kind: 'rows',
+                  rows: fromHealthRows(
+                    forecastAtRisk.map((r) => r.row),
+                    (row) => `${Math.round((riskById.get(row.id) ?? 0) * 100)}% risk`,
+                  ),
+                },
+              },
+              trigger,
+            );
+          }}
         />
         <Kpi
           label="No recent contact"
           value={money(summary.coldArr)}
           detail={`${summary.coldCount} renewing with nothing logged in 60 days`}
           tone={summary.coldCount > 0 ? 'loss' : 'neutral'}
+          onDrill={(trigger) =>
+            open(
+              {
+                title: 'No recent contact',
+                figure: money(summary.coldArr),
+                source: { kind: 'rows', rows: fromHealthRows(noRecentContact.map((r) => r.row)) },
+              },
+              trigger,
+            )
+          }
         />
         <Kpi
           label="Past due"
@@ -113,6 +161,23 @@ export function RenewalView() {
               : 'every renewal date is still ahead'
           }
           tone={summary.overdueCount > 0 ? 'loss' : 'neutral'}
+          onDrill={(trigger) => {
+            const daysById = new Map(pastDue.map((r) => [r.row.id, Math.abs(r.days)]));
+            open(
+              {
+                title: 'Past due',
+                figure: String(summary.overdueCount),
+                source: {
+                  kind: 'rows',
+                  rows: fromHealthRows(
+                    pastDue.map((r) => r.row),
+                    (row) => `${daysById.get(row.id)} days overdue`,
+                  ),
+                },
+              },
+              trigger,
+            );
+          }}
         />
       </KpiStrip>
 

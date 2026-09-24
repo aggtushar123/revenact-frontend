@@ -1,9 +1,13 @@
 import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
-import type { HealthDataRow } from '../mockData';
+import type { HealthDataRow, HealthStatus } from '../mockData';
 import { renewalMonths } from '../movement';
+import type { RenewalMonth } from '../movement';
 import { HEALTH_STACK, makeStackedTotalLabel } from './stackedTotalLabel';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { useDrill } from '../../../drill/useDrill';
+import { fromHealthRows } from '../../../drill/rows';
+import { DrillTargets } from '../../../drill/DrillTargets';
 
 const STATUS_COLORS = {
   Poor: 'var(--danger)',
@@ -24,9 +28,11 @@ const STATUS_COLORS = {
  * is what this chart is being fixed for.
  */
 export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
+  const { open } = useDrill();
+  const months = useMemo(() => renewalMonths(data), [data]);
   const chartData = useMemo(
     () =>
-      renewalMonths(data).map((m) => ({
+      months.map((m) => ({
         name: m.short,
         full: m.label,
         Good: m.counts.Good,
@@ -34,7 +40,7 @@ export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
         Poor: m.counts.Poor,
         total: m.total,
       })),
-    [data],
+    [months],
   );
 
   const busiest = useMemo(
@@ -43,6 +49,30 @@ export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
       null,
     ),
     [chartData],
+  );
+
+  const openSegment = (month: RenewalMonth, status: HealthStatus, trigger?: HTMLElement) => {
+    const picked = month.rows[status];
+    open(
+      {
+        title: `${month.label} · ${status}`,
+        figure: String(picked.length),
+        source: { kind: 'rows', rows: fromHealthRows(picked) },
+      },
+      trigger,
+    );
+  };
+
+  // One button per month × status that actually has an account in it — a
+  // keyboard user (and this chart's own test) can't reach a recharts <Bar>'s
+  // SVG segments, so this is the real drill target; the Bar's own onClick
+  // below is the pointer shortcut to the same thing.
+  const drillItems = months.flatMap((month) =>
+    HEALTH_STACK.filter((status) => month.rows[status].length > 0).map((status) => ({
+      name: `${month.label} · ${status}`,
+      figure: String(month.rows[status].length),
+      onSelect: (trigger: HTMLElement) => openSegment(month, status, trigger),
+    })),
   );
 
   return (
@@ -55,6 +85,8 @@ export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
           </span>
         )}
       </div>
+
+      <DrillTargets label="Accounts by Renewal Date" items={drillItems} />
 
       <div className="flex-1 w-full relative">
         {chartData.length === 0 ? (
@@ -96,6 +128,8 @@ export function AccountsByRenewalDateBar({ data }: { data: HealthDataRow[] }) {
                   stackId="renewal"
                   fill={STATUS_COLORS[status]}
                   barSize={24}
+                  cursor="pointer"
+                  onClick={(_, index) => openSegment(months[index], status)}
                 >
                   <LabelList content={makeStackedTotalLabel(status, chartData)} />
                 </Bar>

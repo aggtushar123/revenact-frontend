@@ -117,4 +117,14 @@ describe('DistributionView', () => {
     expect(screen.getByRole('button', { name: /organizations/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /accounts/i })).toBeInTheDocument();
   });
+
+  it('no longer draws the invented "Accounts by Last Touch" curve', async () => {
+    // That chart scaled a hardcoded twelve-month shape by the row count
+    // rather than reading `daysSinceTouch` at all — removed rather than
+    // fixed, since there was no real per-month touch date to draw it from.
+    vi.stubGlobal('fetch', fetchMock());
+    renderDistribution();
+
+    expect(screen.queryByText(/Accounts by Last Touch/i)).not.toBeInTheDocument();
+  });
 });

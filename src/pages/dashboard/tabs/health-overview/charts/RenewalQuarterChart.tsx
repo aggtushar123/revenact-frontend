@@ -5,6 +5,9 @@ import type { HealthStatus } from '../../../../../features/health/types';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import type { QuarterColumn } from '../renewal';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { useDrill } from '../../../drill/useDrill';
+import { fromHealthRows } from '../../../drill/rows';
+import { DrillTargets } from '../../../drill/DrillTargets';
 
 const STATUS_COLORS: Record<HealthStatus, string> = {
   Poor: 'var(--danger)',
@@ -29,6 +32,8 @@ export interface RenewalQuarterChartProps {
  * same, which is exactly what a chart of account counts does to them.
  */
 export function RenewalQuarterChart({ columns, currency }: RenewalQuarterChartProps) {
+  const { open } = useDrill();
+
   const data = useMemo(
     () =>
       columns.map((column) => ({
@@ -44,6 +49,30 @@ export function RenewalQuarterChart({ columns, currency }: RenewalQuarterChartPr
 
   const booked = columns.reduce((sum, c) => sum + c.total, 0);
   const atRisk = columns.reduce((sum, c) => sum + c.arr.Poor + c.arr.Average, 0);
+
+  const openSegment = (column: QuarterColumn, status: HealthStatus, trigger?: HTMLElement) => {
+    const picked = column.rows[status];
+    open(
+      {
+        title: `${column.label} · ${status}`,
+        figure: String(picked.length),
+        source: { kind: 'rows', rows: fromHealthRows(picked) },
+      },
+      trigger
+    );
+  };
+
+  // One button per quarter × status that actually has an account in it — a
+  // keyboard user (and this chart's own test) can't reach a recharts <Bar>'s
+  // SVG segments, so this is the real drill target; the Bar's own onClick
+  // below is the pointer shortcut to the same thing.
+  const drillItems = columns.flatMap((column) =>
+    STACK.filter((status) => column.rows[status].length > 0).map((status) => ({
+      name: `${column.label} · ${status}`,
+      figure: String(column.rows[status].length),
+      onSelect: (trigger: HTMLElement) => openSegment(column, status, trigger),
+    })),
+  );
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -63,6 +92,8 @@ export function RenewalQuarterChart({ columns, currency }: RenewalQuarterChartPr
           )}
         </div>
       </div>
+
+      <DrillTargets label="Renewal calendar" items={drillItems} />
 
       <div className="flex-1 w-full min-h-0 px-2 pb-2">
         <ResponsiveContainer width="100%" height="100%">
@@ -94,7 +125,15 @@ export function RenewalQuarterChart({ columns, currency }: RenewalQuarterChartPr
               formatter={(value, name) => [formatMoney(Number(value ?? 0), currency), String(name)]}
             />
             {STACK.map((status) => (
-              <Bar {...STATIC_SERIES} key={status} dataKey={status} stackId="arr" fill={STATUS_COLORS[status]} />
+              <Bar
+                {...STATIC_SERIES}
+                key={status}
+                dataKey={status}
+                stackId="arr"
+                fill={STATUS_COLORS[status]}
+                cursor="pointer"
+                onClick={(_, index) => openSegment(columns[index], status)}
+              />
             ))}
           </BarChart>
         </ResponsiveContainer>

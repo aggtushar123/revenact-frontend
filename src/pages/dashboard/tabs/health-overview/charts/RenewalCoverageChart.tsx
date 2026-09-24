@@ -2,9 +2,12 @@ import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
-import type { CoverageBand } from '../renewal';
+import type { Coverage, CoverageBand } from '../renewal';
 import { CONTACT_COLD_DAYS, CONTACT_FRESH_DAYS } from '../renewal';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { useDrill } from '../../../drill/useDrill';
+import { fromHealthRows } from '../../../drill/rows';
+import { DrillTargets } from '../../../drill/DrillTargets';
 
 /** Contact age, not health — green is "somebody is in this deal", red is
  *  "nobody has spoken to them". Deliberately the same three hues the health
@@ -36,22 +39,23 @@ export interface RenewalCoverageChartProps {
  * "what's in the next thirty days, and who's on it?"
  */
 export function RenewalCoverageChart({ bands, currency }: RenewalCoverageChartProps) {
+  const { open } = useDrill();
+
   // Recharts draws the first row at the bottom, so the nearest window would
   // end up furthest from the title. Reversed here, not in the domain module —
   // window order is a fact about the book, this is a fact about the chart.
+  const reversedBands = useMemo(() => [...bands].reverse(), [bands]);
   const data = useMemo(
     () =>
-      [...bands]
-        .reverse()
-        .map((band) => ({
-          name: band.label,
-          cold: band.cold,
-          ageing: band.ageing,
-          fresh: band.fresh,
-          unknown: band.unknown,
-          count: band.count,
-        })),
-    [bands]
+      reversedBands.map((band) => ({
+        name: band.label,
+        cold: band.cold,
+        ageing: band.ageing,
+        fresh: band.fresh,
+        unknown: band.unknown,
+        count: band.count,
+      })),
+    [reversedBands]
   );
 
   // The three windows inside 90 days — not 91–180, and **not overdue**: an
@@ -61,6 +65,31 @@ export function RenewalCoverageChart({ bands, currency }: RenewalCoverageChartPr
   const exposed = bands
     .filter((band) => NINETY_DAY_WINDOWS.includes(band.key))
     .reduce((sum, band) => sum + band.cold, 0);
+
+  const openSegment = (band: CoverageBand, series: Coverage, trigger?: HTMLElement) => {
+    const picked = band.rows[series];
+    const seriesLabel = COVERAGE_SERIES.find((s) => s.key === series)?.label ?? series;
+    open(
+      {
+        title: `${band.label} · ${seriesLabel}`,
+        figure: String(picked.length),
+        source: { kind: 'rows', rows: fromHealthRows(picked) },
+      },
+      trigger
+    );
+  };
+
+  // One button per window × contact-age series that actually has an account
+  // in it — a keyboard user (and this chart's own test) can't reach a
+  // recharts <Bar>'s SVG segments, so this is the real drill target; the
+  // Bar's own onClick below is the pointer shortcut to the same thing.
+  const drillItems = reversedBands.flatMap((band) =>
+    COVERAGE_SERIES.filter((series) => band.rows[series.key].length > 0).map((series) => ({
+      name: `${band.label} · ${series.label}`,
+      figure: String(band.rows[series.key].length),
+      onSelect: (trigger: HTMLElement) => openSegment(band, series.key, trigger),
+    })),
+  );
 
   return (
     <div className="w-full h-full flex flex-col">
@@ -77,6 +106,8 @@ export function RenewalCoverageChart({ bands, currency }: RenewalCoverageChartPr
           </p>
         )}
       </div>
+
+      <DrillTargets label="Coverage gap" items={drillItems} />
 
       <div className="flex-1 w-full min-h-0 px-2 pb-2">
         <ResponsiveContainer width="100%" height="100%">
@@ -115,7 +146,15 @@ export function RenewalCoverageChart({ bands, currency }: RenewalCoverageChartPr
               ]}
             />
             {COVERAGE_SERIES.map((series) => (
-              <Bar {...STATIC_SERIES} key={series.key} dataKey={series.key} stackId="arr" fill={series.color} />
+              <Bar
+                {...STATIC_SERIES}
+                key={series.key}
+                dataKey={series.key}
+                stackId="arr"
+                fill={series.color}
+                cursor="pointer"
+                onClick={(_, index) => openSegment(reversedBands[index], series.key)}
+              />
             ))}
           </BarChart>
         </ResponsiveContainer>

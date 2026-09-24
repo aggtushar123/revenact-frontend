@@ -337,6 +337,19 @@ describe('renewalMonths', () => {
     expect(months[0].counts).toEqual({ Good: 1, Average: 0, Poor: 2 });
   });
 
+  it('carries the exact accounts behind each month × health segment', () => {
+    const goodJuly = healthRow({ id: '1', account: 'GoodJuly', renewalDate: 'Jul 1, 2026', healthStatus: 'Good' });
+    const poorJuly = healthRow({ id: '2', account: 'PoorJuly', renewalDate: 'Jul 2, 2026', healthStatus: 'Poor' });
+    // Near miss: same health status, a different month.
+    const poorAugust = healthRow({ id: '3', account: 'PoorAugust', renewalDate: 'Aug 2, 2026', healthStatus: 'Poor' });
+
+    const months = renewalMonths([goodJuly, poorJuly, poorAugust], NOW);
+    const july = months.find((m) => m.label === 'Jul 2026')!;
+
+    expect(july.rows.Good.map((r) => r.account)).toEqual(['GoodJuly']);
+    expect(july.rows.Poor.map((r) => r.account)).toEqual(['PoorJuly']);
+  });
+
   it('spans a year boundary in order', () => {
     const months = renewalMonths([at('Nov 1, 2026'), at('Feb 1, 2027')], NOW);
     expect(months.map((m) => m.label)).toEqual([

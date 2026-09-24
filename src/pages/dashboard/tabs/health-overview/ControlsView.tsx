@@ -7,7 +7,6 @@ import { HealthByOwnerStackedBar } from './charts/HealthByOwnerStackedBar';
 import { CSMPulseBar } from './charts/CSMPulseBar';
 import { AIPulseBar } from './charts/AIPulseBar';
 import { AccountHealthDetailTable } from './charts/AccountHealthDetailTable';
-import { AccountsLastTouchLine } from './charts/AccountsLastTouchLine';
 import { AccountHealthByRecruiters } from './charts/AccountHealthByRecruiters';
 import { HealthChangeOverTimeStacked } from './charts/HealthChangeOverTimeStacked';
 import { AccountsByRenewalDateBar } from './charts/AccountsByRenewalDateBar';
@@ -65,12 +64,6 @@ export function ControlsView() {
               <HealthByOwnerStackedBar data={filteredData} />
             </div>
           </div>
-
-          {/* Bottom Row inside Left Column (Accounts by Last Touch) */}
-          <div className="bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden h-[280px]">
-            <AccountsLastTouchLine data={filteredData} />
-          </div>
-
         </div>
 
         {/* RIGHT COLUMN */}

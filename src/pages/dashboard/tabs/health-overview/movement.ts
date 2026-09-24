@@ -300,6 +300,9 @@ export interface RenewalMonth {
   short: string;
   counts: Record<HealthStatus, number>;
   total: number;
+  /** The exact accounts behind each of `counts` — what the renewal-date
+   *  chart's month × health segment drills into. */
+  rows: Record<HealthStatus, HealthDataRow[]>;
 }
 
 const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -314,6 +317,7 @@ const MONTH_ABBR = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep
  */
 export function renewalMonths(rows: HealthDataRow[], now: Date = new Date()): RenewalMonth[] {
   const found = new Map<string, Record<HealthStatus, number>>();
+  const foundRows = new Map<string, Record<HealthStatus, HealthDataRow[]>>();
   let earliest: Date | null = null;
   let latest: Date | null = null;
 
@@ -325,6 +329,10 @@ export function renewalMonths(rows: HealthDataRow[], now: Date = new Date()): Re
     const counts = found.get(key) ?? emptyCounts();
     counts[row.healthStatus] += 1;
     found.set(key, counts);
+
+    const monthRows = foundRows.get(key) ?? { Good: [], Average: [], Poor: [] };
+    monthRows[row.healthStatus].push(row);
+    foundRows.set(key, monthRows);
 
     if (!earliest || date < earliest) earliest = date;
     if (!latest || date > latest) latest = date;
@@ -345,6 +353,7 @@ export function renewalMonths(rows: HealthDataRow[], now: Date = new Date()): Re
       short: `${MONTH_ABBR[cursor.getMonth()]} '${String(cursor.getFullYear()).slice(-2)}`,
       counts,
       total: counts.Good + counts.Average + counts.Poor,
+      rows: foundRows.get(key) ?? { Good: [], Average: [], Poor: [] },
     });
     cursor.setMonth(cursor.getMonth() + 1);
   }
