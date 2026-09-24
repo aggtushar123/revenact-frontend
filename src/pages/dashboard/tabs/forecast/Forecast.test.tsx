@@ -11,6 +11,7 @@ import { ForecastContainer } from '../ForecastContainer';
 import { ControlsView } from './ControlsView';
 import { DrillProvider } from '../../drill/DrillContext';
 import { DrillPanel } from '../../drill/DrillPanel';
+import { mockFetchRouted, drillResponse } from '../../drill/testDrill';
 
 // Integration tier: container + view + charts through the real router, with
 // only the fetch boundary mocked. The bridge is Recharts and needs a sized
@@ -327,29 +328,6 @@ describe('Revenue Forecast', () => {
 });
 
 // ── drill (server) ──────────────────────────────────────────────────
-
-// The stats fetch and the drill fetch share one global `fetch` stub — this
-// routes by the `drill=` param so each can answer differently, the same way
-// a real backend would.
-function mockFetchRouted(main: unknown, drillBySegment: Record<string, unknown>) {
-  const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url: string) => {
-    const match = /drill=([^&]+)/.exec(url);
-    const body = match ? drillBySegment[decodeURIComponent(match[1])] : main;
-    return Promise.resolve({ ok: true, status: 200, json: async () => body });
-  });
-  vi.stubGlobal('fetch', spy);
-  return spy;
-}
-
-function drillResponse(
-  companies: { id: number; name: string; owner: string | null; arr: number | null; value: number | null }[],
-  valueLabel: string,
-) {
-  return {
-    drill: { segment: 'x', value_label: valueLabel, count: companies.length, truncated: false, companies },
-    currency: 'USD',
-  };
-}
 
 describe('Revenue Forecast drill', () => {
   beforeEach(() => {

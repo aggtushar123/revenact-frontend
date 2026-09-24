@@ -11,6 +11,7 @@ import { ActivityContainer } from '../ActivityContainer';
 import { ControlsView } from './ControlsView';
 import { DrillProvider } from '../../drill/DrillContext';
 import { DrillPanel } from '../../drill/DrillPanel';
+import { mockFetchRouted, drillResponse } from '../../drill/testDrill';
 
 // Integration tier: container + view + charts through the real router, with
 // only the fetch boundary mocked. The two Recharts charts need a sized
@@ -328,28 +329,6 @@ describe('Activity Tracking', () => {
 
 // ── drill (server) ──────────────────────────────────────────────────
 
-// The stats fetch and the drill fetch share one global `fetch` stub — this
-// routes by the `drill=` param so each can answer differently, the same way
-// a real backend would.
-function mockFetchRouted(main: unknown, drillBySegment: Record<string, unknown>) {
-  const spy = vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>((url: string) => {
-    const match = /drill=([^&]+)/.exec(url);
-    const body = match ? drillBySegment[decodeURIComponent(match[1])] : main;
-    return Promise.resolve({ ok: true, status: 200, json: async () => body });
-  });
-  vi.stubGlobal('fetch', spy);
-  return spy;
-}
-
-function drillResponse(
-  companies: { id: number; name: string; owner: string | null; arr: number | null; value: number | null }[],
-) {
-  return {
-    drill: { segment: 'gone_quiet', value_label: 'days since contact', count: companies.length, truncated: false, companies },
-    currency: 'USD',
-  };
-}
-
 describe('Activity Tracking drill', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -357,10 +336,13 @@ describe('Activity Tracking drill', () => {
 
   it('opens the gone-quiet drill against the server, carrying the window', async () => {
     const fetchMock = mockFetchRouted(stats, {
-      gone_quiet: drillResponse([
-        { id: 21, name: 'WeWork', owner: 'Unassigned', arr: 24_000, value: null },
-        { id: 14, name: 'Pizza Hut', owner: 'Carl CSM', arr: 69_600, value: 84 },
-      ]),
+      gone_quiet: drillResponse(
+        [
+          { id: 21, name: 'WeWork', owner: 'Unassigned', arr: 24_000, value: null },
+          { id: 14, name: 'Pizza Hut', owner: 'Carl CSM', arr: 69_600, value: 84 },
+        ],
+        'days since contact',
+      ),
     });
     const user = userEvent.setup();
     renderActivity();
@@ -378,7 +360,7 @@ describe('Activity Tracking drill', () => {
   });
 
   it('carries the current filters into the gone-quiet drill request', async () => {
-    const fetchMock = mockFetchRouted(stats, { gone_quiet: drillResponse([]) });
+    const fetchMock = mockFetchRouted(stats, { gone_quiet: drillResponse([], 'days since contact') });
     const user = userEvent.setup();
     renderActivity('/dashboard/health/activity?owner=5');
 
