@@ -9,10 +9,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Clock, MessageSquare, Plus, Search, X } from 'lucide-react';
 import { AskRevenactBox } from '../shared/AskRevenactBox';
-import { fetchConversation, fetchConversations, sendMessage } from '../../pages/copilot/copilotApi';
+import { fetchConversation, fetchConversations } from '../../pages/copilot/copilotApi';
+import { MessageSources } from '../../pages/copilot/MessageSources';
 import type { Conversation, ConversationSummary, CopilotMessage } from '../../pages/copilot/types';
-import { ApiError } from '../../lib/apiClient';
 import type { RailContext } from './railContext';
+import { useCopilotThread, type CopilotThread, type Turn } from './useCopilotThread';
 
 export interface CopilotRailProps {
   context: RailContext | null;
@@ -29,6 +30,28 @@ export interface CopilotRailProps {
   /** Rendered above the conversation (Communications' Next event card, the
    *  Dashboard's rail header). */
   top?: ReactNode;
+  /** Drive the rail from outside (the dashboard sends "Why?" without the composer). */
+  thread?: CopilotThread;
+}
+
+function UserTurn({ text }: { text: string }) {
+  return (
+    <div className="self-end max-w-[92%] flex flex-col items-end gap-1">
+      <div className="bg-accent text-on-accent rounded-2xl rounded-br-md px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap">{text}</div>
+    </div>
+  );
+}
+
+/** Shaped like an answer, not a spinner; the words are for screen readers. */
+function Thinking() {
+  return (
+    <div role="status" className="self-start w-4/5 flex flex-col gap-1.5">
+      <span className="sr-only">Thinking…</span>
+      <span aria-hidden="true" className="h-3 w-full rounded bg-subtle animate-pulse" />
+      <span aria-hidden="true" className="h-3 w-4/5 rounded bg-subtle animate-pulse" />
+      <span aria-hidden="true" className="h-3 w-3/5 rounded bg-subtle animate-pulse" />
+    </div>
+  );
 }
 
 export function CopilotRail({
@@ -40,34 +63,27 @@ export function CopilotRail({
   variant = 'glass',
   className = 'w-[320px]',
   top,
+  thread: given,
 }: CopilotRailProps) {
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<string | null>(null);
+  const own = useCopilotThread(conversation, onConversation);
+  const thread = given ?? own;
+  const { pending, failed } = thread;
+  const inputRef = useRef<HTMLInputElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
-
   const messages: CopilotMessage[] = conversation?.messages ?? [];
+  const empty = messages.length === 0 && !pending && !failed;
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end' });
-  }, [messages.length, pending]);
+  }, [messages.length, pending, failed]);
 
   async function send(text: string) {
-    setError(null);
-    setSending(true);
-    setPending(text);
-    try {
-      const next =
-        context?.kind === 'dashboard'
-          ? await sendMessage({ conversationId: conversation?.id, content: text, context: context.context })
-          : await sendMessage({ conversationId: conversation?.id, content: (context ? `[About: ${context.label}] ` : '') + text });
-      onConversation(next);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'The Copilot did not answer. Try again.');
-    } finally {
-      setPending(null);
-      setSending(false);
-    }
+    const turn: Turn =
+      context?.kind === 'dashboard'
+        ? { text, content: text, context: context.context }
+        : { text, content: (context ? `[About: ${context.label}] ` : '') + text };
+    await thread.send(turn);
+    inputRef.current?.focus();
   }
 
   // A label context can be dropped; on the dashboard only a focus can, never the screen.
@@ -78,24 +94,45 @@ export function CopilotRail({
     <aside aria-label={label} className={`${className} shrink-0 flex flex-col h-full min-h-0 ${glass ? 'gap-3' : 'rounded-xl border border-line bg-surface'}`}>
       {top}
       <section className={`flex-1 min-h-0 flex flex-col overflow-hidden ${glass ? 'rv-card-glass' : ''}`} aria-label={`${label} conversation`}>
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-3">
-          {messages.length === 0 && !pending ? (
-            <p className="m-auto text-[12px] text-ink-faint text-center max-w-[22ch]">
+        <div role="log" aria-label={`${label} messages`} className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3 flex flex-col gap-3">
+          {empty ? (
+            <p className="m-auto text-[13px] text-ink-faint text-center max-w-[24ch]">
               Ask about what is in front of you. Answers use your accounts, mail and tickets.
             </p>
           ) : null}
-          {messages.map((m) => (
-            <div key={m.id} className={`max-w-[92%] text-[12.5px] leading-relaxed whitespace-pre-wrap ${m.role === 'user' ? 'self-end bg-accent text-on-accent rounded-2xl rounded-br-md px-3 py-2' : 'self-start text-ink'}`}>
-              {m.content}
-            </div>
-          ))}
+          {messages.map((m) =>
+            m.role === 'user' ? (
+              <UserTurn key={m.id} text={m.content} />
+            ) : (
+              <div key={m.id} className="self-start max-w-[92%] text-[13px] leading-relaxed text-ink">
+                <p className="whitespace-pre-wrap">{m.content}</p>
+                <MessageSources sources={m.sources} />
+              </div>
+            ),
+          )}
           {pending ? (
             <>
-              <div className="self-end max-w-[92%] bg-accent text-on-accent rounded-2xl rounded-br-md px-3 py-2 text-[12.5px] whitespace-pre-wrap">{pending}</div>
-              <div className="self-start text-[12px] text-ink-faint" aria-live="polite">Thinking…</div>
+              <UserTurn text={pending.text} />
+              <Thinking />
             </>
           ) : null}
-          {error ? <p role="alert" className="text-[12px] text-danger">{error}</p> : null}
+          {failed ? (
+            <>
+              <UserTurn text={failed.text} />
+              <div role="alert" className={`self-start flex flex-wrap items-center gap-2 text-[13px] ${failed.budget ? 'text-ink-muted' : 'text-danger'}`}>
+                <span>{failed.message}</span>
+                {failed.budget ? null : (
+                  <button
+                    type="button"
+                    onClick={thread.retry}
+                    className="min-h-9 px-3 rounded-lg border border-line bg-surface text-[13px] font-semibold text-ink hover:bg-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
+            </>
+          ) : null}
           <div ref={endRef} />
         </div>
         <div className="p-2 pt-0">
@@ -117,7 +154,7 @@ export function CopilotRail({
               </span>
             </div>
           ) : null}
-          <AskRevenactBox onSend={(text) => send(text)} disabled={sending} />
+          <AskRevenactBox inputRef={inputRef} onSend={(text) => void send(text)} disabled={Boolean(pending)} />
         </div>
       </section>
     </aside>
