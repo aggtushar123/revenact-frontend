@@ -71,6 +71,7 @@ describe('fetchDrill', () => {
       rows: [{ id: '42', name: 'Uber', owner: 'Carl CSM', arr: 12000, detail: '2 tickets' }],
       count: 1,
       truncated: false,
+      valueLabel: 'tickets',
     });
   });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { Provider } from 'react-redux';
@@ -297,6 +297,53 @@ describe('DrillPanel server source', () => {
       '/organizations/9',
     );
     expect(screen.getByText('4 tickets')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['tickets', 'Companies with at least one matching ticket. Tickets not linked to a company aren\'t listed, and a ticket on a shared account counts for each of its companies.'],
+    ['interactions', 'Companies with at least one matching interaction. Interactions not linked to a company aren\'t listed, and an interaction on a shared account counts for each of its companies.'],
+  ])('explains how %s reconcile to the company rows', async (label, note) => {
+    stubFetch(() =>
+      jsonResponse(200, {
+        drill: {
+          segment: 'priority:high',
+          value_label: label,
+          count: 1,
+          truncated: false,
+          companies: [{ id: 9, name: 'Wayne Enterprises', owner: null, arr: 50000, value: 4 }],
+        },
+        currency: 'USD',
+      }),
+    );
+
+    renderServerPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Open tickets' }));
+
+    const dialog = await screen.findByRole('dialog');
+    const line = await within(dialog).findByText(note);
+    expect(line.className).toContain('text-[11px]');
+    expect(line.className).toContain('text-ink-muted');
+  });
+
+  it('adds no reconciliation note for a money drill', async () => {
+    stubFetch(() =>
+      jsonResponse(200, {
+        drill: {
+          segment: 'at_risk',
+          value_label: 'downside',
+          count: 1,
+          truncated: false,
+          companies: [{ id: 9, name: 'Wayne Enterprises', owner: null, arr: 50000, value: 4 }],
+        },
+        currency: 'USD',
+      }),
+    );
+
+    renderServerPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Open tickets' }));
+
+    expect(await screen.findByRole('link', { name: 'Wayne Enterprises' })).toBeInTheDocument();
+    expect(screen.queryByText(/Companies with at least one matching/)).not.toBeInTheDocument();
   });
 
   it('shows an error message when the fetch fails', async () => {

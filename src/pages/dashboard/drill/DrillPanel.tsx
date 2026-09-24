@@ -158,12 +158,23 @@ function RowList({ rows, total }: { rows: DrillRow[]; total?: number }) {
   );
 }
 
+// A ticket/interaction count is not a company count: the list is the
+// companies with at least one match, unlinked records have no company to
+// list, and a record on a shared account lists under each of its companies.
+// Said once under the header so the rows don't look like they fail to add up.
+const RECONCILE_NOTE: Record<string, string> = {
+  tickets:
+    "Companies with at least one matching ticket. Tickets not linked to a company aren't listed, and a ticket on a shared account counts for each of its companies.",
+  interactions:
+    "Companies with at least one matching interaction. Interactions not linked to a company aren't listed, and an interaction on a shared account counts for each of its companies.",
+};
+
 function ServerRows({ path, query, segment }: { path: string; query: string; segment: string }) {
   const currency = useOrgCurrency();
   const [state, setState] = useState<
     | { status: 'loading' }
     | { status: 'error' }
-    | { status: 'done'; rows: DrillRow[]; count: number; truncated: boolean }
+    | { status: 'done'; rows: DrillRow[]; count: number; truncated: boolean; valueLabel: string }
   >({ status: 'loading' });
 
   useEffect(() => {
@@ -188,8 +199,10 @@ function ServerRows({ path, query, segment }: { path: string; query: string; seg
       />
     );
   }
+  const note = RECONCILE_NOTE[state.valueLabel];
   return (
     <>
+      {note && <p className="mx-4 mt-3 text-[11px] text-ink-muted">{note}</p>}
       {state.truncated && (
         <p className="mx-4 mt-3 text-[11px] text-ink-muted">
           Showing <span className="font-mono-brand tabular-nums">{state.rows.length}</span> of{' '}

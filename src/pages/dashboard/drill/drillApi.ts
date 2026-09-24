@@ -52,7 +52,7 @@ export async function fetchDrill(
   query: string,
   segment: string,
   currency: CurrencyCode,
-): Promise<{ rows: DrillRow[]; count: number; truncated: boolean }> {
+): Promise<{ rows: DrillRow[]; count: number; truncated: boolean; valueLabel: string }> {
   const response = await apiFetch<DrillResponse>(
     `${path}?${query}${query ? '&' : ''}drill=${encodeURIComponent(segment)}`,
   );
@@ -68,5 +68,6 @@ export async function fetchDrill(
     })),
     count: drill.count,
     truncated: drill.truncated,
+    valueLabel: drill.value_label,
   };
 }
