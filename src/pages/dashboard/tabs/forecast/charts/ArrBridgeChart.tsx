@@ -5,12 +5,25 @@ import type { ForecastBridge } from '../../../../../features/forecast/forecastSl
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { useDrill } from '../../../drill/useDrill';
+import { DrillTargets } from '../../../drill/DrillTargets';
 
 export interface ArrBridgeChartProps {
   bridge: ForecastBridge;
   currency: CurrencyCode;
   horizonDays: number;
+  /** The view's own filter query string, forwarded to the server drill so
+   *  the accounts behind a bar respect the same book the bar was drawn from. */
+  query: string;
 }
+
+/** Which server segment a bar drills into — Opening and Forecast are totals,
+ *  not segments, so they carry none. */
+const SEGMENT: Record<string, string> = {
+  Churn: 'churn',
+  Contraction: 'contraction',
+  Expansion: 'expansion',
+};
 
 /**
  * Opening ARR to forecast ARR, one bar per thing that moves it.
@@ -25,7 +38,9 @@ export interface ArrBridgeChartProps {
  * own. The alternative, a library for one chart, is a dependency to carry
  * forever.
  */
-export function ArrBridgeChart({ bridge, currency, horizonDays }: ArrBridgeChartProps) {
+export function ArrBridgeChart({ bridge, currency, horizonDays, query }: ArrBridgeChartProps) {
+  const { open } = useDrill();
+
   const data = useMemo(() => {
     const afterChurn = bridge.opening_arr - bridge.churn;
     const afterContraction = afterChurn - bridge.contraction;
@@ -64,6 +79,31 @@ export function ArrBridgeChart({ bridge, currency, horizonDays }: ArrBridgeChart
   const colour = { total: ROLE.ink, down: ROLE.loss, up: ROLE.gain };
   const max = Math.max(bridge.opening_arr, bridge.forecast_arr, 1) * 1.15;
 
+  const openSegment = (row: (typeof data)[number], trigger?: HTMLElement) => {
+    const segment = SEGMENT[row.name];
+    if (!segment) return;
+    open(
+      {
+        title: row.name,
+        figure: formatCompactMoney(row.value, currency),
+        source: { kind: 'server', path: '/customers/forecast/', query, segment },
+      },
+      trigger,
+    );
+  };
+
+  // One keyboard target per drillable bar — a keyboard user can't reach a
+  // recharts <Bar>'s SVG cells, so this is the real drill target; the Cell's
+  // own onClick below is the pointer shortcut to the same thing. Opening and
+  // Forecast are totals, not segments the server can drill into.
+  const drillItems = data
+    .filter((row) => SEGMENT[row.name])
+    .map((row) => ({
+      name: row.name,
+      figure: formatCompactMoney(row.value, currency),
+      onSelect: (trigger: HTMLElement) => openSegment(row, trigger),
+    }));
+
   return (
     <div className="w-full h-full flex flex-col">
       <div className="flex items-start justify-between gap-3 px-4 pt-3">
@@ -86,6 +126,10 @@ export function ArrBridgeChart({ bridge, currency, horizonDays }: ArrBridgeChart
             {bridge.nrr === null ? 'NRR —' : `${bridge.nrr}% net revenue retention`}
           </p>
         </div>
+      </div>
+
+      <div className="px-4">
+        <DrillTargets label="ARR bridge" items={drillItems} />
       </div>
 
       <div className="flex-1 w-full min-h-0 px-2 pb-3">
@@ -125,6 +169,13 @@ export function ArrBridgeChart({ bridge, currency, horizonDays }: ArrBridgeChart
               {data.map((row) =>
                 row.name === 'Forecast' ? (
                   <Cell key={row.name} fill="transparent" stroke={ROLE.ink} strokeWidth={2} />
+                ) : SEGMENT[row.name] ? (
+                  <Cell
+                    key={row.name}
+                    fill={colour[row.kind]}
+                    cursor="pointer"
+                    onClick={() => openSegment(row)}
+                  />
                 ) : (
                   <Cell key={row.name} fill={colour[row.kind]} />
                 )
