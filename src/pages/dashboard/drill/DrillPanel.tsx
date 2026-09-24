@@ -4,7 +4,7 @@ import { X } from 'lucide-react';
 import { useOrgCurrency } from '../../../hooks';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 import { useDrill } from './useDrill';
-import { fetchDrill } from './drillApi';
+import { fetchDrill, UnlistableDrillError } from './drillApi';
 import { Loading, ErrorState } from '../shared/DataState';
 import type { DrillRow } from './types';
 
@@ -189,7 +189,7 @@ function ServerRows({ path, query, segment }: { path: string; query: string; seg
   const currency = useOrgCurrency();
   const [state, setState] = useState<
     | { status: 'loading' }
-    | { status: 'error' }
+    | { status: 'error'; unlistable: boolean }
     | { status: 'done'; rows: DrillRow[]; count: number; truncated: boolean; valueLabel: string }
   >({ status: 'loading' });
 
@@ -197,7 +197,9 @@ function ServerRows({ path, query, segment }: { path: string; query: string; seg
     let live = true;
     fetchDrill(path, query, segment, currency)
       .then((result) => live && setState({ status: 'done', ...result }))
-      .catch(() => live && setState({ status: 'error' }));
+      .catch((error: unknown) =>
+        live && setState({ status: 'error', unlistable: error instanceof UnlistableDrillError }),
+      );
     return () => {
       live = false;
     };
@@ -208,6 +210,14 @@ function ServerRows({ path, query, segment }: { path: string; query: string; seg
 
   if (state.status === 'loading') return <Loading label="Loading the accounts behind this number…" />;
   if (state.status === 'error') {
+    if (state.unlistable) {
+      return (
+        <ErrorState
+          message="This number can't be listed."
+          detail="Open the area's full view to see what's behind it."
+        />
+      );
+    }
     return (
       <ErrorState
         message="Could not load the accounts behind this number."

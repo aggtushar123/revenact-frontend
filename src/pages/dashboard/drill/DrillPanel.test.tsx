@@ -417,6 +417,16 @@ describe('DrillPanel server source', () => {
     expect(screen.queryByText(/Companies with at least one matching/)).not.toBeInTheDocument();
   });
 
+  it('says the number cannot be listed when the backend sent no drill', async () => {
+    stubFetch(() => jsonResponse(200, { kpis: { total: 42 }, currency: 'USD' }));
+
+    renderServerPanel();
+    await userEvent.click(screen.getByRole('button', { name: 'Open tickets' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent("This number can't be listed.");
+    expect(screen.queryByText('Could not load the accounts behind this number.')).not.toBeInTheDocument();
+  });
+
   it('shows an error message when the fetch fails', async () => {
     stubFetch(() => jsonResponse(500, { detail: 'boom' }));
 

@@ -18,8 +18,18 @@ interface DrillCompany {
   value: number | null;
 }
 
+/** The backend answered with the view's own stats and no `drill` key: it
+ *  didn't recognise the segment (it ignores an unknown one rather than
+ *  erroring), so there is no list behind this number to show. */
+export class UnlistableDrillError extends Error {
+  constructor(segment: string) {
+    super(`The server has no drill for segment "${segment}".`);
+    this.name = 'UnlistableDrillError';
+  }
+}
+
 interface DrillResponse {
-  drill: {
+  drill?: {
     segment: string;
     value_label: string;
     count: number;
@@ -57,6 +67,7 @@ export async function fetchDrill(
     `${path}?${query}${query ? '&' : ''}drill=${encodeURIComponent(segment)}`,
   );
   const { drill } = response;
+  if (!drill) throw new UnlistableDrillError(segment);
 
   return {
     rows: drill.companies.map((company) => ({

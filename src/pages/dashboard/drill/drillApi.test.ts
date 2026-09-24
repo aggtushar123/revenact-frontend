@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { fetchDrill, formatDetail } from './drillApi';
+import { fetchDrill, formatDetail, UnlistableDrillError } from './drillApi';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 
 // Same stubbing pattern as src/components/shared/CustomObjectsTab.test.tsx —
@@ -49,6 +49,14 @@ describe('fetchDrill', () => {
     await fetchDrill('/tickets/summary', '', 'all', 'USD');
 
     expect(requestedUrl).toContain('/tickets/summary?drill=all');
+  });
+
+  it('throws UnlistableDrillError when the backend ignored the segment and sent no drill', async () => {
+    stubFetch(() => jsonResponse(200, { kpis: { total: 3 }, currency: 'USD' }));
+
+    await expect(fetchDrill('/tickets/stats/', '', 'nonsense', 'USD')).rejects.toBeInstanceOf(
+      UnlistableDrillError,
+    );
   });
 
   it('maps companies to DrillRows, stringifying ids and formatting the detail line', async () => {
