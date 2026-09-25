@@ -12,6 +12,9 @@ interface ChurnOrganizationModalProps {
   customerIds: number[];
   customerNames: string[];
   onClose: () => void;
+  /** Called once the churn has saved, before `onClose`. Cancelling or
+   * dismissing never calls it. */
+  onChurned?: () => void;
 }
 
 function today(): string {
@@ -21,7 +24,7 @@ function today(): string {
 /** Sets lifecycle_stage='churn' plus the churn_date/reason/comment fields
  * together — a deliberately separate action from the general Edit form,
  * since "Churn" isn't one of that form's own lifecycle dropdown options. */
-export function ChurnOrganizationModal({ customerIds, customerNames, onClose }: ChurnOrganizationModalProps) {
+export function ChurnOrganizationModal({ customerIds, customerNames, onClose, onChurned }: ChurnOrganizationModalProps) {
   const dispatch = useAppDispatch();
   const [churnDate, setChurnDate] = useState(today());
   const [churnReason, setChurnReason] = useState<ChurnReason | ''>('');
@@ -53,6 +56,7 @@ export function ChurnOrganizationModal({ customerIds, customerNames, onClose }: 
           ).unwrap()
         )
       );
+      onChurned?.();
       onClose();
     } catch (err) {
       const noun = customerIds.length === 1 ? 'this organization' : 'these organizations';

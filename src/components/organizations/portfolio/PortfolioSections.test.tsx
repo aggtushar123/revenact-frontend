@@ -139,6 +139,7 @@ describe('PortfolioSections', () => {
       loadMore: async () => {},
       retry: vi.fn(),
       loadedKey: 'stale',
+      loadedQuery: 'include_churned=1',
       total: null,
     };
     render(

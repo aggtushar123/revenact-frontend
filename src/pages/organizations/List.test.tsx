@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { renderList } from './testList';
 import { resetViewport } from '../../test/viewport';
 import {
+  ALL_ROWS,
   buildPortfolio,
   bulkBodies,
   customerFixture,
@@ -14,12 +15,35 @@ import {
 // Integration tier: the real page, store and router; fetch stubbed with
 // §2-shaped bodies (features/organizations/testPortfolio.ts).
 const where = () => new URL(`http://x${screen.getByTestId('where').textContent}`);
+const { createObjectURL, revokeObjectURL } = URL;
+
+/** Wraps the stub so matching requests wait until `release()`, once `start()`ed. */
+function holdFetch(spy: ReturnType<typeof stubPortfolio>, when: (url: URL) => boolean) {
+  const waiting: (() => void)[] = [];
+  let on = false;
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (on && when(new URL(String(input)))) await new Promise<void>((resolve) => waiting.push(resolve));
+    return spy(input, init);
+  });
+  return {
+    start: () => {
+      on = true;
+    },
+    release: () => {
+      on = false;
+      waiting.splice(0).forEach((resolve) => resolve());
+    },
+  };
+}
+const isPortfolio = (url: URL) => url.pathname.endsWith('/organizations/portfolio/');
 
 describe('Organizations list (portfolio)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     resetViewport();
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
   });
 
   it('loads tiles, health sections and rows from the portfolio endpoint', async () => {
@@ -137,24 +161,45 @@ describe('Organizations list (portfolio)', () => {
 
   it('disables selection and bulk actions while the list reloads', async () => {
     const spy = stubPortfolio();
-    const waiting: (() => void)[] = [];
-    let held = false;
-    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-      if (held && String(input).includes('/organizations/portfolio/?')) {
-        await new Promise<void>((resolve) => waiting.push(resolve));
-      }
-      return spy(input, init);
-    });
+    const gate = holdFetch(spy, isPortfolio);
     renderList();
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
-    held = true;
+    gate.start();
     await userEvent.click(screen.getByRole('button', { name: 'Good 1' }));
     const bar = screen.getByRole('region', { name: 'Selection' });
     expect(within(bar).getByRole('combobox', { name: 'Change owner' })).toBeDisabled();
     expect(within(bar).getByRole('button', { name: /Export/ })).toBeDisabled();
-    held = false;
-    waiting.forEach((resolve) => resolve());
+    expect(bar).not.toHaveTextContent('Applying…');
+    gate.release();
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument());
+  });
+
+  it('grouped, keeps checkboxes disabled until the frame lands, even once a section has', async () => {
+    const spy = stubPortfolio();
+    const gate = holdFetch(spy, (url) => isPortfolio(url) && url.searchParams.has('group') && !url.searchParams.has('group_value'));
+    renderList();
+    await screen.findByRole('checkbox', { name: 'Select Pizza Hut' });
+    gate.start();
+    await userEvent.click(screen.getByRole('button', { name: 'Average 1' }));
+    await waitFor(() =>
+      expect(portfolioQueries(spy).some((q) => q.get('health') === 'average' && q.get('group_value') === 'average')).toBe(true),
+    );
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Pizza Hut' }).closest('ul')).toHaveAttribute('aria-busy', 'false'));
+    expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).toBeDisabled();
+    gate.release();
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).not.toBeDisabled());
+  });
+
+  it('keeps the open sheet in step with reloaded rows', async () => {
+    let rows = ALL_ROWS;
+    stubPortfolio({ portfolio: (q) => buildPortfolio(q, rows), customer: customerFixture });
+    renderList('/organizations/list', { width: 375 });
+    await userEvent.click(await screen.findByRole('button', { name: 'Open Pizza Hut' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Pizza Hut' })).getByRole('button', { name: 'Edit details' }));
+    await screen.findByRole('heading', { name: 'Edit Pizza Hut' });
+    rows = ALL_ROWS.map((row) => (row.id === 7 ? { ...row, name: 'Pizza Hut Ltd' } : row));
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('dialog', { name: 'Pizza Hut Ltd' })).toBeInTheDocument();
   });
 
   describe('bulk actions', () => {
@@ -192,6 +237,59 @@ describe('Organizations list (portfolio)', () => {
       await waitFor(() => expect(bulkBodies(spy)).toEqual([{ ids: [7], action: 'archive', value: null }]));
       expect(await screen.findByText(/You can't archive this organization\./)).toBeInTheDocument();
       expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('Pizza Hut: You can\'t archive this organization.');
+    });
+
+    it('does not reselect failures when the filters changed while the action ran', async () => {
+      const spy = stubPortfolio({ bulk: (body) => ({ updated: [], failed: body.ids.map((id) => ({ id, reason: 'Not found.' })) }) });
+      const gate = holdFetch(spy, (url) => url.pathname.endsWith('/organizations/bulk/'));
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      gate.start();
+      await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Change owner' }), 'unassigned');
+      await userEvent.click(screen.getByRole('button', { name: 'Good 1' }));
+      await waitFor(() => expect(screen.queryByRole('link', { name: 'Pizza Hut' })).not.toBeInTheDocument());
+      await screen.findByRole('link', { name: 'Globex' });
+      gate.release();
+      const bar = await screen.findByRole('region', { name: 'Selection' });
+      expect(await within(bar).findByText(/1 failed/)).toBeInTheDocument();
+      expect(bar).not.toHaveTextContent('selected');
+    });
+
+    it('guards Export (selected) against a double click', async () => {
+      const spy = stubPortfolio();
+      URL.createObjectURL = vi.fn(() => 'blob:x');
+      URL.revokeObjectURL = vi.fn();
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      const gate = holdFetch(spy, (url) => url.pathname.endsWith('export.csv'));
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      gate.start();
+      const bar = screen.getByRole('region', { name: 'Selection' });
+      await userEvent.click(within(bar).getByRole('button', { name: 'Export' }));
+      expect(within(bar).getByRole('button', { name: 'Export' })).toBeDisabled();
+      expect(bar).toHaveTextContent('Applying…');
+      await userEvent.click(within(bar).getByRole('button', { name: 'Export' }));
+      gate.release();
+      await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+      expect(spy.mock.calls.filter(([input]) => String(input).includes('export.csv'))).toHaveLength(1);
+    });
+
+    it('keeps the selection when a churn is cancelled, and clears it once churned', async () => {
+      const spy = stubPortfolio({ customer: customerFixture });
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      const bar = screen.getByRole('region', { name: 'Selection' });
+      await userEvent.click(within(bar).getByRole('button', { name: 'Churn' }));
+      const before = portfolioQueries(spy).length;
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('heading', { name: 'Churn Pizza Hut?' })).not.toBeInTheDocument();
+      expect(bar).toHaveTextContent('1 selected');
+      expect(portfolioQueries(spy)).toHaveLength(before);
+
+      await userEvent.click(within(bar).getByRole('button', { name: 'Churn' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Confirm Churn' }));
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument());
+      await waitFor(() => expect(portfolioQueries(spy).length).toBeGreaterThan(before));
     });
 
     it('offers churn only for exactly one account, in the existing churn modal', async () => {

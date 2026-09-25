@@ -21,16 +21,18 @@ function mockFetch() {
 function renderModal(customerIds = [1], customerNames = ['WeWork']) {
   const store = configureStore({ reducer: { customers: customersReducer } });
   const onClose = vi.fn();
+  const onChurned = vi.fn();
   render(
     <Provider store={store}>
       <ChurnOrganizationModal
         customerIds={customerIds}
         customerNames={customerNames}
         onClose={onClose}
+        onChurned={onChurned}
       />
     </Provider>
   );
-  return { onClose };
+  return { onClose, onChurned };
 }
 
 const bodyOf = (spy: ReturnType<typeof mockFetch>, call = 0) =>
@@ -92,6 +94,18 @@ describe('ChurnOrganizationModal', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(bodyOf(fetchMock).churn_comment).toBe('Our exec sponsor moved to a competitor.');
+  });
+
+  it('calls onChurned only after a churn succeeds, not on Cancel', async () => {
+    mockFetch();
+    const user = userEvent.setup();
+    const { onClose, onChurned } = renderModal();
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onChurned).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Confirm Churn' }));
+    await waitFor(() => expect(onChurned).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledTimes(2);
   });
 
   it('churns several organizations with the same reason', async () => {

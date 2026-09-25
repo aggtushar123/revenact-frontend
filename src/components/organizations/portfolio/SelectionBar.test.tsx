@@ -4,12 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { SelectionBar, type BulkReport } from './SelectionBar';
 import { FILTER_OPTIONS } from '../../../features/organizations/testPortfolio';
 
-function renderBar(count: number, report: BulkReport | null = null, busy = false) {
+function renderBar(count: number, report: BulkReport | null = null, busy = false, loading = false) {
   const props = {
     count,
     owners: FILTER_OPTIONS.owners,
     lifecycles: FILTER_OPTIONS.lifecycles,
     busy,
+    loading,
     report,
     onSetOwner: vi.fn(),
     onSetLifecycle: vi.fn(),
@@ -82,5 +83,14 @@ describe('SelectionBar', () => {
     expect(screen.getByRole('button', { name: 'Archive' })).toBeDisabled();
     expect(screen.getByRole('combobox', { name: 'Change owner' })).toBeDisabled();
     expect(screen.getByText('Applying…')).toBeInTheDocument();
+  });
+
+  it('disables actions while the list loads, without claiming to apply anything', () => {
+    renderBar(1, null, false, true);
+    expect(screen.getByRole('button', { name: 'Archive' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Export' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Churn' })).toBeDisabled();
+    expect(screen.getByRole('combobox', { name: 'Set lifecycle' })).toBeDisabled();
+    expect(screen.queryByText('Applying…')).not.toBeInTheDocument();
   });
 });

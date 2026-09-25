@@ -118,6 +118,22 @@ describe('usePortfolio', () => {
     await waitFor(() => expect(portfolioQueries(spy)).toHaveLength(2));
   });
 
+  it('reports the loaded query, which a version bump does not change', async () => {
+    stubPortfolio();
+    const { result, rerender } = renderHook(({ search, version }) => usePortfolio(params(search), version), {
+      initialProps: { search: '', version: 0 },
+    });
+    expect(result.current.loadedQuery).toBeNull();
+    await waitFor(() => expect(result.current.loadedQuery).not.toBeNull());
+    const first = result.current.loadedQuery;
+    expect(first).toContain('group=health');
+    rerender({ search: '', version: 1 });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.loadedQuery).toBe(first);
+    rerender({ search: 'health=good', version: 1 });
+    await waitFor(() => expect(result.current.loadedQuery).toContain('health=good'));
+  });
+
   it('does not fetch while disabled', async () => {
     const spy = stubPortfolio();
     const { result } = renderHook(() => usePagedPortfolio('group=health&group_value=poor&limit=25', false, 0));

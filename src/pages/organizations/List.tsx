@@ -44,12 +44,17 @@ export function List() {
   // Names of every row loaded so far, for bulk results and the churn and
   // archive dialogs. Written in fetch callbacks, read in event handlers.
   const names = useRef(new Map<number, string>());
-  const rememberNames = useCallback((rows: PortfolioRow[]) => {
-    for (const row of rows) names.current.set(row.id, row.name);
-  }, []);
   const nameOf = useCallback((id: number) => names.current.get(id) ?? `Organization ${id}`, []);
+  const [openRow, setOpenRow] = useState<PortfolioRow | null>(null);
+  // Every page that lands (the flat list's, or any section's): remember the
+  // names, and swap the opened row for its fresh copy, so an open sheet or
+  // panel shows what a reload (after Edit details, say) brought back.
+  const onRowsLoaded = useCallback((rows: PortfolioRow[]) => {
+    for (const row of rows) names.current.set(row.id, row.name);
+    setOpenRow((current) => (current && rows.find((row) => row.id === current.id)) || current);
+  }, []);
 
-  const portfolio = usePortfolio(params, version, rememberNames);
+  const portfolio = usePortfolio(params, version, onRowsLoaded);
   const { pins, toggle: togglePin } = usePins();
   const selection = useSelection();
   const { prune, clear: clearSelection } = selection;
@@ -67,22 +72,32 @@ export function List() {
     if (!grouped) prune(rowsRef.current.map((row) => row.id));
   }, [grouped, portfolio.loadedKey, prune]);
   // Grouped, there is no one full row set to prune against, so a new frame
-  // clears the selection. Only a new query does: a reload of the same query
-  // (the version bump after a bulk action, or Try again) keeps it, so the
-  // ids a bulk action failed on stay selected for a retry.
-  const loadedQuery = portfolio.loadedKey?.split('#')[0] ?? null;
+  // clears the selection (and the last bulk report with it). Only a new
+  // query does: a reload of the same query (the version bump after a bulk
+  // action, or Try again) keeps it, so the ids a bulk action failed on stay
+  // selected for a retry. Adjusted during render, not in an effect.
+  const { loadedQuery } = portfolio;
+  const [seenQuery, setSeenQuery] = useState(loadedQuery);
+  const [report, setReport] = useState<BulkReport | null>(null);
+  if (seenQuery !== loadedQuery) {
+    setSeenQuery(loadedQuery);
+    if (grouped) {
+      clearSelection();
+      setReport(null);
+    }
+  }
+  // Read by runBulk after its await: the query that is loaded by then.
+  const loadedQueryRef = useRef(loadedQuery);
   useEffect(() => {
-    if (grouped) clearSelection();
-  }, [grouped, loadedQuery, clearSelection]);
+    loadedQueryRef.current = loadedQuery;
+  });
 
-  const [openRow, setOpenRow] = useState<PortfolioRow | null>(null);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [churning, setChurning] = useState<Targets | null>(null);
   const [archiving, setArchiving] = useState<Targets | null>(null);
   const [exporting, setExporting] = useState(false);
   const [actionRunning, setActionRunning] = useState(false);
-  const [report, setReport] = useState<BulkReport | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const currency = portfolio.data?.currency ?? orgCurrency;
@@ -114,6 +129,7 @@ export function List() {
 
   const runBulk = async (action: BulkAction, value: number | string | null) => {
     const ids = [...selection.selected];
+    const startQuery = loadedQueryRef.current;
     setActionRunning(true);
     setReport(null);
     try {
@@ -122,8 +138,10 @@ export function List() {
         updated: result.updated.length,
         failed: result.failed.map((failure) => ({ ...failure, name: nameOf(failure.id) })),
       });
-      // Failures stay selected, so they can be retried.
-      selection.replace(result.failed.map((failure) => failure.id));
+      // Failures stay selected, so they can be retried, unless a different
+      // list landed meanwhile (the filters changed while this ran): that
+      // cleared the selection, and these ids may no longer be listed.
+      if (loadedQueryRef.current === startQuery) selection.replace(result.failed.map((failure) => failure.id));
     } catch (err) {
       setReport({ updated: 0, failed: [], error: errorMessage(err, 'Could not update these organizations.') });
     } finally {
@@ -152,7 +170,7 @@ export function List() {
         pins={pins}
         selecting={selection.selecting}
         selected={selection.selected.has(row.id)}
-        selectDisabled={loading || actionRunning}
+        selectDisabled={loading || portfolio.loading || actionRunning}
         atLimit={selection.atLimit}
         open={open}
         onToggleSelect={selection.toggle}
@@ -203,7 +221,7 @@ export function List() {
           currency={currency}
           filtered={hasFilters(params)}
           renderRow={renderRow}
-          onRowsLoaded={rememberNames}
+          onRowsLoaded={onRowsLoaded}
           onClearFilters={clearFilters}
           onAdd={() => setAdding(true)}
         />
@@ -211,7 +229,8 @@ export function List() {
           count={selection.selected.size}
           owners={options?.owners ?? []}
           lifecycles={options?.lifecycles ?? []}
-          busy={actionRunning || portfolio.loading}
+          busy={actionRunning || exporting}
+          loading={portfolio.loading}
           report={report}
           onSetOwner={(id) => void runBulk('set_owner', id)}
           onSetLifecycle={(stage) => void runBulk('set_lifecycle', stage)}
@@ -251,11 +270,11 @@ export function List() {
         <ChurnOrganizationModal
           customerIds={churning.ids}
           customerNames={churning.names}
-          onClose={() => {
-            setChurning(null);
+          onChurned={() => {
             selection.clear();
             reload();
           }}
+          onClose={() => setChurning(null)}
         />
       ) : null}
       {archiving ? (

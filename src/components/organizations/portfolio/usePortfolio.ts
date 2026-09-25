@@ -12,7 +12,7 @@ export function errorMessage(err: unknown, fallback: string): string {
 }
 
 type Loaded =
-  | { key: string; data: PortfolioResponse; rows: PortfolioRow[]; next: string | null }
+  | { key: string; query: string; data: PortfolioResponse; rows: PortfolioRow[]; next: string | null }
   | { key: string; error: string };
 
 type MoreState = { key: string; token: number; loading: boolean; error: string | null };
@@ -34,6 +34,11 @@ export interface PagedState {
    *  fresh page one lands — so it is the right thing for a consumer to key
    *  a "new rows landed" effect on (e.g. pruning a stale selection). */
   loadedKey: string | null;
+  /** The query of the data currently shown (null before any page has
+   *  landed). Unlike `loadedKey` it ignores the version and retry counters,
+   *  so a reload of the same query leaves it unchanged: the signal for
+   *  "a different list landed" (grouped mode clears the selection on it). */
+  loadedQuery: string | null;
 }
 
 /** One cursor-paged read of the portfolio endpoint. The frame, each grouped
@@ -76,7 +81,7 @@ export function usePagedPortfolio(
     fetchPortfolio(query).then(
       (data) => {
         if (cancelled) return;
-        setLoaded({ key, data, rows: data.results, next: data.next_cursor });
+        setLoaded({ key, query, data, rows: data.results, next: data.next_cursor });
         onLoadedRef.current?.(data.results);
       },
       (err: unknown) => {
@@ -144,6 +149,7 @@ export function usePagedPortfolio(
     loadMore,
     retry,
     loadedKey: current?.key ?? null,
+    loadedQuery: current?.query ?? null,
   };
 }
 

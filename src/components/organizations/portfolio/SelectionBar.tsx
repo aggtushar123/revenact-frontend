@@ -20,6 +20,7 @@ export function SelectionBar({
   owners,
   lifecycles,
   busy,
+  loading = false,
   report,
   onSetOwner,
   onSetLifecycle,
@@ -31,7 +32,11 @@ export function SelectionBar({
   count: number;
   owners: Option[];
   lifecycles: Option[];
+  /** An action (bulk edit or export) is running: controls disable and the
+   *  bar says "Applying…". */
   busy: boolean;
+  /** The list is reloading: controls disable, with nothing claimed. */
+  loading?: boolean;
   report: BulkReport | null;
   onSetOwner: (userId: number | null) => void;
   onSetLifecycle: (stage: string) => void;
@@ -52,7 +57,7 @@ export function SelectionBar({
             <select
               aria-label="Change owner"
               value=""
-              disabled={busy}
+              disabled={busy || loading}
               onChange={(event) => {
                 const value = event.target.value;
                 if (value) onSetOwner(value === 'unassigned' ? null : Number(value));
@@ -69,7 +74,7 @@ export function SelectionBar({
             <select
               aria-label="Set lifecycle"
               value=""
-              disabled={busy}
+              disabled={busy || loading}
               onChange={(event) => {
                 if (event.target.value) onSetLifecycle(event.target.value);
               }}
@@ -84,16 +89,16 @@ export function SelectionBar({
                   </option>
                 ))}
             </select>
-            <button type="button" onClick={onExport} disabled={busy} className={CONTROL}>
+            <button type="button" onClick={onExport} disabled={busy || loading} className={CONTROL}>
               <Download className="w-4 h-4" aria-hidden="true" />
               Export
             </button>
-            <button type="button" onClick={onArchive} disabled={busy} className={CONTROL}>
+            <button type="button" onClick={onArchive} disabled={busy || loading} className={CONTROL}>
               <Archive className="w-4 h-4" aria-hidden="true" />
               Archive
             </button>
             {count === 1 ? (
-              <button type="button" onClick={onChurn} disabled={busy} className={`${CONTROL} text-danger`}>
+              <button type="button" onClick={onChurn} disabled={busy || loading} className={`${CONTROL} text-danger`}>
                 <UserX className="w-4 h-4" aria-hidden="true" />
                 Churn
               </button>
