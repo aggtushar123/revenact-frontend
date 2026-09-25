@@ -28,6 +28,14 @@ describe('SelectionBar', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('announces the selected count politely as it changes', () => {
+    const view = renderBar(2);
+    const count = screen.getByText(/selected/).closest('p');
+    expect(count).toHaveAttribute('aria-live', 'polite');
+    view.rerender(<SelectionBar {...view} count={3} />);
+    expect(count).toHaveTextContent('3 selected');
+  });
+
   it('changes owner (Unassigned sends null) and lifecycle (never churn)', async () => {
     const { onSetOwner, onSetLifecycle } = renderBar(2);
     expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('2 selected');

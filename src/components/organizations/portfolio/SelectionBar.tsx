@@ -46,7 +46,7 @@ export function SelectionBar({
       <div className="flex flex-wrap items-center gap-2">
         {count > 0 ? (
           <>
-            <p className="text-[13px] font-semibold text-ink">
+            <p role="status" aria-live="polite" className="text-[13px] font-semibold text-ink">
               <span className="font-mono-brand tabular-nums">{count}</span> selected
             </p>
             <select
