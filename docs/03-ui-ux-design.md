@@ -256,10 +256,14 @@ for the whole dashboard, not one per view.
   (`focus-within:not-sr-only`), so a sighted mouse user still sees only the
   chart.
 - **Shape.** `role="dialog"`, `aria-labelledby` the title. From `1024px`
-  (`lg`) it is a 360px panel laid over the Ask rail (`lg:absolute` in the
-  rail's own box, `lg:top-0 lg:right-4 lg:bottom-4`, `border border-line
-  rounded-xl shadow-md`), so the
-  figures never narrow; below `1024px` there is nowhere
+  (`lg`) it takes exactly the Ask rail's box, 320px wide (`border
+  border-line rounded-xl`). With the rail showing it lies over the rail
+  (`lg:absolute lg:top-0 lg:right-4 lg:bottom-4`, `shadow-md`) and covers it
+  exactly. With the rail hidden or collapsed it is a 320px flex item in the
+  rail's place (`lg:static lg:shrink-0`, `shadow-sm`), so the content
+  column narrows as if the rail were showing and widens again on close; it
+  never covers the figures. `data-placement` says which (`rail`, `column`,
+  `sheet`). Below `1024px` there is nowhere
   useful for focus to go beside it, so it becomes a full-screen sheet
   (`fixed inset-0`, `aria-modal="true"`) with its own Tab/Shift+Tab focus
   trap. Either shape slides in over 180ms `ease-out` (`.animate-slide-in-right`,
@@ -326,8 +330,9 @@ left for the phone sheet).
   - Below `xl`: hidden (not rendered) until the switch shows it.
   - Below `sm`: the switch opens a full-screen sheet with a single 44px
     Close (×) button at the top right.
-  - The drill panel (360px) lies over the 320px rail from `lg` and overhangs
-    it by 40px, which is accepted.
+  - From `lg` the drill panel takes the rail's box: over the rail when it
+    shows (covering it exactly, 320px), in its place when it is hidden or
+    collapsed, so the figures narrow rather than being covered.
 - **Chips.**
   - The composer's chip says what the next question is about ("Revenue ›
     Forecast · Owner: Priya · 2 accounts"). Its × removes only a focus, never
@@ -358,7 +363,7 @@ left for the phone sheet).
     only for a complete list of 200 accounts or fewer; above that it is
     disabled with an 11px note ("Ask about up to 200 accounts at a time.
     Narrow the filters to ask."). Clicking it closes the drill panel first —
-    the drill sits over the rail from `lg` — then opens the rail with an
+    the drill takes the rail's box from `lg` — then opens the rail with an
     editable, unsent draft.
   - Attention row: "Why?", a quiet button after Done, named "Ask why <title>
     is on my list". Unlike the drill's draft, it sends at once. It is
@@ -571,7 +576,8 @@ is `min-h-[100dvh]`, which matters on mobile browsers whose toolbars change the
 viewport height.
 
 The dashboard's Ask rail changes shape at `sm` (sheet below it) and `xl` (open
-by default from it); the drill panel lies over the rail from `lg`.
+by default from it); from `lg` the drill panel takes the rail's box (over the
+rail when it shows, in its place when it does not).
 
 ---
 

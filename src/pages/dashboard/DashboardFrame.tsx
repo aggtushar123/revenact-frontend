@@ -16,8 +16,11 @@ import { AskRail } from './ask/AskRail';
  *  `min-h-0` lets this flex child shrink so the overflow lands here.
  *
  *  The Ask rail (and its conversation) lives above the areas, so it survives
- *  tab and filter changes. The drill panel opens over the rail from `lg`
- *  (absolute, in the rail's own box), so opening a drill never narrows the figures. */
+ *  tab and filter changes. From `lg` the drill panel takes the rail's box:
+ *  absolute over the rail when it shows, or a 320px flex item in the rail's
+ *  place when it is hidden or collapsed, so the content column narrows
+ *  instead of the panel covering the figures (and widens again on close).
+ *  `relative` is what the absolute form is placed against. */
 export function DashboardFrame() {
   return (
     <FilterNamesProvider>

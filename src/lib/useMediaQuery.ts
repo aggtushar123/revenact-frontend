@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 export const SM = '(min-width: 640px)';
+export const LG = '(min-width: 1024px)';
 export const XL = '(min-width: 1280px)';
 
 /** Whether `query` matches. jsdom has no matchMedia, which reads as false:

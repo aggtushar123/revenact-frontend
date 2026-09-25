@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'react';
+import { LG, useMediaQuery } from '../../../lib/useMediaQuery';
 import { Link } from 'react-router-dom';
 import { Sparkles, X } from 'lucide-react';
 import { useOrgCurrency } from '../../../hooks';
@@ -14,52 +15,46 @@ const LIST_LIMIT = 500;
 // The backend's cap on focus ids — see global-constraints.md.
 const ASK_LIMIT = 200;
 
-// Same breakpoint as the panel's own `lg:` classes below — this is the
-// point where it stops being a full-screen sheet over the page and
-// becomes a side panel over the Ask rail from `lg`.
-const LARGE_SCREEN_QUERY = '(min-width: 1024px)';
-
 const FOCUSABLE_SELECTOR = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/** Whether the viewport is at `lg` or above. jsdom has no `matchMedia`, so a
- *  test that never stubs it renders as "not large" (a sheet) — the same
- *  mobile-first default the panel's own CSS assumes. */
-function useIsLargeScreen(): boolean {
-  const [isLarge, setIsLarge] = useState(
-    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(LARGE_SCREEN_QUERY).matches,
-  );
+// Where the panel sits. Below `lg`, a full-screen sheet. From `lg` it
+// always occupies the Ask rail's box (320px, the frame's top, right and
+// bottom padding): over the rail when the rail shows ('rail'), or in the
+// rail's place in DashboardFrame's row when the rail is hidden or
+// collapsed ('column'), so the content column narrows instead of the
+// panel covering the figures. Both keep the `lg:` classes so the first
+// paint is right before matchMedia is read.
+const PLACEMENT_CLASS = {
+  sheet: '',
+  rail: 'lg:absolute lg:inset-auto lg:top-0 lg:bottom-4 lg:right-4 lg:z-30 lg:shadow-md',
+  column: 'lg:static lg:inset-auto lg:z-auto lg:shrink-0 lg:shadow-sm',
+} as const;
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-    const mql = window.matchMedia(LARGE_SCREEN_QUERY);
-    const onChange = () => setIsLarge(mql.matches);
-    mql.addEventListener('change', onChange);
-    return () => mql.removeEventListener('change', onChange);
-  }, []);
-
-  return isLarge;
-}
-
-/** The rows behind one number. Over the Ask rail from `lg`, a sheet
- *  over the page below it. Below `lg` it is a full-screen sheet with
+/** The rows behind one number. Below `lg` it is a full-screen sheet with
  *  nowhere else useful for focus to go, so it is `aria-modal` and traps
- *  Tab/Shift+Tab within itself; at `lg` it sits over the Ask rail as an
- *  ordinary panel (the figures never narrow), so focus is free to move
- *  between it and the page. */
+ *  Tab/Shift+Tab within itself; from `lg` it sits in the Ask rail's box as
+ *  an ordinary panel, so focus is free to move between it and the page. */
 export function DrillPanel() {
   const { current, close } = useDrill();
   const ask = useAsk();
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
-  const isLargeScreen = useIsLargeScreen();
+  // jsdom has no matchMedia, which reads as "not lg": a sheet, the same
+  // mobile-first default the CSS assumes.
+  const isLargeScreen = useMediaQuery(LG);
   const isSheet = !isLargeScreen;
+  // At `lg` the rail shows whenever Ask is open (the sheet form is below `sm`).
+  const placement = isSheet ? 'sheet' : ask?.open ? 'rail' : 'column';
 
   // Focus moves in when a drill opens (or is replaced), not when the
   // viewport merely crosses `lg` — that would yank focus off whatever row
   // the user was on.
   useEffect(() => {
-    if (current) closeRef.current?.focus();
+    // preventScroll: the panel is still translated off the row at the start
+    // of its slide-in, and the frame's <main> is overflow-hidden, so a plain
+    // focus() would scroll it sideways and leave the figures shifted.
+    if (current) closeRef.current?.focus({ preventScroll: true });
   }, [current]);
 
   useEffect(() => {
@@ -99,7 +94,7 @@ export function DrillPanel() {
   }, [current, close, isSheet]);
 
   // Hands the accounts behind this number to the Ask rail as a focus, with
-  // an editable question. The panel closes because it sits over the rail.
+  // an editable question. The panel closes because it sits in the rail's box.
   const onAsk =
     ask && current
       ? (ids: number[]) => {
@@ -115,7 +110,8 @@ export function DrillPanel() {
       role="dialog"
       aria-labelledby={titleId}
       aria-modal={isSheet ? true : undefined}
-      className="animate-slide-in-right fixed inset-0 z-40 bg-surface lg:absolute lg:inset-auto lg:top-0 lg:bottom-4 lg:right-4 lg:z-30 lg:w-[360px] lg:border lg:border-line lg:rounded-xl lg:shadow-md flex flex-col min-h-0"
+      data-placement={placement}
+      className={`animate-slide-in-right fixed inset-0 z-40 bg-surface lg:w-[320px] lg:border lg:border-line lg:rounded-xl flex flex-col min-h-0 ${PLACEMENT_CLASS[placement]}`}
     >
       <header className="flex items-start justify-between gap-3 p-4 border-b border-line">
         <h2 id={titleId} className="text-[15px] font-semibold text-ink">
