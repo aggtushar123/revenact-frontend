@@ -45,7 +45,12 @@ export function AccountSheet({
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCloseRef.current();
+      // Escape belongs to whatever is on top: a modal opened from the sheet
+      // (Edit details) holds focus outside it, or a handler already took it.
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        const target = event.target as Node | null;
+        if (target === document.body || (target && ref.current?.contains(target))) onCloseRef.current();
+      }
       if (event.key === 'Tab' && ref.current) trapTab(event, ref.current);
     };
     window.addEventListener('keydown', onKey);
@@ -60,7 +65,7 @@ export function AccountSheet({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <div aria-hidden="true" className="absolute inset-0 bg-ink/30" onClick={onClose} />
+      <div aria-hidden="true" className="absolute inset-0 bg-scrim" onClick={onClose} />
       <div
         ref={ref}
         role="dialog"

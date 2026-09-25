@@ -26,6 +26,32 @@ describe('AccountSheet', () => {
     expect(within(sheet).getByRole('link', { name: 'Open organization page' })).toHaveAttribute('href', '/organizations/7');
   });
 
+  it('leaves Escape to a modal above it, or to a handler that already took it', () => {
+    const onClose = vi.fn();
+    render(
+      <MemoryRouter>
+        <AccountSheet row={pizzaHut} currency="USD" onClose={onClose} />
+        <div role="dialog" aria-label="Edit Pizza Hut">
+          <input aria-label="Name" />
+        </div>
+      </MemoryRouter>,
+    );
+    const field = screen.getByRole('textbox', { name: 'Name' });
+    field.focus();
+    fireEvent.keyDown(field, { key: 'Escape' });
+    expect(onClose).not.toHaveBeenCalled();
+
+    const close = within(screen.getByRole('dialog', { name: 'Pizza Hut' })).getByRole('button', { name: 'Close' });
+    close.focus();
+    const taken = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
+    taken.preventDefault();
+    close.dispatchEvent(taken);
+    expect(onClose).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(close, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('closes on Escape and returns focus to the opener', async () => {
     const onClose = vi.fn();
     function Page({ open }: { open: boolean }) {

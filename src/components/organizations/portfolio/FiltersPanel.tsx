@@ -299,7 +299,7 @@ export function FiltersPanel({
   }
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">
-      <div aria-hidden="true" className="absolute inset-0 bg-ink/30" onClick={onClose} />
+      <div aria-hidden="true" className="absolute inset-0 bg-scrim" onClick={onClose} />
       <div ref={ref} role="dialog" aria-modal="true" aria-label="Filters" className="relative max-h-[85dvh] overflow-y-auto rounded-t-xl bg-surface p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
         {body}
       </div>

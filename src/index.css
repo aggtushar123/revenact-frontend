@@ -57,6 +57,9 @@
   --color-line-subtle:  #EFECE6;
   --color-line:         #E8E5DF;
   --color-line-strong:  #D8D4CC;
+
+  /* Behind a modal sheet: always darkens the page, in either theme. */
+  --color-scrim:        rgba(20, 20, 19, 0.4);
 }
 
 /* ─────────────────────────────────────────────────────────────
@@ -91,6 +94,8 @@ html.dark, [data-theme="dark"] {
   --color-warning-dim:  rgba(245, 158, 11, 0.12);
   --color-danger-dim:   rgba(239, 68, 68, 0.12);
   --color-info-dim:     rgba(59, 130, 246, 0.12);
+
+  --color-scrim:        rgba(0, 0, 0, 0.6);
 }
 
 /* Bridge: legacy `bg-accent text-white` stays readable on a white

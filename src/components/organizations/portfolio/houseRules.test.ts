@@ -53,6 +53,10 @@ describe('portfolio house rules', () => {
     expect(sources.filter(([, s]) => /rv-card-glass|rv-glass-inner|backdrop-blur/.test(s)).map(([f]) => f)).toEqual([]);
   });
 
+  it('dims behind sheets with the scrim token, which darkens in both themes', () => {
+    expect(sources.filter(([, s]) => /\bbg-ink\/\d+/.test(s)).map(([f]) => f)).toEqual([]);
+  });
+
   it('self-check: the scanners flag real offenders and leave tokens alone', () => {
     expect(RAW.test('bg-orange-500')).toBe(true);
     expect(RAW.test('text-pink-600')).toBe(true);
