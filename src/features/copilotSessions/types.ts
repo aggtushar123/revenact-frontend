@@ -25,11 +25,12 @@ export interface SessionEvent {
   kind: 'joined' | 'left' | 'redirected' | 'handed_off' | 'made_live' | 'closed';
   actor: Actor | null;
   /** Set only for kind='redirected' — which real Message this event
-   * tags (see the backend model's own docstring on why redirect text
-   * itself isn't duplicated here). */
-  message: { id: number; role: 'user' | 'assistant'; content: string; created_at: string } | null;
-  /** kind='handed_off': {to_user_id, to_user_name, note}. Empty object
-   * for every other kind. */
+   * tags. Only a reference: the text itself is read from the
+   * conversation, never from the event. */
+  message: { id: number; role: 'user' | 'assistant'; created_at: string } | null;
+  /** kind='handed_off': {to_user_id, to_user_name, note}. `note` is null
+   * for a viewer who may not see it, and always null in a WebSocket
+   * push. Empty object for every other kind. */
   payload: Record<string, unknown>;
   created_at: string;
 }
@@ -45,8 +46,11 @@ export interface CopilotSession {
   conversation_id: number;
   owner: Actor;
   customer_id: number | null;
+  /** Null for a viewer who may not see the customer, and always null in
+   * a WebSocket push (only the REST poll carries it). */
   customer_name: string | null;
   account_id: number | null;
+  /** Same rule as customer_name. */
   account_name: string | null;
   status: SessionStatus;
   /** Currently present only (left_at null) — see the backend

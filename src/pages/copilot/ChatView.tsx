@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import type { Proposal } from '../../features/proposals/proposalsSlice';
 import { PresenceStrip } from '../../components/shared';
 import { HandoffModal } from './HandoffModal';
-import type { CopilotSession } from '../../features/copilotSessions/types';
+import type { CopilotSession, SessionEvent } from '../../features/copilotSessions/types';
 import type { AskSuggestion, CopilotMessage } from './types';
 import { MentionTextarea } from '../../components/shared/MentionTextarea';
 import { FUNCTION_LABELS } from '../../features/auth/authSlice';
@@ -66,6 +66,16 @@ interface Props {
 // match, so a non-owner participant never sees a button that would just
 // 404. "Hand off" stays available to any active participant, same as
 // the backend's own SessionHandoffView.
+// A hand-off's note is null for a viewer who may not see it (and in every
+// WebSocket push until the next poll), so the line drops it rather than
+// printing "null".
+function handOffLine(event: SessionEvent): string {
+  const from = event.actor?.name ?? 'Someone';
+  const to = typeof event.payload.to_user_name === 'string' ? event.payload.to_user_name : 'someone';
+  const note = typeof event.payload.note === 'string' && event.payload.note ? event.payload.note : null;
+  return note ? `${from} → ${to} — "${note}"` : `${from} → ${to}`;
+}
+
 export function ChatView({
   messages,
   onSendPrompt,
@@ -113,6 +123,10 @@ export function ChatView({
     return session.events.find((e) => e.kind === 'redirected' && e.message?.id === message.id) ?? null;
   }
 
+  // customer_name/account_name are null for a viewer who may not see
+  // them; with neither visible there is no label at all.
+  const aboutLabel = session?.customer_name ?? session?.account_name ?? pendingAccountName ?? null;
+
   const activityEvents =
     session?.events.filter((e) => e.kind === 'joined' || e.kind === 'handed_off') ?? [];
 
@@ -122,10 +136,14 @@ export function ChatView({
         {(pendingAccountName || session) && (
           <div className="w-full max-w-[860px] mx-auto mb-6 flex flex-col gap-2.5">
             <div className="flex items-center justify-between flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-accent bg-accent-dim border border-accent/30 rounded-full px-3 py-1">
-                <Sparkles className="w-3 h-3" />
-                About: {session?.customer_name ?? session?.account_name ?? pendingAccountName}
-              </span>
+              {aboutLabel ? (
+                <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-accent bg-accent-dim border border-accent/30 rounded-full px-3 py-1">
+                  <Sparkles className="w-3 h-3" />
+                  About: {aboutLabel}
+                </span>
+              ) : (
+                <span />
+              )}
 
               {!isEmpty && (
                 <div className="flex items-center gap-3">
@@ -210,7 +228,7 @@ export function ChatView({
               <div key={event.id} className="text-[11.5px] text-ink-faint font-medium pl-1">
                 {event.kind === 'joined'
                   ? `${event.actor?.name ?? 'Someone'} joined the session`
-                  : `${event.actor?.name ?? 'Someone'} → ${event.payload.to_user_name} — "${event.payload.note}"`}
+                  : handOffLine(event)}
               </div>
             ))}
 
