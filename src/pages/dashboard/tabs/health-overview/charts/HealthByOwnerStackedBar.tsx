@@ -5,16 +5,22 @@ import type { HealthDataRow, HealthStatus } from '../mockData';
 import { HEALTH_ORDER, healthByOwner } from '../controls';
 import type { OwnerHealth } from '../controls';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { TOOLTIP_STYLE, CURSOR_FILL, HEALTH_COLORS, HEALTH_LEGEND, barListHeight } from '../../../shared/chartPalette';
+import { AXIS_BASE, truncTick } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import { ScrollArea } from '../../../shared/ScrollTable';
+import { stackedTotalLabelList } from '../../../shared/stackedTotalLabel';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
 
-const STATUS_COLORS: Record<HealthStatus, string> = {
-  Poor: 'var(--danger)',
-  Average: 'var(--warning)',
-  Good: 'var(--success)',
-};
+/** Owner names print in full up to this many characters, then shorten
+ *  with the full name on hover. */
+const NAME_CHARS = 24;
+/** Width of one 10px tick character, as the shared axis kit estimates it. */
+const CHAR_PX = 6;
+/** Past this the owner rows scroll inside the card instead of growing it. */
+const MAX_PLOT = 320;
 
 /**
  * Who is carrying the sick accounts.
@@ -77,87 +83,65 @@ export function HealthByOwnerStackedBar({
       )
     : [];
 
+  // Room for the longest name, so a name is only ever shortened when it is
+  // genuinely long, not because the axis was a fixed 100px.
+  const longest = Math.max(4, ...chartData.map((row) => row.owner.length));
+  const axisWidth = Math.min(NAME_CHARS, longest) * CHAR_PX + 10;
+  const plotHeight = barListHeight(chartData.length, 28, 200);
+
   return (
-    <div className="w-full h-full p-4 flex flex-col relative h-[300px]">
-      <div className="flex flex-col mb-4">
-        <h3 className="text-[13px] font-bold text-ink mb-1">Health By Owner</h3>
-        <p className="text-[11px] text-ink-faint mb-2">
-          Accounts per owner, stacked by health · worst book first
-        </p>
-        <div className="flex items-center gap-4">
-          {HEALTH_ORDER.map((status) => (
-            <div key={status} className="flex items-center gap-1.5 opacity-90">
-              <div
-                className="w-2.5 h-2.5 rounded-sm"
-                style={{ backgroundColor: STATUS_COLORS[status] }}
-              />
-              <span className="text-[11px] font-medium text-ink-muted">{status}</span>
-            </div>
-          ))}
-        </div>
+    <div className="relative w-full p-4 flex flex-col gap-2">
+      <div>
+        <h3 className="text-[13px] font-bold text-ink">Health by owner</h3>
+        <p className="text-[11px] text-ink-faint mt-0.5">Accounts per owner, stacked by health · worst book first</p>
       </div>
+      <ChartLegend items={HEALTH_LEGEND} />
 
-      <DrillTargets label="Health By Owner" items={drillItems} />
+      <DrillTargets label="Health by owner" items={drillItems} />
 
-      <div className="flex-1 w-full relative min-h-[220px]">
-        {chartData.length === 0 ? (
-          <p className="text-[12px] text-ink-faint">No accounts match these filters.</p>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              layout="vertical"
-              data={chartData}
-              margin={{ top: 0, right: 30, left: 10, bottom: 5 }}
-              barSize={20}
-            >
-              <XAxis type="number" hide domain={[0, widest]} allowDecimals={false} />
-              <YAxis
-                type="category"
-                dataKey="owner"
-                axisLine={false}
-                tickLine={false}
-                width={100}
-                tick={{ fontSize: 11, fill: 'var(--text-secondary)', fontWeight: 500 }}
-              />
-              <Tooltip
-                cursor={{ fill: CURSOR_FILL }}
-                contentStyle={TOOLTIP_STYLE}
-                formatter={(value, name) => [
-                  `${value} ${Number(value) === 1 ? 'account' : 'accounts'}`,
-                  name,
-                ]}
-              />
-
-              {HEALTH_ORDER.map((status, index) => (
-                <Bar
-                  key={status}
-                  {...STATIC_SERIES}
-                  dataKey={status}
-                  stackId="a"
-                  fill={STATUS_COLORS[status]}
-                  cursor={drillable ? 'pointer' : undefined}
-                  onClick={
-                    drillable ? (_, dataIndex) => openSegment(chartData[dataIndex], status) : undefined
-                  }
-                >
-                  {/* The book size rides outside the end of the bar, not
-                      inside the slices: on a real book most owners hold one or
-                      two accounts per health band, and no label fits in a 6px
-                      slice. Only the last segment carries it. */}
-                  {index === HEALTH_ORDER.length - 1 && (
-                    <LabelList
-                      dataKey="total"
-                      position="right"
-                      fill="var(--text-secondary)"
-                      fontSize={11}
-                    />
-                  )}
-                </Bar>
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
+      {chartData.length === 0 ? (
+        <p className="text-[12px] text-ink-faint">No accounts match these filters.</p>
+      ) : (
+        <ScrollArea label="Health by owner" maxHeight={MAX_PLOT}>
+          <div data-testid="owner-plot" className="w-full" style={{ height: plotHeight }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart layout="vertical" data={chartData} margin={{ top: 4, right: 36, left: 8, bottom: 4 }} barSize={18}>
+                {/* Hidden: every bar carries its total at its end. */}
+                <XAxis type="number" hide domain={[0, widest]} allowDecimals={false} />
+                <YAxis
+                  {...AXIS_BASE}
+                  type="category"
+                  dataKey="owner"
+                  width={axisWidth}
+                  interval={0}
+                  tick={truncTick(NAME_CHARS)}
+                />
+                <Tooltip
+                  cursor={{ fill: CURSOR_FILL }}
+                  contentStyle={TOOLTIP_STYLE}
+                  formatter={(value, name) => [`${value} ${Number(value) === 1 ? 'account' : 'accounts'}`, name]}
+                />
+                {HEALTH_ORDER.map((status) => (
+                  <Bar
+                    key={status}
+                    {...STATIC_SERIES}
+                    dataKey={status}
+                    stackId="a"
+                    fill={HEALTH_COLORS[status]}
+                    cursor={drillable ? 'pointer' : undefined}
+                    onClick={drillable ? (_, dataIndex) => openSegment(chartData[dataIndex], status) : undefined}
+                  >
+                    {/* The book size rides past the end of the bar, not inside
+                        the slices: most owners hold one or two accounts per
+                        band, and no label fits in a 6px slice. */}
+                    <LabelList {...stackedTotalLabelList(status, chartData, 11, { horizontal: true })} />
+                  </Bar>
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }

@@ -4,12 +4,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import type { HealthDataRow } from '../mockData';
 import { buildFlow } from '../movement';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { CURSOR_FILL, HEALTH_COLORS, HEALTH_LEGEND, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 
-const STATUS_COLORS = {
-  Poor: 'var(--danger)',
-  Average: 'var(--warning)',
-  Good: 'var(--success)',
-};
+/** "Jan" + "Jan 31, 2026" → "Jan '26": twelve months can cross a year end. */
+function monthTick(short: string, label: string): string {
+  const year = /(\d{4})\s*$/.exec(label)?.[1];
+  return year ? `${short} '${year.slice(2)}` : short;
+}
 
 /** Bottom to top, so Good sits on top — matching the flow and runway charts. */
 const STACK = ['Poor', 'Average', 'Good'] as const;
@@ -30,7 +33,7 @@ export function HealthChangeOverTimeStacked({ data }: { data: HealthDataRow[] })
   const chartData = useMemo(
     () =>
       buildFlow(data).months.map((m) => ({
-        name: m.short,
+        name: monthTick(m.short, m.label),
         full: m.label,
         Good: m.counts.Good,
         Average: m.counts.Average,
@@ -41,52 +44,47 @@ export function HealthChangeOverTimeStacked({ data }: { data: HealthDataRow[] })
   );
 
   return (
-    <div className="w-full h-full p-6 flex flex-col mt-4 border-t border-line-subtle">
-      <div className="flex items-baseline justify-between gap-3 mb-4">
-        <h3 className="text-[13px] font-bold text-ink">Account Health Change Over Time (Monthly)</h3>
+    <div className="w-full p-4 flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="text-[13px] font-bold text-ink">Account health change over time (monthly)</h3>
         <span className="text-[11px] text-ink-faint">
           {chartData.length} month{chartData.length === 1 ? '' : 's'} of recorded history
         </span>
       </div>
+      <ChartLegend items={HEALTH_LEGEND} />
 
-      <div className="flex-1 w-full relative min-h-[160px]">
-        {chartData.length === 0 ? (
-          <p className="text-[12px] text-ink-faint">No health history for the current selection.</p>
-        ) : (
+      {chartData.length === 0 ? (
+        <p className="text-[12px] text-ink-faint">No health history for the current selection.</p>
+      ) : (
+        <div className="w-full h-[240px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 20, right: 30, left: -20, bottom: 0 }} barSize={28}>
+            <BarChart data={chartData} margin={chartMargin({ x: true, left: true })} barSize={28}>
               <XAxis
+                {...AXIS_BASE}
                 dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
+                {...categoryAxis(chartData.length)}
                 padding={{ left: 10, right: 10 }}
+                label={axisLabel('Month', 'x')}
               />
-              <YAxis hide />
+              <YAxis {...AXIS_BASE} width={32} allowDecimals={false} label={axisLabel('Accounts')} />
               <Tooltip
-                cursor={{ fill: 'var(--bg-subtle)' }}
+                cursor={{ fill: CURSOR_FILL }}
                 // The axis is shortened to a month name so twelve of them fit;
                 // the tooltip restores the month-end date they stand for.
                 labelFormatter={(_, payload) => payload?.[0]?.payload?.full ?? ''}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default)',
-                  backgroundColor: 'var(--bg-elevated)',
-                  color: 'var(--text-primary)',
-                  fontSize: 12,
-                }}
+                contentStyle={{ ...TOOLTIP_STYLE, fontSize: 12 }}
               />
 
               {/* No total label: every account carries every month, so the
                   total is identical on all twelve bars whatever the filter.
-                  The stacked split is what changes. */}
+                  The stacked split is what changes, read off the Y axis. */}
               {STACK.map((status) => (
-                <Bar {...STATIC_SERIES} key={status} dataKey={status} stackId="health" fill={STATUS_COLORS[status]} />
+                <Bar {...STATIC_SERIES} key={status} dataKey={status} stackId="health" fill={HEALTH_COLORS[status]} />
               ))}
             </BarChart>
           </ResponsiveContainer>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

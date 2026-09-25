@@ -17,6 +17,8 @@ import { EntityAvatar } from '../../components/shared';
 import type { Account, Customer } from '../../features/customers/customersSlice';
 import type { HealthCategory } from '../../components/organizations/tableData';
 import { SHARED_KEYS, useDashboardFilters } from '../dashboard/shared/useDashboardFilters';
+import { ScrollTable } from '../dashboard/shared/ScrollTable';
+import { zeroMoney } from '../dashboard/shared/chartAxis';
 
 // Real health signals already live on both Customer and Account (see
 // revenact-backend's Account model docstring: its health/AI Pulse/NPS
@@ -186,7 +188,10 @@ export function HealthDistribution() {
   function metricValue(category: HealthCategory): string {
     if (!activeStats) return '—';
     const bucket = activeStats.health[category];
-    return metricTab === 'count' ? String(bucket.count) : formatCompactMoney(bucket.mrr, currency);
+    if (metricTab === 'count') return String(bucket.count);
+    // Compact notation prints nothing as "$0.0", which reads like a rounded
+    // non-zero.
+    return bucket.mrr === 0 ? zeroMoney(currency) : formatCompactMoney(bucket.mrr, currency);
   }
 
   function toggleCategory(category: HealthCategory) {
@@ -247,19 +252,21 @@ export function HealthDistribution() {
       )}
 
       {/* Health distribution */}
-      <div className="flex gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {HEALTH_ORDER.map((category) => {
           const colors = HEALTH_COLORS[category];
           const Icon = colors.icon;
           const count = activeStats?.health[category].count ?? 0;
-          const widthPct = Math.max(8, Math.round((count / maxCount) * 100));
+          // An empty category draws no bar: the old 8% floor made nothing look
+          // like something. A non-empty one keeps at least a sliver.
+          const widthPct = Math.round((count / maxCount) * 100);
           const isSelected = selectedCategory === category;
           return (
             <button
               key={category}
               onClick={() => toggleCategory(category)}
               aria-pressed={isSelected}
-              className={`flex-1 flex flex-col gap-2 rounded-xl border p-4 text-left transition-all ${
+              className={`flex flex-col gap-2 rounded-xl border p-4 text-left transition-all ${
                 isSelected ? `${colors.bg} border-transparent shadow-sm` : 'bg-surface border-line-subtle hover:border-line-strong'
               }`}
             >
@@ -273,7 +280,11 @@ export function HealthDistribution() {
                 {activeStatsLoading && !activeStats ? '—' : metricValue(category)}
               </span>
               <div className="h-1.5 rounded-full bg-subtle overflow-hidden">
-                <div className={`h-full rounded-full ${colors.bar}`} style={{ width: `${widthPct}%` }} />
+                <div
+                  data-testid="health-share-bar"
+                  className={`h-full rounded-full ${colors.bar} ${count > 0 ? 'min-w-[2px]' : ''}`}
+                  style={{ width: `${widthPct}%` }}
+                />
               </div>
             </button>
           );
@@ -281,7 +292,7 @@ export function HealthDistribution() {
       </div>
 
       {/* NPS */}
-      <div className="flex items-center gap-6 rounded-xl border border-line-subtle bg-surface p-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3 rounded-xl border border-line-subtle bg-surface p-4">
         <div className="flex flex-col gap-0.5 pr-6 border-r border-line-subtle">
           <span className="text-[11px] font-bold uppercase tracking-wider text-ink-faint">NPS Score</span>
           <span className="text-[24px] font-bold text-ink leading-none">
@@ -300,7 +311,7 @@ export function HealthDistribution() {
       </div>
 
       {/* AI Pulse */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-[12px] font-bold text-ink-faint uppercase tracking-wider shrink-0">AI Pulse</span>
         {AI_PULSE_ORDER.map((score) => (
           <span
@@ -313,7 +324,7 @@ export function HealthDistribution() {
       </div>
 
       {/* Detail table */}
-      <div className="flex-1 min-h-[240px] flex flex-col bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden">
+      <div className="flex flex-col bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-3 border-b border-line-subtle shrink-0">
           <h2 className="text-[13.5px] font-bold text-ink">
             {selectedCategory ? `${HEALTH_LABELS[selectedCategory]} — ${rows.length}` : `All ${entityLabel} — ${rows.length}`}
@@ -325,17 +336,19 @@ export function HealthDistribution() {
           )}
         </div>
 
-        <div className="flex-1 overflow-y-auto">
-          {entitiesLoading ? (
-            <div className="flex items-center justify-center h-full py-16 text-[13px] text-ink-faint">Loading…</div>
-          ) : entitiesError ? (
-            <div className="flex items-center justify-center h-full py-16 text-[13px] text-danger">{entitiesError}</div>
-          ) : rows.length === 0 ? (
-            <div className="flex items-center justify-center h-full py-16 text-[13px] text-ink-faint">No {entityLabelSingular}s here.</div>
-          ) : (
+        {entitiesLoading ? (
+          <div className="flex items-center justify-center py-16 text-[13px] text-ink-faint">Loading…</div>
+        ) : entitiesError ? (
+          <div className="flex items-center justify-center py-16 text-[13px] text-danger">{entitiesError}</div>
+        ) : rows.length === 0 ? (
+          <div className="flex items-center justify-center py-16 text-[13px] text-ink-faint">No {entityLabelSingular}s here.</div>
+        ) : (
+          // Scrolls inside its card with the header pinned: it used to grow
+          // the page by every organization or account in the tenant.
+          <ScrollTable caption={`${entityLabel} health`} maxHeight={520} minWidth={720}>
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-subtle/40 border-b border-line-subtle sticky top-0">
+                <tr className="border-b border-line-subtle">
                   <th className="px-5 py-2.5 text-[11px] font-bold text-ink-faint uppercase tracking-wider">
                     {entityTab === 'organizations' ? 'Organization' : 'Account'}
                   </th>
@@ -380,8 +393,8 @@ export function HealthDistribution() {
                 ))}
               </tbody>
             </table>
-          )}
-        </div>
+          </ScrollTable>
+        )}
       </div>
     </div>
   );

@@ -84,7 +84,8 @@ describe('DrillTargets call sites', () => {
       const wrapper = /className="([^"]*)"/.exec(source.slice(source.lastIndexOf('return (', at)));
       if (!wrapper || !/\brelative\b/.test(wrapper[1])) offenders.push(file);
     }
-    expect(sites.length).toBeGreaterThanOrEqual(18);
+    // 17 files: the CSM and AI Pulse bars share one (PulseScoreBar).
+    expect(sites.length).toBeGreaterThanOrEqual(17);
     expect(offenders).toEqual([]);
   });
 });

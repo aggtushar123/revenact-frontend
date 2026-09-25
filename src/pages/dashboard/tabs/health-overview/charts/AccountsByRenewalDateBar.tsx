@@ -3,17 +3,14 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } 
 import type { HealthDataRow, HealthStatus } from '../mockData';
 import { renewalMonths } from '../movement';
 import type { RenewalMonth } from '../movement';
-import { HEALTH_STACK, makeStackedTotalLabel } from '../../../shared/stackedTotalLabel';
+import { HEALTH_STACK, emptyStackMarker, stackedTotalLabelList } from '../../../shared/stackedTotalLabel';
+import { CHART_HEIGHT, CURSOR_FILL, HEALTH_COLORS, HEALTH_LEGEND, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
-
-const STATUS_COLORS = {
-  Poor: 'var(--danger)',
-  Average: 'var(--warning)',
-  Good: 'var(--success)',
-};
 
 /**
  * When the book comes up for renewal, and what state each account is in.
@@ -88,48 +85,40 @@ export function AccountsByRenewalDateBar({
     : [];
 
   return (
-    <div className="relative w-full h-[280px] p-6 flex flex-col">
-      <div className="flex items-baseline justify-between gap-3 mb-6">
-        <h3 className="text-[13px] font-bold text-ink">Accounts by Renewal Date (Monthly)</h3>
+    <div className="relative w-full p-4 flex flex-col gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="text-[13px] font-bold text-ink">Accounts by renewal date (monthly)</h3>
         {busiest && busiest.total > 0 && (
           <span className="text-[11px] text-ink-faint">
             Busiest: {busiest.full} · {busiest.total} renewing
           </span>
         )}
       </div>
+      <ChartLegend items={HEALTH_LEGEND} />
 
-      <DrillTargets label="Accounts by Renewal Date" items={drillItems} />
+      <DrillTargets label="Accounts by renewal date" items={drillItems} />
 
-      <div className="flex-1 w-full relative">
-        {chartData.length === 0 ? (
-          <p className="text-[12px] text-ink-faint">
-            No readable renewal dates for the current selection.
-          </p>
-        ) : (
+      {chartData.length === 0 ? (
+        <p className="text-[12px] text-ink-faint">No readable renewal dates for the current selection.</p>
+      ) : (
+        <div className="w-full" style={{ height: CHART_HEIGHT.md }}>
           <ResponsiveContainer width="100%" height="100%">
-            {/* Rotated labels need real bottom margin or they render clipped. */}
-            <BarChart data={chartData} margin={{ top: 20, right: 30, left: -20, bottom: 26 }}>
+            <BarChart data={chartData} margin={chartMargin({ x: true })}>
+              {/* "Sep '26": the range can span years, so every tick says which. */}
               <XAxis
+                {...AXIS_BASE}
                 dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10, angle: -45, textAnchor: 'end' }}
+                {...categoryAxis(chartData.length)}
                 padding={{ left: 12, right: 12 }}
-                dy={6}
-                interval={0}
+                label={axisLabel('Renewal month', 'x')}
               />
+              {/* Hidden: every column carries its total. */}
               <YAxis hide />
               <Tooltip
-                cursor={{ fill: 'var(--bg-subtle)' }}
+                cursor={{ fill: CURSOR_FILL }}
                 // The axis is abbreviated to fit; the tooltip spells the month out.
                 labelFormatter={(_, payload) => payload?.[0]?.payload?.full ?? ''}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default)',
-                  backgroundColor: 'var(--bg-elevated)',
-                  color: 'var(--text-primary)',
-                  fontSize: 12,
-                }}
+                contentStyle={{ ...TOOLTIP_STYLE, fontSize: 12 }}
               />
 
               {HEALTH_STACK.map((status) => (
@@ -138,18 +127,26 @@ export function AccountsByRenewalDateBar({
                   {...STATIC_SERIES}
                   dataKey={status}
                   stackId="renewal"
-                  fill={STATUS_COLORS[status]}
+                  fill={HEALTH_COLORS[status]}
                   barSize={24}
                   cursor={drillable ? 'pointer' : undefined}
                   onClick={drillable ? (_, index) => openSegment(months[index], status) : undefined}
                 >
-                  <LabelList content={makeStackedTotalLabel(status, chartData)} />
+                  <LabelList {...stackedTotalLabelList(status, chartData)} />
                 </Bar>
               ))}
+              {/* A month nobody renews in keeps a hairline and "0", so it
+                  reads as empty rather than as a gap in the data. */}
+              <Bar
+                {...STATIC_SERIES}
+                {...emptyStackMarker(chartData.map((row) => row.total), '0')}
+                stackId="renewal"
+                barSize={24}
+              />
             </BarChart>
           </ResponsiveContainer>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

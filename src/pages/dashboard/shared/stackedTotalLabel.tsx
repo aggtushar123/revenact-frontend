@@ -25,60 +25,50 @@ interface LabelContentProps {
   y?: number | string;
   width?: number | string;
   height?: number | string;
-  index?: number;
   value?: unknown;
 }
 
-function totalText(x: number, y: number, total: number, fontSize: number) {
+function totalText(x: number, y: number, total: number, fontSize: number, anchor: 'middle' | 'start' = 'middle') {
   return (
-    <text x={x} y={y} textAnchor="middle" fontSize={fontSize} fontWeight={700} fill="var(--text-secondary)">
+    <text x={x} y={y} textAnchor={anchor} fontSize={fontSize} fontWeight={700} fill="var(--text-secondary)">
       {total}
     </text>
   );
 }
 
 /**
- * A total drawn above a stacked bar, on whichever segment is actually on top.
+ * A total drawn at the end of a stacked bar, on whichever segment is
+ * actually last. Spread onto the `LabelList` of each health `<Bar>`:
+ * `<LabelList {...stackedTotalLabelList(status, data)} />`.
  *
- * Attaching a `LabelList` to one fixed series — the natural reading of "put the
- * total on the last bar" — drops the label on every row where that series is
- * zero. On a health chart that silently hides the total for exactly the months
- * with no healthy accounts, which are the ones worth reading.
+ * Attaching a `LabelList` to one fixed series (the natural reading of "put
+ * the total on the last bar") drops the label on every row where that series
+ * is zero. On a health chart that hides the total for exactly the months with
+ * no healthy accounts, which are the ones worth reading. So each series gets
+ * one, and only the topmost non-empty one draws.
  *
- * So each series gets one of these, and only the topmost non-empty one draws.
+ * Recharts skips a zero-height bar, and the `index` it hands a label counts
+ * only the bars it drew, so `data[index]` would point at the wrong row as soon
+ * as a series is empty somewhere to its left. The `valueAccessor` hands each
+ * label its row's own position in `data` instead.
  *
- * Reads the row from `index`, which Recharts counts over drawn bars only, so
- * it mislabels once a series is empty left of a bar: prefer
- * `stackedTotalLabelList` below.
+ * `horizontal` is for a `layout="vertical"` chart: the total sits just past
+ * the bar's right end instead of above it.
  */
-export function makeStackedTotalLabel<T extends StackedDatum>(
+export function stackedTotalLabelList<T extends StackedDatum>(
   status: HealthStatus,
   data: T[],
   fontSize = 10,
+  { horizontal = false } = {},
 ) {
-  return function StackedTotalLabel({ x = 0, y = 0, width = 0, index = 0 }: LabelContentProps) {
-    const datum = data[index];
-    if (!datum || datum.total === 0 || topSegment(datum) !== status) return null;
-    return totalText(Number(x) + Number(width) / 2, Number(y) - 6, datum.total, fontSize);
-  };
-}
-
-/**
- * `makeStackedTotalLabel`, safe when a series has empty rows: spread onto the
- * `LabelList` of each health `<Bar>` — `<LabelList {...stackedTotalLabelList(status, data)} />`.
- *
- * Recharts skips a zero-height bar, and the `index` it hands a label counts
- * only the bars it drew, so `data[index]` points at the wrong row as soon as
- * a series is empty somewhere to its left. The `valueAccessor` hands each
- * label its row's own position in `data` instead.
- */
-export function stackedTotalLabelList<T extends StackedDatum>(status: HealthStatus, data: T[], fontSize = 10) {
   return {
     valueAccessor: (entry: { payload?: unknown }) => data.indexOf(entry.payload as T),
-    content: function StackedTotalLabel({ x = 0, y = 0, width = 0, value }: LabelContentProps) {
+    content: function StackedTotalLabel({ x = 0, y = 0, width = 0, height = 0, value }: LabelContentProps) {
       const datum = data[Number(value)];
       if (!datum || datum.total === 0 || topSegment(datum) !== status) return null;
-      return totalText(Number(x) + Number(width) / 2, Number(y) - 6, datum.total, fontSize);
+      return horizontal
+        ? totalText(Number(x) + Number(width) + 6, Number(y) + Number(height) / 2 + 3, datum.total, fontSize, 'start')
+        : totalText(Number(x) + Number(width) / 2, Number(y) - 6, datum.total, fontSize);
     },
   };
 }

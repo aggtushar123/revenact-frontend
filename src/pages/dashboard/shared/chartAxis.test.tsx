@@ -227,6 +227,16 @@ describe('categoryAxis', () => {
     expect(text).toHaveAttribute('text-anchor', 'end');
     expect(text.querySelector('title')!.textContent).toBe('Globex International Holdings');
   });
+
+  it('keeps a short name flat in a narrow band it still fits in', () => {
+    // A 1–5 score or a "Low" band fits a 44px band as it is; slanting it
+    // only makes it harder to read.
+    for (const name of ['3', 'Low']) {
+      const text = draw(5, 220, name);
+      expect(text).not.toHaveAttribute('transform');
+      expect(text.textContent).toBe(name);
+    }
+  });
 });
 
 describe('zeroMoney', () => {

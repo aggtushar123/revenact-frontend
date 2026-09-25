@@ -189,7 +189,8 @@ export function categoryAxis(count: number) {
     const perLine = Math.floor((band - 6) / TICK_CHAR_PX);
     const style = { fill: AXIS_TICK.fill, fontSize: AXIS_TICK.fontSize };
 
-    if (perLine < MIN_FLAT_CHARS) {
+    // A name that fits its band as it is stays flat, however narrow the band.
+    if (perLine < MIN_FLAT_CHARS && full.length > Math.max(0, perLine)) {
       // How many characters a slanted name can run before leaving the axis.
       const room = Math.floor((height - 8) / Math.sin((-SLANT * Math.PI) / 180) / TICK_CHAR_PX);
       const short = truncate(full, Math.max(4, room));

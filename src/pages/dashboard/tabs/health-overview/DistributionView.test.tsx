@@ -155,4 +155,16 @@ describe('DistributionView', () => {
       expect(screen.queryByRole('list', { name: new RegExp(label, 'i') })).not.toBeInTheDocument();
     }
   });
+
+  it('never fixes a row of cards to one height, so cards that stack below xl are not clipped', () => {
+    vi.stubGlobal('fetch', fetchMock());
+    const { container } = renderDistribution({ rows: book });
+
+    // A row or card is a flex box; a chart's own plot area has a definite
+    // height by design and is not one.
+    const fixed = [...container.querySelectorAll('[class~="flex"]')].filter((el) =>
+      el.getAttribute('class')!.split(/\s+/).some((token) => /^h-\[\d+px\]$/.test(token) && token !== 'h-[24px]'),
+    );
+    expect(fixed.map((el) => el.getAttribute('class'))).toEqual([]);
+  });
 });

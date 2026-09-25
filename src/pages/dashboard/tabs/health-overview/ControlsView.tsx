@@ -7,9 +7,14 @@ import { HealthByOwnerStackedBar } from './charts/HealthByOwnerStackedBar';
 import { CSMPulseBar } from './charts/CSMPulseBar';
 import { AIPulseBar } from './charts/AIPulseBar';
 import { AccountHealthDetailTable } from './charts/AccountHealthDetailTable';
-import { AccountHealthByRecruiters } from './charts/AccountHealthByRecruiters';
+import { AccountHealthBySeats } from './charts/AccountHealthBySeats';
 import { HealthChangeOverTimeStacked } from './charts/HealthChangeOverTimeStacked';
 import { AccountsByRenewalDateBar } from './charts/AccountsByRenewalDateBar';
+
+/** The card each chart sits in. `relative` anchors the chart's drill targets;
+ *  `overflow-hidden` keeps the rounded corners, never a clipped plot, since
+ *  no card has a fixed height. */
+const CARD = 'relative bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden';
 
 export function ControlsView() {
   const [activeFilter, setActiveFilter] = useState<HealthStatus | null>(null);
@@ -47,64 +52,50 @@ export function ControlsView() {
         )}
       </div>
 
-      {/* Main 2-Column Grid */}
-      <div className="flex flex-col lg:flex-row gap-4 h-auto">
-        
+      {/* Every row sizes to its cards: a fixed-height row used to clip two
+          cards that stack inside it below xl. Each chart sets its own plot
+          height, so cards in a row line up by stretching, not by clipping. */}
+      <div className="flex flex-col lg:flex-row gap-4">
         {/* LEFT COLUMN */}
-        <div className="flex-[2] flex flex-col gap-4">
-          
-          {/* Top Row inside Left Column */}
-          <div className="flex flex-col xl:flex-row gap-4 h-[280px]">
-             {/* Column 1: Donut */}
-            <div className="xl:w-[40%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 flex flex-col">
-              <CurrentHealthDonut 
-                data={rows} 
-                activeFilter={activeFilter}
-                onSegmentClick={setActiveFilter}
-                filteredCount={filteredData.length}
-              />
-            </div>
-
-            {/* Column 2: Health by Owner */}
-            <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
-              <HealthByOwnerStackedBar data={filteredData} drillable={drillable} />
-            </div>
+        <div className="lg:flex-[2] min-w-0 flex flex-col xl:flex-row gap-4">
+          <div className={`xl:w-[40%] shrink-0 ${CARD}`}>
+            <CurrentHealthDonut
+              data={rows}
+              activeFilter={activeFilter}
+              onSegmentClick={setActiveFilter}
+              filteredCount={filteredData.length}
+            />
+          </div>
+          <div className={`flex-1 min-w-0 ${CARD}`}>
+            <HealthByOwnerStackedBar data={filteredData} drillable={drillable} />
           </div>
         </div>
 
         {/* RIGHT COLUMN */}
-        <div className="flex-[1] flex flex-col gap-4">
-           {/* CSM Pulse */}
-           <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden min-h-[280px]">
+        <div className="lg:flex-[1] min-w-0 flex flex-col gap-4">
+          <div className={CARD}>
             <CSMPulseBar data={filteredData} drillable={drillable} />
           </div>
-           {/* AI Pulse */}
-           <div className="flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden min-h-[280px]">
+          <div className={CARD}>
             <AIPulseBar data={filteredData} drillable={drillable} />
           </div>
         </div>
-
       </div>
 
-      {/* Full Width Renewal Graph */}
-      <div className="w-full bg-surface border border-line-subtle shadow-sm rounded-lg flex flex-col overflow-hidden min-h-[300px]">
+      <div className={CARD}>
         <AccountsByRenewalDateBar data={filteredData} drillable={drillable} />
       </div>
 
-      {/* Analytics Insights Row */}
-      <div className="flex flex-col xl:flex-row gap-4 h-[320px]">
-        {/* Recruiter Stats */}
-        <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
-          <AccountHealthByRecruiters data={filteredData} />
+      <div className="flex flex-col xl:flex-row gap-4">
+        <div className={`xl:w-[32%] shrink-0 ${CARD}`}>
+          <AccountHealthBySeats data={filteredData} />
         </div>
-        {/* Time Tracking */}
-        <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden">
+        <div className={`flex-1 min-w-0 ${CARD}`}>
           <HealthChangeOverTimeStacked data={filteredData} />
         </div>
       </div>
 
-      {/* Detail Table */}
-      <div className="w-full bg-surface border border-line-subtle shadow-sm rounded-lg flex flex-col overflow-hidden min-h-[400px]">
+      <div className={CARD}>
         <AccountHealthDetailTable data={filteredData} />
       </div>
     </div>

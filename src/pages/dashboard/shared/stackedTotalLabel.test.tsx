@@ -1,11 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis } from 'recharts';
+import { Bar, BarChart, LabelList, ResponsiveContainer, XAxis, YAxis } from 'recharts';
 import { sizeCharts } from '../../../test/chartSize';
 import {
   HEALTH_STACK,
   emptyStackMarker,
-  makeStackedTotalLabel,
   stackedTotalLabelList,
   topSegment,
 } from './stackedTotalLabel';
@@ -15,23 +14,10 @@ const data = [
   { Good: 0, Average: 0, Poor: 0, total: 0 },
 ];
 
-const draw = (node: React.ReactNode) => render(<svg>{node}</svg>).container.querySelector('text');
-
-describe('makeStackedTotalLabel', () => {
-  it('draws the total on the topmost non-empty segment only', () => {
+describe('topSegment', () => {
+  it('names the highest segment that has accounts, or nothing for an empty bar', () => {
     expect(topSegment(data[0])).toBe('Average');
-    const OnAverage = makeStackedTotalLabel('Average', data);
-    const OnGood = makeStackedTotalLabel('Good', data);
-    const text = draw(<OnAverage x={10} y={50} width={20} index={0} />);
-    expect(text).toHaveTextContent('3');
-    expect(text).toHaveAttribute('x', '20');
-    expect(text).toHaveAttribute('y', '44');
-    expect(draw(<OnGood x={10} y={50} width={20} index={0} />)).toBeNull();
-  });
-
-  it('draws nothing for an empty bar', () => {
-    const OnPoor = makeStackedTotalLabel('Poor', data);
-    expect(draw(<OnPoor index={1} />)).toBeNull();
+    expect(topSegment(data[1])).toBeUndefined();
   });
 });
 
@@ -66,6 +52,25 @@ describe('stackedTotalLabelList', () => {
     // "c"'s Good segment is the first Good bar drawn (index 0), yet its
     // total is 5, not "a"'s 2.
     expect(labels(container)).toEqual(['2', '5']);
+  });
+
+  it('puts a horizontal bar\'s total just past its right end', () => {
+    const { container } = render(
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={rows} layout="vertical">
+          <XAxis type="number" hide />
+          <YAxis type="category" dataKey="name" />
+          {HEALTH_STACK.map((status) => (
+            <Bar key={status} dataKey={status} stackId="s" isAnimationActive={false}>
+              <LabelList {...stackedTotalLabelList(status, rows, 10, { horizontal: true })} />
+            </Bar>
+          ))}
+        </BarChart>
+      </ResponsiveContainer>,
+    );
+    const texts = [...container.querySelectorAll('.recharts-label-list text')];
+    expect(texts.map((t) => t.textContent)).toEqual(['2', '5']);
+    for (const text of texts) expect(text).toHaveAttribute('text-anchor', 'start');
   });
 
   it('marks an empty column with a hairline and a zero label', () => {
