@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { useEffect } from 'react';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { usePagedPortfolio, usePortfolio } from './usePortfolio';
+import { useSelection } from './useSelection';
 import { parseParams } from '../../../features/organizations/portfolioParams';
 import { buildPortfolio, portfolioQueries, stubPortfolio } from '../../../features/organizations/testPortfolio';
 import type { PortfolioResponse } from '../../../features/organizations/portfolioTypes';
@@ -73,6 +75,29 @@ describe('usePortfolio', () => {
     await waitFor(() => expect(churn.result.current.total).toBe(3));
   });
 
+  it('clamps the M probe so it is never less than the frame count', async () => {
+    stubPortfolio({
+      portfolio: (q) => {
+        const built = buildPortfolio(q);
+        // Pretend the unfiltered-book probe answers with a stale, smaller M.
+        return q.toString() === 'limit=1' ? { ...built, count: 1 } : built;
+      },
+    });
+    const { result } = renderHook(() => usePortfolio(params('health=average,good'), 0));
+    await waitFor(() => expect(result.current.total).not.toBeNull());
+    expect(result.current.data?.count).toBe(2);
+    expect(result.current.total).toBe(2);
+  });
+
+  it('never pages the frame itself when grouped, even if the backend implies more', async () => {
+    const spy = stubPortfolio({ portfolio: (q) => ({ ...buildPortfolio(q), next_cursor: '1' }) });
+    const { result } = renderHook(() => usePortfolio(params(), 0));
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    expect(result.current.next).toBeNull();
+    await act(() => result.current.loadMore());
+    expect(portfolioQueries(spy)).toHaveLength(1);
+  });
+
   it('reports an error and retries', async () => {
     let fail = true;
     stubPortfolio({ portfolio: (q) => (fail ? { status: 500, body: { detail: 'Boom' } } : buildPortfolio(q)) });
@@ -113,14 +138,16 @@ describe('usePortfolio', () => {
     await waitFor(() => expect(calls).toHaveLength(2));
 
     // The fresh (second) request lands first.
-    calls[1].resolve(answer(calls[1].search));
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      calls[1].resolve(answer(calls[1].search));
+    });
+    expect(result.current.loading).toBe(false);
     expect(result.current.rows.map((r) => r.id)).toEqual([1]);
 
     // The superseded (first) request resolves late; it must be ignored.
-    calls[0].resolve(answer(calls[0].search));
-    await Promise.resolve();
-    await Promise.resolve();
+    await act(async () => {
+      calls[0].resolve(answer(calls[0].search));
+    });
     expect(result.current.rows.map((r) => r.id)).toEqual([1]);
     expect(result.current.loading).toBe(false);
   });
@@ -132,8 +159,10 @@ describe('usePortfolio', () => {
     });
 
     await waitFor(() => expect(calls).toHaveLength(1));
-    calls[0].resolve(answer(calls[0].search));
-    await waitFor(() => expect(result.current.next).toBe('1'));
+    await act(async () => {
+      calls[0].resolve(answer(calls[0].search));
+    });
+    expect(result.current.next).toBe('1');
 
     // Params change before the next page is requested.
     rerender({ query: 'owner=2&limit=1' });
@@ -145,8 +174,166 @@ describe('usePortfolio', () => {
     expect(calls).toHaveLength(2);
     expect(calls.some((c) => c.search.includes('cursor='))).toBe(false);
 
-    calls[1].resolve(answer(calls[1].search));
-    await waitFor(() => expect(result.current.loading).toBe(false));
+    await act(async () => {
+      calls[1].resolve(answer(calls[1].search));
+    });
+    expect(result.current.loading).toBe(false);
     expect(result.current.rows.map((r) => r.id)).toEqual([7]);
+  });
+
+  it('does nothing on a second concurrent Show more while one is in flight', async () => {
+    const calls = stubDeferred();
+    const onLoaded = vi.fn();
+    const { result } = renderHook(() => usePagedPortfolio('limit=1', true, 0, onLoaded));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await act(async () => {
+      calls[0].resolve(answer(calls[0].search));
+    });
+    expect(result.current.next).toBe('1');
+    onLoaded.mockClear();
+
+    act(() => {
+      result.current.loadMore();
+      result.current.loadMore();
+    });
+    await waitFor(() => expect(calls).toHaveLength(2));
+
+    await act(async () => {
+      calls[1].resolve(answer(calls[1].search));
+    });
+    expect(result.current.loading).toBe(false);
+
+    // Exactly one load-more request went out, and rows were appended once.
+    expect(calls).toHaveLength(2);
+    expect(result.current.rows.map((r) => r.id)).toEqual([7, 1]);
+    expect(onLoaded).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears a stale load-more error once the params change', async () => {
+    stubPortfolio({
+      portfolio: (q) =>
+        q.has('cursor') ? { status: 500, body: { detail: 'Boom' } } : (() => {
+          const one = new URLSearchParams(q);
+          one.set('limit', '1');
+          return buildPortfolio(one);
+        })(),
+    });
+    const { result, rerender } = renderHook(({ query }) => usePagedPortfolio(query, true, 0), {
+      initialProps: { query: 'limit=1' },
+    });
+    await waitFor(() => expect(result.current.next).not.toBeNull());
+
+    await act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.moreError).toBe('Boom'));
+
+    rerender({ query: 'owner=2&limit=1' });
+    expect(result.current.moreError).toBeNull();
+  });
+
+  it('drops a load-more response that lands after the params have changed', async () => {
+    const calls = stubDeferred();
+    const onLoaded = vi.fn();
+    const { result, rerender } = renderHook(({ query }) => usePagedPortfolio(query, true, 0, onLoaded), {
+      initialProps: { query: 'limit=1' },
+    });
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await act(async () => {
+      calls[0].resolve(answer(calls[0].search));
+    });
+    expect(result.current.next).toBe('1');
+    onLoaded.mockClear();
+
+    act(() => {
+      result.current.loadMore();
+    });
+    await waitFor(() => expect(calls).toHaveLength(2));
+    expect(result.current.loadingMore).toBe(true);
+
+    // Params change while that load-more is still in flight.
+    rerender({ query: 'owner=2&limit=1' });
+    await waitFor(() => expect(calls).toHaveLength(3));
+    expect(result.current.loadingMore).toBe(false);
+
+    // The stale load-more's answer lands late; it must be dropped entirely.
+    await act(async () => {
+      calls[1].resolve(answer(calls[1].search));
+    });
+    expect(onLoaded).not.toHaveBeenCalled();
+    expect(result.current.moreError).toBeNull();
+
+    // The fresh page-one request for the new params resolves normally.
+    await act(async () => {
+      calls[2].resolve(answer(calls[2].search));
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.rows.map((r) => r.id)).toEqual([7]);
+  });
+
+  it('does not warn or update state when unmounted while the initial fetch is in flight', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const calls = stubDeferred();
+    const { unmount } = renderHook(() => usePagedPortfolio('limit=50', true, 0));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    unmount();
+    await act(async () => {
+      calls[0].resolve(answer(calls[0].search));
+    });
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('does not warn or update state when unmounted while Show more is in flight', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const calls = stubDeferred();
+    const { result, unmount } = renderHook(() => usePagedPortfolio('limit=1', true, 0));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await act(async () => {
+      calls[0].resolve(answer(calls[0].search));
+    });
+    expect(result.current.next).toBe('1');
+
+    act(() => {
+      result.current.loadMore();
+    });
+    await waitFor(() => expect(calls).toHaveLength(2));
+
+    unmount();
+    await act(async () => {
+      calls[1].resolve(answer(calls[1].search));
+    });
+
+    expect(errorSpy).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  // Ruling: selection resets when NEW rows have loaded (not on the filter
+  // string alone), using the hook's `loadedKey` and useSelection's `prune`.
+  it('prunes a selected id once new rows load after a params change', async () => {
+    stubPortfolio();
+
+    function useCombined(query: string) {
+      const portfolio = usePagedPortfolio(query, true, 0);
+      const selection = useSelection();
+      useEffect(() => {
+        selection.prune(portfolio.rows.map((r) => r.id));
+        // Intentionally keyed on loadedKey alone: it changes only when a
+        // fresh page one lands, never on a mere `loadMore` append.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [portfolio.loadedKey]);
+      return { portfolio, selection };
+    }
+
+    const { result, rerender } = renderHook(({ query }) => useCombined(query), {
+      initialProps: { query: 'include_churned=1' },
+    });
+    await waitFor(() => expect(result.current.portfolio.rows.length).toBe(3));
+
+    act(() => result.current.selection.toggle(2)); // Initech: only visible with include_churned=1
+    expect(result.current.selection.selected.has(2)).toBe(true);
+
+    rerender({ query: '' });
+    await waitFor(() => expect(result.current.portfolio.rows.map((r) => r.id)).toEqual([7, 1]));
+    expect(result.current.selection.selected.has(2)).toBe(false);
   });
 });
