@@ -18,6 +18,13 @@ export interface AccountRowProps {
   /** Any row is selected: taps select instead of opening. */
   selecting: boolean;
   selected: boolean;
+  /** While this row's own section (or the flat list) is loading, or a bulk
+   *  action is running on it: its checkbox is disabled and a long press no
+   *  longer starts selection. */
+  selectDisabled?: boolean;
+  /** The selection is at its 500-id cap. An unchecked checkbox is disabled
+   *  (a checked one stays enabled, so it can still be unticked). */
+  atLimit?: boolean;
   open: boolean;
   onToggleSelect: (id: number) => void;
   onLongPress: (id: number) => void;
@@ -36,6 +43,8 @@ export function AccountRow({
   pins,
   selecting,
   selected,
+  selectDisabled = false,
+  atLimit = false,
   open,
   onToggleSelect,
   onLongPress,
@@ -47,6 +56,8 @@ export function AccountRow({
   const longPressed = useRef(false);
   const detailsId = `account-${row.id}-details`;
   const arr = row.arr == null ? '—' : formatCompactMoney(row.arr, currency);
+  const checkboxDisabled = selectDisabled || (atLimit && !selected);
+  const limitHint = atLimit && !selected ? '500 is the most you can select at once' : undefined;
 
   const cancelPress = () => {
     if (timer.current !== null) {
@@ -61,7 +72,7 @@ export function AccountRow({
 
   const startPress = (event: PointerEvent) => {
     // A mouse selects with the checkbox; long-press is for touch and pen.
-    if (event.pointerType === 'mouse') return;
+    if (event.pointerType === 'mouse' || selectDisabled) return;
     longPressed.current = false;
     cancelPress();
     timer.current = window.setTimeout(() => {
@@ -103,9 +114,11 @@ export function AccountRow({
           <input
             type="checkbox"
             checked={selected}
+            disabled={checkboxDisabled}
             onChange={() => onToggleSelect(row.id)}
             aria-label={`Select ${row.name}`}
-            className="w-4 h-4 cursor-pointer accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            title={limitHint}
+            className="w-4 h-4 cursor-pointer accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
           />
         </label>
 

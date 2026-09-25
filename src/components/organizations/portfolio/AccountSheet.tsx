@@ -28,19 +28,35 @@ export function AccountSheet({
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
+  // A caller re-rendering with a brand new inline `onClose` (the common
+  // case) must not re-run the effect below — that would re-focus Close and
+  // steal focus back from wherever the visitor has since tabbed to. Kept in
+  // a ref so Escape always calls whatever `onClose` is current.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     ref.current?.querySelector<HTMLElement>('button')?.focus();
+    // A background body scrolling under a fixed sheet is the one thing that
+    // makes a bottom sheet feel broken on a phone — lock it while open.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') onCloseRef.current();
       if (event.key === 'Tab' && ref.current) trapTab(event, ref.current);
     };
     window.addEventListener('keydown', onKey);
     return () => {
       window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previousOverflow;
       opener?.focus();
     };
-  }, [onClose]);
+    // Deliberately once on mount (see onCloseRef above) — not keyed on
+    // `onClose`.
+  }, []);
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end">

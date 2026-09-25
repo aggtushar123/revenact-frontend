@@ -3,7 +3,7 @@
 // (Task 13). Fast refresh doesn't apply to this module, same precedent as
 // rowParts.tsx and AccountDetails.tsx.
 /* eslint-disable react-refresh/only-export-components */
-import { useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useState, type ReactNode } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
@@ -18,6 +18,11 @@ const QUIET = `inline-flex min-h-11 sm:min-h-9 items-center justify-center gap-1
 export function sectionStartsOpen(index: number, total: number): boolean {
   return total <= 4 || index === 0;
 }
+
+/** A row renderer that also gets its own section's (or the flat list's)
+ *  `loading`, so it can disable that row's checkbox while a fetch for it is
+ *  in flight (spec §1's "disabled while loading" rule). */
+export type PortfolioRowRenderer = (row: PortfolioRow, state: { loading: boolean }) => ReactNode;
 
 export function RowSkeleton({ count }: { count: number }) {
   return (
@@ -88,6 +93,7 @@ function MoreButton({
 
 function Section({
   group,
+  groupsKey,
   params,
   version,
   currency,
@@ -96,14 +102,29 @@ function Section({
   onRowsLoaded,
 }: {
   group: PortfolioGroup;
+  /** The joined keys of every group currently shown, so this section's
+   *  `open` state can be reset below when the *set* of groups changes (a
+   *  filter change can shift which index this group sits at, or shift the
+   *  total across the "4 or fewer" line) even though React reuses this same
+   *  component instance (its own `key` — this group's key alone — didn't
+   *  change). Merely opening/closing this one section does not change it. */
+  groupsKey: string;
   params: PortfolioParams;
   version: number;
   currency: CurrencyCode;
   defaultOpen: boolean;
-  renderRow: (row: PortfolioRow) => ReactNode;
+  renderRow: PortfolioRowRenderer;
   onRowsLoaded: (rows: PortfolioRow[]) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  // Re-applies the start-open rule whenever the group set changes. A section
+  // that this flips from closed to open was never fetched (it was disabled),
+  // so this can trigger a fresh page-one fetch for it below — accepted, since
+  // the group set changing already means the list moved under the user.
+  useEffect(() => {
+    setOpen(defaultOpen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupsKey]);
   const bodyId = useId();
   const page = usePagedPortfolio(
     toApiQuery(params, { group_value: group.key, limit: String(SECTION_PAGE_SIZE) }),
@@ -147,7 +168,7 @@ function Section({
             <RowSkeleton count={Math.min(3, group.count)} />
           ) : (
             <ul className="flex flex-col gap-1.5" aria-busy={page.loading}>
-              {page.rows.map(renderRow)}
+              {page.rows.map((row) => renderRow(row, { loading: page.loading }))}
             </ul>
           )}
           <MoreButton
@@ -181,7 +202,13 @@ export function PortfolioSections({
   portfolio: PortfolioState;
   currency: CurrencyCode;
   filtered: boolean;
-  renderRow: (row: PortfolioRow) => ReactNode;
+  renderRow: PortfolioRowRenderer;
+  /** Rows that just landed (a page one or a `loadMore` append), for a
+   *  pinned-fields cache or the like. It only ever *adds* — it must never be
+   *  used to prune the selection against these rows (grouped mode has no one
+   *  full row set to prune against, and flat mode already prunes off
+   *  `portfolio.loadedKey`, which fires only on a fresh page one, not on
+   *  every append this callback also sees). */
   onRowsLoaded: (rows: PortfolioRow[]) => void;
   onClearFilters: () => void;
   onAdd: () => void;
@@ -215,9 +242,13 @@ export function PortfolioSections({
     );
   }
 
+  // `error` is a stale-but-still-shown re-fetch failure (spec §1: keep the
+  // last good list rather than blank it) and already ends in its own period
+  // (e.g. "Could not load organizations."), so appending a sentence needs
+  // its own leading capital, not a second period run on from the first.
   const staleError = error ? (
     <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
-      {error}. Showing the last result.
+      {error} Showing the last result.
       <button type="button" onClick={portfolio.retry} className={QUIET}>
         Try again
       </button>
@@ -228,7 +259,9 @@ export function PortfolioSections({
     return (
       <div aria-busy={portfolio.loading}>
         {staleError}
-        <ul className="flex flex-col gap-1.5">{portfolio.rows.map(renderRow)}</ul>
+        <ul className="flex flex-col gap-1.5">
+          {portfolio.rows.map((row) => renderRow(row, { loading: portfolio.loading }))}
+        </ul>
         <MoreButton
           next={portfolio.next}
           loading={portfolio.loadingMore}
@@ -240,6 +273,8 @@ export function PortfolioSections({
     );
   }
 
+  const groupsKey = data.groups.map((group) => group.key).join('|');
+
   return (
     <div className="flex flex-col gap-4" aria-busy={portfolio.loading}>
       {staleError}
@@ -247,6 +282,7 @@ export function PortfolioSections({
         <Section
           key={group.key}
           group={group}
+          groupsKey={groupsKey}
           params={params}
           version={version}
           currency={currency}

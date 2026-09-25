@@ -1,4 +1,5 @@
 import { vi } from 'vitest';
+import { LIFECYCLE_VALUES } from './portfolioParams';
 import type {
   BulkRequest,
   BulkResult,
@@ -190,14 +191,31 @@ export function buildPortfolio(query: URLSearchParams, rows: PortfolioRow[] = AL
       (!owner || (owner === 'unassigned' ? row.owner === null : String(row.owner?.id) === owner)),
   );
   const group = query.get('group') ?? '';
+  // Only `health` scopes group_value for real (Task 1's parked note) — this
+  // adds `lifecycle` too (T13 fix round 1: a test needs more than 4 groups
+  // to exercise "only the first section starts open").
   const groups =
     group === 'health'
       ? BAND_ORDER.map((band) => ({ band, rows: set.filter((row) => row.health.category === band) }))
           .filter((g) => g.rows.length > 0)
           .map((g) => ({ key: g.band, label: BAND_LABEL[g.band], count: g.rows.length, arr: sumArr(g.rows) }))
-      : [];
+      : group === 'lifecycle'
+        ? LIFECYCLE_VALUES.map((value) => set.filter((row) => row.lifecycle.value === value))
+            .filter((groupRows) => groupRows.length > 0)
+            .map((groupRows) => ({
+              key: groupRows[0].lifecycle.value,
+              label: groupRows[0].lifecycle.label,
+              count: groupRows.length,
+              arr: sumArr(groupRows),
+            }))
+        : [];
   const groupValue = query.get('group_value');
-  const scoped = groupValue && group === 'health' ? set.filter((row) => row.health.category === groupValue) : set;
+  const scoped =
+    groupValue && group === 'health'
+      ? set.filter((row) => row.health.category === groupValue)
+      : groupValue && group === 'lifecycle'
+        ? set.filter((row) => row.lifecycle.value === groupValue)
+        : set;
   const limit = Number(query.get('limit') ?? 50);
   const start = Number(query.get('cursor') ?? 0);
   return {

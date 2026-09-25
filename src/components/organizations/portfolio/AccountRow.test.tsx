@@ -130,6 +130,26 @@ describe('AccountRow', () => {
     expect(props.onLongPress).not.toHaveBeenCalled();
   });
 
+  it('disables the checkbox while selectDisabled, and suppresses a long-press select', () => {
+    vi.useFakeTimers();
+    const { props, header } = renderRow({ selecting: true, selectDisabled: true });
+    expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).toBeDisabled();
+    fireEvent.pointerDown(header);
+    vi.advanceTimersByTime(LONG_PRESS_MS);
+    expect(props.onLongPress).not.toHaveBeenCalled();
+  });
+
+  it('disables an unchecked checkbox at the selection limit, but not a checked one', () => {
+    const { unmount } = renderRow({ selecting: true, atLimit: true, selected: false });
+    const unchecked = screen.getByRole('checkbox', { name: 'Select Pizza Hut' });
+    expect(unchecked).toBeDisabled();
+    expect(unchecked).toHaveAttribute('title', '500 is the most you can select at once');
+    unmount();
+
+    renderRow({ selecting: true, atLimit: true, selected: true });
+    expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).not.toBeDisabled();
+  });
+
   it('reaches the chevron by Tab and toggles it with Enter and Space', async () => {
     const user = userEvent.setup();
     const { props } = renderRow();
