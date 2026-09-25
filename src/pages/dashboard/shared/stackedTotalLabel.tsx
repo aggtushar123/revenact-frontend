@@ -13,8 +13,13 @@ export interface StackedDatum {
 
 /** The highest segment that actually has accounts in it, or undefined if empty. */
 export function topSegment(datum: StackedDatum): HealthStatus | undefined {
-  for (let i = HEALTH_STACK.length - 1; i >= 0; i--) {
-    if (datum[HEALTH_STACK[i]] > 0) return HEALTH_STACK[i];
+  return topOf(datum as unknown as Record<string, unknown>, HEALTH_STACK) as HealthStatus | undefined;
+}
+
+/** The highest key of `stack` (bottom to top) with a value in `datum`. */
+function topOf(datum: Record<string, unknown>, stack: readonly string[]): string | undefined {
+  for (let i = stack.length - 1; i >= 0; i--) {
+    if (Number(datum[stack[i]]) > 0) return stack[i];
   }
   return undefined;
 }
@@ -53,19 +58,20 @@ function totalText(x: number, y: number, total: number, fontSize: number, anchor
  * label its row's own position in `data` instead.
  *
  * `horizontal` is for a `layout="vertical"` chart: the total sits just past
- * the bar's right end instead of above it.
+ * the bar's right end instead of above it. `stack` is the series order,
+ * bottom (or left) first, for a stack that is not the three health bands.
  */
-export function stackedTotalLabelList<T extends StackedDatum>(
-  status: HealthStatus,
+export function stackedTotalLabelList<T extends { total: number }>(
+  status: string,
   data: T[],
   fontSize = 10,
-  { horizontal = false } = {},
+  { horizontal = false, stack = HEALTH_STACK as readonly string[] } = {},
 ) {
   return {
     valueAccessor: (entry: { payload?: unknown }) => data.indexOf(entry.payload as T),
     content: function StackedTotalLabel({ x = 0, y = 0, width = 0, height = 0, value }: LabelContentProps) {
       const datum = data[Number(value)];
-      if (!datum || datum.total === 0 || topSegment(datum) !== status) return null;
+      if (!datum || datum.total === 0 || topOf(datum as Record<string, unknown>, stack) !== status) return null;
       return horizontal
         ? totalText(Number(x) + Number(width) + 6, Number(y) + Number(height) / 2 + 3, datum.total, fontSize, 'start')
         : totalText(Number(x) + Number(width) / 2, Number(y) - 6, datum.total, fontSize);

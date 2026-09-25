@@ -3,11 +3,17 @@ import { BarChart, Bar, Cell, LabelList, XAxis, YAxis, Tooltip, ResponsiveContai
 import type { TicketOrigin } from '../../../../../features/tickets/ticketsSlice';
 import { niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL, barListHeight } from '../../../shared/chartPalette';
+import { AXIS_BASE, truncTick } from '../../../shared/chartAxis';
 import { useDrill } from '../../../drill/useDrill';
 import { DrillTargets } from '../../../drill/DrillTargets';
 
 const PATH = '/tickets/stats/';
+/** Origin names print in full up to this many characters, then shorten
+ *  with the full name on hover. */
+const NAME_CHARS = 18;
+/** Width of one 10px tick character, as the shared axis kit estimates it. */
+const CHAR_PX = 6;
 
 /** One distinct display name per origin. Connector names are the user's
  *  own, so two can match each other, or match the "Revenact" bucket for
@@ -90,36 +96,42 @@ export function OriginBar({
     onSelect: (trigger: HTMLElement) => openSegment(row, trigger),
   }));
 
+  // Room for the longest name, so a name is only shortened when it is
+  // genuinely long; a fixed 78px cut "Zendesk (support)" to "Zendesk (s…".
+  const longest = Math.max(4, ...ranked.map((row) => row.label.length));
+  const axisWidth = Math.min(NAME_CHARS, longest) * CHAR_PX + 10;
+
   return (
-    <div className="relative w-full h-[280px] p-4 flex flex-col bg-surface border border-line-subtle rounded-lg shadow-sm">
+    <div className="relative w-full h-full p-4 flex flex-col bg-surface border border-line-subtle rounded-lg shadow-sm">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-[13px] font-bold text-ink">Tickets By Origin</h3>
       </div>
 
       <DrillTargets label="Tickets By Origin" items={drillItems} />
 
-      <div className="flex-1 w-full min-h-[200px] relative -ml-4">
-        {ranked.length === 0 ? (
-          <p className="text-[12px] text-ink-faint">No tickets match these filters.</p>
-        ) : (
+      {ranked.length === 0 ? (
+        <p className="text-[12px] text-ink-faint">No tickets match these filters.</p>
+      ) : (
+        // One 26px row per origin, so twelve connectors get room and three do
+        // not float in a tall card. Origins are bounded by the connectors a
+        // workspace has, so the card grows rather than scrolls.
+        <div data-testid="origin-plot" className="relative w-full" style={{ height: barListHeight(ranked.length, 26, 200) }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               layout="vertical"
               data={ranked}
-              margin={{ top: 0, right: 34, left: 6, bottom: 0 }}
+              margin={{ top: 0, right: 34, left: 0, bottom: 0 }}
               barSize={16}
             >
+              {/* Hidden: every bar carries its count at its end. */}
               <XAxis type="number" hide domain={[0, max]} allowDecimals={false} />
               <YAxis
+                {...AXIS_BASE}
                 type="category"
                 dataKey="label"
-                axisLine={false}
-                tickLine={false}
-                // 78, not the assignee chart's 110: that card is three times
-                // as wide. Here the name column was taking more of the card
-                // than the bars, so the largest origin drew 30px.
-                width={78}
-                tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 500 }}
+                width={axisWidth}
+                interval={0}
+                tick={truncTick(NAME_CHARS)}
               />
               <Tooltip
                 cursor={{ fill: CURSOR_FILL }}
@@ -148,8 +160,8 @@ export function OriginBar({
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

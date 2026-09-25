@@ -115,6 +115,12 @@ describe('tick formatters', () => {
     expect(dateTick('2026-12-31T10:00:00Z')).toBe('31 Dec');
   });
 
+  it('reads the backend\'s pre-formatted month and week labels too', () => {
+    expect(dateTick('Aug 2026')).toBe("Aug '26");
+    expect(dateTick('Jun 15, 2025')).toBe('15 Jun');
+    expect(dateTick('Sep 1, 2026')).toBe('1 Sep');
+  });
+
   it('date leaves anything it cannot read alone', () => expect(dateTick('Q3')).toBe('Q3'));
 });
 

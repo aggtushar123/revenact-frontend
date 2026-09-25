@@ -54,6 +54,27 @@ describe('stackedTotalLabelList', () => {
     expect(labels(container)).toEqual(['2', '5']);
   });
 
+  it('takes any stack order, not just the three health bands', () => {
+    const stack = ['Open', 'Closed'];
+    const tickets = [
+      { name: 'a', Open: 2, Closed: 0, total: 2 },
+      { name: 'b', Open: 1, Closed: 3, total: 4 },
+    ];
+    const { container } = render(
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={tickets}>
+          <XAxis dataKey="name" />
+          {stack.map((status) => (
+            <Bar key={status} dataKey={status} stackId="s" isAnimationActive={false}>
+              <LabelList {...stackedTotalLabelList(status, tickets, 10, { stack })} />
+            </Bar>
+          ))}
+        </BarChart>
+      </ResponsiveContainer>,
+    );
+    expect(labels(container)).toEqual(['2', '4']);
+  });
+
   it('puts a horizontal bar\'s total just past its right end', () => {
     const { container } = render(
       <ResponsiveContainer width="100%" height="100%">

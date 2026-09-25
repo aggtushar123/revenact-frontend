@@ -80,8 +80,13 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 /** "2026-09-01" → "1 Sep", "2026-09" → "Sep '26". Read from the string, not a
  *  `Date`, so a UTC midnight never shifts a day in the viewer's timezone.
- *  Anything else is returned unchanged. */
+ *  The backend's pre-formatted labels read the same way: "Aug 2026" →
+ *  "Aug '26", "Jun 15, 2025" → "15 Jun". Anything else is returned unchanged. */
 export function dateTick(iso: string): string {
+  const label = /^([A-Z][a-z]{2}) (?:(\d{1,2}), )?(\d{4})$/.exec(iso);
+  if (label && MONTHS.includes(label[1])) {
+    return label[2] ? `${Number(label[2])} ${label[1]}` : `${label[1]} '${label[3].slice(2)}`;
+  }
   const match = /^(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(iso);
   const month = match ? MONTHS[Number(match[2]) - 1] : undefined;
   if (!match || !month) return iso;

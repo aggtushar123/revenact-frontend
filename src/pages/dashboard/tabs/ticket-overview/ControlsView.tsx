@@ -45,7 +45,7 @@ export function ControlsView() {
           statsLoading && stats ? 'opacity-60' : ''
         }`}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 min-h-[300px]">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <div className="lg:col-span-1">
             <KPIGrid kpis={stats?.kpis ?? null} query={query} drillable={!statsLoading} />
           </div>
@@ -58,12 +58,12 @@ export function ControlsView() {
             <StatusDonut data={stats?.status ?? []} query={query} drillable={!statsLoading} />
           </div>
 
-          <div className="w-full lg:w-[240px] shrink-0">
+          <div className="w-full">
             <OriginBar data={stats?.origin ?? []} query={query} drillable={!statsLoading} />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 min-h-[350px]">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden flex flex-col">
             <AssigneesStackedBar data={stats?.assignees ?? []} query={query} drillable={!statsLoading} />
           </div>
