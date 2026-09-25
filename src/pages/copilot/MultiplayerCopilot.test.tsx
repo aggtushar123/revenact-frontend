@@ -111,7 +111,7 @@ function makeFetchMock() {
               id: session.events.length + 1,
               kind: 'redirected',
               actor: alice,
-              message: { id: 3, role: 'user', content: body.content, created_at: 't3' },
+              message: { id: 3, role: 'user', created_at: 't3' },
               payload: {},
               created_at: 't3',
             },

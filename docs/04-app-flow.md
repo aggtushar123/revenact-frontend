@@ -487,7 +487,7 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
   - **Entry points.**
     - Typing.
     - "Ask about these" in the drill panel: it closes the drill first, because
-      the drill sits over the rail at `lg` and up, then opens the rail and
+      the drill takes the rail's box at `lg` and up, then opens the rail and
       prefills "Why are these in <segment>?" with focus `{kind:'companies',
       ids}`. It is enabled only for a complete list of up to 200 accounts;
       otherwise it is disabled with a note explaining the 200-account limit,
@@ -585,8 +585,13 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     anywhere: every figure there is an aggregate across a product's own
     customers, never a set of accounts.
   - **Panel.** `role="dialog"`, `aria-labelledby` the title. From `1024px`
-    (`lg`) it is a 360px panel positioned over the Ask rail (absolute, in the
-    rail's box: `lg:top-0 lg:right-4 lg:bottom-4`), so opening it never narrows the figures; below that it
+    (`lg`) it takes the Ask rail's box, 320px wide. With the rail showing
+    it lies over the rail and covers it exactly (absolute: `lg:top-0
+    lg:right-4 lg:bottom-4`, against `DashboardFrame`'s `relative` row). With
+    the rail hidden (switch off) or collapsed it is a 320px flex item in the
+    rail's place in that row, so the content column narrows while the drill
+    is open and returns to full width when it closes; the figures are never
+    covered. Below that it
     is a full-screen sheet (`aria-modal="true"`) with
     its own Tab/Shift+Tab focus trap, since there's nowhere else useful for
     focus to go. Escape and the close button both close it from either

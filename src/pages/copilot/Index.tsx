@@ -23,6 +23,7 @@ import { askQuestion, fetchMyQuestions } from '../../features/knowledge/knowledg
 import { connectSessionSocket } from '../../features/copilotSessions/sessionSocket';
 import {
   sessionSnapshotReceived,
+  sessionPushReceived,
   myInvitesReceived,
   inviteRemoved,
 } from '../../features/copilotSessions/copilotSessionsSlice';
@@ -114,7 +115,7 @@ export function CopilotIndex() {
     };
 
     const socket = connectSessionSocket(activeConversationId, accessToken, (session) => {
-      dispatch(sessionSnapshotReceived(session));
+      dispatch(sessionPushReceived(session));
       refreshMessages();
     });
 
