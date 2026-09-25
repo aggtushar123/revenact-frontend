@@ -9,6 +9,7 @@ import { useDrill } from '../drill/useDrill';
 import { useAsk } from '../ask/useAsk';
 import { Panel } from '../shared/Panel';
 import { Empty, ErrorState } from '../shared/DataState';
+import { ScrollArea } from '../shared/ScrollTable';
 
 const KIND_LABEL: Record<AttentionKind, string> = {
   renewal: 'Renewal',
@@ -223,115 +224,117 @@ export function AttentionList({
             Could not load for these filters. Showing the last list.
           </p>
         )}
-        <ol aria-label="Needs attention" aria-busy={stale || undefined} className="divide-y divide-line">
-          {entries.map(({ item, acted: done }, index) => {
-            if (done) {
-              return (
-                <li key={item.key} aria-live="polite" className="flex items-center justify-between gap-3 py-3">
-                  <p className="text-[13px] text-ink-muted min-w-0 truncate">
-                    {ACTED_LINE[done]} · <span className="text-ink">{item.title}</span>
-                  </p>
-                  <button
-                    type="button"
-                    ref={register(`${item.key}:undo`)}
-                    aria-label={`Undo: ${item.title}`}
-                    className={QUIET}
-                    disabled={stale}
-                    aria-disabled={pending[item.key] || undefined}
-                    onClick={() => !pending[item.key] && undo(item)}
-                  >
-                    Undo
-                  </button>
-                </li>
-              );
-            }
-            return (
-              <li key={item.key} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-3">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 rounded-md bg-subtle px-1.5 py-0.5 text-[11px] font-semibold text-ink-muted">
-                      {KIND_LABEL[item.kind]}
-                    </span>
-                    {item.customer_id !== null ? (
-                      <Link
-                        to={`/organizations/${item.customer_id}`}
-                        className="min-w-0 truncate text-[13px] font-semibold text-ink hover:underline rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                      >
-                        {item.title}
-                      </Link>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(event) =>
-                          open(
-                            {
-                              title: item.title,
-                              figure: item.companies.length === 1 ? '1 company' : `${item.companies.length} companies`,
-                              source: {
-                                kind: 'rows',
-                                rows: item.companies.map((c) => ({ id: String(c.id), name: c.name })),
-                              },
-                            },
-                            event.currentTarget,
-                          )
-                        }
-                        className="min-w-0 truncate text-left text-[13px] font-semibold text-ink hover:underline rounded cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                      >
-                        {item.title}
-                      </button>
-                    )}
-                  </div>
-                  <p className="mt-1 text-[11px] text-ink-muted">{item.reason}</p>
-                </div>
-                <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shrink-0">
-                  <span className="text-right">
-                    <span className="block font-mono-brand tabular-nums text-[13px] text-ink">
-                      {formatCompactMoney(item.at_stake, currency)}
-                    </span>
-                    <span className="block text-[11px] text-ink-muted">at stake</span>
-                  </span>
-                  <span className="flex gap-2">
+        <ScrollArea label="Needs attention, scrollable" maxHeight={560} className="-mx-1 px-1">
+          <ol aria-label="Needs attention" aria-busy={stale || undefined} className="divide-y divide-line">
+            {entries.map(({ item, acted: done }, index) => {
+              if (done) {
+                return (
+                  <li key={item.key} aria-live="polite" className="flex items-center justify-between gap-3 py-3">
+                    <p className="text-[13px] text-ink-muted min-w-0 truncate">
+                      {ACTED_LINE[done]} · <span className="text-ink">{item.title}</span>
+                    </p>
                     <button
                       type="button"
-                      ref={register(`${item.key}:snooze`)}
-                      aria-label={`Snooze ${item.title} for 7 days`}
-                      className={SECONDARY}
-                      disabled={stale}
-                      aria-disabled={pending[item.key] || undefined}
-                      onClick={() => !pending[item.key] && act(item, index, 'snoozed')}
-                    >
-                      Snooze 7 days
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Mark ${item.title} done`}
+                      ref={register(`${item.key}:undo`)}
+                      aria-label={`Undo: ${item.title}`}
                       className={QUIET}
                       disabled={stale}
                       aria-disabled={pending[item.key] || undefined}
-                      onClick={() => !pending[item.key] && act(item, index, 'done')}
+                      onClick={() => !pending[item.key] && undo(item)}
                     >
-                      Done
+                      Undo
                     </button>
-                    {ask && (
+                  </li>
+                );
+              }
+              return (
+                <li key={item.key} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 py-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="shrink-0 rounded-md bg-subtle px-1.5 py-0.5 text-[11px] font-semibold text-ink-muted">
+                        {KIND_LABEL[item.kind]}
+                      </span>
+                      {item.customer_id !== null ? (
+                        <Link
+                          to={`/organizations/${item.customer_id}`}
+                          className="min-w-0 truncate text-[13px] font-semibold text-ink hover:underline rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                        >
+                          {item.title}
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(event) =>
+                            open(
+                              {
+                                title: item.title,
+                                figure: item.companies.length === 1 ? '1 company' : `${item.companies.length} companies`,
+                                source: {
+                                  kind: 'rows',
+                                  rows: item.companies.map((c) => ({ id: String(c.id), name: c.name })),
+                                },
+                              },
+                              event.currentTarget,
+                            )
+                          }
+                          className="min-w-0 truncate text-left text-[13px] font-semibold text-ink hover:underline rounded cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                        >
+                          {item.title}
+                        </button>
+                      )}
+                    </div>
+                    <p className="mt-1 text-[11px] text-ink-muted">{item.reason}</p>
+                  </div>
+                  <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shrink-0">
+                    <span className="text-right">
+                      <span className="block font-mono-brand tabular-nums text-[13px] text-ink">
+                        {formatCompactMoney(item.at_stake, currency)}
+                      </span>
+                      <span className="block text-[11px] text-ink-muted">at stake</span>
+                    </span>
+                    <span className="flex gap-2">
                       <button
                         type="button"
-                        aria-label={`Ask why ${item.title} is on my list`}
+                        ref={register(`${item.key}:snooze`)}
+                        aria-label={`Snooze ${item.title} for 7 days`}
+                        className={SECONDARY}
+                        disabled={stale}
+                        aria-disabled={pending[item.key] || undefined}
+                        onClick={() => !pending[item.key] && act(item, index, 'snoozed')}
+                      >
+                        Snooze 7 days
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Mark ${item.title} done`}
                         className={QUIET}
                         disabled={stale}
-                        aria-disabled={Boolean(ask.thread.pending) || pending[item.key] || undefined}
-                        onClick={() =>
-                          !ask.thread.pending && !pending[item.key] && ask.ask('Why is this on my list?', { kind: 'attention', key: item.key })
-                        }
+                        aria-disabled={pending[item.key] || undefined}
+                        onClick={() => !pending[item.key] && act(item, index, 'done')}
                       >
-                        Why?
+                        Done
                       </button>
-                    )}
-                  </span>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+                      {ask && (
+                        <button
+                          type="button"
+                          aria-label={`Ask why ${item.title} is on my list`}
+                          className={QUIET}
+                          disabled={stale}
+                          aria-disabled={Boolean(ask.thread.pending) || pending[item.key] || undefined}
+                          onClick={() =>
+                            !ask.thread.pending && !pending[item.key] && ask.ask('Why is this on my list?', { kind: 'attention', key: item.key })
+                          }
+                        >
+                          Why?
+                        </button>
+                      )}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
+        </ScrollArea>
       </>
     );
   }

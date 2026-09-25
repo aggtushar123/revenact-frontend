@@ -99,6 +99,13 @@ describe('AttentionList', () => {
     expect(document.body.textContent).not.toContain('band');
   });
 
+  it('scrolls a long list inside the card rather than growing the page', () => {
+    renderList();
+    const scroller = screen.getByRole('region', { name: 'Needs attention, scrollable' });
+    expect(scroller).toHaveStyle({ maxHeight: '560px' });
+    expect(within(scroller).getByRole('list', { name: 'Needs attention' })).toBeInTheDocument();
+  });
+
   it('shows the count in the header', () => {
     renderList();
     expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeInTheDocument();
