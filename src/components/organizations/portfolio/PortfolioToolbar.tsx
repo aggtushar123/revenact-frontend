@@ -77,7 +77,7 @@ export function PortfolioToolbar({
           type="search"
           value={text}
           onChange={(event) => setText(event.target.value)}
-          placeholder={LABEL}
+          placeholder={isSm ? LABEL : 'Search'}
           className={`w-full min-h-11 sm:min-h-9 rounded-lg border border-line bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint hover:border-line-strong ${FOCUS}`}
         />
       </label>
