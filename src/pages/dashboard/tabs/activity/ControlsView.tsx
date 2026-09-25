@@ -114,7 +114,7 @@ export function ControlsView() {
         </KpiStrip>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="xl:col-span-2 bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
+          <div className="xl:col-span-2 bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
             <TouchTimeline
               weeks={stats?.timeline ?? []}
               sources={stats?.sources ?? []}
@@ -122,7 +122,7 @@ export function ControlsView() {
               windowDays={windowDays}
             />
           </div>
-          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
             <CadenceChart
               buckets={stats?.cadence ?? []}
               currency={currency}

@@ -1,7 +1,9 @@
-import { AreaChart, Area, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { ActivityWeek, SourceCount } from '../../../../../features/activity/activitySlice';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 
 /** One colour per source. Not semantic — a note is not better or worse than a
  *  call — so these are five steps of the monochrome scale rather than a
@@ -17,6 +19,10 @@ const SOURCE_SERIES = [
   { key: 'emails', label: 'Emails', color: ROLE.inkSoft },
   { key: 'notes', label: 'Notes', color: ROLE.faint },
 ] as const;
+
+/** The key reads top to bottom like the stack: the last series drawn is the
+ *  top band. */
+const LEGEND = [...SOURCE_SERIES].reverse().map((series) => ({ label: series.label, color: series.color }));
 
 export interface TouchTimelineProps {
   weeks: ActivityWeek[];
@@ -61,6 +67,7 @@ export function TouchTimeline({ weeks, sources, inbound, windowDays }: TouchTime
           </p>
         </div>
       </div>
+      <ChartLegend className="px-4 mt-2" items={LEGEND} />
 
       <div className="flex-1 w-full min-h-0 px-2 pb-2">
         {weeks.length === 0 ? (
@@ -69,26 +76,14 @@ export function TouchTimeline({ weeks, sources, inbound, windowDays }: TouchTime
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={weeks} margin={{ top: 12, right: 12, left: -14, bottom: 0 }}>
-              <XAxis
-                dataKey="date"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-                interval="preserveStartEnd"
-                minTickGap={24}
-              />
-              <YAxis
-                axisLine={false}
-                tickLine={false}
-                width={40}
-                allowDecimals={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-              />
-              <Tooltip
-                contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
-              />
-              <Legend verticalAlign="top" height={22} iconType="plainline" />
+            <AreaChart data={weeks} margin={chartMargin({ x: true, left: true })}>
+              {/* `date` arrives formatted ("Jun 8"). */}
+              <XAxis {...AXIS_BASE} dataKey="date" {...categoryAxis(weeks.length)} label={axisLabel('Week', 'x')} />
+              <YAxis {...AXIS_BASE} width={32} allowDecimals={false} label={axisLabel('Touches / week')} />
+              <Tooltip contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }} />
+              {/* Solid fills with a surface-coloured edge: five greys at 45%
+                  opacity blended into one another and could not be told
+                  apart. */}
               {SOURCE_SERIES.map((series) => (
                 <Area
                   key={series.key}
@@ -97,9 +92,10 @@ export function TouchTimeline({ weeks, sources, inbound, windowDays }: TouchTime
                   dataKey={series.key}
                   name={series.label}
                   stackId="touches"
-                  stroke={series.color}
+                  stroke="var(--bg-surface)"
+                  strokeWidth={1}
                   fill={series.color}
-                  fillOpacity={0.45}
+                  fillOpacity={0.9}
                 />
               ))}
             </AreaChart>

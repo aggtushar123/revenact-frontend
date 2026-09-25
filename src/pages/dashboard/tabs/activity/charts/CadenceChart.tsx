@@ -3,19 +3,30 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { CadenceBucket } from '../../../../../features/activity/activitySlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { CURSOR_FILL, ROLE, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import { emptyStackMarker } from '../../../shared/stackedTotalLabel';
 
 /** Fresher is better, so this one *is* a scale — and "never" is grey rather
  *  than the darkest red, because it is a different kind of fact: an absence of
  *  records, not a long silence. */
 const BUCKET_COLORS: Record<string, string> = {
-  week: 'var(--success)',
-  month: 'var(--success)',
-  stale: 'var(--warning)',
-  dark: 'var(--danger)',
-  cold: 'var(--danger)',
-  never: 'var(--text-tertiary)',
+  week: ROLE.gain,
+  month: ROLE.gain,
+  stale: ROLE.caution,
+  dark: ROLE.loss,
+  cold: ROLE.loss,
+  never: ROLE.faint,
 };
+
+/** What the four colours mean. */
+const LEGEND = [
+  { label: 'On track', color: ROLE.gain },
+  { label: 'Stale', color: ROLE.caution },
+  { label: 'Dark', color: ROLE.loss },
+  { label: 'Never', color: ROLE.faint },
+];
 
 /** Axis labels. The API's own names carry their units ("No contact logged"),
  *  which is right in a tooltip and collides with its neighbour under a bar —
@@ -66,33 +77,27 @@ export function CadenceChart({ buckets, currency, threshold }: CadenceChartProps
           </p>
         )}
       </div>
+      <ChartLegend className="px-4 mt-2" items={LEGEND} />
 
-      <div className="flex-1 w-full min-h-0 px-2 pb-3">
+      <div className="flex-1 w-full min-h-0 px-2 pb-1">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={buckets.map((bucket) => ({
               ...bucket,
               short: SHORT_LABELS[bucket.key] ?? bucket.name,
             }))}
-            margin={{ top: 14, right: 12, left: -18, bottom: 4 }}
+            margin={chartMargin({ x: true, left: true })}
             barSize={40}
           >
             <XAxis
+              {...AXIS_BASE}
               dataKey="short"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-secondary)', fontSize: 10 }}
-              interval={0}
+              {...categoryAxis(buckets.length)}
+              label={axisLabel('Days since last contact', 'x')}
             />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              width={38}
-              allowDecimals={false}
-              tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-            />
+            <YAxis {...AXIS_BASE} width={32} allowDecimals={false} label={axisLabel('Accounts')} />
             <Tooltip
-              cursor={{ fill: 'var(--bg-subtle)' }}
+              cursor={{ fill: CURSOR_FILL }}
               contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               formatter={(value, _name, item) => [
                 `${value} account${value === 1 ? '' : 's'} · ${formatMoney(
@@ -102,11 +107,18 @@ export function CadenceChart({ buckets, currency, threshold }: CadenceChartProps
                 item?.payload?.name ?? '',
               ]}
             />
-            <Bar {...STATIC_SERIES} dataKey="accounts" radius={[3, 3, 0, 0]}>
+            <Bar {...STATIC_SERIES} dataKey="accounts" stackId="cadence" radius={[3, 3, 0, 0]}>
               {buckets.map((bucket) => (
-                <Cell key={bucket.key} fill={BUCKET_COLORS[bucket.key] ?? 'var(--text-tertiary)'} />
+                <Cell key={bucket.key} fill={BUCKET_COLORS[bucket.key] ?? ROLE.faint} />
               ))}
             </Bar>
+            {/* A bucket nobody sits in keeps a hairline and "0", so it reads
+                as empty rather than as a gap in the data. */}
+            <Bar
+              {...STATIC_SERIES}
+              {...emptyStackMarker(buckets.map((bucket) => bucket.accounts), '0')}
+              stackId="cadence"
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>

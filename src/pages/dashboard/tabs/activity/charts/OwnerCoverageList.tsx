@@ -56,7 +56,8 @@ export function OwnerCoverageList({
                   aria-label={`${owner.owner}: ${owner.touched} of ${owner.accounts} accounts touched, ${owner.dark} gone quiet`}
                 >
                   <div
-                    className="h-full rounded-[3px] bg-success/70"
+                    // Ink, not green: a touched account is coverage, not a gain.
+                    className="h-full rounded-[3px] bg-ink"
                     style={{ width: `${share}%` }}
                   />
                 </div>

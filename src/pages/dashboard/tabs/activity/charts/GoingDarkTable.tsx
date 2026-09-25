@@ -1,6 +1,7 @@
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { DarkAccount } from '../../../../../features/activity/activitySlice';
 import { formatMoney } from '../../../../../features/customers/formatters';
+import { ScrollTable } from '../../../shared/ScrollTable';
 
 const HEALTH_STYLE: Record<DarkAccount['health_category'], string> = {
   good: 'bg-success-dim text-success',
@@ -33,7 +34,7 @@ export interface GoingDarkTableProps {
  */
 export function GoingDarkTable({ rows, currency, threshold }: GoingDarkTableProps) {
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full flex flex-col">
       <div className="px-4 pt-3">
         <h3 className="text-[13px] font-bold text-ink">Going quiet</h3>
         <p className="text-[11px] text-ink-faint mt-[1px]">
@@ -46,7 +47,9 @@ export function GoingDarkTable({ rows, currency, threshold }: GoingDarkTableProp
           Every account in this selection has been contacted inside {threshold} days.
         </p>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto px-2 pb-3 pt-2">
+        // Scrolls inside its card with the header pinned, instead of growing
+        // the page by every quiet account.
+        <ScrollTable caption="Going quiet" maxHeight={420} className="mx-2 mb-3 mt-2">
           <table className="w-full border-collapse">
             <thead>
               <tr className="text-left">
@@ -66,23 +69,16 @@ export function GoingDarkTable({ rows, currency, threshold }: GoingDarkTableProp
                   key={row.id}
                   className="border-t border-line-subtle hover:bg-subtle/60 transition-colors"
                 >
-                  <td className="px-2 py-[7px] max-w-[220px]">
+                  <td className="px-2 py-[7px]">
                     <div className="flex items-center gap-2">
                       <span
                         className={`px-1.5 py-[1px] rounded text-[10px] font-bold shrink-0 ${HEALTH_STYLE[row.health_category]}`}
                       >
                         {HEALTH_LABEL[row.health_category]}
                       </span>
-                      <span className="text-[12.5px] font-medium text-ink truncate">
-                        {row.name}
-                      </span>
+                      <span className="text-[12.5px] font-medium text-ink">{row.name}</span>
                     </div>
-                    <p className="text-[10.5px] text-ink-faint truncate mt-[1px]">
-                      {row.lifecycle_stage}
-                      {/* The rubric's narrower measure, when it disagrees.
-                          Both are true; they count different things. */}
-
-                    </p>
+                    <p className="text-[10.5px] text-ink-faint mt-[1px]">{row.lifecycle_stage}</p>
                   </td>
                   <td className="px-2 py-[7px] text-[12px] font-semibold text-danger tabular-nums whitespace-nowrap">
                     {row.days_since_contact === null
@@ -92,14 +88,14 @@ export function GoingDarkTable({ rows, currency, threshold }: GoingDarkTableProp
                   <td className="px-2 py-[7px] text-[12px] text-ink tabular-nums whitespace-nowrap">
                     {row.arr === null ? '—' : formatMoney(row.arr, currency)}
                   </td>
-                  <td className="px-2 py-[7px] text-[12px] text-ink-muted truncate max-w-[140px]">
+                  <td className="px-2 py-[7px] text-[12px] text-ink-muted whitespace-nowrap">
                     {row.owner}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollTable>
       )}
     </div>
   );
