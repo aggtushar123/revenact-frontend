@@ -77,4 +77,34 @@ describe('FiltersPanel', () => {
     expect(screen.queryByRole('combobox', { name: 'Group' })).not.toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'Filters' })).not.toHaveAttribute('aria-modal');
   });
+
+  it('focuses the owner select first, not the close button', () => {
+    renderPanel();
+    expect(screen.getByRole('combobox', { name: 'Owner' })).toHaveFocus();
+  });
+
+  it('closes on an outside click but not on its trigger, and hands focus back to the trigger', async () => {
+    const onClose = vi.fn();
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Filters';
+    document.body.appendChild(trigger);
+    render(
+      <FiltersPanel
+        params={parseParams(new URLSearchParams())}
+        update={vi.fn()}
+        options={FILTER_OPTIONS}
+        isSm
+        onClose={onClose}
+        onExport={vi.fn()}
+        exporting={false}
+        onAdd={vi.fn()}
+        triggerRef={{ current: trigger }}
+      />,
+    );
+    await userEvent.click(trigger);
+    expect(onClose).not.toHaveBeenCalled();
+    await userEvent.click(document.body);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    document.body.removeChild(trigger);
+  });
 });

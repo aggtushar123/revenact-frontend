@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type RefObject } from 'react';
 import type { ColumnId } from '../tableData';
 import { MAX_PINS } from '../../../features/organizations/pinnedFields';
 import { PANELS, PANEL_ORDER, PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
@@ -9,20 +9,43 @@ export function PinFieldsMenu({
   pins,
   onToggle,
   onClose,
+  triggerRef,
 }: {
   pins: ColumnId[];
   onToggle: (id: ColumnId) => void;
   onClose: () => void;
+  /** The toolbar's "Pin fields" button, excluded from the "click outside"
+   *  close check and where focus goes back to on close (see FiltersPanel's
+   *  triggerRef for why the trigger itself must never count as outside). */
+  triggerRef?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const trigger = triggerRef?.current ?? null;
     ref.current?.querySelector<HTMLElement>('input')?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (ref.current?.contains(target)) return;
+      if (trigger?.contains(target)) return;
+      // Stops the browser's own mousedown default action (blur the current
+      // focus, then focus whatever was clicked, or nothing) from running
+      // after this handler and undoing the trigger.focus() the unmount
+      // cleanup below is about to do.
+      event.preventDefault();
+      onClose();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+    document.addEventListener('mousedown', onPointerDown);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.removeEventListener('mousedown', onPointerDown);
+      (trigger ?? previouslyFocused)?.focus();
+    };
+  }, [onClose, triggerRef]);
 
   const full = pins.length >= MAX_PINS;
   return (
@@ -37,7 +60,7 @@ export function PinFieldsMenu({
             {PANEL_ORDER[panel.key].map((id) => {
               const checked = pins.includes(id);
               return (
-                <label key={id} className={`flex min-h-8 items-center gap-2 text-[13px] ${!checked && full ? 'text-ink-faint' : 'text-ink'}`}>
+                <label key={id} className={`flex min-h-11 sm:min-h-8 items-center gap-2 text-[13px] ${!checked && full ? 'text-ink-faint' : 'text-ink'}`}>
                   <input
                     type="checkbox"
                     checked={checked}

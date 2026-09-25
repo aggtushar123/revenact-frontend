@@ -64,6 +64,45 @@ describe('PortfolioToolbar', () => {
     expect(screen.getByRole('dialog', { name: 'Pin fields' })).toBeInTheDocument();
   });
 
+  it('returns focus to the Filters button when the panel closes', async () => {
+    renderToolbar();
+    const button = screen.getByRole('button', { name: /^Filters/ });
+    await userEvent.click(button);
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+  });
+
+  it('returns focus to the Pin fields button when the menu closes', async () => {
+    renderToolbar();
+    const button = screen.getByRole('button', { name: 'Pin fields' });
+    await userEvent.click(button);
+    expect(screen.getByRole('dialog', { name: 'Pin fields' })).toBeInTheDocument();
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog', { name: 'Pin fields' })).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+  });
+
+  it('closes the Filters popover on an outside click and returns focus to the trigger', async () => {
+    renderToolbar();
+    const button = screen.getByRole('button', { name: /^Filters/ });
+    await userEvent.click(button);
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument();
+    await userEvent.click(document.body);
+    expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument();
+    expect(button).toHaveFocus();
+  });
+
+  it('toggles the Filters popover closed via its own trigger, rather than reopening it', async () => {
+    renderToolbar();
+    const button = screen.getByRole('button', { name: /^Filters/ });
+    await userEvent.click(button);
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument();
+    await userEvent.click(button);
+    expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument();
+  });
+
   it('collapses to Search and Filters on phones', () => {
     renderToolbar('', false);
     expect(screen.getByRole('searchbox')).toBeInTheDocument();

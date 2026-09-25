@@ -3,7 +3,7 @@
 // (Task 10). Fast refresh doesn't apply to this shared, mostly-presentational
 // module (same precedent as rowParts.tsx, Task 4).
 /* eslint-disable react-refresh/only-export-components */
-import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
 import { ArrowDown, ArrowUp, Download, Plus, X } from 'lucide-react';
 import { trapTab } from '../../../lib/focusTrap';
 import { SORT_OPTIONS } from '../../../features/organizations/portfolioFields';
@@ -140,6 +140,7 @@ export function FiltersPanel({
   onExport,
   exporting,
   onAdd,
+  triggerRef,
 }: {
   params: PortfolioParams;
   update: (patch: Partial<PortfolioParams>) => void;
@@ -149,19 +150,44 @@ export function FiltersPanel({
   onExport: () => void;
   exporting: boolean;
   onAdd: () => void;
+  /** The toolbar's "Filters" button. Excluded from the "click outside"
+   *  close check entirely — not just from where the popover itself sits —
+   *  so a click that reopens it (its own onClick toggle) never races a
+   *  mousedown that would otherwise close it first. Also where focus goes
+   *  back to on close. */
+  triggerRef?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const ownerRef = useRef<HTMLSelectElement>(null);
   const ownerId = useId();
 
   useEffect(() => {
-    ref.current?.querySelector<HTMLElement>('button, select, input')?.focus();
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const trigger = triggerRef?.current ?? null;
+    ownerRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
       if (!isSm && event.key === 'Tab' && ref.current) trapTab(event, ref.current);
     };
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (ref.current?.contains(target)) return;
+      if (trigger?.contains(target)) return;
+      // Stops the browser's own mousedown default action (blur the current
+      // focus, then focus whatever was clicked, or nothing) from running
+      // after this handler and undoing the trigger.focus() the unmount
+      // cleanup below is about to do.
+      event.preventDefault();
+      onClose();
+    };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [isSm, onClose]);
+    if (isSm) document.addEventListener('mousedown', onPointerDown);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      if (isSm) document.removeEventListener('mousedown', onPointerDown);
+      (trigger ?? previouslyFocused)?.focus();
+    };
+  }, [isSm, onClose, triggerRef]);
 
   const body = (
     <div className="flex flex-col gap-4">
@@ -188,7 +214,7 @@ export function FiltersPanel({
           Owner
         </label>
         {/* The server's options already include Unassigned. */}
-        <select id={ownerId} className={SELECT} value={params.owner} onChange={(event) => update({ owner: event.target.value })}>
+        <select ref={ownerRef} id={ownerId} className={SELECT} value={params.owner} onChange={(event) => update({ owner: event.target.value })}>
           <option value="">Everyone</option>
           {(options?.owners ?? []).map((owner) => (
             <option key={owner.value} value={owner.value}>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { Download, Pin, Plus, Search, SlidersHorizontal } from 'lucide-react';
 import type { ColumnId } from '../tableData';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
@@ -60,6 +60,8 @@ export function PortfolioToolbar({
   const [open, setOpen] = useState<'filters' | 'pins' | null>(null);
   const close = useCallback(() => setOpen(null), []);
   const count = activeFilters(params);
+  const filtersTriggerRef = useRef<HTMLButtonElement>(null);
+  const pinsTriggerRef = useRef<HTMLButtonElement>(null);
 
   return (
     <div className="relative flex flex-wrap items-center gap-2">
@@ -79,6 +81,7 @@ export function PortfolioToolbar({
       {isSm ? <GroupSortControls params={params} update={update} /> : null}
 
       <button
+        ref={filtersTriggerRef}
         type="button"
         aria-expanded={open === 'filters'}
         aria-haspopup="dialog"
@@ -94,7 +97,7 @@ export function PortfolioToolbar({
 
       {isSm ? (
         <>
-          <button type="button" aria-expanded={open === 'pins'} aria-haspopup="dialog" onClick={() => setOpen(open === 'pins' ? null : 'pins')} className={QUIET}>
+          <button ref={pinsTriggerRef} type="button" aria-expanded={open === 'pins'} aria-haspopup="dialog" onClick={() => setOpen(open === 'pins' ? null : 'pins')} className={QUIET}>
             <Pin className="w-4 h-4" aria-hidden="true" />
             Pin fields
           </button>
@@ -129,9 +132,10 @@ export function PortfolioToolbar({
             close();
             onAdd();
           }}
+          triggerRef={filtersTriggerRef}
         />
       ) : null}
-      {open === 'pins' ? <PinFieldsMenu pins={pins} onToggle={onTogglePin} onClose={close} /> : null}
+      {open === 'pins' ? <PinFieldsMenu pins={pins} onToggle={onTogglePin} onClose={close} triggerRef={pinsTriggerRef} /> : null}
     </div>
   );
 }

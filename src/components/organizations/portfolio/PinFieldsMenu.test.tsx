@@ -25,4 +25,34 @@ describe('PinFieldsMenu', () => {
     await userEvent.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('rows are tall enough to tap on phones', () => {
+    render(<PinFieldsMenu pins={[]} onToggle={vi.fn()} onClose={vi.fn()} />);
+    const label = screen.getByRole('checkbox', { name: 'NPS' }).closest('label');
+    expect(label).toHaveClass('min-h-11', 'sm:min-h-8');
+  });
+
+  it('closes on an outside click but not on its trigger', async () => {
+    const onClose = vi.fn();
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Pin fields';
+    document.body.appendChild(trigger);
+    render(<PinFieldsMenu pins={[]} onToggle={vi.fn()} onClose={onClose} triggerRef={{ current: trigger }} />);
+    await userEvent.click(trigger);
+    expect(onClose).not.toHaveBeenCalled();
+    await userEvent.click(document.body);
+    expect(onClose).toHaveBeenCalledTimes(1);
+    document.body.removeChild(trigger);
+  });
+
+  it('hands focus back to its trigger when unmounted after an outside click', async () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Pin fields';
+    document.body.appendChild(trigger);
+    const { unmount } = render(<PinFieldsMenu pins={[]} onToggle={vi.fn()} onClose={vi.fn()} triggerRef={{ current: trigger }} />);
+    await userEvent.click(document.body);
+    unmount();
+    expect(trigger).toHaveFocus();
+    document.body.removeChild(trigger);
+  });
 });
