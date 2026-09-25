@@ -202,13 +202,51 @@ in instead.
 
 ### 4.2 Organisations: list to detail
 
-1. `/organizations/list` dispatches `fetchCustomers`, `fetchCustomerStats` and
-   `fetchUpcomingRenewals`.
-2. `MetricsPanel` draws the health donut with a COUNT, MRR and ARR toggle, NPS,
-   the lifecycle donut and a renewal-window popover.
-3. `ActionBar` debounces search by 300ms into `/customers/?search=`.
-   `OrganizationsTable` offers 34 selectable columns, row selection, and hover
-   popovers that show the **real** health breakdown and CSAT bands.
+1. `/organizations/list` reads its state from the URL (`search, owner, lifecycle,
+   health, product, renews_within, nps, ids, include_churned, sort, group`;
+   `group` defaults to health and `group=none` turns grouping off) and calls
+   `GET /organizations/portfolio/`. Grouped, that first call asks `limit=1`
+   for the summary, groups, filter options and count; each expanded section
+   then reads its own rows with `group_value=<key>&limit=25` and a "Show more"
+   cursor. Ungrouped, the list pages 50 at a time. With any filter active, a
+   second `?limit=1` call (with `include_churned=1` when the view includes
+   churned accounts) gives M for "N of M organizations".
+2. Five summary tiles (Health with Count/MRR/ARR, NPS, Lifecycle, Accounts · ARR,
+   Renewing 30/90) show the server's figures for the current filters; clicking a
+   segment writes that filter to the URL.
+3. The toolbar has search (300ms debounce, name or Revenact ID), Group, Sort
+   (with direction), Filters (a popover; a bottom sheet on phones holding group,
+   sort, Export and Add too), Pin fields (up to three row chips per user, in
+   `localStorage`), Export (`export.csv` of the current query via the session)
+   and Add organization. Active filters are removable chips; removing one, or
+   Clear all, returns focus to the search box. Opening the Filters or Pin
+   fields popover moves focus into it; Escape, its own Close, or applying a
+   choice sends focus back to the toolbar button that opened it, while a click
+   outside just closes the popover and leaves focus wherever the visitor had
+   already moved it.
+   Each account is a row: health ring, name (links to the detail page), owner ·
+   lifecycle · last touch, trend, renewal runway, pinned chips, ARR, AI/CSM pulse
+   with the stored dots and a "pulses disagree" marker, and one signal. Below
+   `sm` a row collapses to a two-line card holding the ring, name, owner, ARR,
+   signal and trend; the renewal runway and pulse pair stay desktop-only there
+   (an opened row's own panels still show both). Opening a row shows six panels
+   (Commercial, Contract timeline, Adoption, Voice of the customer, Profile,
+   History) inline, or in a bottom sheet on phones — which locks page scroll,
+   traps focus, returns it to whatever opened the sheet on close, and shows the
+   row's fresh values after a reload — with **Edit details** opening
+   `OrganizationFormModal`.
+   Selecting rows (a checkbox, or a long press on phones) shows the selection
+   bar: Change owner, Set lifecycle, Export, Archive (`POST /organizations/bulk/`;
+   the backend can refuse an account server-side — "You can't archive this
+   organization." — and any failures list by organisation name with their
+   reason, staying selected for a retry) and, for exactly one selected account,
+   Churn (the existing `ChurnOrganizationModal`; cancelling it keeps the
+   selection). Selection is capped at 500, with a hint once an unchecked row
+   hits the cap, and a row's checkbox disables while its list or section is
+   loading or a bulk action is running. Ungrouped, a freshly loaded page prunes
+   the selection down to the ids still listed; grouped, a different query
+   landing clears the selection outright, since there is no one row set left to
+   prune against.
 4. Row click → `/organizations/:id`, which dispatches six parallel fetches:
    the customer, its accounts, contacts, opportunities, risks and canvases.
 5. Tabs: General (metrics banner, `PinnedAttributes`, `ActivityFeed`), Company
@@ -221,18 +259,18 @@ in instead.
    (placeholder), Canvas List.
 6. "Ask Copilot" navigates to `/copilot?forCustomerId=&forCustomerName=`.
 
-Add, edit, churn and archive all run through `OrganizationFormModal`,
-`ChurnOrganizationModal` and a `ConfirmDialog` that patches `is_archived`.
+Add and edit run through `OrganizationFormModal`; churn through
+`ChurnOrganizationModal`, one account at a time; archive, owner and lifecycle
+changes through `POST /organizations/bulk/`.
 
 A dashboard drill's "Open as a list" (§4.7) lands here as `?ids=3,7`: the
-table fetches `/customers/?ids=3,7` instead of the plain list, a banner reads
-"Showing n accounts from the dashboard" with a "Show all" that clears the
-param and restores focus to the search box, and `MetricsPanel`'s population
-figure comes from a separate, unfiltered `/customers/` count probe rather
-than the `ids`-filtered fetch — so it keeps reading the whole book, not the
-drilled-down page. Until that probe answers (or if it fails) the figure reads
-"—", never 0, and the banner leaves out its number while the `ids` fetch is
-loading.
+portfolio call carries `ids` (archived and churned accounts named there are
+included), the chip "Opened from the dashboard (2)" shows, and removing it
+drops the param and returns focus to the search box. The count reads "N of M"
+against the whole book.
+
+`/organizations/board` is unchanged in this release: it still reads
+`/customers/` and `MetricsPanel`, and keeps its old header.
 
 ### 4.3 Accounts
 
