@@ -4,11 +4,12 @@ import { formatCompactMoney } from '../../../features/customers/formatters';
 import { signed } from '../../../features/organizations/portfolioFields';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { HealthBand, NpsBand, PortfolioSummary } from '../../../features/organizations/portfolioTypes';
-import { BAND_LABEL } from './rowParts';
+import { HEALTH_LABEL, NPS_BANDS, NPS_LABEL } from '../../../features/organizations/portfolioLabels';
+import { FOCUS } from './styles';
 
 const BANDS: HealthBand[] = ['good', 'average', 'poor'];
 const BAND_DOT: Record<HealthBand, string> = { good: 'bg-success', average: 'bg-warning', poor: 'bg-danger' };
-const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+const NPS_BAR: Record<NpsBand, string> = { promoter: 'bg-success', passive: 'bg-line-strong', detractor: 'bg-danger' };
 
 function Tile({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -108,11 +109,8 @@ export function SummaryTiles({
   const show = (n: number) => (mode === 'count' ? String(n) : formatCompactMoney(n, currency));
 
   const nps = summary.nps;
-  const npsBands: { band: NpsBand; label: string; count: number; bar: string }[] = [
-    { band: 'promoter', label: 'Promoters', count: nps.promoters, bar: 'bg-success' },
-    { band: 'passive', label: 'Passives', count: nps.passives, bar: 'bg-line-strong' },
-    { band: 'detractor', label: 'Detractors', count: nps.detractors, bar: 'bg-danger' },
-  ];
+  const npsCount: Record<NpsBand, number> = { promoter: nps.promoters, passive: nps.passives, detractor: nps.detractors };
+  const npsBands = NPS_BANDS.map((band) => ({ band, label: NPS_LABEL[band], count: npsCount[band], bar: NPS_BAR[band] }));
   const npsTotal = nps.promoters + nps.passives + nps.detractors;
   const stageMax = Math.max(1, ...summary.lifecycle.map((s) => s.count));
   const renewing = summary.renewing[span];
@@ -149,7 +147,7 @@ export function SummaryTiles({
           >
             <span className="flex items-center gap-1.5">
               <span aria-hidden="true" className={`h-2 w-2 rounded-full ${BAND_DOT[band]}`} />
-              {BAND_LABEL[band]}
+              {HEALTH_LABEL[band]}
             </span>{' '}
             <span className={`${mono} text-ink`}>{show(bandValue(band))}</span>
           </FilterButton>

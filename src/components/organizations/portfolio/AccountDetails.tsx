@@ -8,6 +8,7 @@ import { Pencil } from 'lucide-react';
 import type { ColumnId } from '../tableData';
 import { PANELS, PANEL_ORDER, PORTFOLIO_FIELDS, type PanelKey } from '../../../features/organizations/portfolioFields';
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
+import { BUTTON } from './styles';
 
 const utc = (iso: string) => {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
@@ -221,7 +222,7 @@ export function AccountDetails({
           <button
             type="button"
             onClick={() => onEdit(row.id)}
-            className="inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-lg border border-line px-3 text-[13px] font-semibold text-ink hover:bg-subtle active:bg-line-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className={BUTTON}
           >
             <Pencil className="w-4 h-4" aria-hidden="true" />
             Edit details

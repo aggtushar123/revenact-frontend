@@ -5,9 +5,8 @@ import type { PortfolioParams } from '../../../features/organizations/portfolioP
 import type { PortfolioResponse } from '../../../features/organizations/portfolioTypes';
 import { FiltersPanel, GroupSortControls } from './FiltersPanel';
 import { PinFieldsMenu } from './PinFieldsMenu';
+import { BUTTON, FOCUS } from './styles';
 
-const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
-const QUIET = `inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-subtle active:bg-line-subtle disabled:opacity-50 ${FOCUS}`;
 const LABEL = 'Search by name or Revenact ID';
 
 function activeFilters(p: PortfolioParams): number {
@@ -86,7 +85,7 @@ export function PortfolioToolbar({
         aria-expanded={open === 'filters'}
         aria-haspopup="dialog"
         onClick={() => setOpen(open === 'filters' ? null : 'filters')}
-        className={QUIET}
+        className={BUTTON}
       >
         <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
         Filters
@@ -97,11 +96,11 @@ export function PortfolioToolbar({
 
       {isSm ? (
         <>
-          <button ref={pinsTriggerRef} type="button" aria-expanded={open === 'pins'} aria-haspopup="dialog" onClick={() => setOpen(open === 'pins' ? null : 'pins')} className={QUIET}>
+          <button ref={pinsTriggerRef} type="button" aria-expanded={open === 'pins'} aria-haspopup="dialog" onClick={() => setOpen(open === 'pins' ? null : 'pins')} className={BUTTON}>
             <Pin className="w-4 h-4" aria-hidden="true" />
             Pin fields
           </button>
-          <button type="button" onClick={onExport} disabled={exporting} className={QUIET}>
+          <button type="button" onClick={onExport} disabled={exporting} className={BUTTON}>
             <Download className="w-4 h-4" aria-hidden="true" />
             {exporting ? 'Exporting…' : 'Export'}
           </button>

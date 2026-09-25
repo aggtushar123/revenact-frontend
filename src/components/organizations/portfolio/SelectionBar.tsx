@@ -1,5 +1,6 @@
 import { Archive, Download, UserX, X } from 'lucide-react';
 import type { Option } from '../../../features/organizations/portfolioTypes';
+import { BUTTON, FOCUS } from './styles';
 
 export interface BulkReport {
   updated: number;
@@ -8,8 +9,6 @@ export interface BulkReport {
   error?: string;
 }
 
-const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
-const CONTROL = `inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-subtle active:bg-line-subtle disabled:opacity-50 ${FOCUS}`;
 
 /** Selection mode's action bar (spec §1). It sticks to the bottom of the
  *  content column. Churn is offered for one account at a time: the backend
@@ -62,7 +61,7 @@ export function SelectionBar({
                 const value = event.target.value;
                 if (value) onSetOwner(value === 'unassigned' ? null : Number(value));
               }}
-              className={CONTROL}
+              className={BUTTON}
             >
               <option value="">Change owner</option>
               {owners.map((owner) => (
@@ -78,7 +77,7 @@ export function SelectionBar({
               onChange={(event) => {
                 if (event.target.value) onSetLifecycle(event.target.value);
               }}
-              className={CONTROL}
+              className={BUTTON}
             >
               <option value="">Set lifecycle</option>
               {lifecycles
@@ -89,16 +88,16 @@ export function SelectionBar({
                   </option>
                 ))}
             </select>
-            <button type="button" onClick={onExport} disabled={busy || loading} className={CONTROL}>
+            <button type="button" onClick={onExport} disabled={busy || loading} className={BUTTON}>
               <Download className="w-4 h-4" aria-hidden="true" />
               Export
             </button>
-            <button type="button" onClick={onArchive} disabled={busy || loading} className={CONTROL}>
+            <button type="button" onClick={onArchive} disabled={busy || loading} className={BUTTON}>
               <Archive className="w-4 h-4" aria-hidden="true" />
               Archive
             </button>
             {count === 1 ? (
-              <button type="button" onClick={onChurn} disabled={busy || loading} className={`${CONTROL} text-danger`}>
+              <button type="button" onClick={onChurn} disabled={busy || loading} className={`${BUTTON} text-danger`}>
                 <UserX className="w-4 h-4" aria-hidden="true" />
                 Churn
               </button>

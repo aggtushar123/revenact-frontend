@@ -2,8 +2,8 @@ import { X } from 'lucide-react';
 import { countText, filterChips } from '../../../features/organizations/filterChips';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { PortfolioResponse } from '../../../features/organizations/portfolioTypes';
+import { FOCUS } from './styles';
 
-const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
 export function FilterChips({
   params,

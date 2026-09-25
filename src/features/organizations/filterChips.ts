@@ -1,6 +1,7 @@
 import { LIFECYCLE_LABELS } from '../customers/formatters';
 import type { PortfolioParams } from './portfolioParams';
-import type { HealthBand, NpsBand, Option, PortfolioResponse } from './portfolioTypes';
+import { HEALTH_LABEL, NPS_LABEL } from './portfolioLabels';
+import type { Option, PortfolioResponse } from './portfolioTypes';
 
 export interface Chip {
   key: string;
@@ -8,9 +9,6 @@ export interface Chip {
   /** What removing this chip writes to the URL. */
   patch: Partial<PortfolioParams>;
 }
-
-const HEALTH: Record<HealthBand, string> = { good: 'Good', average: 'Average', poor: 'Poor' };
-const NPS: Record<NpsBand, string> = { promoter: 'Promoters', passive: 'Passives', detractor: 'Detractors' };
 
 const nameIn = (list: Option[] | undefined, value: string) => list?.find((o) => o.value === value)?.name;
 
@@ -28,14 +26,14 @@ export function filterChips(p: PortfolioParams, options: PortfolioResponse['filt
     chips.push({ key: `lifecycle:${stage}`, label: `Lifecycle: ${name}`, patch: { lifecycle: p.lifecycle.filter((s) => s !== stage) } });
   }
   for (const band of p.health) {
-    chips.push({ key: `health:${band}`, label: `Health: ${HEALTH[band]}`, patch: { health: p.health.filter((b) => b !== band) } });
+    chips.push({ key: `health:${band}`, label: `Health: ${HEALTH_LABEL[band]}`, patch: { health: p.health.filter((b) => b !== band) } });
   }
   for (const product of p.product) {
     const name = nameIn(options?.products, product) ?? `Product ${product}`;
     chips.push({ key: `product:${product}`, label: `Product: ${name}`, patch: { product: p.product.filter((v) => v !== product) } });
   }
   if (p.renews_within) chips.push({ key: 'renews', label: `Renews within ${p.renews_within} days`, patch: { renews_within: '' } });
-  if (p.nps) chips.push({ key: 'nps', label: `NPS: ${NPS[p.nps]}`, patch: { nps: '' } });
+  if (p.nps) chips.push({ key: 'nps', label: `NPS: ${NPS_LABEL[p.nps]}`, patch: { nps: '' } });
   if (p.include_churned) chips.push({ key: 'churned', label: 'Includes churned', patch: { include_churned: false } });
   return chips;
 }

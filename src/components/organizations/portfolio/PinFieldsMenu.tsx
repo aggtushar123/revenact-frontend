@@ -2,6 +2,7 @@ import { useEffect, useRef, type RefObject } from 'react';
 import type { ColumnId } from '../tableData';
 import { MAX_PINS } from '../../../features/organizations/pinnedFields';
 import { PANELS, PANEL_ORDER, PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
+import { FOCUS } from './styles';
 
 /** Replaces the old "Edit columns" popover: pick up to three fields to show
  *  as chips on every row (spec §1 "Pin a field"). */
@@ -68,7 +69,7 @@ export function PinFieldsMenu({
                     checked={checked}
                     disabled={!checked && full}
                     onChange={() => onToggle(id)}
-                    className="w-4 h-4 accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:opacity-50"
+                    className={`w-4 h-4 accent-accent ${FOCUS} disabled:opacity-50`}
                   />
                   {PORTFOLIO_FIELDS[id].label}
                 </label>

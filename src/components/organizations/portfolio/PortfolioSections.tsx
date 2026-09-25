@@ -11,8 +11,8 @@ import { toApiQuery, type PortfolioParams } from '../../../features/organization
 import type { PortfolioGroup, PortfolioRow } from '../../../features/organizations/portfolioTypes';
 import { ErrorState } from '../../../pages/dashboard/shared/DataState';
 import { SECTION_PAGE_SIZE, usePagedPortfolio, type PortfolioState } from './usePortfolio';
+import { FOCUS } from './styles';
 
-const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 const QUIET = `inline-flex min-h-11 sm:min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-ink hover:bg-subtle active:bg-line-subtle disabled:opacity-50 ${FOCUS}`;
 
 export function sectionStartsOpen(index: number, total: number): boolean {

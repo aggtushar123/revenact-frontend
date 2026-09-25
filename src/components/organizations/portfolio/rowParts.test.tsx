@@ -19,11 +19,6 @@ describe('row parts', () => {
     expect(screen.getByText('4.9')).toHaveClass('font-mono-brand', 'tabular-nums');
   });
 
-  it('says so when there is no score', () => {
-    render(<HealthRing score={null} category="poor" />);
-    expect(screen.getByRole('img', { name: 'Health not scored' })).toBeInTheDocument();
-  });
-
   it('labels the trend in words', () => {
     expect(trendLabel([6.2, 5.8, 5.5, 5.1, 5.0, 4.9])).toBe('Health falling from 6.2 to 4.9 over 6 months');
     expect(trendLabel([4, 5])).toBe('Health rising from 4.0 to 5.0 over 2 months');

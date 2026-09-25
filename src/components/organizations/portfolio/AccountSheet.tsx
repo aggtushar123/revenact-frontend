@@ -8,8 +8,8 @@ import type { PortfolioRow } from '../../../features/organizations/portfolioType
 import { trapTab } from '../../../lib/focusTrap';
 import { AccountDetails } from './AccountDetails';
 import { HealthRing, PulsePair, RenewalRunway, SignalTag, TrendLine, touchText } from './rowParts';
+import { FOCUS } from './styles';
 
-const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 
 /** The opened row on phones (spec §1 "Phones"): a modal bottom sheet with
  *  the row's signals on top and the six panels below. Focus moves in, Tab

@@ -5,13 +5,8 @@
 /* eslint-disable react-refresh/only-export-components */
 import { HEALTH_COLORS } from '../../../pages/dashboard/shared/chartPalette';
 import { pulseWords } from '../../../features/organizations/portfolioFields';
+import { HEALTH_LABEL } from '../../../features/organizations/portfolioLabels';
 import type { HealthBand, PortfolioRow } from '../../../features/organizations/portfolioTypes';
-
-export const BAND_LABEL: Record<HealthBand, 'Good' | 'Average' | 'Poor'> = {
-  good: 'Good',
-  average: 'Average',
-  poor: 'Poor',
-};
 
 export function trendLabel(trend: number[]): string {
   if (trend.length < 2) return 'Not enough health history for a trend';
@@ -37,20 +32,12 @@ export function touchText(days: number | null): string {
 }
 
 /** Score out of 10 as a ring, coloured by band; the number carries the meaning. */
-export function HealthRing({
-  score,
-  category,
-  size = 'md',
-}: {
-  score: number | null;
-  category: HealthBand;
-  size?: 'md' | 'lg';
-}) {
+export function HealthRing({ score, category }: { score: number; category: HealthBand }) {
   const radius = 15;
   const circumference = 2 * Math.PI * radius;
-  const filled = score == null ? 0 : Math.max(0, Math.min(10, score)) / 10;
-  const label = score == null ? 'Health not scored' : `Health ${score.toFixed(1)}, ${BAND_LABEL[category]}`;
-  const box = size === 'lg' ? 'w-12 h-12' : 'w-10 h-10';
+  const filled = Math.max(0, Math.min(10, score)) / 10;
+  const label = `Health ${score.toFixed(1)}, ${HEALTH_LABEL[category]}`;
+  const box = 'w-10 h-10';
   return (
     <span role="img" aria-label={label} data-field="health" className={`relative inline-flex shrink-0 items-center justify-center ${box}`}>
       <svg viewBox="0 0 36 36" className={`absolute inset-0 -rotate-90 ${box}`} aria-hidden="true">
@@ -60,14 +47,14 @@ export function HealthRing({
           cy="18"
           r={radius}
           fill="none"
-          stroke={HEALTH_COLORS[BAND_LABEL[category]]}
+          stroke={HEALTH_COLORS[HEALTH_LABEL[category]]}
           strokeWidth="3"
           strokeLinecap="round"
           strokeDasharray={`${circumference * filled} ${circumference}`}
         />
       </svg>
       <span aria-hidden="true" className="font-mono-brand tabular-nums text-[11px] font-semibold text-ink">
-        {score == null ? '—' : score.toFixed(1)}
+        {score.toFixed(1)}
       </span>
     </span>
   );
@@ -91,7 +78,7 @@ export function TrendLine({ trend, category, className = '' }: { trend: number[]
     <span role="img" aria-label={trendLabel(trend)} className={`inline-flex shrink-0 ${className}`}>
       <svg viewBox={`0 0 ${width} ${height}`} className="w-16 h-5" aria-hidden="true">
         {points ? (
-          <polyline points={points} fill="none" stroke={HEALTH_COLORS[BAND_LABEL[category]]} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+          <polyline points={points} fill="none" stroke={HEALTH_COLORS[HEALTH_LABEL[category]]} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
         ) : (
           <line x1="0" y1={height / 2} x2={width} y2={height / 2} stroke="var(--border-default)" strokeDasharray="2 3" />
         )}

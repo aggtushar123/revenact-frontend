@@ -35,8 +35,6 @@ export interface FieldDef {
   short: string;
   place: 'header' | PanelKey;
   value: (row: PortfolioRow) => string;
-  /** The backend sort key, for fields the list can sort by. */
-  sort?: string;
 }
 
 const DASH = '—';
@@ -64,36 +62,35 @@ export function signed(n: number | null): string {
 
 type Def = Omit<FieldDef, 'id'>;
 const defs: Record<ColumnId, Def> = {
-  organization: { label: 'Organization', short: 'Name', place: 'header', value: (r) => r.name, sort: 'name' },
+  organization: { label: 'Organization', short: 'Name', place: 'header', value: (r) => r.name },
   owner: { label: 'Owner', short: 'Owner', place: 'header', value: (r) => r.owner?.name ?? 'Unassigned' },
   lifecycleStage: { label: 'Lifecycle stage', short: 'Lifecycle', place: 'header', value: (r) => r.lifecycle.label },
   health: {
     label: 'Health',
     short: 'Health',
     place: 'header',
-    value: (r) => (r.health.score == null ? DASH : r.health.score.toFixed(1)),
-    sort: 'health',
+    value: (r) => r.health.score.toFixed(1),
   },
   // The old "Pulse" column was the stored dots; "AI Pulse Score" was the AI
   // category label. Same mapping as the backend's fields.FIELDS.
   pulse: { label: 'Pulse', short: 'Pulse', place: 'header', value: (r) => pulseWords(r.pulse.history) },
-  aiPulseScore: { label: 'AI pulse score', short: 'AI pulse', place: 'header', value: (r) => text(r.pulse.ai_label), sort: 'ai_pulse_value' },
+  aiPulseScore: { label: 'AI pulse score', short: 'AI pulse', place: 'header', value: (r) => text(r.pulse.ai_label) },
 
-  arrAccount: { label: 'ARR billed at account', short: 'ARR', place: 'commercial', value: (r) => money(r, r.details.commercial.arr_billed_at_account), sort: 'arr' },
-  arrHQ: { label: 'ARR billed at HQ', short: 'ARR HQ', place: 'commercial', value: (r) => money(r, r.details.commercial.arr_billed_at_hq), sort: 'arr_billed_at_hq' },
-  tcv: { label: 'Total contract value', short: 'TCV', place: 'commercial', value: (r) => money(r, r.details.commercial.total_contract_value), sort: 'total_contract_value' },
-  tcvRenewal: { label: 'Forecasted renewal revenue', short: 'Renewal rev.', place: 'commercial', value: (r) => money(r, r.details.commercial.total_forecasted_renewal_revenue), sort: 'total_forecasted_renewal_revenue' },
-  implFee: { label: 'Implementation fee', short: 'Impl. fee', place: 'commercial', value: (r) => money(r, r.details.commercial.implementation_fee), sort: 'implementation_fee' },
+  arrAccount: { label: 'ARR billed at account', short: 'ARR', place: 'commercial', value: (r) => money(r, r.details.commercial.arr_billed_at_account) },
+  arrHQ: { label: 'ARR billed at HQ', short: 'ARR HQ', place: 'commercial', value: (r) => money(r, r.details.commercial.arr_billed_at_hq) },
+  tcv: { label: 'Total contract value', short: 'TCV', place: 'commercial', value: (r) => money(r, r.details.commercial.total_contract_value) },
+  tcvRenewal: { label: 'Forecasted renewal revenue', short: 'Renewal rev.', place: 'commercial', value: (r) => money(r, r.details.commercial.total_forecasted_renewal_revenue) },
+  implFee: { label: 'Implementation fee', short: 'Impl. fee', place: 'commercial', value: (r) => money(r, r.details.commercial.implementation_fee) },
 
   joinedDate: { label: 'Joined', short: 'Joined', place: 'contract', value: (r) => day(r.details.contract.joined_date) },
   contractStart: { label: 'Contract start', short: 'Start', place: 'contract', value: (r) => day(r.details.contract.contract_start_date) },
-  renewalDate: { label: 'Renewal', short: 'Renews', place: 'contract', value: (r) => day(r.details.contract.renewal_date), sort: 'renewal' },
+  renewalDate: { label: 'Renewal', short: 'Renews', place: 'contract', value: (r) => day(r.details.contract.renewal_date) },
   contractEnd: { label: 'Contract end', short: 'Ends', place: 'contract', value: (r) => day(r.details.contract.contract_end_date) },
 
-  totalContractedSeats: { label: 'Contracted seats', short: 'Contracted', place: 'adoption', value: (r) => count(r.details.adoption.total_contracted_seats), sort: 'total_contracted_seats' },
-  totalActiveSeats: { label: 'Active seats', short: 'Active', place: 'adoption', value: (r) => count(r.details.adoption.total_active_seats), sort: 'total_active_seats' },
-  totalSeatUtilization: { label: 'Seat utilisation', short: 'Seats', place: 'adoption', value: (r) => pct(r.details.adoption.seat_utilization_percentage), sort: 'seat_utilization_percentage' },
-  totalHires: { label: 'Total hires', short: 'Hires', place: 'adoption', value: (r) => count(r.details.adoption.total_hires), sort: 'total_hires' },
+  totalContractedSeats: { label: 'Contracted seats', short: 'Contracted', place: 'adoption', value: (r) => count(r.details.adoption.total_contracted_seats) },
+  totalActiveSeats: { label: 'Active seats', short: 'Active', place: 'adoption', value: (r) => count(r.details.adoption.total_active_seats) },
+  totalSeatUtilization: { label: 'Seat utilisation', short: 'Seats', place: 'adoption', value: (r) => pct(r.details.adoption.seat_utilization_percentage) },
+  totalHires: { label: 'Total hires', short: 'Hires', place: 'adoption', value: (r) => count(r.details.adoption.total_hires) },
   productsUtilized: {
     label: 'Products',
     short: 'Products',
@@ -107,9 +104,9 @@ const defs: Record<ColumnId, Def> = {
   },
   scopeWebApp: { label: 'Scope web app', short: 'Web app', place: 'adoption', value: (r) => text(r.details.adoption.scope_web_app) },
 
-  nps: { label: 'NPS', short: 'NPS', place: 'voice', value: (r) => signed(r.details.voice.nps_score), sort: 'nps_score' },
-  csatScore: { label: 'CSAT', short: 'CSAT', place: 'voice', value: (r) => pct(r.details.voice.csat_score), sort: 'csat_score' },
-  cesPercentage: { label: 'CES', short: 'CES', place: 'voice', value: (r) => pct(r.details.voice.ces_percentage), sort: 'ces_percentage' },
+  nps: { label: 'NPS', short: 'NPS', place: 'voice', value: (r) => signed(r.details.voice.nps_score) },
+  csatScore: { label: 'CSAT', short: 'CSAT', place: 'voice', value: (r) => pct(r.details.voice.csat_score) },
+  cesPercentage: { label: 'CES', short: 'CES', place: 'voice', value: (r) => pct(r.details.voice.ces_percentage) },
   aiPulseReason: { label: 'AI pulse reason', short: 'Why', place: 'voice', value: (r) => text(r.details.voice.ai_pulse_reason) },
 
   revenactId: { label: 'Revenact ID', short: 'ID', place: 'profile', value: (r) => String(r.details.profile.revenact_id) },

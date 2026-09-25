@@ -1,3 +1,4 @@
+import { NPS_BANDS, RENEWAL_WINDOWS, type RenewalWindow } from './portfolioLabels';
 import type { GroupKey, HealthBand, LifecycleValue, NpsBand } from './portfolioTypes';
 
 /** Everything the portfolio page reads from the URL. Every filter, sort and
@@ -9,7 +10,7 @@ export interface PortfolioParams {
   lifecycle: LifecycleValue[];
   health: HealthBand[];
   product: string[];
-  renews_within: '' | '30' | '90' | '180';
+  renews_within: '' | RenewalWindow;
   nps: '' | NpsBand;
   ids: number[];
   include_churned: boolean;
@@ -27,8 +28,6 @@ export const LIFECYCLE_VALUES: LifecycleValue[] = [
 ];
 export const HEALTH_BANDS: HealthBand[] = ['poor', 'average', 'good'];
 export const GROUP_KEYS: GroupKey[] = ['health', 'owner', 'lifecycle', 'product', 'renewal'];
-const WINDOWS = ['30', '90', '180'] as const;
-const NPS_BANDS: NpsBand[] = ['promoter', 'passive', 'detractor'];
 
 export const BASE_SORT_KEYS = ['arr', 'health', 'renewal', 'touch', 'risk', 'name'] as const;
 /** The Customer field names the backend sorts on (plan pre-flight #4). */
@@ -66,7 +65,7 @@ export function parseParams(search: URLSearchParams): PortfolioParams {
     lifecycle: only(list(search.get('lifecycle')), LIFECYCLE_VALUES),
     health: only(list(search.get('health')), HEALTH_BANDS),
     product: list(search.get('product')).filter((value) => /^\d+$/.test(value)),
-    renews_within: only([renews], WINDOWS)[0] ?? '',
+    renews_within: only([renews], RENEWAL_WINDOWS)[0] ?? '',
     nps: only([nps], NPS_BANDS)[0] ?? '',
     ids: list(search.get('ids')).filter((value) => /^\d+$/.test(value)).map(Number).slice(0, MAX_IDS),
     include_churned: search.get('include_churned') === '1',

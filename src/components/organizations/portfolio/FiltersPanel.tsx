@@ -8,10 +8,10 @@ import { ArrowDown, ArrowUp, Download, Plus, X } from 'lucide-react';
 import { trapTab } from '../../../lib/focusTrap';
 import { SORT_OPTIONS } from '../../../features/organizations/portfolioFields';
 import { HEALTH_BANDS, toggleIn, type PortfolioParams } from '../../../features/organizations/portfolioParams';
+import { HEALTH_LABEL, NPS_BANDS, NPS_LABEL, RENEWAL_WINDOWS, windowLabel } from '../../../features/organizations/portfolioLabels';
 import type { GroupKey, LifecycleValue, NpsBand, PortfolioResponse } from '../../../features/organizations/portfolioTypes';
-import { BAND_LABEL } from './rowParts';
+import { FOCUS } from './styles';
 
-const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
 const SELECT = `min-h-11 sm:min-h-9 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink hover:border-line-strong disabled:opacity-50 ${FOCUS}`;
 
 export const GROUP_OPTIONS: { value: GroupKey | 'none'; label: string }[] = [
@@ -116,15 +116,11 @@ function Group({ legend, children }: { legend: string; children: ReactNode }) {
 
 const WINDOWS: { value: PortfolioParams['renews_within']; label: string }[] = [
   { value: '', label: 'Any time' },
-  { value: '30', label: '30 days' },
-  { value: '90', label: '90 days' },
-  { value: '180', label: '180 days' },
+  ...RENEWAL_WINDOWS.map((days) => ({ value: days, label: windowLabel(days) })),
 ];
 const NPS: { value: '' | NpsBand; label: string }[] = [
   { value: '', label: 'Any' },
-  { value: 'promoter', label: 'Promoters' },
-  { value: 'passive', label: 'Passives' },
-  { value: 'detractor', label: 'Detractors' },
+  ...NPS_BANDS.map((band) => ({ value: band, label: NPS_LABEL[band] })),
 ];
 
 /** Every filter from spec §1. Changes apply at once (they write the URL).
@@ -229,7 +225,7 @@ export function FiltersPanel({
 
       <Group legend="Health">
         {HEALTH_BANDS.map((band) => (
-          <Check key={band} label={BAND_LABEL[band]} checked={params.health.includes(band)} onChange={() => update({ health: toggleIn(params.health, band) })} />
+          <Check key={band} label={HEALTH_LABEL[band]} checked={params.health.includes(band)} onChange={() => update({ health: toggleIn(params.health, band) })} />
         ))}
       </Group>
 

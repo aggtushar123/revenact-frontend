@@ -8,6 +8,7 @@ import { PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioField
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
 import { SM, useMediaQuery } from '../../../lib/useMediaQuery';
 import { HealthRing, PulsePair, RenewalRunway, SignalTag, TrendLine, touchText } from './rowParts';
+import { FOCUS } from './styles';
 
 export const LONG_PRESS_MS = 500;
 
@@ -118,7 +119,7 @@ export function AccountRow({
             onChange={() => onToggleSelect(row.id)}
             aria-label={`Select ${row.name}`}
             title={limitHint}
-            className="w-4 h-4 cursor-pointer accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-not-allowed disabled:opacity-50"
+            className={`w-4 h-4 cursor-pointer accent-accent ${FOCUS} disabled:cursor-not-allowed disabled:opacity-50`}
           />
         </label>
 
@@ -129,7 +130,7 @@ export function AccountRow({
             to={`/organizations/${row.id}`}
             onClick={(event) => event.stopPropagation()}
             data-field="organization"
-            className="block truncate rounded-sm text-[13px] font-semibold text-ink hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            className={`block truncate rounded-sm text-[13px] font-semibold text-ink hover:underline ${FOCUS}`}
           >
             {row.name}
           </Link>
@@ -174,7 +175,7 @@ export function AccountRow({
           aria-expanded={open}
           aria-controls={open && children ? detailsId : undefined}
           aria-label={open ? `Close ${row.name}` : `Open ${row.name}`}
-          className="shrink-0 w-11 h-11 sm:w-8 sm:h-8 inline-flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-subtle active:bg-line-subtle focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className={`shrink-0 w-11 h-11 sm:w-8 sm:h-8 inline-flex items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-subtle active:bg-line-subtle ${FOCUS}`}
         >
           <ChevronDown
             className={`w-4 h-4 transition-transform duration-[var(--dur-fast)] ${open ? 'rotate-180' : ''}`}
