@@ -67,13 +67,14 @@ describe('reopening from history on the dashboard', () => {
     await userEvent.click(screen.getByRole('button', { name: 'History' }));
     await userEvent.click(await screen.findByRole('button', { name: 'Pizza Hut mail' }));
     expect(await screen.findByText('They replied.')).toBeInTheDocument();
-    // Let the held answer land: one macrotask drains every microtask in its chain.
-    await act(async () => {
-      release();
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
+    // Let the held answer land, and wait for the thread to have received it
+    // (the POST's reply delivered), not for a tick.
+    act(() => release());
+    const post = spy.mock.calls.findIndex(([url, init]) => String(url).includes('/copilot/messages/') && init?.method === 'POST');
+    await waitFor(() => expect(spy.mock.settledResults[post]?.type).toBe('fulfilled'));
     expect(postedBodies(spy)).toHaveLength(1);
-    expect(screen.queryByText('Answer to: What needs me?')).not.toBeInTheDocument();
-    expect(screen.getByText('They replied.')).toBeInTheDocument();
+    // The picked conversation stays on screen; the late answer is dropped.
+    expect(await screen.findByText('They replied.')).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('Answer to: What needs me?')).not.toBeInTheDocument());
   });
 });
