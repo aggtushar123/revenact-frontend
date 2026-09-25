@@ -5,6 +5,7 @@ import type { UsageAccount, UsageBand } from '../../../../../features/usage/usag
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { BAND_COLORS, BAND_SHORT, FALLBACK_COLOR, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 import { useDrill } from '../../../drill/useDrill';
 import { fromUsageRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
@@ -122,11 +123,7 @@ export function UtilisationBandChart({
             />
             <Tooltip
               cursor={{ fill: 'var(--bg-subtle)' }}
-              contentStyle={{
-                borderRadius: '8px',
-                border: '1px solid var(--border-default)',
-                fontSize: '12px',
-              }}
+              contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               formatter={(value, _name, item) => [
                 `${formatMoney(Number(value ?? 0), currency)} · ${item?.payload?.accounts ?? 0} accounts · ${item?.payload?.idle ?? 0} idle seats`,
                 item?.payload?.full ?? '',

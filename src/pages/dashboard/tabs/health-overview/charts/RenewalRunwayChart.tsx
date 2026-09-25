@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 import type { HealthStatus } from '../mockData';
 import type { RenewalBucket } from '../movement';
-import { HEALTH_STACK, makeStackedTotalLabel } from './stackedTotalLabel';
+import { HEALTH_STACK, makeStackedTotalLabel } from '../../../shared/stackedTotalLabel';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';

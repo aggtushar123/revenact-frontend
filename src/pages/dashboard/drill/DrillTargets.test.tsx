@@ -31,4 +31,22 @@ describe('DrillTargets', () => {
     expect(errors.mock.calls.filter((call) => String(call[0]).includes('same key'))).toHaveLength(0);
     errors.mockRestore();
   });
+
+  // Revealed on focus, the list used to become a static flex row with a
+  // bottom margin, pushing the plot down inside a fixed-height card and
+  // squashing it. It now stays out of flow and overlays the card's top edge.
+  it('overlays the card when revealed instead of taking space from the chart', () => {
+    render(<DrillTargets label="Priority" items={[{ name: 'High', figure: '3', onSelect: vi.fn() }]} />);
+    const list = screen.getByRole('list', { name: 'Priority' });
+    expect(list).toHaveClass('sr-only');
+    expect(list.className).not.toMatch(/not-sr-only|focus-within:mb-/);
+    expect(list).toHaveClass(
+      'focus-within:top-0',
+      'focus-within:inset-x-0',
+      'focus-within:z-20',
+      'focus-within:size-auto',
+      'focus-within:bg-surface',
+      'focus-within:flex',
+    );
+  });
 });

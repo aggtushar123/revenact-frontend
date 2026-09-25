@@ -5,6 +5,7 @@ import type { HealthStatus } from '../../../../../features/health/types';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import type { QuarterColumn } from '../renewal';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
@@ -126,11 +127,7 @@ export function RenewalQuarterChart({
             />
             <Tooltip
               cursor={{ fill: 'var(--bg-subtle)' }}
-              contentStyle={{
-                borderRadius: '8px',
-                border: '1px solid var(--border-default)',
-                fontSize: '12px',
-              }}
+              contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               // Untyped parameters: Recharts hands these through as
               // `ValueType | undefined`, and the stack only ever carries
               // numbers, so the coercion is at the boundary rather than an

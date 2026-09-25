@@ -7,6 +7,7 @@ import {
   formatMoney,
 } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 /** The three segments, in the order they stack. Also the chart's own key. */
 const LABELS: Record<string, string> = {
@@ -115,11 +116,7 @@ export function ProductMoneyChart({ rows, currency }: ProductMoneyChartProps) {
               />
               <Tooltip
                 cursor={{ fill: 'var(--bg-subtle)' }}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
-                }}
+                contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
                 formatter={(value, name) => [
                   formatMoney(Number(value ?? 0), currency),
                   LABELS[String(name)] ?? String(name),

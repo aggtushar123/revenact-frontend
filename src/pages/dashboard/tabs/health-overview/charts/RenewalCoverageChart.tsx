@@ -5,6 +5,7 @@ import { formatCompactMoney, formatMoney } from '../../../../../features/custome
 import type { Coverage, CoverageBand } from '../renewal';
 import { CONTACT_COLD_DAYS, CONTACT_FRESH_DAYS } from '../renewal';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
@@ -147,11 +148,7 @@ export function RenewalCoverageChart({
             />
             <Tooltip
               cursor={{ fill: 'var(--bg-subtle)' }}
-              contentStyle={{
-                borderRadius: '8px',
-                border: '1px solid var(--border-default)',
-                fontSize: '12px',
-              }}
+              contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               // See RenewalQuarterChart on why these parameters are untyped.
               formatter={(value, name) => [
                 formatMoney(Number(value ?? 0), currency),

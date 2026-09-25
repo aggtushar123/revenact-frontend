@@ -3,6 +3,7 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { CadenceBucket } from '../../../../../features/activity/activitySlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 /** Fresher is better, so this one *is* a scale — and "never" is grey rather
  *  than the darkest red, because it is a different kind of fact: an absence of
@@ -92,11 +93,7 @@ export function CadenceChart({ buckets, currency, threshold }: CadenceChartProps
             />
             <Tooltip
               cursor={{ fill: 'var(--bg-subtle)' }}
-              contentStyle={{
-                borderRadius: '8px',
-                border: '1px solid var(--border-default)',
-                fontSize: '12px',
-              }}
+              contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               formatter={(value, _name, item) => [
                 `${value} account${value === 1 ? '' : 's'} · ${formatMoney(
                   Number(item?.payload?.arr ?? 0),

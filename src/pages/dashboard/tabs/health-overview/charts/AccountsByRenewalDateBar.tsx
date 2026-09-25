@@ -3,7 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } 
 import type { HealthDataRow, HealthStatus } from '../mockData';
 import { renewalMonths } from '../movement';
 import type { RenewalMonth } from '../movement';
-import { HEALTH_STACK, makeStackedTotalLabel } from './stackedTotalLabel';
+import { HEALTH_STACK, makeStackedTotalLabel } from '../../../shared/stackedTotalLabel';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';

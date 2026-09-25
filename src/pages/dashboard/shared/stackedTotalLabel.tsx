@@ -1,4 +1,4 @@
-import type { HealthStatus } from '../mockData';
+import type { HealthStatus } from '../../../features/health/types';
 
 /** The three health bars, bottom to top, as every stacked chart here orders them. */
 export const HEALTH_STACK: HealthStatus[] = ['Poor', 'Average', 'Good'];

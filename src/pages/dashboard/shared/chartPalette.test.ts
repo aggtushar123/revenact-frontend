@@ -2,7 +2,17 @@ import { describe, it, expect } from 'vitest';
 import * as ai from '../tabs/ai-trending/chartTheme';
 import * as tickets from '../tabs/ticket-overview/chartTheme';
 import * as usage from '../tabs/usage-overview/chartTheme';
-import { niceMax, compact, percentOf, ticksTo } from './chartPalette';
+import {
+  niceMax,
+  compact,
+  percentOf,
+  ticksTo,
+  CHART_HEIGHT,
+  barListHeight,
+  DONUT,
+  hideSeries,
+  TOOLTIP_STYLE,
+} from './chartPalette';
 
 const HEX = /#[0-9a-f]{3,8}\b|rgb\(/i;
 
@@ -107,6 +117,56 @@ describe('no info role in the dashboard', () => {
       .filter(([, source]) => NO_INFO.test(source))
       .map(([file]) => file);
 
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe('chart sizing', () => {
+  it('has three standard plot heights', () => expect(CHART_HEIGHT).toEqual({ sm: 240, md: 320, lg: 400 }));
+
+  it('barListHeight grows with the rows and never drops under the floor', () => {
+    expect(barListHeight(3)).toBe(200);
+    expect(barListHeight(12)).toBe(12 * 28);
+    expect(barListHeight(10, 32, 240)).toBe(320);
+    expect(barListHeight(0, 32, 240)).toBe(240);
+  });
+
+  it('DONUT is one ring for every donut', () => expect(DONUT).toEqual({ innerRadius: '58%', outerRadius: '80%' }));
+});
+
+describe('tooltips', () => {
+  it('hideSeries drops the named series from a tooltip payload by key or name', () => {
+    const hide = hideSeries('base', 'total');
+    const payload = [
+      { dataKey: 'base', name: 'base', value: 1 },
+      { dataKey: 'value', name: 'Change', value: 2 },
+      { dataKey: 'sum', name: 'total', value: 3 },
+    ];
+    expect(hide(payload).map((entry) => entry.value)).toEqual([2]);
+    expect(hide(undefined)).toEqual([]);
+  });
+
+  it('TOOLTIP_STYLE carries its own background and ink, so it reads in dark mode', () => {
+    expect(TOOLTIP_STYLE.background).toBe('var(--bg-elevated)');
+    expect(TOOLTIP_STYLE.color).toBe('var(--text-primary)');
+  });
+
+  // A `contentStyle` literal without a background falls back to Recharts'
+  // white box, which leaves light ink on white in dark mode. Spreading
+  // TOOLTIP_STYLE is the fix; a literal that sets its own background passes too.
+  it('no dashboard or health chart passes a contentStyle without a background', () => {
+    const modules = {
+      ...import.meta.glob('../**/*.tsx', { query: '?raw', eager: true, import: 'default' }),
+      ...import.meta.glob('../../health/**/*.tsx', { query: '?raw', eager: true, import: 'default' }),
+    } as Record<string, string>;
+
+    const offenders: string[] = [];
+    for (const [file, source] of Object.entries(modules)) {
+      if (file.includes('.test.')) continue;
+      for (const match of source.matchAll(/contentStyle=\{\{([\s\S]*?)\}\}/g)) {
+        if (!/\.\.\.TOOLTIP_STYLE|\bbackground(Color)?\s*:/.test(match[1])) offenders.push(file);
+      }
+    }
     expect(offenders).toEqual([]);
   });
 });

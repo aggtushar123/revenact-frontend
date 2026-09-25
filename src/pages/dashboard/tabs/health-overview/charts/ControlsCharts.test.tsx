@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import type { HealthDataRow, HealthStatus } from '../../../../../features/health/types';
 import { AccountsByRenewalDateBar } from './AccountsByRenewalDateBar';
 import { HealthChangeOverTimeStacked } from './HealthChangeOverTimeStacked';
-import { topSegment } from './stackedTotalLabel';
+import { topSegment } from '../../../shared/stackedTotalLabel';
 import { healthRow, renderWithDrill } from '../testUtils';
 
 // Both of these charts used to ignore the data they were handed and draw

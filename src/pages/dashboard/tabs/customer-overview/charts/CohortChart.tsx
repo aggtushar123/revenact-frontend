@@ -1,6 +1,7 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import type { CohortRow } from '../../../../../features/portfolio/portfolioSlice';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
+import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
 
 export interface CohortChartProps {
   rows: CohortRow[];
@@ -51,11 +52,7 @@ export function CohortChart({ rows, undated }: CohortChartProps) {
               />
               <Tooltip
                 cursor={{ fill: 'var(--bg-subtle)' }}
-                contentStyle={{
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-default)',
-                  fontSize: '12px',
-                }}
+                contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
                 formatter={(value, name, item) =>
                   name === 'retained'
                     ? [`${value} still here (${item?.payload?.retention ?? 0}%)`, 'Retained']
