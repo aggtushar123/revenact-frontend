@@ -51,6 +51,17 @@ describe('ArrBridgeChart', () => {
     expect(labels).toEqual(['$924.7K', '−$175.4K', '−$33.1K', '+$131.9K', '$848.0K']);
   });
 
+  it('labels a zero step "$0" so its column never looks missing', () => {
+    const { container } = render(
+      <DrillProvider>
+        <ArrBridgeChart bridge={{ ...bridge, contraction: 0 }} currency="USD" horizonDays={365} query="" />
+      </DrillProvider>,
+    );
+    const labels = [...container.querySelectorAll('.recharts-label-list text')].map((t) => t.textContent);
+    expect(labels[2]).toBe('$0');
+    expect(labels).toHaveLength(5);
+  });
+
   it('keeps tick text at 10px or more', () => {
     const { container } = renderBridge();
     const ticks = [...container.querySelectorAll('.recharts-cartesian-axis-tick-value')];
@@ -77,8 +88,13 @@ describe('ScenarioRange', () => {
   it('gives the scale both its ends', () => {
     renderRange();
     const scale = screen.getByTestId('range-scale');
-    expect(scale).toHaveTextContent('$0');
+    expect(scale.firstElementChild).toHaveTextContent(/^\$0$/);
     expect(scale).toHaveTextContent('$1.2M');
+  });
+
+  it('sits at the top of its card rather than floating mid-way', () => {
+    renderRange();
+    expect(screen.getByLabelText('Scenarios').parentElement).not.toHaveClass('justify-center');
   });
 
   it('draws today as a dashed marker so it cannot be mistaken for likely', () => {

@@ -1,6 +1,7 @@
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { ForecastScenarios } from '../../../../../features/forecast/forecastSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
+import { zeroMoney } from '../../../shared/chartAxis';
 
 export interface ScenarioRangeProps {
   scenarios: ForecastScenarios;
@@ -51,8 +52,7 @@ export function ScenarioRange({ scenarios, opening, currency }: ScenarioRangePro
         </p>
       </div>
 
-      {/* Centred in the card, which the row stretches to the bridge's height. */}
-      <div className="flex-1 flex flex-col justify-center px-4 pt-4 pb-3">
+      <div className="px-4 pt-4 pb-3">
         <div
           role="img"
           aria-label={`Forecast range from ${formatMoney(scenarios.worst, currency)} to ${formatMoney(
@@ -107,7 +107,7 @@ export function ScenarioRange({ scenarios, opening, currency }: ScenarioRangePro
           data-testid="range-scale"
           className="flex items-baseline justify-between mt-1 text-[10px] text-ink-faint tabular-nums"
         >
-          <span>{formatCompactMoney(0, currency)}</span>
+          <span>{zeroMoney(currency)}</span>
           <span>{formatCompactMoney(top, currency)}</span>
         </div>
 

@@ -3,6 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import { sizeCharts } from '../../../../../test/chartSize';
 import { ConcentrationChart } from './ConcentrationChart';
 import { CohortChart } from './CohortChart';
+import { CompositionSplit } from './CompositionSplit';
 
 // Unit tier: each Customers chart on its own, with the element box stubbed
 // so Recharts draws its axes (see sizeCharts).
@@ -59,10 +60,13 @@ describe('ConcentrationChart', () => {
     expect(screen.getByText('Cumulative % of ARR')).toBeInTheDocument();
   });
 
-  it('shortens long account names at 10px and keeps the full name in a title', () => {
+  it('prints full account names flat at 10px when the chart has the room', () => {
     const { container } = renderChart();
-    const name = [...container.querySelectorAll('text')].find((t) => t.textContent?.includes('Globex Intern…'));
-    expect(name?.querySelector('title')?.textContent).toBe('Globex International Holdings');
+    const name = [...container.querySelectorAll('.recharts-xAxis text, .recharts-cartesian-axis-tick-label text')].find(
+      (t) => [...t.querySelectorAll('tspan')].map((line) => line.textContent).join(' ').includes('Globex International Holdings'),
+    );
+    expect(name).toBeDefined();
+    expect(name).not.toHaveAttribute('transform');
     expect(name).toHaveAttribute('font-size', '10');
     expect(Math.min(...tickSizes(container))).toBeGreaterThanOrEqual(10);
   });
@@ -88,6 +92,26 @@ describe('CohortChart', () => {
   it('titles the count axis', () => {
     const { container } = renderChart();
     expect(screen.getByText('Customers')).toBeInTheDocument();
+    expect(screen.getByText('Year joined')).toBeInTheDocument();
     expect(Math.min(...tickSizes(container))).toBeGreaterThanOrEqual(10);
+  });
+});
+
+describe('CompositionSplit', () => {
+  it('lets its few fixed buckets set the card height instead of scrolling them', () => {
+    render(
+      <CompositionSplit
+        title="By lifecycle stage"
+        subtitle="Where the active book sits today"
+        currency="USD"
+        emptyMessage="None"
+        rows={[
+          { key: 'onboarding', name: 'Onboarding', customers: 2, arr: 40_000 },
+          { key: 'live', name: 'Live', customers: 8, arr: 400_000 },
+        ]}
+      />,
+    );
+    const list = screen.getByText('Onboarding').closest('ul') as HTMLElement;
+    expect(list).not.toHaveClass('overflow-y-auto');
   });
 });

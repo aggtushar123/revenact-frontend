@@ -45,11 +45,12 @@ export function CohortChart({ rows, undated }: CohortChartProps) {
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={rows} margin={chartMargin({ left: true })} barSize={42}>
+            <BarChart data={rows} margin={chartMargin({ left: true, x: true })} barSize={42}>
               <XAxis
                 {...AXIS_BASE}
                 dataKey="year"
                 tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+                label={axisLabel('Year joined', 'x')}
               />
               <YAxis
                 {...AXIS_BASE}

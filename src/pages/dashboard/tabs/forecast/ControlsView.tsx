@@ -124,7 +124,9 @@ export function ControlsView() {
               />
             )}
           </div>
-          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
+          {/* Top-aligned: the range is short, and stretched to the bridge's
+              height it floated in empty space. */}
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden xl:self-start">
             {stats && (
               <ScenarioRange
                 scenarios={stats.scenarios}

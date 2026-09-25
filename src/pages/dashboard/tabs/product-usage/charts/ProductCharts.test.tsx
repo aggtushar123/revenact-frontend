@@ -42,6 +42,15 @@ const legendOf = (first: string) =>
 
 const axisTexts = (container: HTMLElement) => [...container.querySelectorAll('.recharts-xAxis text, .recharts-cartesian-axis-tick-label text')];
 
+/** The tick carrying the whole first product name, however it wrapped. */
+const fullName = (container: HTMLElement) => {
+  const tick = axisTexts(container).find((t) =>
+    [...t.querySelectorAll('tspan')].map((line) => line.textContent).join(' ').includes('Revenue intelligence suite'),
+  );
+  expect(tick).toBeDefined();
+  return tick;
+};
+
 describe('ProductMoneyChart', () => {
   it('keys the three segments in stack order', () => {
     render(<ProductMoneyChart rows={rows} currency="USD" />);
@@ -53,10 +62,10 @@ describe('ProductMoneyChart', () => {
     expect(screen.getByText('ARR (USD)')).toBeInTheDocument();
   });
 
-  it('shortens long product names at 10px and keeps the full name in a title', () => {
+  it('prints full product names flat at 10px when the chart has the room', () => {
     const { container } = render(<ProductMoneyChart rows={rows} currency="USD" />);
-    const name = [...container.querySelectorAll('text')].find((t) => t.textContent?.includes('Revenue intel…'));
-    expect(name?.querySelector('title')?.textContent).toBe('Revenue intelligence suite');
+    const name = fullName(container);
+    expect(name).not.toHaveAttribute('transform');
     for (const tick of axisTexts(container)) {
       expect(Number(tick.getAttribute('font-size'))).toBeGreaterThanOrEqual(10);
     }
@@ -75,10 +84,9 @@ describe('ProductChurnChart', () => {
     expect(screen.getByText('Churn rate %')).toBeInTheDocument();
   });
 
-  it('shortens long product names with the full name in a title', () => {
+  it('prints full product names flat when the chart has the room', () => {
     const { container } = render(<ProductChurnChart rows={rows} currency="USD" />);
-    const name = [...container.querySelectorAll('text')].find((t) => t.textContent?.includes('Revenue intel…'));
-    expect(name?.querySelector('title')?.textContent).toBe('Revenue intelligence suite');
+    expect(fullName(container)).not.toHaveAttribute('transform');
   });
 });
 

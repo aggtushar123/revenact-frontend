@@ -16,11 +16,9 @@ import {
 } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
-import { AXIS_BASE, axisLabel, chartMargin, pctTick, truncTick } from '../../../shared/chartAxis';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin, pctTick } from '../../../shared/chartAxis';
 import { ChartLegend } from '../../../shared/ChartLegend';
 
-/** Product names slant and cut at 14 characters, full name in a `<title>`. */
-const NAME_TICK = truncTick(14, -25);
 
 export interface ProductChurnChartProps {
   rows: ProductRow[];
@@ -89,7 +87,7 @@ export function ProductChurnChart({ rows, currency }: ProductChurnChartProps) {
               margin={chartMargin({ left: true, right: true })}
               maxBarSize={84}
             >
-              <XAxis {...AXIS_BASE} dataKey="name" tick={NAME_TICK} interval={0} height={56} />
+              <XAxis {...AXIS_BASE} dataKey="name" {...categoryAxis(data.length)} />
               <YAxis
                 {...AXIS_BASE}
                 yAxisId="money"

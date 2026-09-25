@@ -46,7 +46,9 @@ export function CompositionSplit({
       {!anyCustomers ? (
         <p className="px-4 py-6 text-[12px] text-ink-faint">{emptyMessage}</p>
       ) : (
-        <ul className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-[10px]">
+        // No scroller: the buckets are a small fixed set (size bands,
+        // lifecycle stages), so the card grows to hold them all.
+        <ul className="px-4 py-3 flex flex-col gap-[10px]">
           {rows.map((row) => (
             <li key={row.key}>
               <div className="flex items-baseline justify-between gap-3">

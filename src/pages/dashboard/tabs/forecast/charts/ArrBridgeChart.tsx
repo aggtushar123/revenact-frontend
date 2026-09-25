@@ -5,7 +5,7 @@ import type { ForecastBridge } from '../../../../../features/forecast/forecastSl
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
-import { AXIS_BASE, axisLabel, chartMargin } from '../../../shared/chartAxis';
+import { AXIS_BASE, axisLabel, chartMargin, zeroMoney } from '../../../shared/chartAxis';
 import { ChartLegend } from '../../../shared/ChartLegend';
 import { useDrill } from '../../../drill/useDrill';
 import { DrillTargets } from '../../../drill/DrillTargets';
@@ -92,6 +92,8 @@ export function ArrBridgeChart({
   /** The figure printed on each step: signed for the movements, plain for
    *  the two totals, so the bridge reads without hovering every bar. */
   const stepLabel = (row: (typeof data)[number]) => {
+    // Compact notation prints zero as "$0.0"; a step that moved nothing is "$0".
+    if (row.value === 0) return zeroMoney(currency);
     const figure = formatCompactMoney(row.value, currency);
     if (row.kind === 'total') return figure;
     return `${row.kind === 'down' ? '−' : '+'}${figure}`;
@@ -191,7 +193,10 @@ export function ArrBridgeChart({
             {/* The invisible half of the waterfall: it lifts each step to
                 where the running total sits. */}
             <Bar {...STATIC_SERIES} dataKey="base" stackId="bridge" fill="transparent" tooltipType="none" />
-            <Bar {...STATIC_SERIES} dataKey="value" stackId="bridge" radius={[3, 3, 0, 0]}>
+            {/* minPointSize: Recharts drops a zero-height bar and its label with
+                it, so a $0 step would leave a gap that reads as missing data.
+                A hairline keeps the column and its "$0". */}
+            <Bar {...STATIC_SERIES} dataKey="value" stackId="bridge" radius={[3, 3, 0, 0]} minPointSize={2}>
               {data.map((row) =>
                 row.name === 'Forecast' ? (
                   <Cell key={row.name} fill="transparent" stroke={ROLE.ink} strokeWidth={2} />

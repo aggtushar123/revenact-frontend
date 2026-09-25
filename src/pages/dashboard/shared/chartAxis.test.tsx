@@ -12,6 +12,9 @@ import {
   dateTick,
   truncate,
   truncTick,
+  categoryAxis,
+  wrapLabel,
+  zeroMoney,
 } from './chartAxis';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 
@@ -161,5 +164,73 @@ describe('truncTick', () => {
     expect(text).toHaveAttribute('text-anchor', 'end');
     expect(text).toHaveAttribute('dy', '0.71em');
     expect(text.querySelector('title')!.textContent).toBe('Globex International Holdings');
+  });
+});
+
+describe('wrapLabel', () => {
+  it('keeps a name that fits on one line whole', () => {
+    expect(wrapLabel('Analytics Suite', 20, 2)).toEqual({ lines: ['Analytics Suite'], cut: false });
+  });
+
+  it('wraps on word boundaries onto a second line', () => {
+    expect(wrapLabel('Workflow Automation', 12, 2)).toEqual({ lines: ['Workflow', 'Automation'], cut: false });
+  });
+
+  it('cuts the last allowed line with an ellipsis when the name runs past it', () => {
+    const { lines, cut } = wrapLabel('Globex International Holdings Group', 12, 2);
+    expect(cut).toBe(true);
+    expect(lines).toHaveLength(2);
+    expect(lines[1].endsWith('…')).toBe(true);
+    expect(lines[1].length).toBeLessThanOrEqual(12);
+  });
+
+  it('hard-cuts a single word longer than the line', () => {
+    expect(wrapLabel('Supercalifragilistic', 8, 1)).toEqual({ lines: ['Superca…'], cut: true });
+  });
+});
+
+describe('categoryAxis', () => {
+  const Tick = (count: number) => categoryAxis(count).tick;
+  const draw = (count: number, width: number, name: string) => {
+    const T = Tick(count);
+    const { height } = categoryAxis(count);
+    return render(
+      <svg>
+        <T x={100} y={10} width={width} height={height} visibleTicksCount={count} payload={{ value: name }} />
+      </svg>,
+    ).container.querySelector('text')!;
+  };
+
+  it('reserves two lines for a few categories and three for many', () => {
+    expect(categoryAxis(5)).toMatchObject({ interval: 0, height: 38 });
+    expect(categoryAxis(9)).toMatchObject({ interval: 0, height: 50 });
+  });
+
+  it('draws full names flat, centred on the band, when the band is wide enough', () => {
+    const text = draw(5, 1400, 'Workflow Automation');
+    expect(text).not.toHaveAttribute('transform');
+    expect(text).toHaveAttribute('text-anchor', 'middle');
+    expect(text.textContent).toBe('Workflow Automation');
+    expect(text.querySelector('title')).toBeNull();
+    expect(text).toHaveAttribute('font-size', '10');
+  });
+
+  it('wraps a long name onto a second line in a moderately wide band', () => {
+    const text = draw(9, 900, 'Globex International');
+    const lines = [...text.querySelectorAll('tspan')].map((t) => t.textContent);
+    expect(lines).toEqual(['Globex', 'International']);
+  });
+
+  it('slants and shortens only when the band is too narrow for flat text', () => {
+    const text = draw(9, 360, 'Globex International Holdings');
+    expect(text.getAttribute('transform')).toMatch(/^rotate\(-35/);
+    expect(text).toHaveAttribute('text-anchor', 'end');
+    expect(text.querySelector('title')!.textContent).toBe('Globex International Holdings');
+  });
+});
+
+describe('zeroMoney', () => {
+  it('prints zero without a decimal', () => {
+    expect(zeroMoney('USD')).toBe('$0');
   });
 });

@@ -14,7 +14,7 @@ import type { Concentration } from '../../../../../features/portfolio/portfolioS
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL, HEALTH_LEGEND } from '../../../shared/chartPalette';
-import { AXIS_BASE, axisLabel, chartMargin, pctTick, truncTick } from '../../../shared/chartAxis';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin, pctTick } from '../../../shared/chartAxis';
 import { ChartLegend } from '../../../shared/ChartLegend';
 
 const HEALTH_COLORS: Record<string, string> = {
@@ -23,9 +23,6 @@ const HEALTH_COLORS: Record<string, string> = {
   poor: ROLE.loss,
 };
 
-/** Account names are slanted and cut to this many characters; the full
- *  name stays in the tick's `<title>` and in the tooltip. */
-const NAME_TICK = truncTick(14, -35);
 
 export interface ConcentrationChartProps {
   concentration: Concentration;
@@ -89,7 +86,9 @@ export function ConcentrationChart({ concentration, currency }: ConcentrationCha
         ) : (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={data} margin={chartMargin({ left: true, right: true })}>
-              <XAxis {...AXIS_BASE} dataKey="name" tick={NAME_TICK} interval={0} height={64} />
+              {/* Full names, flat, wrapping; slanted and shortened only when the
+                  bands get too narrow (the full name then sits in a <title>). */}
+              <XAxis {...AXIS_BASE} dataKey="name" {...categoryAxis(data.length)} />
               <YAxis
                 {...AXIS_BASE}
                 yAxisId="arr"

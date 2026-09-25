@@ -69,6 +69,11 @@ export function chartMargin(titles: { x?: boolean; left?: boolean; right?: boole
 /** Money ticks in the app's one compact format ("$1.8M"). */
 export const moneyTick = (currency: CurrencyCode) => (value: number) => formatCompactMoney(value, currency);
 
+/** Zero in `currency` with no decimals ("$0"): compact notation prints it
+ *  as "$0.0", which reads like a rounded non-zero. */
+export const zeroMoney = (currency: CurrencyCode) =>
+  new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(0);
+
 export const pctTick = (value: number) => `${value}%`;
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -120,4 +125,92 @@ export function truncTick(max = 14, angle = 0) {
       short,
     );
   };
+}
+
+/** Average width of a 10px tick character, rounded up so estimates err
+ *  towards wrapping rather than overlapping the next band. */
+const TICK_CHAR_PX = 6;
+/** Height of one tick line at 10px. */
+const TICK_LINE_PX = 12;
+/** Below this many characters per line a flat name reads worse than a
+ *  slanted one, so the tick slants instead. */
+const MIN_FLAT_CHARS = 7;
+const SLANT = -35;
+
+/** Word-wraps `text` into at most `maxLines` lines of `perLine` characters.
+ *  A word longer than a line is cut; text left over after the last line
+ *  ends that line with an ellipsis, and `cut` says so. */
+export function wrapLabel(text: string, perLine: number, maxLines: number): { lines: string[]; cut: boolean } {
+  const words = text.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let next = 0;
+  while (next < words.length && lines.length < maxLines) {
+    let line = words[next++];
+    while (next < words.length && `${line} ${words[next]}`.length <= perLine) line += ` ${words[next++]}`;
+    lines.push(line);
+  }
+  const leftOver = next < words.length;
+  let cut = false;
+  const shown = lines.map((line, i) => {
+    if (line.length <= perLine && !(leftOver && i === lines.length - 1)) return line;
+    cut = true;
+    return `${line.slice(0, Math.max(1, perLine - 1))}…`;
+  });
+  return { lines: shown, cut };
+}
+
+interface CategoryTickProps extends TickProps {
+  /** The axis's width and height, which Recharts hands every custom tick. */
+  width?: number | string;
+  height?: number | string;
+  visibleTicksCount?: number;
+}
+
+/**
+ * A category x-axis that reads at a glance: full names, flat and centred,
+ * wrapping onto more lines when a name is long, and slanted and shortened
+ * only when each category's band is too narrow for flat text. The band is
+ * measured per render (axis width ÷ category count), so the same chart is
+ * flat on a wide screen and slanted on a narrow one.
+ *
+ *   <XAxis {...AXIS_BASE} dataKey="name" {...categoryAxis(data.length)} />
+ *
+ * `height` reserves two lines for up to six categories and three beyond,
+ * which also holds a slanted, shortened name. A shortened name keeps the
+ * full one in a `<title>`.
+ */
+export function categoryAxis(count: number) {
+  const maxLines = count <= 6 ? 2 : 3;
+  const height = TICK_LINE_PX * maxLines + 14;
+
+  function CategoryTick({ x = 0, y = 0, payload, width = 0, visibleTicksCount }: CategoryTickProps) {
+    const full = String(payload?.value ?? '');
+    const band = Number(width) / Math.max(1, visibleTicksCount ?? count);
+    const perLine = Math.floor((band - 6) / TICK_CHAR_PX);
+    const style = { fill: AXIS_TICK.fill, fontSize: AXIS_TICK.fontSize };
+
+    if (perLine < MIN_FLAT_CHARS) {
+      // How many characters a slanted name can run before leaving the axis.
+      const room = Math.floor((height - 8) / Math.sin((-SLANT * Math.PI) / 180) / TICK_CHAR_PX);
+      const short = truncate(full, Math.max(4, room));
+      return createElement(
+        'text',
+        { x, y, dy: '0.71em', textAnchor: 'end', transform: `rotate(${SLANT}, ${x}, ${y})`, ...style },
+        short !== full ? createElement('title', null, full) : null,
+        short,
+      );
+    }
+
+    const { lines, cut } = wrapLabel(full, perLine, maxLines);
+    return createElement(
+      'text',
+      { x, y, textAnchor: 'middle', ...style },
+      cut ? createElement('title', null, full) : null,
+      ...lines.map((line, i) =>
+        createElement('tspan', { key: i, x, dy: i === 0 ? '0.71em' : '1.2em' }, line),
+      ),
+    );
+  }
+
+  return { tick: CategoryTick, height, interval: 0 as const };
 }

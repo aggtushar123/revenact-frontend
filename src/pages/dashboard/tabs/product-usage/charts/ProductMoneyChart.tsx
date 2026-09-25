@@ -8,7 +8,7 @@ import {
 } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
-import { AXIS_BASE, axisLabel, chartMargin, truncTick } from '../../../shared/chartAxis';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin } from '../../../shared/chartAxis';
 import { ChartLegend } from '../../../shared/ChartLegend';
 import type { LegendItem } from '../../../shared/ChartLegend';
 
@@ -25,8 +25,6 @@ const KEY: LegendItem[] = [
   { label: LABELS.lost, color: ROLE.faint },
 ];
 
-/** Product names slant and cut at 14 characters, full name in a `<title>`. */
-const NAME_TICK = truncTick(14, -25);
 
 export interface ProductMoneyChartProps {
   rows: ProductRow[];
@@ -92,7 +90,7 @@ export function ProductMoneyChart({ rows, currency }: ProductMoneyChartProps) {
               margin={chartMargin({ left: true })}
               maxBarSize={84}
             >
-              <XAxis {...AXIS_BASE} dataKey="name" tick={NAME_TICK} interval={0} height={56} />
+              <XAxis {...AXIS_BASE} dataKey="name" {...categoryAxis(data.length)} />
               <YAxis
                 {...AXIS_BASE}
                 width={56}
