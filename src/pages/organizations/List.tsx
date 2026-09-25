@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { useAppSelector, useOrgCurrency } from '../../hooks';
 import { apiFetch } from '../../lib/apiClient';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
@@ -64,34 +64,26 @@ export function List() {
   const searchRef = useRef<HTMLInputElement>(null);
   const grouped = params.group !== '';
 
-  // Selection resets (the T8 contract). Ungrouped, once a fresh page one
-  // lands, drop selected ids that are no longer listed. `loadedKey` changes
-  // only then, not on a Show-more append, so the rows are read from a ref.
-  const rowsRef = useRef(portfolio.rows);
-  useEffect(() => {
-    rowsRef.current = portfolio.rows;
-  });
-  useEffect(() => {
-    if (!grouped) prune(rowsRef.current.map((row) => row.id));
-  }, [grouped, portfolio.loadedKey, prune]);
-  // Grouped, there is no one full row set to prune against, so a new frame
-  // clears the selection (and the last bulk report with it). Only a new
-  // query does: a reload of the same query (the version bump after a bulk
-  // action, or Try again) keeps it, so the ids a bulk action failed on stay
-  // selected for a retry. Adjusted during render, not in an effect.
+  // One selection rule (spec §1): a different list landing (`loadedQuery`
+  // changed: a filter, sort or group change) resets the selection. Grouped,
+  // there is no one full row set to prune against (the frame is a limit=1
+  // read), so it clears. Ungrouped, it prunes to the new page one's rows.
+  // A reload of the same query (the version bump after a bulk action, Edit
+  // details or Try again) keeps it, so the ids a bulk action failed on stay
+  // selected for a retry, even ones from a Show-more page. The last bulk
+  // report goes with it either way. Adjusted during render, not in an effect.
   const { loadedQuery } = portfolio;
   const [seenQuery, setSeenQuery] = useState(loadedQuery);
   const [report, setReport] = useState<BulkReport | null>(null);
   if (seenQuery !== loadedQuery) {
     setSeenQuery(loadedQuery);
-    if (grouped) {
-      clearSelection();
-      setReport(null);
-    }
+    if (grouped) clearSelection();
+    else prune(portfolio.rows.map((row) => row.id));
+    setReport(null);
   }
   // Read by runBulk after its await: the query that is loaded by then.
   const loadedQueryRef = useRef(loadedQuery);
-  useEffect(() => {
+  useLayoutEffect(() => {
     loadedQueryRef.current = loadedQuery;
   });
 
@@ -142,9 +134,10 @@ export function List() {
         failed: result.failed.map((failure) => ({ ...failure, name: nameOf(failure.id) })),
       });
       // Failures stay selected, so they can be retried, unless a different
-      // list landed meanwhile (the filters changed while this ran): that
-      // cleared the selection, and these ids may no longer be listed.
+      // list landed meanwhile (the query changed while this ran): these ids
+      // may no longer be listed, so nothing stays selected.
       if (loadedQueryRef.current === startQuery) selection.replace(result.failed.map((failure) => failure.id));
+      else selection.clear();
     } catch (err) {
       setReport({ updated: 0, failed: [], error: errorMessage(err, 'Could not update these organizations.') });
     } finally {

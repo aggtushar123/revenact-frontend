@@ -2,12 +2,10 @@ import { useCallback, useState } from 'react';
 import { MAX_IDS } from '../../../features/organizations/portfolioParams';
 
 /** Selected account ids, capped at MAX_IDS (matching the `ids` filter's own
- *  cap). There is no reset keyed off the filter string: a filter change on
- *  its own does not clear the selection, since some of the same rows may
- *  still be visible. Instead call `prune(visibleIds)` once fresh rows have
- *  actually loaded (the portfolio hook's `loadedKey` is the right signal —
- *  it changes only when a new page one lands, not on every `loadMore`), so a
- *  row that has genuinely dropped out of view stops being selected. */
+ *  cap). There is no reset keyed off the filter string: the page calls
+ *  `prune(visibleIds)` or `clear()` once a different list has actually
+ *  landed (the portfolio hook's `loadedQuery` changed), never on a reload
+ *  of the same query, so ids a bulk action failed on stay selected. */
 export function useSelection() {
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
 

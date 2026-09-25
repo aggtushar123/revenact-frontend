@@ -31,13 +31,12 @@ export interface PagedState {
   retry: () => void;
   /** The key of the data currently shown (null before any page has landed).
    *  Unlike `rows`, it does not change on a `loadMore` append — only when a
-   *  fresh page one lands — so it is the right thing for a consumer to key
-   *  a "new rows landed" effect on (e.g. pruning a stale selection). */
+   *  fresh page one lands, including a reload of the same query. */
   loadedKey: string | null;
   /** The query of the data currently shown (null before any page has
    *  landed). Unlike `loadedKey` it ignores the version and retry counters,
    *  so a reload of the same query leaves it unchanged: the signal for
-   *  "a different list landed" (grouped mode clears the selection on it). */
+   *  "a different list landed" (the page clears or prunes the selection on it). */
   loadedQuery: string | null;
 }
 

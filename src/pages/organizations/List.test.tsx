@@ -162,6 +162,70 @@ describe('Organizations list (portfolio)', () => {
     expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).toBeChecked();
   });
 
+  it('ungrouped, keeps failed ids selected across the reload after a bulk action, even from page 3', { timeout: 30000 }, async () => {
+    const rows = Array.from({ length: 120 }, (_, i) => ({ ...ALL_ROWS[1], id: 100 + i, name: `Account ${100 + i}` }));
+    const spy = stubPortfolio({
+      portfolio: (q) => buildPortfolio(q, rows),
+      bulk: (body) => ({ updated: body.ids.slice(2), failed: body.ids.slice(0, 2).map((id) => ({ id, reason: 'Not found.' })) }),
+    });
+    renderList('/organizations/list?group=none');
+    await screen.findByRole('link', { name: 'Account 100' });
+    await userEvent.click(screen.getByRole('button', { name: 'Show more organizations' }));
+    await screen.findByRole('link', { name: 'Account 150' });
+    await userEvent.click(screen.getByRole('button', { name: 'Show more organizations' }));
+    await screen.findByRole('link', { name: 'Account 219' });
+    for (let id = 200; id < 210; id += 1) await userEvent.click(screen.getByRole('checkbox', { name: `Select Account ${id}` }));
+    const bar = screen.getByRole('region', { name: 'Selection' });
+    expect(bar).toHaveTextContent('10 selected');
+    const before = portfolioQueries(spy).length;
+    await userEvent.selectOptions(within(bar).getByRole('combobox', { name: 'Set lifecycle' }), 'live');
+    await userEvent.click(within(bar).getByRole('button', { name: 'Apply to 10' }));
+    await waitFor(() => expect(bulkBodies(spy)).toHaveLength(1));
+    expect(await within(bar).findByText(/1 failed|2 failed/)).toBeInTheDocument();
+    // The reload lands page one only; the two failures are on page 3.
+    await waitFor(() => expect(portfolioQueries(spy).length).toBeGreaterThan(before));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Account 200' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Account 100' })).not.toBeDisabled());
+    expect(bar).toHaveTextContent('2 selected');
+  });
+
+  it('keeps the selection when the group changes to None, pruning against the flat rows, and clears it back to Health', async () => {
+    stubPortfolio();
+    renderList();
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Globex' }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Group' }), 'none');
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Average · 1/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Globex' })).not.toBeDisabled());
+    expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('2 selected');
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'name');
+    await waitFor(() => expect(where().searchParams.get('sort')).toBe('-name'));
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Globex' })).not.toBeDisabled());
+    expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('2 selected');
+
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Group' }), 'health');
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument());
+  });
+
+  it('ungrouped, clears the selection when the query changed while a bulk action ran', async () => {
+    const spy = stubPortfolio();
+    const gate = holdFetch(spy, (url) => url.pathname.endsWith('/organizations/bulk/'));
+    renderList('/organizations/list?group=none');
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Globex' }));
+    gate.start();
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Set lifecycle' }), 'live');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply to 2' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Average 1' }));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Globex' })).not.toBeInTheDocument());
+    gate.release();
+    const bar = await screen.findByRole('region', { name: 'Selection' });
+    expect(await within(bar).findByText(/Updated 2 organizations/)).toBeInTheDocument();
+    expect(bar).not.toHaveTextContent('selected');
+    expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).not.toBeChecked();
+  });
+
   it('disables selection and bulk actions while the list reloads', async () => {
     const spy = stubPortfolio();
     const gate = holdFetch(spy, isPortfolio);

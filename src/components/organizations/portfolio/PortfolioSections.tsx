@@ -207,9 +207,9 @@ export function PortfolioSections({
   /** Rows that just landed (a page one or a `loadMore` append), for a
    *  pinned-fields cache or the like. It only ever *adds* — it must never be
    *  used to prune the selection against these rows (grouped mode has no one
-   *  full row set to prune against, and flat mode already prunes off
-   *  `portfolio.loadedKey`, which fires only on a fresh page one, not on
-   *  every append this callback also sees). */
+   *  full row set to prune against, and flat mode prunes only when
+   *  `portfolio.loadedQuery` changes, not on every append this callback
+   *  also sees). */
   onRowsLoaded: (rows: PortfolioRow[]) => void;
   onClearFilters: () => void;
   onAdd: () => void;
