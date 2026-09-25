@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { InteractionRow } from '../../../../../features/interactions/interactionsSlice';
 import { correctClassification } from '../../../../../features/interactions/interactionsSlice';
 import { useAppDispatch, useAppSelector } from '../../../../../hooks';
+import { ScrollTable } from '../../../shared/ScrollTable';
 
 const getSentimentColor = (sentiment: string) => {
   switch (sentiment) {
@@ -41,9 +42,11 @@ export function ActivityDetailedTable({ rows }: { rows: InteractionRow[] }) {
       {rows.length === 0 ? (
         <p className="text-[12.5px] text-ink-faint">No activity matches these filters.</p>
       ) : (
-        <div className="flex-1 overflow-x-auto border border-line rounded-lg max-h-[480px]">
+        // The pattern ScrollTable generalised: it scrolls inside the card with
+        // the header pinned, and a keyboard can focus it to scroll.
+        <ScrollTable caption="Detailed activity breakdown" maxHeight={480} className="flex-1 border border-line rounded-lg">
           <table className="w-full text-left border-collapse">
-            <thead className="sticky top-0 z-10 bg-elevated">
+            <thead>
               <tr>
                 <th className="py-2.5 px-4 text-[12px] font-bold text-ink-muted border-b border-r border-line whitespace-nowrap">
                   Source Type
@@ -77,7 +80,7 @@ export function ActivityDetailedTable({ rows }: { rows: InteractionRow[] }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollTable>
       )}
     </div>
   );
@@ -188,7 +191,10 @@ function Row({ row }: { row: InteractionRow }) {
                   <td className="py-2 px-4 text-[13px] text-ink-muted border-r border-line-subtle">
                     {row.source}
                   </td>
-                  <td className="py-2 px-4 text-[13px] text-ink font-medium border-r border-line-subtle truncate max-w-[200px]">
+                  <td
+                    className="py-2 px-4 text-[13px] text-ink font-medium border-r border-line-subtle truncate max-w-[200px]"
+                    title={row.account}
+                  >
                     {row.account}
                   </td>
                   <td

@@ -132,6 +132,28 @@ export function truncTick(max = 14, angle = 0) {
   };
 }
 
+/** A category tick for a horizontal bar list (`layout="vertical"`) that
+ *  wraps a long name onto a second line instead of cutting it, and only
+ *  shortens past two lines, keeping the whole name in a `<title>`:
+ *  `<YAxis type="category" tick={wrapTick(20)} width={20 * 6 + 10} />`.
+ *  Two 10px lines fit a 28px row. */
+export function wrapTick(perLine = 20) {
+  return function WrappedTick({ x = 0, y = 0, payload }: TickProps) {
+    const full = String(payload?.value ?? '');
+    const { lines, cut } = wrapLabel(full, perLine, 2);
+    return createElement(
+      'text',
+      { x, y, textAnchor: 'end', fill: AXIS_TICK.fill, fontSize: AXIS_TICK.fontSize },
+      cut ? createElement('title', null, full) : null,
+      ...lines.map((line, i) =>
+        // The first line lifts by half a line per extra line, so the block
+        // stays centred on its bar.
+        createElement('tspan', { key: i, x, dy: i === 0 ? `${(0.355 - (lines.length - 1) * 0.6).toFixed(3)}em` : '1.2em' }, line),
+      ),
+    );
+  };
+}
+
 /** Average width of a 10px tick character, rounded up so estimates err
  *  towards wrapping rather than overlapping the next band. */
 const TICK_CHAR_PX = 6;

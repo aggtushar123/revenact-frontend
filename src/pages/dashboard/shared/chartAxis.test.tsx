@@ -12,6 +12,7 @@ import {
   dateTick,
   truncate,
   truncTick,
+  wrapTick,
   categoryAxis,
   wrapLabel,
   zeroMoney,
@@ -259,5 +260,41 @@ describe('categoryAxis', () => {
 describe('zeroMoney', () => {
   it('prints zero without a decimal', () => {
     expect(zeroMoney('USD')).toBe('$0');
+  });
+});
+
+describe('wrapTick', () => {
+  const draw = (value: string, perLine = 20) => {
+    const Tick = wrapTick(perLine);
+    return render(
+      <svg>
+        <Tick x={120} y={50} payload={{ value }} />
+      </svg>,
+    ).container.querySelector('text')!;
+  };
+
+  it('keeps a short name on one line, centred on its row', () => {
+    const text = draw('Billing');
+    expect(text).toHaveAttribute('text-anchor', 'end');
+    expect(text).toHaveAttribute('font-size', String(AXIS_TICK.fontSize));
+    expect([...text.querySelectorAll('tspan')].map((t) => t.textContent)).toEqual(['Billing']);
+    expect(text.querySelector('tspan')).toHaveAttribute('dy', '0.355em');
+    expect(text.querySelector('title')).toBeNull();
+  });
+
+  it('wraps a longer name onto a second line instead of cutting it', () => {
+    const text = draw('Integration Support Requests');
+    expect([...text.querySelectorAll('tspan')].map((t) => t.textContent)).toEqual([
+      'Integration Support',
+      'Requests',
+    ]);
+    expect(text.querySelector('title')).toBeNull();
+  });
+
+  it('cuts only past two lines, keeping the whole name in a <title>', () => {
+    const long = 'Contract Renewal Negotiation And Pricing Questions';
+    const text = draw(long);
+    expect(text.querySelectorAll('tspan')).toHaveLength(2);
+    expect(text.querySelector('title')!.textContent).toBe(long);
   });
 });

@@ -2,7 +2,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import type { InteractionBucket } from '../../../../../features/interactions/interactionsSlice';
 import { SENTIMENT_COLORS, FALLBACK_COLOR, compact, percentOf } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { DONUT, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { ChartLegend } from '../../../shared/ChartLegend';
 import { useDrill } from '../../../drill/useDrill';
 import { DrillTargets } from '../../../drill/DrillTargets';
 
@@ -42,11 +43,21 @@ export function ActivitySentimentDonut({
     onSelect: (trigger: HTMLElement) => openSegment(entry, trigger),
   }));
 
+  // The key carries each slice's count and share, so the ring needs no
+  // labels of its own: the old ones sat outside a 120px ring and overflowed
+  // the card or piled onto each other when slices were thin.
+  const legend = data.map((entry) => ({
+    label: entry.name,
+    color: SENTIMENT_COLORS[entry.name] ?? FALLBACK_COLOR,
+    value: `${entry.value.toLocaleString()} · ${percentOf(entry.value, total)}%`,
+  }));
+
   return (
-    <div className="w-full h-full p-6 flex flex-col relative">
-      <h3 className="text-[14px] font-bold text-ink mb-4">Activities By Sentiment</h3>
+    <div className="w-full h-full p-6 flex flex-col gap-3 relative">
+      <h3 className="text-[14px] font-bold text-ink">Activities By Sentiment</h3>
+      <ChartLegend items={legend} />
       <DrillTargets label="Activities By Sentiment" items={drillItems} />
-      <div className="flex-1 min-h-[300px] relative">
+      <div className="relative w-full h-[240px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -54,36 +65,10 @@ export function ActivitySentimentDonut({
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius={45}
-              outerRadius={60}
+              {...DONUT}
               paddingAngle={0}
               dataKey="value"
               stroke="none"
-              label={({ name, value, cx, cy, midAngle = 0, outerRadius = 0 }) => {
-                const RADIAN = Math.PI / 180;
-                const radius = outerRadius + 15;
-                const x = cx + radius * Math.cos(-midAngle * RADIAN);
-                const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-                return (
-                  <text
-                    x={x}
-                    y={y}
-                    fill="var(--text-secondary)"
-                    textAnchor={x > cx ? 'start' : 'end'}
-                    dominantBaseline="central"
-                    className="text-[12px] font-medium"
-                  >
-                    <tspan x={x} dy="-0.6em">
-                      {name}
-                    </tspan>
-                    <tspan x={x} dy="1.4em">
-                      {`${compact(Number(value))} (${percentOf(Number(value), total)}%)`}
-                    </tspan>
-                  </text>
-                );
-              }}
-              labelLine={{ stroke: 'var(--border-strong)', strokeWidth: 1 }}
             >
               {data.map((entry) => (
                 <Cell

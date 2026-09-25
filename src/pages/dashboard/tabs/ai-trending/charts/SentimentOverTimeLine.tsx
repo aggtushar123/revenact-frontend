@@ -1,13 +1,17 @@
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from 'recharts';
 import type { SentimentPoint } from '../../../../../features/interactions/interactionsSlice';
 import { SENTIMENT_SERIES, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, chartMargin, dateTick } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 
 /** How many weeks the line shows. A year of weekly points is 52 ticks on an axis
  *  about 700px wide, which is unreadable; the most recent half-year is what a
  *  trend is read for, and the filter bar's own date range is how you see more. */
 const MAX_WEEKS = 26;
+
+const LEGEND = SENTIMENT_SERIES.map((series) => ({ label: series.label, color: series.color, kind: 'line' as const }));
 
 /** Positive / neutral / negative counts per week.
  *
@@ -24,36 +28,36 @@ export function SentimentOverTimeLine({ data }: { data: SentimentPoint[] }) {
   const max = niceMax(rows.flatMap((p) => [p.positive, p.neutral, p.negative]));
 
   return (
-    <div className="w-full h-full p-6 flex flex-col">
-      <h3 className="text-[14px] font-bold text-ink mb-4">Activity Sentiments Over Time</h3>
+    <div className="relative w-full h-full p-6 flex flex-col gap-3">
+      <h3 className="text-[14px] font-bold text-ink">Activity Sentiments Over Time</h3>
+      <ChartLegend items={LEGEND} />
 
-      <div className="flex-1 w-full min-h-[350px] relative">
+      <div className="relative w-full h-[320px]">
         {rows.length === 0 ? (
           <p className="text-[12.5px] text-ink-faint">No activity in this period.</p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={rows} margin={{ top: 25, right: 30, left: -20, bottom: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-strong)" />
+            <LineChart data={rows} margin={chartMargin({ left: true, x: true })}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border-default)" />
+              {/* Flat "15 Jun" weeks, thinned by `minTickGap` rather than
+                  rotated: 26 slanted "Jun 15, 2025"s crowded the card. */}
               <XAxis
+                {...AXIS_BASE}
                 dataKey="date"
-                axisLine={false}
-                tickLine={false}
                 scale="point"
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10, angle: -45, textAnchor: 'end' }}
+                tickFormatter={dateTick}
+                minTickGap={16}
                 padding={{ left: 10, right: 10 }}
-                dy={15}
+                label={axisLabel('Week', 'x')}
               />
               <YAxis
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 12 }}
-                dx={-10}
+                {...AXIS_BASE}
+                width={40}
                 domain={[0, max]}
+                allowDecimals={false}
+                label={axisLabel('Interactions')}
               />
-              <Tooltip
-                contentStyle={TOOLTIP_STYLE}
-              />
-              <Legend verticalAlign="top" height={24} iconType="plainline" />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
 
               {SENTIMENT_SERIES.map((series) => (
                 <Line
