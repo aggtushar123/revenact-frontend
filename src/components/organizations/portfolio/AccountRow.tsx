@@ -1,4 +1,4 @@
-import { useRef, type PointerEvent, type ReactNode } from 'react';
+import { useEffect, useRef, type PointerEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown } from 'lucide-react';
 import type { ColumnId } from '../tableData';
@@ -6,6 +6,7 @@ import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 import { PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
+import { SM, useMediaQuery } from '../../../lib/useMediaQuery';
 import { HealthRing, PulsePair, RenewalRunway, SignalTag, TrendLine, touchText } from './rowParts';
 
 export const LONG_PRESS_MS = 500;
@@ -41,6 +42,7 @@ export function AccountRow({
   onToggleOpen,
   children,
 }: AccountRowProps) {
+  const isSm = useMediaQuery(SM);
   const timer = useRef<number | null>(null);
   const longPressed = useRef(false);
   const detailsId = `account-${row.id}-details`;
@@ -52,6 +54,10 @@ export function AccountRow({
       timer.current = null;
     }
   };
+
+  // Unmounting mid-press (e.g. the list re-renders under a filter change)
+  // must not fire a stray onLongPress once the timer elapses.
+  useEffect(() => cancelPress, []);
 
   const startPress = (event: PointerEvent) => {
     // A mouse selects with the checkbox; long-press is for touch and pen.
@@ -121,24 +127,26 @@ export function AccountRow({
         </div>
 
         <TrendLine trend={row.health.trend} category={row.health.category} className="order-4 sm:order-none" />
-        <RenewalRunway renewal={row.renewal} className="hidden sm:flex" />
+        {isSm ? <RenewalRunway renewal={row.renewal} /> : null}
 
-        <span className="hidden sm:flex flex-1 min-w-0 flex-wrap gap-1">
-          {pins.map((id) => {
-            const field = PORTFOLIO_FIELDS[id];
-            return (
-              <span key={id} data-pin={id} className="inline-flex items-center gap-1 rounded-full bg-subtle px-2 py-0.5 text-[11px] text-ink-muted">
-                {field.short} <span className="font-mono-brand tabular-nums text-ink">{field.value(row)}</span>
-              </span>
-            );
-          })}
-        </span>
+        {isSm ? (
+          <span className="flex flex-1 min-w-0 flex-wrap gap-1">
+            {pins.map((id) => {
+              const field = PORTFOLIO_FIELDS[id];
+              return (
+                <span key={id} data-pin={id} className="inline-flex items-center gap-1 rounded-full bg-subtle px-2 py-0.5 text-[11px] text-ink-muted">
+                  {field.short} <span className="font-mono-brand tabular-nums text-ink">{field.value(row)}</span>
+                </span>
+              );
+            })}
+          </span>
+        ) : null}
 
         <span className="order-2 sm:order-none sm:w-20 sm:text-right font-mono-brand tabular-nums text-[13px] text-ink">
           {arr}
         </span>
 
-        <PulsePair pulse={row.pulse} className="hidden sm:flex" />
+        {isSm ? <PulsePair pulse={row.pulse} /> : null}
 
         <span className="order-3 sm:order-none sm:w-36 flex sm:justify-end min-w-0">
           <SignalTag signal={row.signal} />

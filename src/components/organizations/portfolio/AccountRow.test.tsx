@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AccountRow, LONG_PRESS_MS, type AccountRowProps } from './AccountRow';
 import { pizzaHut } from '../../../features/organizations/testPortfolio';
+import { resetViewport, setViewport } from '../../../test/viewport';
 
 function renderRow(overrides: Partial<AccountRowProps> = {}) {
   const props: AccountRowProps = {
@@ -29,9 +30,13 @@ function renderRow(overrides: Partial<AccountRowProps> = {}) {
 }
 
 describe('AccountRow', () => {
-  afterEach(() => vi.useRealTimers());
+  afterEach(() => {
+    vi.useRealTimers();
+    resetViewport();
+  });
 
-  it('shows the eight row elements', () => {
+  it('shows all eight row elements on desktop', () => {
+    setViewport(1440);
     const { container } = renderRow();
     expect(screen.getByRole('link', { name: 'Pizza Hut' })).toHaveAttribute('href', '/organizations/7');
     expect(container).toHaveTextContent('Carl CSM · Live · Touched 33d ago');
@@ -43,6 +48,21 @@ describe('AccountRow', () => {
     expect(screen.getByText('High Risk')).toBeInTheDocument();
     expect(screen.getByText('pulses disagree')).toBeInTheDocument();
     expect(screen.getByText('Renewal overdue')).toBeInTheDocument();
+  });
+
+  it('shows only the phone-card elements on phones, not the runway, pulse or pins', () => {
+    // Default: jsdom has no matchMedia, so useMediaQuery reads false (phone).
+    const { container } = renderRow({ pins: ['nps'] });
+    expect(screen.getByRole('link', { name: 'Pizza Hut' })).toHaveAttribute('href', '/organizations/7');
+    expect(container).toHaveTextContent('Carl CSM · Live · Touched 33d ago');
+    expect(screen.getByRole('img', { name: 'Health 4.9, Average' })).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: 'Health falling from 6.2 to 4.9 over 6 months' })).toBeInTheDocument();
+    expect(screen.getByText('$69.6K')).toHaveClass('font-mono-brand', 'tabular-nums');
+    expect(screen.getByText('Renewal overdue')).toBeInTheDocument();
+    expect(screen.queryByText('47d overdue')).not.toBeInTheDocument();
+    expect(screen.queryByText('High Risk')).not.toBeInTheDocument();
+    expect(screen.queryByText('pulses disagree')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-pin="nps"]')).not.toBeInTheDocument();
   });
 
   it('opens from the row or the chevron, and the name navigates instead', async () => {
@@ -72,7 +92,8 @@ describe('AccountRow', () => {
     expect(props.onToggleOpen).not.toHaveBeenCalled();
   });
 
-  it('shows pinned fields as chips', () => {
+  it('shows pinned fields as chips on desktop', () => {
+    setViewport(1440);
     const { container } = renderRow({ pins: ['nps', 'totalSeatUtilization'] });
     expect(container.querySelector('[data-pin="nps"]')).toHaveTextContent('NPS −80');
     expect(container.querySelector('[data-pin="totalSeatUtilization"]')).toHaveTextContent('Seats 16%');
@@ -98,5 +119,28 @@ describe('AccountRow', () => {
     fireEvent.click(header);
     expect(props.onLongPress).not.toHaveBeenCalled();
     expect(props.onToggleOpen).toHaveBeenCalledWith(pizzaHut);
+  });
+
+  it('clears the long-press timer on unmount so it never fires late', () => {
+    vi.useFakeTimers();
+    const { props, header, unmount } = renderRow();
+    fireEvent.pointerDown(header);
+    unmount();
+    vi.advanceTimersByTime(LONG_PRESS_MS);
+    expect(props.onLongPress).not.toHaveBeenCalled();
+  });
+
+  it('reaches the chevron by Tab and toggles it with Enter and Space', async () => {
+    const user = userEvent.setup();
+    const { props } = renderRow();
+    const chevron = screen.getByRole('button', { name: 'Open Pizza Hut' });
+    for (let i = 0; i < 8 && document.activeElement !== chevron; i++) {
+      await user.tab();
+    }
+    expect(chevron).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(props.onToggleOpen).toHaveBeenCalledTimes(1);
+    await user.keyboard(' ');
+    expect(props.onToggleOpen).toHaveBeenCalledTimes(2);
   });
 });
