@@ -259,6 +259,9 @@ export function PortfolioSections({
   if (params.group === '') {
     return (
       <div aria-busy={portfolio.loading}>
+        {/* The flat list's own heading, so an opened row's panels (h3) sit
+            under it rather than under the last summary tile's. */}
+        <h2 className="sr-only">Organizations list</h2>
         {staleError}
         <ul className="flex flex-col gap-1.5">
           {portfolio.rows.map((row) => renderRow(row, { loading: portfolio.loading }))}

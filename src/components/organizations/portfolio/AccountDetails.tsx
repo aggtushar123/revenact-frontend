@@ -3,7 +3,7 @@
 // (Task 6 brief). Fast refresh doesn't apply to this mostly-presentational
 // module, same precedent as rowParts.tsx.
 /* eslint-disable react-refresh/only-export-components */
-import { Fragment, useId, type ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { Pencil } from 'lucide-react';
 import type { ColumnId } from '../tableData';
 import { PANELS, PANEL_ORDER, PORTFOLIO_FIELDS, type PanelKey } from '../../../features/organizations/portfolioFields';
@@ -32,11 +32,12 @@ export function timelinePositions(
 }
 
 function Panel({ panel, children }: { panel: PanelKey; children: ReactNode }) {
-  const headingId = useId();
   const title = PANELS.find((p) => p.key === panel)?.title ?? panel;
+  // A headed section with no accessible name: six panels per opened row
+  // would otherwise each be a region landmark.
   return (
-    <section aria-labelledby={headingId} data-panel={panel} className="min-w-0">
-      <h3 id={headingId} className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+    <section data-panel={panel} className="min-w-0">
+      <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
         {title}
       </h3>
       {children}

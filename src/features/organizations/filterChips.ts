@@ -38,8 +38,8 @@ export function filterChips(p: PortfolioParams, options: PortfolioResponse['filt
   return chips;
 }
 
-export function countText(count: number | null, total: number | null, filtered: boolean): string {
-  if (count == null) return 'Loading organizations…';
+export function countText(count: number | null, total: number | null, filtered: boolean, failed = false): string {
+  if (count == null) return failed ? 'Organizations unavailable' : 'Loading organizations…';
   if (filtered && total != null) return `${count} of ${total} organizations`;
   return `${count} organization${count === 1 ? '' : 's'}`;
 }

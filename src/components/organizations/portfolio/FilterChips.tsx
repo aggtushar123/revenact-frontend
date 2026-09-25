@@ -10,6 +10,7 @@ export function FilterChips({
   options,
   count,
   total,
+  failed = false,
   onChange,
   onClearAll,
 }: {
@@ -17,6 +18,8 @@ export function FilterChips({
   options: PortfolioResponse['filters'] | null;
   count: number | null;
   total: number | null;
+  /** The first load failed: there is no count to wait for. */
+  failed?: boolean;
   onChange: (patch: Partial<PortfolioParams>) => void;
   onClearAll: () => void;
 }) {
@@ -45,7 +48,7 @@ export function FilterChips({
         </button>
       ) : null}
       <p role="status" aria-live="polite" className="ml-auto font-mono-brand tabular-nums text-[13px] text-ink-muted">
-        {countText(count, total, chips.length > 0)}
+        {countText(count, total, chips.length > 0, failed)}
       </p>
     </div>
   );

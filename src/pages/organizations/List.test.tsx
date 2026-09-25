@@ -53,7 +53,7 @@ describe('Organizations list (portfolio)', () => {
     renderList();
     expect(await screen.findByRole('button', { name: /^Average · 1/ })).toHaveAttribute('aria-expanded', 'true');
     expect(await screen.findByRole('link', { name: 'Pizza Hut' })).toHaveAttribute('href', '/organizations/7');
-    expect(screen.getByRole('region', { name: 'Health' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Health' })).toBeInTheDocument();
     const [frame] = portfolioQueries(spy);
     expect(frame.get('group')).toBe('health');
     expect(frame.get('sort')).toBe('-arr');
@@ -91,6 +91,14 @@ describe('Organizations list (portfolio)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(where().searchParams.has('search')).toBe(false);
     expect(await screen.findByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+  });
+
+  it('says the tiles and count are unavailable after a failed first load, not loading forever', async () => {
+    stubPortfolio({ portfolio: () => ({ status: 500, body: { detail: 'Boom' } }) });
+    renderList();
+    expect(await screen.findByText('Summary unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Organizations unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading summary' })).not.toBeInTheDocument();
   });
 
   it('shows an error and recovers on Try again', async () => {

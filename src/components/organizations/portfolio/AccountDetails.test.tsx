@@ -17,6 +17,11 @@ describe('AccountDetails', () => {
     ]);
   });
 
+  it('keeps the panels out of the landmark list: headed sections, not named regions', () => {
+    render(<AccountDetails row={pizzaHut} today="2026-09-25" />);
+    expect(screen.queryAllByRole('region')).toHaveLength(0);
+  });
+
   it('prints commercial money in the account currency and numbers in mono', () => {
     const { container } = render(<AccountDetails row={pizzaHut} today="2026-09-25" />);
     const tcv = container.querySelector('[data-field="tcv"]');

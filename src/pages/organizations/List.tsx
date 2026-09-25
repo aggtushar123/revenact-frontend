@@ -182,7 +182,13 @@ export function List() {
   return (
     <OrganizationsFrame>
       <div className="flex flex-col gap-4 pb-6">
-        <SummaryTiles summary={portfolio.data?.summary ?? null} currency={currency} params={params} onFilter={update} />
+        <SummaryTiles
+          summary={portfolio.data?.summary ?? null}
+          failed={!portfolio.data && portfolio.error !== null}
+          currency={currency}
+          params={params}
+          onFilter={update}
+        />
         <PortfolioToolbar
           params={params}
           update={update}
@@ -200,6 +206,7 @@ export function List() {
           options={options}
           count={portfolio.data?.count ?? null}
           total={portfolio.total}
+          failed={!portfolio.data && portfolio.error !== null}
           onChange={applyFilter}
           onClearAll={() => {
             clearFilters();

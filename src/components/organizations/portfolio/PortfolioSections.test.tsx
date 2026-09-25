@@ -88,6 +88,7 @@ describe('PortfolioSections', () => {
     });
     render(<Harness search="group=none&include_churned=1" />);
     expect(await screen.findByText('Globex')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Organizations list' })).toHaveClass('sr-only');
     await userEvent.click(screen.getByRole('button', { name: 'Show more organizations' }));
     expect(await screen.findByText('Initech')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show more organizations' })).not.toBeInTheDocument();

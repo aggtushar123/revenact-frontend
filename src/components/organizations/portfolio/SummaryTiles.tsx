@@ -1,25 +1,30 @@
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 import { signed } from '../../../features/organizations/portfolioFields';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { HealthBand, NpsBand, PortfolioSummary } from '../../../features/organizations/portfolioTypes';
-import { HEALTH_LABEL, NPS_BANDS, NPS_LABEL } from '../../../features/organizations/portfolioLabels';
+import { HEALTH_LABEL, NPS_BANDS, NPS_LABEL, RENEWAL_WINDOWS, type RenewalWindow } from '../../../features/organizations/portfolioLabels';
 import { FOCUS } from './styles';
 
 const BANDS: HealthBand[] = ['good', 'average', 'poor'];
 const BAND_DOT: Record<HealthBand, string> = { good: 'bg-success', average: 'bg-warning', poor: 'bg-danger' };
 const NPS_BAR: Record<NpsBand, string> = { promoter: 'bg-success', passive: 'bg-line-strong', detractor: 'bg-danger' };
 
+/** A group named by its heading, not a region: five tiles as landmarks
+ *  would crowd a screen reader's landmark list. */
 function Tile({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  const headingId = useId();
   return (
-    <section aria-label={title} className="min-w-[15rem] shrink-0 snap-start rounded-xl bg-surface p-3 sm:min-w-0">
-      <header className="mb-2 flex items-center justify-between gap-2">
-        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">{title}</h2>
+    <div role="group" aria-labelledby={headingId} className="min-w-[15rem] shrink-0 snap-start rounded-xl bg-surface p-3 sm:min-w-0">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <h2 id={headingId} className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+          {title}
+        </h2>
         {action}
-      </header>
+      </div>
       {children}
-    </section>
+    </div>
   );
 }
 
@@ -53,13 +58,23 @@ function Switch<T extends string>({
   );
 }
 
-function FilterButton({ pressed, onClick, children }: { pressed: boolean; onClick: () => void; children: ReactNode }) {
+function FilterButton({
+  pressed,
+  onClick,
+  compact = false,
+  children,
+}: {
+  pressed: boolean;
+  onClick: () => void;
+  compact?: boolean;
+  children: ReactNode;
+}) {
   return (
     <button
       type="button"
       aria-pressed={pressed}
       onClick={onClick}
-      className={`flex w-full min-h-11 sm:min-h-7 items-center justify-between gap-2 rounded-md px-1.5 text-[11px] hover:bg-subtle active:bg-line-subtle ${FOCUS} ${
+      className={`flex w-full min-w-0 min-h-11 ${compact ? 'sm:min-h-6' : 'sm:min-h-7'} items-center justify-between gap-2 rounded-md px-1.5 text-[11px] hover:bg-subtle active:bg-line-subtle ${FOCUS} ${
         pressed ? 'bg-subtle font-semibold text-ink' : 'text-ink-muted'
       }`}
     >
@@ -90,18 +105,38 @@ function Skeleton() {
  *  the row swipes sideways; the page itself never scrolls horizontally. */
 export function SummaryTiles({
   summary,
+  failed = false,
   currency,
   params,
   onFilter,
 }: {
   summary: PortfolioSummary | null;
+  /** The first load failed: there is no summary to wait for. */
+  failed?: boolean;
   currency: CurrencyCode;
   params: PortfolioParams;
   onFilter: (patch: Partial<PortfolioParams>) => void;
 }) {
   const [mode, setMode] = useState<'count' | 'mrr' | 'arr'>('count');
-  const [span, setSpan] = useState<'30' | '90'>('30');
-  if (!summary) return <Skeleton />;
+  // The Renewing tile's window. The summary counts 30 and 90 days; a
+  // 180-day filter (set from the Filters panel) shows as a third, pressed
+  // option, whose count is the whole filtered book. Synced during render.
+  const [span, setSpan] = useState<RenewalWindow>(params.renews_within || '30');
+  const [seenWindow, setSeenWindow] = useState(params.renews_within);
+  if (seenWindow !== params.renews_within) {
+    setSeenWindow(params.renews_within);
+    if (params.renews_within) setSpan(params.renews_within);
+    else if (span === '180') setSpan('30');
+  }
+  if (!summary) {
+    if (!failed) return <Skeleton />;
+    return (
+      <div className="rounded-xl bg-surface p-3">
+        <p className="text-[13px] font-semibold text-ink">Summary unavailable</p>
+        <p className="text-[11px] text-ink-muted">The tiles return once the list loads.</p>
+      </div>
+    );
+  }
 
   const health = summary.health;
   const bandValue = (band: HealthBand) => (mode === 'count' ? health[band] : health[mode][band]);
@@ -112,11 +147,15 @@ export function SummaryTiles({
   const npsCount: Record<NpsBand, number> = { promoter: nps.promoters, passive: nps.passives, detractor: nps.detractors };
   const npsBands = NPS_BANDS.map((band) => ({ band, label: NPS_LABEL[band], count: npsCount[band], bar: NPS_BAR[band] }));
   const npsTotal = nps.promoters + nps.passives + nps.detractors;
-  const stageMax = Math.max(1, ...summary.lifecycle.map((s) => s.count));
-  const renewing = summary.renewing[span];
+  const stages = summary.lifecycle.filter((stage) => stage.count > 0);
+  const stageMax = Math.max(1, ...stages.map((s) => s.count));
+  // More than four stages fit the tile's height in two columns, without bars.
+  const twoColumns = stages.length > 4;
+  const renewing = span === '180' ? summary.accounts : summary.renewing[span];
+  const spans = RENEWAL_WINDOWS.filter((days) => days !== '180' || span === '180');
 
   return (
-    <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5">
+    <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5">
       <Tile
         title="Health"
         action={
@@ -170,17 +209,22 @@ export function SummaryTiles({
       </Tile>
 
       <Tile title="Lifecycle">
-        <div className="max-h-36 overflow-y-auto">
-          {summary.lifecycle.map((stage) => (
+        <div className={twoColumns ? 'grid grid-cols-2 gap-x-2' : ''}>
+          {stages.map((stage) => (
             <FilterButton
               key={stage.value}
+              compact={twoColumns}
               pressed={only(params.lifecycle, stage.value)}
               onClick={() => onFilter({ lifecycle: only(params.lifecycle, stage.value) ? [] : [stage.value] })}
             >
-              <span className="w-20 truncate text-left">{stage.label}</span>{' '}
-              <span aria-hidden="true" className="mx-1 h-1 flex-1 rounded-full bg-line">
-                <span className="block h-full rounded-full bg-ink-muted" style={{ width: `${(stage.count / stageMax) * 100}%` }} />
-              </span>
+              <span title={stage.label} className={`truncate text-left ${twoColumns ? 'min-w-0' : 'w-20'}`}>
+                {stage.label}
+              </span>{' '}
+              {twoColumns ? null : (
+                <span aria-hidden="true" className="mx-1 h-1 flex-1 rounded-full bg-line">
+                  <span className="block h-full rounded-full bg-ink-muted" style={{ width: `${(stage.count / stageMax) * 100}%` }} />
+                </span>
+              )}
               <span className={`${mono} text-ink`}>{stage.count}</span>
             </FilterButton>
           ))}
@@ -204,10 +248,7 @@ export function SummaryTiles({
             label="Renewal window"
             value={span}
             onChange={setSpan}
-            options={[
-              { value: '30', label: '30d' },
-              { value: '90', label: '90d' },
-            ]}
+            options={spans.map((days) => ({ value: days, label: `${days}d` }))}
           />
         }
       >

@@ -37,5 +37,6 @@ describe('filterChips', () => {
     expect(countText(1, null, false)).toBe('1 organization');
     expect(countText(12, null, false)).toBe('12 organizations');
     expect(countText(null, null, true)).toBe('Loading organizations…');
+    expect(countText(null, null, false, true)).toBe('Organizations unavailable');
   });
 });
