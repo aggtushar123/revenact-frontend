@@ -9,6 +9,8 @@ import { RenewalRunwayChart } from './charts/RenewalRunwayChart';
 import { Kpi, KpiStrip } from '../../shared/Kpi';
 import { useDrill } from '../../drill/useDrill';
 import { fromHealthRows } from '../../drill/rows';
+import { ChartLegend } from '../../shared/ChartLegend';
+import { HEALTH_LEGEND } from '../../shared/chartPalette';
 
 const DEFAULT_WINDOW: WindowMonths = 6;
 
@@ -154,7 +156,7 @@ export function MovementView() {
         />
       </KpiStrip>
 
-      <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
+      <section className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
         <div className="flex items-start justify-between gap-3 px-4 pt-3">
           <div>
             <h3 className="text-[13px] font-bold text-ink">Health transitions</h3>
@@ -162,31 +164,14 @@ export function MovementView() {
               Ribbon width is the number of accounts moving · faded ribbons held their grade
             </p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
-            {(['Good', 'Average', 'Poor'] as const).map((status) => (
-              <span key={status} className="flex items-center gap-1.5">
-                <span
-                  className="w-2.5 h-2.5 rounded-sm"
-                  style={{
-                    backgroundColor:
-                      status === 'Good'
-                        ? 'var(--success)'
-                        : status === 'Average'
-                          ? 'var(--warning)'
-                          : 'var(--danger)',
-                  }}
-                />
-                <span className="text-[11px] font-medium text-ink-muted">{status}</span>
-              </span>
-            ))}
-          </div>
+          <ChartLegend className="shrink-0" align="end" items={HEALTH_LEGEND} />
         </div>
         <div className="px-2 pb-3 pt-1">
           <HealthFlowChart flow={flow} />
         </div>
-      </div>
+      </section>
 
-      <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[300px] flex flex-col">
+      <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[340px] flex flex-col">
         <RenewalRunwayChart buckets={buckets} drillable={drillable} />
       </div>
     </div>
