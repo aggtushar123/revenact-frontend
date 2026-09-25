@@ -27,7 +27,7 @@ export function DualPulse({ csmPulseScore, aiPulseScore, divergenceThreshold = 2
 
   const lane = (label: string, score: number | null) => (
     <div className="flex items-center gap-[2px]">
-      <span className="w-5 text-[8.5px] tracking-wide text-ink-faint">{label}</span>
+      <span className="w-6 text-[10px] text-ink-faint">{label}</span>
       {score === null ? (
         // Hollow track, not five empty dots: "unrated" has to look different
         // from "rated 1 out of 5".
