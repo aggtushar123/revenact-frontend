@@ -14,12 +14,9 @@ import type { HealthStatus } from '../mockData';
 import { PULSE_MIDPOINT, QUADRANT_LABEL } from '../divergence';
 import type { DivergenceRow } from '../divergence';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-
-const STATUS_COLORS: Record<HealthStatus, string> = {
-  Poor: 'var(--danger)',
-  Average: 'var(--warning)',
-  Good: 'var(--success)',
-};
+import { HEALTH_COLORS as STATUS_COLORS, HEALTH_LEGEND, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, chartMargin } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 
 /** Drawn back to front, so the rarer and more urgent states land on top. */
 const SERIES_ORDER: HealthStatus[] = ['Good', 'Average', 'Poor'];
@@ -42,7 +39,7 @@ function DivergenceTooltip({ active, payload }: { active?: boolean; payload?: To
   const aiOffset = gap === null ? null : -gap;
 
   return (
-    <div className="bg-elevated border border-line rounded-lg shadow-lg px-3 py-2 max-w-[240px]">
+    <div style={TOOLTIP_STYLE} className="px-3 py-2 max-w-[240px]">
       <p className="text-[12px] font-bold text-ink">{row.account}</p>
       <p className="text-[11px] text-ink-faint mb-1">
         {row.owner} · {row.healthStatus}
@@ -114,24 +111,14 @@ export function PulseDivergenceScatter({ laid }: PulseDivergenceScatterProps) {
             {plotted.length} plotted · dot size = active seats
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
-          {SERIES_ORDER.map((status) => (
-            <span key={status} className="flex items-center gap-1.5">
-              <span
-                className="w-2.5 h-2.5 rounded-sm"
-                style={{ backgroundColor: STATUS_COLORS[status] }}
-              />
-              <span className="text-[11px] font-medium text-ink-muted">{status}</span>
-            </span>
-          ))}
-        </div>
+        <ChartLegend className="shrink-0" align="end" items={HEALTH_LEGEND} />
       </div>
 
       {/* min-h-0 lets this flex child actually shrink to its share of the
           card's height instead of being floored by its content. */}
       <div className="flex-1 w-full min-h-0 px-2 pb-2">
         <ResponsiveContainer width="100%" height="100%">
-          <ScatterChart margin={{ top: 16, right: 20, bottom: 24, left: 4 }}>
+          <ScatterChart margin={chartMargin({ x: true, left: true })}>
             {/* The two corners where the pulses disagree, washed so the eye
                 lands there before it reads a single dot. */}
             <ReferenceArea
@@ -158,33 +145,17 @@ export function PulseDivergenceScatter({ laid }: PulseDivergenceScatterProps) {
               dataKey="x"
               domain={[AXIS_MIN, AXIS_MAX]}
               ticks={TICKS}
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-tertiary)', fontSize: 11 }}
-              label={{
-                value: 'CSM Pulse →',
-                position: 'insideBottom',
-                offset: -14,
-                fill: 'var(--text-secondary)',
-                fontSize: 11,
-              }}
+              {...AXIS_BASE}
+              label={axisLabel('CSM Pulse (1–5)', 'x')}
             />
             <YAxis
               type="number"
               dataKey="y"
               domain={[AXIS_MIN, AXIS_MAX]}
               ticks={TICKS}
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-tertiary)', fontSize: 11 }}
-              width={34}
-              label={{
-                value: 'AI Pulse →',
-                angle: -90,
-                position: 'insideLeft',
-                fill: 'var(--text-secondary)',
-                fontSize: 11,
-              }}
+              {...AXIS_BASE}
+              width={24}
+              label={axisLabel('AI Pulse (1–5)')}
             />
             <ZAxis type="number" dataKey="row.activeSeats" range={[45, 330]} domain={seatRange} />
 

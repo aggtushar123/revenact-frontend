@@ -39,7 +39,7 @@ export function DivergenceList({ title, caption, rows, tone, emptyMessage }: Div
 
   return (
     <section className="flex flex-col">
-      <header className="flex items-baseline justify-between gap-3 px-4 pt-3 pb-1">
+      <header className="sticky top-0 z-10 bg-surface flex items-baseline justify-between gap-3 px-4 pt-3 pb-1">
         <h3 className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">{title}</h3>
         <span className="text-[11px] font-bold text-ink-muted tabular-nums">{rows.length}</span>
       </header>
