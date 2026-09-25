@@ -27,6 +27,8 @@ export function DashboardLayout() {
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   // The dashboard's frame pads itself the way Communications' body does.
   const isDashboard = location.pathname.startsWith('/dashboard');
+  // The Organizations list pads itself the same way (OrganizationsFrame).
+  const isOrgList = location.pathname === '/organizations/list';
   // The Navbar's actions slot, which a page below (the dashboard) portals into.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const slotValue = useMemo(() => ({ slot, setSlot }), [slot]);
@@ -62,7 +64,7 @@ export function DashboardLayout() {
         <Sidebar />
         <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden rv-canvas">
           {!isScenarios && !isCopilot && !isCommunications && <Navbar />}
-          <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications || isDashboard) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
+          <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications || isDashboard || isOrgList) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
             <Outlet />
           </main>
         </div>
