@@ -307,6 +307,77 @@ describe('usePortfolio', () => {
     errorSpy.mockRestore();
   });
 
+  // ABA: the key goes A -> B -> A while a Show more issued under the first A
+  // is still in flight. A guard keyed on the `key` string alone cannot tell
+  // that second "A" apart from the first, so the abandoned answer can be let
+  // through (appending a duplicate page) and its cleanup can clobber a
+  // legitimate later call's own in-flight guard. A per-call token that only
+  // ever increases (never reused) is required instead.
+  it('does not resurrect a stale load-more when the key returns to a previous value (A to B to A)', async () => {
+    const calls = stubDeferred();
+    const { result, rerender } = renderHook(({ query }) => usePagedPortfolio(query, true, 0), {
+      initialProps: { query: 'limit=1' }, // "A"
+    });
+
+    await waitFor(() => expect(calls).toHaveLength(1));
+    await act(async () => {
+      calls[0].resolve(answer(calls[0].search));
+    });
+    expect(result.current.next).toBe('1');
+
+    // Start "Show more" under A; leave its fetch pending.
+    act(() => {
+      result.current.loadMore();
+    });
+    await waitFor(() => expect(calls).toHaveLength(2));
+    expect(result.current.loadingMore).toBe(true);
+
+    // Switch to B while that request is still in flight.
+    rerender({ query: 'owner=2&limit=1' }); // "B"
+    await waitFor(() => expect(calls).toHaveLength(3));
+    expect(result.current.loadingMore).toBe(false);
+    await act(async () => {
+      calls[2].resolve(answer(calls[2].search));
+    });
+    expect(result.current.loading).toBe(false);
+
+    // Switch back to the exact same key string as the original "A".
+    rerender({ query: 'limit=1' });
+    await waitFor(() => expect(calls).toHaveLength(4));
+    await act(async () => {
+      calls[3].resolve(answer(calls[3].search));
+    });
+    await waitFor(() => expect(result.current.next).toBe('1'));
+
+    // Bug check 1: returning to a previously-seen key must not resurrect the
+    // abandoned load-more's spinner.
+    expect(result.current.loadingMore).toBe(false);
+
+    // A second "Show more" under the "new" A must still work.
+    act(() => {
+      result.current.loadMore();
+    });
+    await waitFor(() => expect(calls).toHaveLength(5));
+    expect(result.current.loadingMore).toBe(true);
+
+    // The original, long-abandoned load-more finally resolves.
+    await act(async () => {
+      calls[1].resolve(answer(calls[1].search));
+    });
+
+    // Bug check 2: it must not append a duplicate page, and must not clear
+    // the second call's own in-flight guard.
+    expect(result.current.rows.map((r) => r.id)).toEqual([7]);
+    expect(result.current.loadingMore).toBe(true);
+
+    // The second (legitimate) "Show more" resolves normally.
+    await act(async () => {
+      calls[4].resolve(answer(calls[4].search));
+    });
+    expect(result.current.loadingMore).toBe(false);
+    expect(result.current.rows.map((r) => r.id)).toEqual([7, 1]);
+  });
+
   // Ruling: selection resets when NEW rows have loaded (not on the filter
   // string alone), using the hook's `loadedKey` and useSelection's `prune`.
   it('prunes a selected id once new rows load after a params change', async () => {

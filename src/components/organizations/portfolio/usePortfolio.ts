@@ -15,7 +15,7 @@ type Loaded =
   | { key: string; data: PortfolioResponse; rows: PortfolioRow[]; next: string | null }
   | { key: string; error: string };
 
-type MoreState = { key: string; loading: boolean; error: string | null };
+type MoreState = { key: string; token: number; loading: boolean; error: string | null };
 
 export interface PagedState {
   /** The latest response. While a new query loads, the previous one stays so
@@ -50,13 +50,19 @@ export function usePagedPortfolio(
   const key = `${query}#${version}#${attempt}`;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [moreState, setMoreState] = useState<MoreState | null>(null);
-  // Guards a `loadMore` in flight, keyed to the page-one it extends. A second
-  // concurrent call sees it already set and backs off; the fetch effect below
-  // clears it (in its cleanup) the moment that page-one stops being current,
-  // so a `loadMore` answer that lands after a params/version change is
-  // recognised as stale and dropped — never appended, never surfaced as an
-  // error, under either the old key or the new one.
-  const loadMoreKeyRef = useRef<string | null>(null);
+  // A generation counter, bumped every time the fetch effect's cleanup runs
+  // (a params/version change, or unmount) — never reset, so it never repeats.
+  // The `key` string, by contrast, CAN repeat (a filter changed away and back
+  // reproduces the same string) — guarding a `loadMore` by key alone lets an
+  // answer abandoned under the first occurrence of that key be mistaken for
+  // current when the key recurs (an ABA race). `loadMoreCallRef` holds the
+  // generation a `loadMore` call was issued under, or null when none is in
+  // flight: a second concurrent call sees it already set and backs off, and
+  // a call whose generation no longer matches `generationRef` knows its
+  // answer is stale and drops it — never appended, never surfaced as an
+  // error, and never able to clear a different (later) call's own guard.
+  const generationRef = useRef(0);
+  const loadMoreCallRef = useRef<number | null>(null);
   // The latest callback, so a caller passing an inline function does not
   // refetch on every render.
   const onLoadedRef = useRef(onLoaded);
@@ -79,32 +85,49 @@ export function usePagedPortfolio(
     );
     return () => {
       cancelled = true;
-      loadMoreKeyRef.current = null;
+      generationRef.current += 1;
+      loadMoreCallRef.current = null;
+      // Any in-flight (or just-finished) load-more belonged to the
+      // generation that's ending — its answer, whenever it lands, is
+      // dropped anyway (below), but the spinner must not wait for that to
+      // clear it: nothing about the new generation has asked for a page two
+      // yet.
+      setMoreState(null);
     };
   }, [enabled, key, query]);
 
   const current = loaded && 'data' in loaded ? loaded : null;
 
   const loadMore = useCallback(async () => {
-    if (!current || current.key !== key || !current.next || loadMoreKeyRef.current) return;
-    loadMoreKeyRef.current = key;
+    if (!current || current.key !== key || !current.next || loadMoreCallRef.current !== null) return;
+    const token = generationRef.current;
+    loadMoreCallRef.current = token;
     const cursor = current.next;
-    setMoreState({ key, loading: true, error: null });
+    setMoreState({ key, token, loading: true, error: null });
     try {
       const page = await fetchPortfolio(`${query}&cursor=${encodeURIComponent(cursor)}`);
-      if (loadMoreKeyRef.current !== key) return; // superseded — drop the answer
+      if (generationRef.current !== token) {
+        // Superseded — drop the answer. Never clear a newer call's own
+        // moreState; only clear if it's still (somehow) this stale one's.
+        setMoreState((prev) => (prev && prev.token === token ? null : prev));
+        return;
+      }
       setLoaded((prev) =>
         prev && 'data' in prev && prev.key === key
           ? { ...prev, rows: [...prev.rows, ...page.results], next: page.next_cursor }
           : prev,
       );
       onLoadedRef.current?.(page.results);
-      setMoreState({ key, loading: false, error: null });
+      setMoreState({ key, token, loading: false, error: null });
     } catch (err) {
-      if (loadMoreKeyRef.current !== key) return; // superseded — never surface a stale error
-      setMoreState({ key, loading: false, error: errorMessage(err, 'Could not load more organizations.') });
+      if (generationRef.current !== token) {
+        // Superseded — never surface a stale error.
+        setMoreState((prev) => (prev && prev.token === token ? null : prev));
+        return;
+      }
+      setMoreState({ key, token, loading: false, error: errorMessage(err, 'Could not load more organizations.') });
     } finally {
-      if (loadMoreKeyRef.current === key) loadMoreKeyRef.current = null;
+      if (loadMoreCallRef.current === token) loadMoreCallRef.current = null;
     }
   }, [current, key, query]);
 
