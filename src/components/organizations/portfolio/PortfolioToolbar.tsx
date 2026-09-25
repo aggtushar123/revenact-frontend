@@ -1,0 +1,137 @@
+import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { Download, Pin, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import type { ColumnId } from '../tableData';
+import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
+import type { PortfolioResponse } from '../../../features/organizations/portfolioTypes';
+import { FiltersPanel, GroupSortControls } from './FiltersPanel';
+import { PinFieldsMenu } from './PinFieldsMenu';
+
+const FOCUS = 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent';
+const QUIET = `inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 text-[13px] font-semibold text-ink hover:bg-subtle active:bg-line-subtle disabled:opacity-50 ${FOCUS}`;
+const LABEL = 'Search by name or Revenact ID';
+
+function activeFilters(p: PortfolioParams): number {
+  return (
+    [p.owner !== '', p.renews_within !== '', p.nps !== '', p.include_churned, p.ids.length > 0].filter(Boolean).length +
+    p.lifecycle.length +
+    p.health.length +
+    p.product.length
+  );
+}
+
+export function PortfolioToolbar({
+  params,
+  update,
+  options,
+  isSm,
+  pins,
+  onTogglePin,
+  onExport,
+  exporting,
+  onAdd,
+  searchRef,
+}: {
+  params: PortfolioParams;
+  update: (patch: Partial<PortfolioParams>) => void;
+  options: PortfolioResponse['filters'] | null;
+  isSm: boolean;
+  pins: ColumnId[];
+  onTogglePin: (id: ColumnId) => void;
+  onExport: () => void;
+  exporting: boolean;
+  onAdd: () => void;
+  searchRef: RefObject<HTMLInputElement | null>;
+}) {
+  // The box shows what is typed; the URL gets it 300ms after typing stops.
+  // A chip or "Clear all" changing the URL resets the box (adjusted during
+  // render, not in an effect).
+  const [text, setText] = useState(params.search);
+  const [synced, setSynced] = useState(params.search);
+  if (params.search !== synced) {
+    setSynced(params.search);
+    setText(params.search);
+  }
+  useEffect(() => {
+    if (text.trim() === params.search) return;
+    const timeout = window.setTimeout(() => update({ search: text.trim() }), 300);
+    return () => window.clearTimeout(timeout);
+  }, [text, params.search, update]);
+
+  const [open, setOpen] = useState<'filters' | 'pins' | null>(null);
+  const close = useCallback(() => setOpen(null), []);
+  const count = activeFilters(params);
+
+  return (
+    <div className="relative flex flex-wrap items-center gap-2">
+      <label className="relative min-w-0 flex-1 sm:max-w-sm">
+        <span className="sr-only">{LABEL}</span>
+        <Search className="pointer-events-none absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
+        <input
+          ref={searchRef}
+          type="search"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          placeholder={LABEL}
+          className={`w-full min-h-11 sm:min-h-9 rounded-lg border border-line bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint hover:border-line-strong ${FOCUS}`}
+        />
+      </label>
+
+      {isSm ? <GroupSortControls params={params} update={update} /> : null}
+
+      <button
+        type="button"
+        aria-expanded={open === 'filters'}
+        aria-haspopup="dialog"
+        onClick={() => setOpen(open === 'filters' ? null : 'filters')}
+        className={QUIET}
+      >
+        <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
+        Filters
+        {count > 0 ? (
+          <span className="rounded-full bg-accent px-1.5 font-mono-brand tabular-nums text-[11px] text-on-accent">{count}</span>
+        ) : null}
+      </button>
+
+      {isSm ? (
+        <>
+          <button type="button" aria-expanded={open === 'pins'} aria-haspopup="dialog" onClick={() => setOpen(open === 'pins' ? null : 'pins')} className={QUIET}>
+            <Pin className="w-4 h-4" aria-hidden="true" />
+            Pin fields
+          </button>
+          <button type="button" onClick={onExport} disabled={exporting} className={QUIET}>
+            <Download className="w-4 h-4" aria-hidden="true" />
+            {exporting ? 'Exporting…' : 'Export'}
+          </button>
+          <button
+            type="button"
+            onClick={onAdd}
+            className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-semibold text-on-accent hover:bg-accent-hover active:opacity-90 ${FOCUS}`}
+          >
+            <Plus className="w-4 h-4" aria-hidden="true" />
+            Add organization
+          </button>
+        </>
+      ) : null}
+
+      {open === 'filters' ? (
+        <FiltersPanel
+          params={params}
+          update={update}
+          options={options}
+          isSm={isSm}
+          onClose={close}
+          onExport={() => {
+            close();
+            onExport();
+          }}
+          exporting={exporting}
+          onAdd={() => {
+            close();
+            onAdd();
+          }}
+        />
+      ) : null}
+      {open === 'pins' ? <PinFieldsMenu pins={pins} onToggle={onTogglePin} onClose={close} /> : null}
+    </div>
+  );
+}
