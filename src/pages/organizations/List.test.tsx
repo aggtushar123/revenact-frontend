@@ -453,6 +453,23 @@ describe('Organizations list (portfolio)', () => {
       expect(within(sheet).getByRole('checkbox', { name: 'Include churned' })).toBeInTheDocument();
     });
 
+    it('enters selection mode from a visible Select toggle, without a long press', async () => {
+      stubPortfolio();
+      renderList('/organizations/list', { width: 375 });
+      await screen.findByRole('link', { name: 'Pizza Hut' });
+      const toggle = screen.getByRole('button', { name: 'Select' });
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' }).closest('label')).not.toHaveClass('hidden');
+      await userEvent.click(document.querySelector('[data-row-id="7"] [data-part="header"]') as HTMLElement);
+      expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('1 selected');
+      expect(screen.queryByRole('dialog', { name: 'Pizza Hut' })).not.toBeInTheDocument();
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument();
+    });
+
     it('opens a row as a bottom sheet, and Escape closes it', async () => {
       stubPortfolio();
       renderList('/organizations/list', { width: 375 });

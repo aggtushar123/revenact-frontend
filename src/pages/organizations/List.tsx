@@ -94,6 +94,17 @@ export function List() {
   const [exporting, setExporting] = useState(false);
   const [actionRunning, setActionRunning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  // Phones: the toolbar's Select toggle shows the checkboxes without a
+  // long press. Turning it off ends selection mode, clearing the selection.
+  const [selectMode, setSelectMode] = useState(false);
+  const selecting = selection.selecting || (selectMode && !isSm);
+  const toggleSelectMode = () => {
+    if (selectMode) {
+      selection.clear();
+      setReport(null);
+    }
+    setSelectMode(!selectMode);
+  };
 
   const currency = portfolio.data?.currency ?? orgCurrency;
   const options = portfolio.data?.filters ?? null;
@@ -165,7 +176,7 @@ export function List() {
         currency={currency}
         pins={pins}
         isSm={isSm}
-        selecting={selection.selecting}
+        selecting={selecting}
         selected={selection.selected.has(row.id)}
         selectDisabled={loading || portfolio.loading || actionRunning}
         atLimit={selection.atLimit}
@@ -200,6 +211,8 @@ export function List() {
           exporting={exporting}
           onAdd={() => setAdding(true)}
           searchRef={searchRef}
+          selectMode={selectMode}
+          onToggleSelectMode={toggleSelectMode}
         />
         <FilterChips
           params={params}
@@ -246,6 +259,7 @@ export function List() {
           onClose={() => {
             selection.clear();
             setReport(null);
+            setSelectMode(false);
           }}
         />
       </div>

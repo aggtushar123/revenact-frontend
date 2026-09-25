@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { Download, Pin, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { CheckSquare, Download, Pin, Plus, Search, SlidersHorizontal } from 'lucide-react';
 import type { ColumnId } from '../tableData';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { PortfolioResponse } from '../../../features/organizations/portfolioTypes';
@@ -29,6 +29,8 @@ export function PortfolioToolbar({
   exporting,
   onAdd,
   searchRef,
+  selectMode = false,
+  onToggleSelectMode,
 }: {
   params: PortfolioParams;
   update: (patch: Partial<PortfolioParams>) => void;
@@ -40,6 +42,9 @@ export function PortfolioToolbar({
   exporting: boolean;
   onAdd: () => void;
   searchRef: RefObject<HTMLInputElement | null>;
+  /** Phones: selection mode is on (checkboxes show without a long press). */
+  selectMode?: boolean;
+  onToggleSelectMode?: () => void;
 }) {
   // The box shows what is typed; the URL gets it 300ms after typing stops.
   // A chip or "Clear all" changing the URL resets the box (adjusted during
@@ -93,6 +98,18 @@ export function PortfolioToolbar({
           <span className="rounded-full bg-accent px-1.5 font-mono-brand tabular-nums text-[11px] text-on-accent">{count}</span>
         ) : null}
       </button>
+
+      {!isSm && onToggleSelectMode ? (
+        <button
+          type="button"
+          aria-pressed={selectMode}
+          onClick={onToggleSelectMode}
+          className={`${BUTTON} ${selectMode ? 'bg-accent-dim' : ''}`}
+        >
+          <CheckSquare className="w-4 h-4" aria-hidden="true" />
+          Select
+        </button>
+      ) : null}
 
       {isSm ? (
         <>
