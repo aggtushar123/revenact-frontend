@@ -138,18 +138,25 @@ const MIN_FLAT_CHARS = 7;
 const SLANT = -35;
 
 /** Word-wraps `text` into at most `maxLines` lines of `perLine` characters.
- *  A word longer than a line is cut; text left over after the last line
- *  ends that line with an ellipsis, and `cut` says so. */
+ *  A newline in `text` always starts a new line ("Low\n25–50%"). A word
+ *  longer than a line is cut; text left over after the last line ends that
+ *  line with an ellipsis, and `cut` says so. */
 export function wrapLabel(text: string, perLine: number, maxLines: number): { lines: string[]; cut: boolean } {
-  const words = text.split(/\s+/).filter(Boolean);
+  const words = text.replace(/\n/g, ' \n ').split(/[ \t]+/).filter(Boolean);
   const lines: string[] = [];
   let next = 0;
   while (next < words.length && lines.length < maxLines) {
+    if (words[next] === '\n') {
+      next++;
+      continue;
+    }
     let line = words[next++];
-    while (next < words.length && `${line} ${words[next]}`.length <= perLine) line += ` ${words[next++]}`;
+    while (next < words.length && words[next] !== '\n' && `${line} ${words[next]}`.length <= perLine) {
+      line += ` ${words[next++]}`;
+    }
     lines.push(line);
   }
-  const leftOver = next < words.length;
+  const leftOver = words.slice(next).some((word) => word !== '\n');
   let cut = false;
   const shown = lines.map((line, i) => {
     if (line.length <= perLine && !(leftOver && i === lines.length - 1)) return line;
@@ -184,13 +191,17 @@ export function categoryAxis(count: number) {
   const height = TICK_LINE_PX * maxLines + 14;
 
   function CategoryTick({ x = 0, y = 0, payload, width = 0, visibleTicksCount }: CategoryTickProps) {
-    const full = String(payload?.value ?? '');
+    const given = String(payload?.value ?? '');
+    // A two-part name ("Low\n25–50%") reads as one line when slanted or
+    // hovered.
+    const full = given.replace(/\n/g, ' ');
+    const widestLine = Math.max(...given.split('\n').map((line) => line.length));
     const band = Number(width) / Math.max(1, visibleTicksCount ?? count);
     const perLine = Math.floor((band - 6) / TICK_CHAR_PX);
     const style = { fill: AXIS_TICK.fill, fontSize: AXIS_TICK.fontSize };
 
     // A name that fits its band as it is stays flat, however narrow the band.
-    if (perLine < MIN_FLAT_CHARS && full.length > Math.max(0, perLine)) {
+    if (perLine < MIN_FLAT_CHARS && widestLine > Math.max(0, perLine)) {
       // How many characters a slanted name can run before leaving the axis.
       const room = Math.floor((height - 8) / Math.sin((-SLANT * Math.PI) / 180) / TICK_CHAR_PX);
       const short = truncate(full, Math.max(4, room));
@@ -202,7 +213,7 @@ export function categoryAxis(count: number) {
       );
     }
 
-    const { lines, cut } = wrapLabel(full, perLine, maxLines);
+    const { lines, cut } = wrapLabel(given, perLine, maxLines);
     return createElement(
       'text',
       { x, y, textAnchor: 'middle', ...style },

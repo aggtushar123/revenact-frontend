@@ -7,29 +7,25 @@ import {
   ZAxis,
   ReferenceLine,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from 'recharts';
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { UsageAccount } from '../../../../../features/usage/usageSlice';
-import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
+import { formatMoney } from '../../../../../features/customers/formatters';
 import { BAND_COLORS, BAND_SHORT, FALLBACK_COLOR, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, chartMargin, moneyTick, pctTick } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 
-// Recharts (v3) only builds its `<Legend>` from named graphical items it
-// finds mounted in the chart — a `payload` prop passed straight to
-// `<Legend>` is silently ignored (its own type even omits `payload` from
-// the public props). A single `<Scatter>` with per-point `<Cell>` colours
-// has no per-band identity for the legend to read, so every band gets its
-// own `<Scatter>` (each still just a set of dots, positioned by the same
-// x/y/z), named from `BAND_SHORT` and coloured from `BAND_COLORS` — that's
-// what the legend below actually lists. Order matches `BAND_COLORS`' own
-// declaration order (dormant → over), worst-to-best. Not exported — a test
-// exercising the legend imports `BAND_COLORS`/`BAND_SHORT` from
-// `../chartTheme` directly rather than reaching into this component module
-// (react-refresh only allows a component file to export components).
+// One `<Scatter>` per band, in `BAND_COLORS`' declaration order (dormant →
+// over, worst to best), so each band's dots carry its name into the tooltip;
+// the key above the plot is the shared `ChartLegend` in the same order. It
+// sits above the plot rather than inside it, where a wrapped six-item
+// Recharts legend took 40px out of the plot.
 const BAND_ORDER = Object.keys(BAND_COLORS);
+
+const LEGEND = BAND_ORDER.map((band) => ({ label: BAND_SHORT[band] ?? band, color: BAND_COLORS[band] }));
 
 export interface UsageScatterProps {
   points: UsageAccount[];
@@ -99,6 +95,7 @@ export function UsageScatter({
           Dot size is contracted seats · top-left is the money problem, right of{' '}
           {capacityFloor}% is expansion
         </p>
+        <ChartLegend className="mt-2" items={LEGEND} />
       </div>
 
       <div className="flex-1 w-full min-h-0 px-2 pb-3">
@@ -108,28 +105,25 @@ export function UsageScatter({
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ScatterChart margin={{ top: 16, right: 16, left: 4, bottom: 12 }}>
-              <Legend verticalAlign="top" height={24} wrapperStyle={{ fontSize: 11 }} />
+            <ScatterChart margin={chartMargin({ x: true, left: true })}>
               <XAxis
+                {...AXIS_BASE}
                 type="number"
                 dataKey="x"
                 name="Utilisation"
                 domain={[0, maxUtil]}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-                tickFormatter={(value: number) => `${value}%`}
+                tickFormatter={pctTick}
+                label={axisLabel('Seat utilisation %', 'x')}
               />
               <YAxis
+                {...AXIS_BASE}
                 type="number"
                 dataKey="y"
                 name="ARR"
                 domain={[0, maxArr]}
-                width={64}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-                tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+                width={52}
+                tickFormatter={moneyTick(currency)}
+                label={axisLabel(`ARR (${currency})`)}
               />
               <ZAxis type="number" dataKey="z" range={[40, 420]} />
 

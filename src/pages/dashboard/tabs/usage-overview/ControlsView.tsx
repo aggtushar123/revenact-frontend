@@ -179,7 +179,7 @@ export function ControlsView() {
         </KpiStrip>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
             <UtilisationBandChart
               bands={stats?.bands ?? []}
               scatter={stats?.scatter ?? []}
@@ -188,7 +188,7 @@ export function ControlsView() {
               drillable={scatterComplete}
             />
           </div>
-          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
             <UsageScatter points={stats?.scatter ?? []} currency={currency} />
           </div>
         </div>
@@ -204,7 +204,7 @@ export function ControlsView() {
               emptyMessage="Nothing in this selection is below 75% used."
             />
           </div>
-          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden max-h-[420px]">
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
             <AccountUsageList
               title="At capacity — what to sell"
               subtitle="Accounts out of seats, largest first"

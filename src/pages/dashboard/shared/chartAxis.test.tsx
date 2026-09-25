@@ -187,6 +187,10 @@ describe('wrapLabel', () => {
   it('hard-cuts a single word longer than the line', () => {
     expect(wrapLabel('Supercalifragilistic', 8, 1)).toEqual({ lines: ['Superca…'], cut: true });
   });
+
+  it('breaks the line at a newline even when both parts would fit on one', () => {
+    expect(wrapLabel('Low\n25–50%', 20, 2)).toEqual({ lines: ['Low', '25–50%'], cut: false });
+  });
 });
 
 describe('categoryAxis', () => {
@@ -226,6 +230,13 @@ describe('categoryAxis', () => {
     expect(text.getAttribute('transform')).toMatch(/^rotate\(-35/);
     expect(text).toHaveAttribute('text-anchor', 'end');
     expect(text.querySelector('title')!.textContent).toBe('Globex International Holdings');
+  });
+
+  it('draws a two-part name on two lines, and slants it as one line with its full name kept', () => {
+    const flat = draw(5, 1400, 'At capacity\n90–100%');
+    expect([...flat.querySelectorAll('tspan')].map((t) => t.textContent)).toEqual(['At capacity', '90–100%']);
+    const slanted = draw(9, 200, 'At capacity\n90–100%');
+    expect(slanted.querySelector('title')!.textContent).toBe('At capacity 90–100%');
   });
 
   it('keeps a short name flat in a narrow band it still fits in', () => {

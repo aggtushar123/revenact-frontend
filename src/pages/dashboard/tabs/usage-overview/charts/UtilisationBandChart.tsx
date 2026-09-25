@@ -5,10 +5,20 @@ import type { UsageAccount, UsageBand } from '../../../../../features/usage/usag
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { BAND_COLORS, BAND_SHORT, FALLBACK_COLOR, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { CURSOR_FILL, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin, moneyTick, zeroMoney } from '../../../shared/chartAxis';
+import { emptyStackMarker } from '../../../shared/stackedTotalLabel';
 import { useDrill } from '../../../drill/useDrill';
 import { fromUsageRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
+
+/** "Low\n25–50%": the short name over the range the API's own name carries
+ *  in brackets, so the axis says what the bands mean. */
+function tickName(band: UsageBand): string {
+  const short = BAND_SHORT[band.key] ?? band.name;
+  const range = /\(([^)]+)\)/.exec(band.name)?.[1];
+  return range && short !== band.name ? `${short}\n${range}` : short;
+}
 
 export interface UtilisationBandChartProps {
   bands: UsageBand[];
@@ -45,7 +55,7 @@ export function UtilisationBandChart({
     () =>
       bands.map((band) => ({
         key: band.key,
-        name: BAND_SHORT[band.key] ?? band.name,
+        name: tickName(band),
         full: band.name,
         arr: band.arr,
         accounts: band.accounts,
@@ -103,26 +113,22 @@ export function UtilisationBandChart({
 
       <div className="flex-1 w-full min-h-0 px-2 pb-1">
         <ResponsiveContainer width="100%" height="100%">
-          {/* A bottom margin, not the default 4: the band names sit at the
-                very bottom of the plot and the footnote below the card starts
-                immediately after it, which read as one crowded line. */}
-          <BarChart data={data} margin={{ top: 16, right: 12, left: 4, bottom: 14 }} barSize={44}>
+          <BarChart data={data} margin={chartMargin({ x: true, left: true })} barSize={44}>
             <XAxis
+              {...AXIS_BASE}
               dataKey="name"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+              {...categoryAxis(data.length)}
+              label={axisLabel('Seat utilisation', 'x')}
             />
             <YAxis
-              axisLine={false}
-              tickLine={false}
-              width={64}
+              {...AXIS_BASE}
+              width={52}
               domain={[0, max]}
-              tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-              tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+              tickFormatter={moneyTick(currency)}
+              label={axisLabel(`ARR (${currency})`)}
             />
             <Tooltip
-              cursor={{ fill: 'var(--bg-subtle)' }}
+              cursor={{ fill: CURSOR_FILL }}
               contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               formatter={(value, _name, item) => [
                 `${formatMoney(Number(value ?? 0), currency)} · ${item?.payload?.accounts ?? 0} accounts · ${item?.payload?.idle ?? 0} idle seats`,
@@ -132,6 +138,7 @@ export function UtilisationBandChart({
             <Bar
               {...STATIC_SERIES}
               dataKey="arr"
+              stackId="band"
               radius={[4, 4, 0, 0]}
               cursor={drillable ? 'pointer' : undefined}
             >
@@ -143,6 +150,9 @@ export function UtilisationBandChart({
                 />
               ))}
             </Bar>
+            {/* A band holding no ARR keeps a hairline and "$0", so it reads
+                as empty rather than as a gap in the data. */}
+            <Bar {...STATIC_SERIES} {...emptyStackMarker(data.map((row) => row.arr), zeroMoney(currency))} stackId="band" />
           </BarChart>
         </ResponsiveContainer>
       </div>
