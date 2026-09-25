@@ -3,6 +3,8 @@ import { useAppSelector, useOrgCurrency } from '../../hooks';
 import { apiFetch } from '../../lib/apiClient';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
 import type { Customer } from '../../features/customers/customersSlice';
+import { useMembers } from '../../features/knowledge/useMembers';
+import { LIFECYCLE_TARGETS, ownerTargets } from '../../features/organizations/bulkTargets';
 import { bulkUpdate, exportPortfolio } from '../../features/organizations/portfolioApi';
 import { hasFilters, toApiQuery, type PortfolioParams } from '../../features/organizations/portfolioParams';
 import type { BulkAction, PortfolioRow } from '../../features/organizations/portfolioTypes';
@@ -56,6 +58,7 @@ export function List() {
 
   const portfolio = usePortfolio(params, version, onRowsLoaded);
   const { pins, toggle: togglePin } = usePins();
+  const members = useMembers();
   const selection = useSelection();
   const { prune, clear: clearSelection } = selection;
   const searchRef = useRef<HTMLInputElement>(null);
@@ -227,9 +230,9 @@ export function List() {
         />
         <SelectionBar
           count={selection.selected.size}
-          owners={options?.owners ?? []}
-          lifecycles={options?.lifecycles ?? []}
-          busy={actionRunning || exporting}
+          owners={ownerTargets(members)}
+          lifecycles={LIFECYCLE_TARGETS}
+          activity={actionRunning ? 'applying' : exporting ? 'exporting' : null}
           loading={portfolio.loading}
           report={report}
           onSetOwner={(id) => void runBulk('set_owner', id)}

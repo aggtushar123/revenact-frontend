@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderList } from './testList';
+import { resetMembersCache } from '../../features/knowledge/useMembers';
 import { resetViewport } from '../../test/viewport';
 import {
   ALL_ROWS,
@@ -39,6 +40,7 @@ const isPortfolio = (url: URL) => url.pathname.endsWith('/organizations/portfoli
 
 describe('Organizations list (portfolio)', () => {
   afterEach(() => {
+    resetMembersCache();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     resetViewport();
@@ -95,7 +97,8 @@ describe('Organizations list (portfolio)', () => {
     let fail = true;
     stubPortfolio({ portfolio: (q) => (fail ? { status: 500, body: { detail: 'Boom' } } : buildPortfolio(q)) });
     renderList();
-    expect(await screen.findByRole('alert')).toHaveTextContent('Boom');
+    expect(await screen.findByText(/Boom/)).toBeInTheDocument();
+    expect(screen.getByText(/Boom/).closest('[role="alert"]')).not.toBeNull();
     fail = false;
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(await screen.findByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
@@ -213,6 +216,8 @@ describe('Organizations list (portfolio)', () => {
       const before = portfolioQueries(spy).length;
       const bar = screen.getByRole('region', { name: 'Selection' });
       await userEvent.selectOptions(within(bar).getByRole('combobox', { name: 'Change owner' }), 'unassigned');
+      expect(bulkBodies(spy)).toHaveLength(0);
+      await userEvent.click(within(bar).getByRole('button', { name: 'Apply to 2' }));
       await waitFor(() => expect(bulkBodies(spy)).toHaveLength(1));
       expect(bulkBodies(spy)[0]).toEqual({ ids: [7, 1], action: 'set_owner', value: null });
       expect(await within(bar).findByText(/Updated 1 organization\./)).toBeInTheDocument();
@@ -222,6 +227,32 @@ describe('Organizations list (portfolio)', () => {
       expect(bar).toHaveTextContent('1 selected');
       expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).toBeChecked();
       expect(screen.getByRole('checkbox', { name: 'Select Globex' })).not.toBeChecked();
+    });
+
+    it('offers every active member and every stage but churn as targets, not just the ones in use', async () => {
+      const spy = stubPortfolio({
+        members: [
+          { id: 9, name: 'Nora New', is_active: true },
+          { id: 4, name: 'Gone Away', is_active: false },
+        ],
+      });
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      const bar = screen.getByRole('region', { name: 'Selection' });
+      const owner = within(bar).getByRole('combobox', { name: 'Change owner' });
+      // Nora owns nothing, so the filter options never name her.
+      expect(await within(owner).findByRole('option', { name: 'Nora New' })).toBeInTheDocument();
+      expect(within(owner).getByRole('option', { name: 'Unassigned' })).toBeInTheDocument();
+      expect(within(owner).queryByRole('option', { name: 'Gone Away' })).not.toBeInTheDocument();
+      expect(within(owner).queryByRole('option', { name: 'Carl CSM' })).not.toBeInTheDocument();
+      const stage = within(bar).getByRole('combobox', { name: 'Set lifecycle' });
+      // No account is in Expansion.
+      expect(within(stage).getByRole('option', { name: 'Expansion' })).toBeInTheDocument();
+      expect(within(stage).queryByRole('option', { name: 'Churn' })).not.toBeInTheDocument();
+
+      await userEvent.selectOptions(owner, '9');
+      await userEvent.click(within(bar).getByRole('button', { name: 'Apply to 1' }));
+      await waitFor(() => expect(bulkBodies(spy)).toEqual([{ ids: [7], action: 'set_owner', value: 9 }]));
     });
 
     it('archives after a confirm and names the account the server refused', async () => {
@@ -246,6 +277,7 @@ describe('Organizations list (portfolio)', () => {
       await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
       gate.start();
       await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Change owner' }), 'unassigned');
+      await userEvent.click(screen.getByRole('button', { name: 'Apply to 1' }));
       await userEvent.click(screen.getByRole('button', { name: 'Good 1' }));
       await waitFor(() => expect(screen.queryByRole('link', { name: 'Pizza Hut' })).not.toBeInTheDocument());
       await screen.findByRole('link', { name: 'Globex' });
@@ -267,7 +299,8 @@ describe('Organizations list (portfolio)', () => {
       const bar = screen.getByRole('region', { name: 'Selection' });
       await userEvent.click(within(bar).getByRole('button', { name: 'Export' }));
       expect(within(bar).getByRole('button', { name: 'Export' })).toBeDisabled();
-      expect(bar).toHaveTextContent('Applying…');
+      expect(bar).toHaveTextContent('Exporting…');
+      expect(bar).not.toHaveTextContent('Applying…');
       await userEvent.click(within(bar).getByRole('button', { name: 'Export' }));
       gate.release();
       await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
@@ -330,7 +363,7 @@ describe('Organizations list (portfolio)', () => {
     renderList();
     await screen.findByRole('link', { name: 'Pizza Hut' });
     await userEvent.click(screen.getByRole('button', { name: 'Export' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Export broke');
+    expect((await screen.findByText('Export broke')).closest('[role="alert"]')).not.toBeNull();
     expect(screen.getByRole('button', { name: 'Export' })).not.toBeDisabled();
   });
 

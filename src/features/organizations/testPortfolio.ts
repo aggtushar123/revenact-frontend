@@ -257,6 +257,8 @@ export interface PortfolioStub {
   portfolio?: (query: URLSearchParams) => PortfolioResponse | { status: number; body: unknown };
   bulk?: (body: BulkRequest) => BulkResult;
   customer?: unknown;
+  /** GET /auth/members/ (the bulk owner targets). */
+  members?: unknown[];
 }
 
 function json(status: number, body: unknown) {
@@ -289,7 +291,7 @@ export function stubPortfolio(stub: PortfolioStub = {}) {
       return json(200, (stub.bulk ?? ((b: BulkRequest) => ({ updated: b.ids, failed: [] })))(body));
     }
     if (/^\/customers\/\d+\/$/.test(path) && stub.customer) return json(200, stub.customer);
-    if (path === '/auth/members/') return json(200, []);
+    if (path === '/auth/members/') return json(200, stub.members ?? []);
     return json(404, { detail: `Not stubbed: ${path}` });
   });
   vi.stubGlobal('fetch', spy);

@@ -5,6 +5,7 @@ import { renderList } from '../pages/organizations/testList';
 import { LONG_PRESS_MS } from '../components/organizations/portfolio/AccountRow';
 import { bulkBodies, portfolioQueries, stubPortfolio } from '../features/organizations/testPortfolio';
 import { resetViewport } from '../test/viewport';
+import { resetMembersCache } from '../features/knowledge/useMembers';
 
 // End-to-end tier (jsdom, no browser): the real page, store, router and
 // every portfolio component. Only fetch is stubbed, with §2-shaped bodies.
@@ -12,12 +13,17 @@ import { resetViewport } from '../test/viewport';
 
 describe('Organizations portfolio', () => {
   afterEach(() => {
+    resetMembersCache();
     vi.unstubAllGlobals();
     resetViewport();
   });
 
   it('filters, opens a row, pins a field, selects and bulk-edits, reporting failures per account', { timeout: 30000 }, async () => {
     const spy = stubPortfolio({
+      members: [
+        { id: 2, name: 'Carl CSM', is_active: true },
+        { id: 3, name: 'Priya', is_active: true },
+      ],
       bulk: (body) =>
         body.action === 'set_lifecycle'
           ? { updated: body.ids.filter((id) => id !== 1), failed: body.ids.includes(1) ? [{ id: 1, reason: 'Not found.' }] : [] }
@@ -51,9 +57,10 @@ describe('Organizations portfolio', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Select Pizza Hut' }));
     expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('1 selected');
 
-    // 5. Bulk: change owner to Priya. The list reloads.
+    // 5. Bulk: choose Priya, then Apply. The list reloads.
     const before = portfolioQueries(spy).length;
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Change owner' }), '3');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply to 1' }));
     await waitFor(() => expect(bulkBodies(spy)).toEqual([{ ids: [7], action: 'set_owner', value: 3 }]));
     expect(await screen.findByText('Updated 1 organization.')).toBeInTheDocument();
     await waitFor(() => expect(portfolioQueries(spy).length).toBeGreaterThan(before));
@@ -64,6 +71,7 @@ describe('Organizations portfolio', () => {
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Globex' }));
     await userEvent.click(screen.getByRole('checkbox', { name: 'Select Pizza Hut' }));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Set lifecycle' }), 'live');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply to 2' }));
     await waitFor(() => expect(bulkBodies(spy).at(-1)).toEqual({ ids: [1, 7], action: 'set_lifecycle', value: 'live' }));
     const bar = await screen.findByRole('region', { name: 'Selection' });
     expect(await within(bar).findByText('Globex')).toBeInTheDocument();
