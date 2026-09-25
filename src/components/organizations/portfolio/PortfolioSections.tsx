@@ -3,7 +3,7 @@
 // (Task 13). Fast refresh doesn't apply to this module, same precedent as
 // rowParts.tsx and AccountDetails.tsx.
 /* eslint-disable react-refresh/only-export-components */
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
@@ -117,14 +117,15 @@ function Section({
   onRowsLoaded: (rows: PortfolioRow[]) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
-  // Re-applies the start-open rule whenever the group set changes. A section
-  // that this flips from closed to open was never fetched (it was disabled),
-  // so this can trigger a fresh page-one fetch for it below — accepted, since
-  // the group set changing already means the list moved under the user.
-  useEffect(() => {
+  // Re-applies the start-open rule whenever the group set changes, adjusted
+  // during render (no effect). A section this flips from closed to open was
+  // never fetched (it was disabled), so it fetches page one below — accepted,
+  // since the group set changing already means the list moved under the user.
+  const [seenGroups, setSeenGroups] = useState(groupsKey);
+  if (seenGroups !== groupsKey) {
+    setSeenGroups(groupsKey);
     setOpen(defaultOpen);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupsKey]);
+  }
   const bodyId = useId();
   const page = usePagedPortfolio(
     toApiQuery(params, { group_value: group.key, limit: String(SECTION_PAGE_SIZE) }),
