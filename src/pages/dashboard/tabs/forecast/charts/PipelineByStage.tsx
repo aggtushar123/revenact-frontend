@@ -1,6 +1,8 @@
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { PipelineStage } from '../../../../../features/forecast/forecastSlice';
 import { formatCompactMoney } from '../../../../../features/customers/formatters';
+import { ROLE } from '../../../shared/chartPalette';
+import { ChartLegend } from '../../../shared/ChartLegend';
 
 export interface PipelineByStageProps {
   stages: PipelineStage[];
@@ -25,15 +27,21 @@ export function PipelineByStage({ stages, currency }: PipelineByStageProps) {
       <div className="flex items-start justify-between gap-3 px-4 pt-3">
         <div>
           <h3 className="text-[13px] font-bold text-ink">Expansion pipeline</h3>
-          <p className="text-[11px] text-ink-faint mt-[1px]">
-            Solid is weighted into the forecast · faint is the rest of what is open
-          </p>
+          <p className="text-[11px] text-ink-faint mt-[1px]">Open expansion by stage, and how much of it the forecast carries</p>
         </div>
         <p className="text-[11px] text-ink-muted shrink-0 tabular-nums">
           {formatCompactMoney(totalWeighted, currency)} of{' '}
           {formatCompactMoney(totalOpen, currency)}
         </p>
       </div>
+
+      <ChartLegend
+        className="px-4 pt-2"
+        items={[
+          { label: 'Weighted', color: ROLE.ink },
+          { label: 'Open, not yet weighted', color: ROLE.faint },
+        ]}
+      />
 
       {totalOpen === 0 ? (
         <p className="px-4 py-6 text-[12px] text-ink-faint">
@@ -52,12 +60,13 @@ export function PipelineByStage({ stages, currency }: PipelineByStageProps) {
               </div>
               <div className="mt-[3px] h-[10px] rounded-[3px] bg-subtle overflow-hidden">
                 <div
-                  className="h-full rounded-[3px] bg-success/25 flex"
-                  style={{ width: `${(stage.open / widest) * 100}%` }}
+                  className="h-full rounded-[3px] flex"
+                  style={{ width: `${(stage.open / widest) * 100}%`, backgroundColor: ROLE.faint }}
                 >
                   <div
-                    className="h-full bg-success/80"
+                    className="h-full"
                     style={{
+                      backgroundColor: ROLE.ink,
                       width: stage.open > 0 ? `${(stage.weighted / stage.open) * 100}%` : '0%',
                     }}
                   />

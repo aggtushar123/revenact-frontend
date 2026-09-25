@@ -185,10 +185,12 @@ describe('Revenue Forecast', () => {
     renderForecast();
 
     await screen.findByText('Forecast range');
-    expect(screen.getByText('$150.2K')).toBeInTheDocument();
-    expect(screen.getByText('$1.2M')).toBeInTheDocument();
+    // The scale's far end is also $1.2M, so this reads the scenario figures.
+    const scenarios = within(screen.getByLabelText('Scenarios'));
+    expect(scenarios.getByText('$150.2K')).toBeInTheDocument();
+    expect(scenarios.getByText('$1.2M')).toBeInTheDocument();
     // And each scenario against where the book stands today.
-    expect(screen.getByText('16% of today')).toBeInTheDocument();
+    expect(scenarios.getByText('16% of today')).toBeInTheDocument();
   });
 
   it('ranks the swing list by how far each account moves the number', async () => {
