@@ -39,7 +39,7 @@ describe('row parts', () => {
     expect(renewalText(12)).toBe('in 12d');
     expect(renewalText(null)).toBe('No renewal date');
     render(<RenewalRunway renewal={{ date: '2026-08-09', days: -47 }} />);
-    expect(screen.getByText('47d overdue')).toHaveClass('text-danger');
+    expect(screen.getByText('47d overdue')).toHaveClass('text-danger', 'font-mono-brand', 'tabular-nums');
   });
 
   it('writes last touch, and says so when never contacted', () => {

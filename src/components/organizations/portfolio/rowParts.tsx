@@ -109,7 +109,7 @@ export function RenewalRunway({ renewal, className = '' }: { renewal: PortfolioR
       <span className="block h-1 w-full rounded-full bg-line overflow-hidden" aria-hidden="true">
         <span className={`block h-full rounded-full ${overdue ? 'bg-danger' : 'bg-ink-muted'}`} style={{ width: `${fill * 100}%` }} />
       </span>
-      <span className={`text-[11px] ${overdue ? 'text-danger font-semibold' : 'text-ink-muted'}`}>{renewalText(renewal.days)}</span>
+      <span className={`font-mono-brand tabular-nums text-[11px] ${overdue ? 'text-danger font-semibold' : 'text-ink-muted'}`}>{renewalText(renewal.days)}</span>
     </span>
   );
 }
