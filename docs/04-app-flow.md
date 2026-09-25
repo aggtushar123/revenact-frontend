@@ -235,19 +235,25 @@ in instead.
    traps focus, returns it to whatever opened the sheet on close, and shows the
    row's fresh values after a reload — with **Edit details** opening
    `OrganizationFormModal`.
-   Selecting rows (a checkbox, or a long press on phones) shows the selection
-   bar: Change owner, Set lifecycle, Export, Archive (`POST /organizations/bulk/`;
+   Selecting rows (a checkbox, a long press on phones, or the phone toolbar's
+   Select toggle) shows the selection bar: Change owner and Set lifecycle
+   (choosing a value only arms an "Apply to N" button beside it; the targets
+   are the org's active members plus Unassigned, and every stage but churn),
+   Export, Archive (`POST /organizations/bulk/`;
    the backend can refuse an account server-side — "You can't archive this
    organization." — and any failures list by organisation name with their
    reason, staying selected for a retry) and, for exactly one selected account,
    Churn (the existing `ChurnOrganizationModal`; cancelling it keeps the
    selection). Selection is capped at 500, with a hint once an unchecked row
    hits the cap, and a row's checkbox disables while its list or section is
-   loading or a bulk action is running. Ungrouped, a freshly loaded page prunes
-   the selection down to the ids still listed; grouped, a different query
-   landing clears the selection outright, since there is no one row set left to
-   prune against.
-4. Row click → `/organizations/:id`, which dispatches six parallel fetches:
+   loading or a bulk action is running. Only a different query landing (a
+   filter, sort or group change) resets the selection: ungrouped it prunes to
+   the ids on the new page one; grouped it clears outright, since there is no
+   one row set left to prune against. A reload of the same query (after a bulk
+   action) keeps it, so failures stay selected even from a Show-more page.
+4. On a row, the organisation name links to `/organizations/:id`; a row click
+   or the chevron opens the row instead (inline on desktop, a sheet on
+   phones). `/organizations/:id` dispatches six parallel fetches:
    the customer, its accounts, contacts, opportunities, risks and canvases.
 5. Tabs: General (metrics banner, `PinnedAttributes`, `ActivityFeed`), Company
    View, Accounts, Contacts, Pipelines, Custom Objects, Success Plans.
