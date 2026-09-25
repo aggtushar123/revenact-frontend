@@ -47,7 +47,9 @@ describe('the 34 table fields', () => {
       const container = renderOpened(initech);
       const found = container.querySelectorAll(`[data-field="${id}"]`);
       expect(found).toHaveLength(1);
-      expect(found[0].textContent?.trim()).not.toBe('');
+      // A field shows text, or (the pulse dots) is an image with a spoken name.
+      const said = found[0].textContent?.trim() || found[0].getAttribute('aria-label')?.trim();
+      expect(said ?? '').not.toBe('');
       const place = PORTFOLIO_FIELDS[id].place;
       if (place === 'header') {
         expect(found[0].closest('[data-part="header"]')).not.toBeNull();
