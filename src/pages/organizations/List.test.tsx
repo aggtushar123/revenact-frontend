@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderList } from './testList';
+import { LONG_PRESS_MS } from '../../components/organizations/portfolio/AccountRow';
 import { resetMembersCache } from '../../features/knowledge/useMembers';
 import { resetViewport } from '../../test/viewport';
 import {
@@ -465,6 +466,21 @@ describe('Organizations list (portfolio)', () => {
       await userEvent.click(document.querySelector('[data-row-id="7"] [data-part="header"]') as HTMLElement);
       expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('1 selected');
       expect(screen.queryByRole('dialog', { name: 'Pizza Hut' })).not.toBeInTheDocument();
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument();
+    });
+
+    it('shows the Select toggle pressed after a long press, and turning it off ends selection', async () => {
+      stubPortfolio();
+      renderList('/organizations/list', { width: 375 });
+      await screen.findByRole('link', { name: 'Pizza Hut' });
+      const header = document.querySelector('[data-row-id="7"] [data-part="header"]') as HTMLElement;
+      fireEvent.pointerDown(header);
+      await new Promise((resolve) => setTimeout(resolve, LONG_PRESS_MS + 50));
+      fireEvent.pointerUp(header);
+      const toggle = screen.getByRole('button', { name: 'Select' });
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
       await userEvent.click(toggle);
       expect(toggle).toHaveAttribute('aria-pressed', 'false');
       expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument();

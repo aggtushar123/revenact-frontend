@@ -58,6 +58,15 @@ describe('SelectionBar', () => {
     expect(onSetOwner).toHaveBeenLastCalledWith(null);
   });
 
+  it('drops an armed choice when the selection empties', async () => {
+    const view = renderBar(2);
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Change owner' }), '3');
+    expect(screen.getByRole('button', { name: 'Apply to 2' })).toBeInTheDocument();
+    view.rerender(<SelectionBar {...view} count={0} />);
+    view.rerender(<SelectionBar {...view} count={2} />);
+    expect(screen.queryByRole('button', { name: 'Apply to 2' })).not.toBeInTheDocument();
+  });
+
   it('does nothing while the keyboard arrows through a select', () => {
     const { onSetOwner, onSetLifecycle } = renderBar(3);
     const owner = screen.getByRole('combobox', { name: 'Change owner' });

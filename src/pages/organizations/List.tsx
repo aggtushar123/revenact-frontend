@@ -98,12 +98,16 @@ export function List() {
   // long press. Turning it off ends selection mode, clearing the selection.
   const [selectMode, setSelectMode] = useState(false);
   const selecting = selection.selecting || (selectMode && !isSm);
+  // On whenever selection mode is, however it started (toggle or long press);
+  // turning it off always ends the mode and clears the selection.
   const toggleSelectMode = () => {
-    if (selectMode) {
+    if (selecting) {
       selection.clear();
       setReport(null);
+      setSelectMode(false);
+    } else {
+      setSelectMode(true);
     }
-    setSelectMode(!selectMode);
   };
 
   const currency = portfolio.data?.currency ?? orgCurrency;
@@ -211,7 +215,7 @@ export function List() {
           exporting={exporting}
           onAdd={() => setAdding(true)}
           searchRef={searchRef}
-          selectMode={selectMode}
+          selectMode={selecting}
           onToggleSelectMode={toggleSelectMode}
         />
         <FilterChips

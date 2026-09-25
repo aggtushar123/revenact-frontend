@@ -57,6 +57,8 @@ export function SelectionBar({
   onClose: () => void;
 }) {
   const [pending, setPending] = useState<Pending | null>(null);
+  // An armed choice never outlives the selection it was armed for.
+  if (count === 0 && pending) setPending(null);
   const regionRef = useRef<HTMLDivElement>(null);
   const reportRef = useRef<HTMLDivElement>(null);
 
