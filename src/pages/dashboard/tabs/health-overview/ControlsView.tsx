@@ -40,45 +40,43 @@ export function ControlsView() {
   return (
     <div className="w-full h-full flex flex-col gap-4 pb-12">
       {truncated && <HealthTruncatedNotice />}
-      <div className="flex items-center justify-end px-2 h-[24px]">
-        {activeFilter && (
-          <button 
+      {/* Only when a filter is on: an always-rendered empty row left a band
+          of blank space above the first cards. */}
+      {activeFilter && (
+        <div className="flex items-center justify-end px-2">
+          <button
             onClick={() => setActiveFilter(null)}
             className="text-xs bg-danger-dim hover:opacity-80 text-danger font-bold py-1 px-3 rounded-full transition-colors flex items-center gap-1.5 shadow-sm"
           >
             <div className="w-1.5 h-1.5 rounded-full bg-danger" />
             Clear active filter: {activeFilter}
           </button>
-        )}
+        </div>
+      )}
+
+      {/* Every card sits at its own height: no row has a fixed height (that
+          clipped two cards stacked inside it below xl), and the donut and
+          owner cards are not stretched to match a taller neighbour. */}
+      <div data-row className="flex flex-col md:flex-row items-start gap-4 [&>*]:min-w-0">
+        <div className={`w-full md:w-[36%] lg:w-[32%] shrink-0 ${CARD}`}>
+          <CurrentHealthDonut
+            data={rows}
+            activeFilter={activeFilter}
+            onSegmentClick={setActiveFilter}
+            filteredCount={filteredData.length}
+          />
+        </div>
+        <div className={`w-full md:flex-1 min-w-0 ${CARD}`}>
+          <HealthByOwnerStackedBar data={filteredData} drillable={drillable} />
+        </div>
       </div>
 
-      {/* Every row sizes to its cards: a fixed-height row used to clip two
-          cards that stack inside it below xl. Each chart sets its own plot
-          height, so cards in a row line up by stretching, not by clipping. */}
-      <div className="flex flex-col lg:flex-row gap-4">
-        {/* LEFT COLUMN */}
-        <div className="lg:flex-[2] min-w-0 flex flex-col xl:flex-row gap-4">
-          <div className={`xl:w-[40%] shrink-0 ${CARD}`}>
-            <CurrentHealthDonut
-              data={rows}
-              activeFilter={activeFilter}
-              onSegmentClick={setActiveFilter}
-              filteredCount={filteredData.length}
-            />
-          </div>
-          <div className={`flex-1 min-w-0 ${CARD}`}>
-            <HealthByOwnerStackedBar data={filteredData} drillable={drillable} />
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 [&>*]:min-w-0">
+        <div className={CARD}>
+          <CSMPulseBar data={filteredData} drillable={drillable} />
         </div>
-
-        {/* RIGHT COLUMN */}
-        <div className="lg:flex-[1] min-w-0 flex flex-col gap-4">
-          <div className={CARD}>
-            <CSMPulseBar data={filteredData} drillable={drillable} />
-          </div>
-          <div className={CARD}>
-            <AIPulseBar data={filteredData} drillable={drillable} />
-          </div>
+        <div className={CARD}>
+          <AIPulseBar data={filteredData} drillable={drillable} />
         </div>
       </div>
 
@@ -86,7 +84,7 @@ export function ControlsView() {
         <AccountsByRenewalDateBar data={filteredData} drillable={drillable} />
       </div>
 
-      <div className="flex flex-col xl:flex-row gap-4">
+      <div className="flex flex-col xl:flex-row gap-4 [&>*]:min-w-0">
         <div className={`xl:w-[32%] shrink-0 ${CARD}`}>
           <AccountHealthBySeats data={filteredData} />
         </div>

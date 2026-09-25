@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
@@ -163,8 +163,23 @@ describe('DistributionView', () => {
     // A row or card is a flex box; a chart's own plot area has a definite
     // height by design and is not one.
     const fixed = [...container.querySelectorAll('[class~="flex"]')].filter((el) =>
-      el.getAttribute('class')!.split(/\s+/).some((token) => /^h-\[\d+px\]$/.test(token) && token !== 'h-[24px]'),
+      el.getAttribute('class')!.split(/\s+/).some((token) => /^h-\[\d+px\]$/.test(token)),
     );
     expect(fixed.map((el) => el.getAttribute('class'))).toEqual([]);
+  });
+
+  it('sits the donut and owner cards at their own height, not stretched to the pulse cards', () => {
+    vi.stubGlobal('fetch', fetchMock());
+    renderDistribution({ rows: book });
+    const donutRow = screen.getByText('Current health').closest('[data-row]')!;
+    expect(donutRow.className).toContain('items-start');
+    expect(within(donutRow as HTMLElement).queryByText('CSM Pulse Score')).toBeNull();
+  });
+
+  it('draws no empty filter row above the cards when no filter is on', () => {
+    vi.stubGlobal('fetch', fetchMock());
+    renderDistribution({ rows: book });
+    expect(screen.queryByRole('button', { name: /Clear active filter/ })).toBeNull();
+    expect(document.querySelector('.h-\\[24px\\]')).toBeNull();
   });
 });

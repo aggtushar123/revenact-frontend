@@ -162,9 +162,17 @@ describe('AccountHealthBySeats', () => {
     expect(totals(container)).toEqual(['1 seat', '20 seats']);
   });
 
-  it('titles the status axis and keeps tick text at 10px or more', () => {
+  it('writes a large count grouped, on one line', () => {
+    const { container } = render(<AccountHealthBySeats data={[healthRow({ id: '1', activeSeats: 2906 })]} />);
+    const label = container.querySelector('.recharts-label-list text')!;
+    expect(label.textContent).toBe('2,906 seats');
+    expect(label.querySelectorAll('tspan')).toHaveLength(0);
+  });
+
+  it('titles both axes and keeps tick text at 10px or more', () => {
     const { container } = render(<AccountHealthBySeats data={book} />);
     expect(screen.getByText('Health status')).toBeInTheDocument();
+    expect(screen.getByText('Active seats')).toBeInTheDocument();
     expectReadableTicks(container);
   });
 });
