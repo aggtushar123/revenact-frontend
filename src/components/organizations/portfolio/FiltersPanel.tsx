@@ -160,8 +160,15 @@ export function FiltersPanel({
   const ref = useRef<HTMLDivElement>(null);
   const ownerRef = useRef<HTMLSelectElement>(null);
   const ownerId = useId();
+  // Escape, the close button and applying a choice (Export/Add on the phone
+  // sheet) hand focus back to the trigger. An outside click doesn't: the
+  // user moved focus somewhere on purpose (e.g. straight into the search
+  // box), so the browser's own focus change is left alone instead of being
+  // fought right after.
+  const restoreFocus = useRef(true);
 
   useEffect(() => {
+    restoreFocus.current = true;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const trigger = triggerRef?.current ?? null;
     ownerRef.current?.focus();
@@ -173,11 +180,7 @@ export function FiltersPanel({
       const target = event.target as Node;
       if (ref.current?.contains(target)) return;
       if (trigger?.contains(target)) return;
-      // Stops the browser's own mousedown default action (blur the current
-      // focus, then focus whatever was clicked, or nothing) from running
-      // after this handler and undoing the trigger.focus() the unmount
-      // cleanup below is about to do.
-      event.preventDefault();
+      restoreFocus.current = false;
       onClose();
     };
     window.addEventListener('keydown', onKey);
@@ -185,7 +188,7 @@ export function FiltersPanel({
     return () => {
       window.removeEventListener('keydown', onKey);
       if (isSm) document.removeEventListener('mousedown', onPointerDown);
-      (trigger ?? previouslyFocused)?.focus();
+      if (restoreFocus.current) (trigger ?? previouslyFocused)?.focus();
     };
   }, [isSm, onClose, triggerRef]);
 

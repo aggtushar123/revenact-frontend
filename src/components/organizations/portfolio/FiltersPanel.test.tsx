@@ -83,7 +83,7 @@ describe('FiltersPanel', () => {
     expect(screen.getByRole('combobox', { name: 'Owner' })).toHaveFocus();
   });
 
-  it('closes on an outside click but not on its trigger, and hands focus back to the trigger', async () => {
+  it('closes on an outside click but not on its trigger', async () => {
     const onClose = vi.fn();
     const trigger = document.createElement('button');
     trigger.textContent = 'Filters';
@@ -105,6 +105,52 @@ describe('FiltersPanel', () => {
     expect(onClose).not.toHaveBeenCalled();
     await userEvent.click(document.body);
     expect(onClose).toHaveBeenCalledTimes(1);
+    document.body.removeChild(trigger);
+  });
+
+  it('does not force focus back to the trigger when closed by an outside click (the user moved focus on purpose)', async () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Filters';
+    document.body.appendChild(trigger);
+    const { unmount } = render(
+      <FiltersPanel
+        params={parseParams(new URLSearchParams())}
+        update={vi.fn()}
+        options={FILTER_OPTIONS}
+        isSm
+        onClose={vi.fn()}
+        onExport={vi.fn()}
+        exporting={false}
+        onAdd={vi.fn()}
+        triggerRef={{ current: trigger }}
+      />,
+    );
+    await userEvent.click(document.body);
+    unmount();
+    expect(trigger).not.toHaveFocus();
+    document.body.removeChild(trigger);
+  });
+
+  it('restores focus to the trigger when closed via Escape', async () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Filters';
+    document.body.appendChild(trigger);
+    const { unmount } = render(
+      <FiltersPanel
+        params={parseParams(new URLSearchParams())}
+        update={vi.fn()}
+        options={FILTER_OPTIONS}
+        isSm
+        onClose={vi.fn()}
+        onExport={vi.fn()}
+        exporting={false}
+        onAdd={vi.fn()}
+        triggerRef={{ current: trigger }}
+      />,
+    );
+    await userEvent.keyboard('{Escape}');
+    unmount();
+    expect(trigger).toHaveFocus();
     document.body.removeChild(trigger);
   });
 });

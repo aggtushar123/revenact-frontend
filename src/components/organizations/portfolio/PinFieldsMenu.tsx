@@ -20,7 +20,13 @@ export function PinFieldsMenu({
   triggerRef?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  // Escape and the close button (there isn't one here, but the pattern
+  // matches FiltersPanel) hand focus back to the trigger. An outside click
+  // doesn't: the user moved focus somewhere on purpose, so the browser's own
+  // focus change is left alone instead of being fought right after.
+  const restoreFocus = useRef(true);
   useEffect(() => {
+    restoreFocus.current = true;
     const previouslyFocused = document.activeElement as HTMLElement | null;
     const trigger = triggerRef?.current ?? null;
     ref.current?.querySelector<HTMLElement>('input')?.focus();
@@ -31,11 +37,7 @@ export function PinFieldsMenu({
       const target = event.target as Node;
       if (ref.current?.contains(target)) return;
       if (trigger?.contains(target)) return;
-      // Stops the browser's own mousedown default action (blur the current
-      // focus, then focus whatever was clicked, or nothing) from running
-      // after this handler and undoing the trigger.focus() the unmount
-      // cleanup below is about to do.
-      event.preventDefault();
+      restoreFocus.current = false;
       onClose();
     };
     window.addEventListener('keydown', onKey);
@@ -43,7 +45,7 @@ export function PinFieldsMenu({
     return () => {
       window.removeEventListener('keydown', onKey);
       document.removeEventListener('mousedown', onPointerDown);
-      (trigger ?? previouslyFocused)?.focus();
+      if (restoreFocus.current) (trigger ?? previouslyFocused)?.focus();
     };
   }, [onClose, triggerRef]);
 

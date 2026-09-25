@@ -84,14 +84,25 @@ describe('PortfolioToolbar', () => {
     expect(button).toHaveFocus();
   });
 
-  it('closes the Filters popover on an outside click and returns focus to the trigger', async () => {
+  it('closes the Filters popover on an outside click without forcing focus back to the trigger', async () => {
     renderToolbar();
     const button = screen.getByRole('button', { name: /^Filters/ });
     await userEvent.click(button);
     expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument();
     await userEvent.click(document.body);
     expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument();
-    expect(button).toHaveFocus();
+    expect(button).not.toHaveFocus();
+  });
+
+  it('an outside click into the search box closes Filters and leaves focus there', async () => {
+    renderToolbar();
+    const button = screen.getByRole('button', { name: /^Filters/ });
+    await userEvent.click(button);
+    expect(screen.getByRole('dialog', { name: 'Filters' })).toBeInTheDocument();
+    const search = screen.getByRole('searchbox', { name: 'Search by name or Revenact ID' });
+    await userEvent.click(search);
+    expect(screen.queryByRole('dialog', { name: 'Filters' })).not.toBeInTheDocument();
+    expect(search).toHaveFocus();
   });
 
   it('toggles the Filters popover closed via its own trigger, rather than reopening it', async () => {

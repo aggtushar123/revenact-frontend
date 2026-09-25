@@ -45,12 +45,23 @@ describe('PinFieldsMenu', () => {
     document.body.removeChild(trigger);
   });
 
-  it('hands focus back to its trigger when unmounted after an outside click', async () => {
+  it('does not force focus back to the trigger when closed by an outside click (the user moved focus on purpose)', async () => {
     const trigger = document.createElement('button');
     trigger.textContent = 'Pin fields';
     document.body.appendChild(trigger);
     const { unmount } = render(<PinFieldsMenu pins={[]} onToggle={vi.fn()} onClose={vi.fn()} triggerRef={{ current: trigger }} />);
     await userEvent.click(document.body);
+    unmount();
+    expect(trigger).not.toHaveFocus();
+    document.body.removeChild(trigger);
+  });
+
+  it('restores focus to the trigger when closed via Escape', async () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Pin fields';
+    document.body.appendChild(trigger);
+    const { unmount } = render(<PinFieldsMenu pins={[]} onToggle={vi.fn()} onClose={vi.fn()} triggerRef={{ current: trigger }} />);
+    await userEvent.keyboard('{Escape}');
     unmount();
     expect(trigger).toHaveFocus();
     document.body.removeChild(trigger);
