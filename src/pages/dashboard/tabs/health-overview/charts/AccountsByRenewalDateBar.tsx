@@ -88,7 +88,7 @@ export function AccountsByRenewalDateBar({
     : [];
 
   return (
-    <div className="w-full h-[280px] p-6 flex flex-col">
+    <div className="relative w-full h-[280px] p-6 flex flex-col">
       <div className="flex items-baseline justify-between gap-3 mb-6">
         <h3 className="text-[13px] font-bold text-ink">Accounts by Renewal Date (Monthly)</h3>
         {busiest && busiest.total > 0 && (

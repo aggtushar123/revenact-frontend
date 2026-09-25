@@ -45,7 +45,13 @@ export function ChartLegend({
         <li key={item.label} className="inline-flex items-center gap-1.5">
           <Swatch color={item.color} kind={item.kind} />
           <span>{item.label}</span>
-          {item.value !== undefined && <span className="font-mono-brand tabular-nums text-ink">{item.value}</span>}
+          {item.value !== undefined && (
+            <>
+              {/* Heard as "Good, 12" rather than "Good12". */}
+              <span className="sr-only">, </span>
+              <span className="font-mono-brand tabular-nums text-ink">{item.value}</span>
+            </>
+          )}
         </li>
       ))}
     </ul>

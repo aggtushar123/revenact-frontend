@@ -106,7 +106,7 @@ export function RenewalCoverageChart({
     : [];
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="relative w-full h-full flex flex-col">
       <div className="flex items-start justify-between gap-3 px-4 pt-3">
         <div>
           <h3 className="text-[13px] font-bold text-ink">Coverage gap</h3>

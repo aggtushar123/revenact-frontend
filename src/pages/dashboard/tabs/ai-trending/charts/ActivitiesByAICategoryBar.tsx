@@ -66,7 +66,7 @@ export function ActivitiesByAICategoryBar({
   }));
 
   return (
-    <div className="w-full h-full p-6 flex flex-col">
+    <div className="relative w-full h-full p-6 flex flex-col">
       <div className="flex items-baseline justify-between mb-4">
         <h3 className="text-[14px] font-bold text-ink">Activities By AI Category</h3>
         {data.length > MAX_BARS && (

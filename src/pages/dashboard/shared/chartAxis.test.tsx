@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
+import { BarChart, Bar, XAxis, YAxis } from 'recharts';
 import {
   axisLabel,
   AXIS_TICK,
@@ -18,18 +19,61 @@ describe('axisLabel', () => {
   it('lays a left title along the axis, rotated, in the secondary ink', () => {
     expect(axisLabel('Accounts')).toEqual({
       value: 'Accounts',
-      position: 'insideLeft',
+      position: 'left',
       angle: -90,
-      offset: 8,
+      offset: 10,
       fill: 'var(--text-secondary)',
       fontSize: 11,
-      style: { textAnchor: 'middle' },
+      textAnchor: 'middle',
     });
   });
 
   it('sets the x title flat under the axis and the right title the other way round', () => {
-    expect(axisLabel('Month', 'x')).toMatchObject({ position: 'insideBottom', angle: 0, offset: -4 });
-    expect(axisLabel('ARR', 'right')).toMatchObject({ position: 'insideRight', angle: 90, offset: 8 });
+    expect(axisLabel('Month', 'x')).toMatchObject({ position: 'bottom', angle: 0, offset: 4 });
+    expect(axisLabel('ARR', 'right')).toMatchObject({ position: 'right', angle: 90, offset: 10 });
+  });
+});
+
+// Renders a real chart: the title must land in the margin `chartMargin`
+// reserves, outside the tick band, never over the tick numbers.
+describe('axis titles in a real chart', () => {
+  const data = [
+    { month: 'Jan', value: 1200 },
+    { month: 'Feb', value: 900 },
+  ];
+  const drawn = () =>
+    render(
+      <BarChart width={400} height={240} data={data} margin={chartMargin({ left: true, x: true })}>
+        <XAxis {...AXIS_BASE} dataKey="month" label={axisLabel('Month', 'x')} />
+        <YAxis {...AXIS_BASE} width={38} label={axisLabel('Accounts')} />
+        <Bar dataKey="value" isAnimationActive={false} />
+      </BarChart>,
+    ).container;
+
+  const title = (container: HTMLElement, text: string) =>
+    [...container.querySelectorAll('text')].find((node) => node.textContent === text)!;
+
+  it('puts the y title left of every y tick, inside the chart', () => {
+    const container = drawn();
+    const ticks = [...container.querySelectorAll('.recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value')];
+    expect(ticks.length).toBeGreaterThan(0);
+    const labelX = Number(title(container, 'Accounts').getAttribute('x'));
+    // Ticks are end-anchored at their x; the rotated title is centred on its
+    // x, so half its 11px line sits either side.
+    const tickRight = Math.min(...ticks.map((tick) => Number(tick.getAttribute('x'))));
+    const widestTick = Math.max(...ticks.map((tick) => (tick.textContent ?? '').length)) * 6;
+    expect(labelX + 5.5).toBeLessThan(tickRight - widestTick);
+    expect(labelX - 5.5).toBeGreaterThan(0);
+  });
+
+  it('puts the x title below every x tick, inside the chart', () => {
+    const container = drawn();
+    const ticks = [...container.querySelectorAll('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value')];
+    expect(ticks.length).toBeGreaterThan(0);
+    const labelY = Number(title(container, 'Month').getAttribute('y'));
+    const tickY = Math.max(...ticks.map((tick) => Number(tick.getAttribute('y'))));
+    expect(labelY).toBeGreaterThan(tickY);
+    expect(labelY).toBeLessThan(240);
   });
 });
 

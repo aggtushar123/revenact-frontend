@@ -1,6 +1,21 @@
 // Axis furniture every dashboard chart shares: titles, tick style, margins
 // and tick formatters. A plain `.ts` file (the truncating tick uses
 // `createElement`) so it can sit beside `chartPalette.ts` as data, not UI.
+//
+// Axis-title recipe. A title goes *outside* its axis's tick band, in margin
+// the chart reserves for it, so it can never sit on the tick numbers:
+//
+//   <BarChart margin={chartMargin({ left: true, x: true })}>
+//     <XAxis {...AXIS_BASE} dataKey="month" label={axisLabel('Month', 'x')} />
+//     <YAxis {...AXIS_BASE} width={38} label={axisLabel('Accounts')} />
+//
+// `axisLabel` uses Recharts' outside positions (`left` / `right` / `bottom`),
+// which place the label relative to the axis's own box, beyond its outer
+// edge (the y titles' centre 10px out, the x title's top 4px down). `chartMargin` widens the same side by
+// `TITLE_ROOM`, which holds that offset plus one 11px line. The `inside*`
+// positions are anchored inside the tick band and overlap the ticks on a
+// narrow axis, so they are not used. Keep the axis `width` to what the ticks
+// need; the title does not share it.
 
 import { createElement } from 'react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
@@ -8,18 +23,23 @@ import { formatCompactMoney } from '../../../features/customers/formatters';
 
 export type AxisSide = 'x' | 'left' | 'right';
 
+/** Distance from an axis's outer edge to its title: to the centre of a
+ *  rotated y title, to the top of the x title. */
+const TITLE_OFFSET = { x: 4, y: 10 } as const;
+
 /** An axis title, for `<XAxis label={axisLabel('Month', 'x')}>` or
- *  `<YAxis label={axisLabel('Accounts')}>`. Pair it with `chartMargin` so the
- *  title has room and is not clipped. */
+ *  `<YAxis label={axisLabel('Accounts')}>`. Always pair it with
+ *  `chartMargin` for the same side, which reserves the room it lands in
+ *  (see the recipe at the top of this file). */
 export function axisLabel(value: string, side: AxisSide = 'left') {
   return {
     value,
-    position: side === 'x' ? 'insideBottom' : side === 'left' ? 'insideLeft' : 'insideRight',
+    position: side === 'x' ? 'bottom' : side,
     angle: side === 'x' ? 0 : side === 'left' ? -90 : 90,
-    offset: side === 'x' ? -4 : 8,
+    offset: side === 'x' ? TITLE_OFFSET.x : TITLE_OFFSET.y,
     fill: 'var(--text-secondary)',
     fontSize: 11,
-    style: { textAnchor: 'middle' },
+    textAnchor: 'middle',
   } as const;
 }
 
@@ -32,8 +52,9 @@ export const AXIS_BASE = { axisLine: false, tickLine: false, tick: AXIS_TICK } a
 /** No negative sides: a negative left margin is how tick labels got clipped. */
 export const CHART_MARGIN = { top: 16, right: 16, bottom: 8, left: 8 } as const;
 
-/** Room an axis title takes beside its axis. */
-const TITLE_ROOM = 16;
+/** Room an axis title takes beside its axis: its offset plus one 11px line
+ *  (a y title is rotated, so its line height is its width). */
+const TITLE_ROOM = 20;
 
 /** `CHART_MARGIN`, widened on each side that carries an `axisLabel`. */
 export function chartMargin(titles: { x?: boolean; left?: boolean; right?: boolean } = {}) {

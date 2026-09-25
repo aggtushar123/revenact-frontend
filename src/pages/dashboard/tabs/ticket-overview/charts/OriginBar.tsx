@@ -91,7 +91,7 @@ export function OriginBar({
   }));
 
   return (
-    <div className="w-full h-[280px] p-4 flex flex-col bg-surface border border-line-subtle rounded-lg shadow-sm">
+    <div className="relative w-full h-[280px] p-4 flex flex-col bg-surface border border-line-subtle rounded-lg shadow-sm">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-[13px] font-bold text-ink">Tickets By Origin</h3>
       </div>

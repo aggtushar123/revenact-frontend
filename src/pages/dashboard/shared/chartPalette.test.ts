@@ -160,12 +160,36 @@ describe('tooltips', () => {
       ...import.meta.glob('../../health/**/*.tsx', { query: '?raw', eager: true, import: 'default' }),
     } as Record<string, string>;
 
+    // The literal's body, braces balanced, so a nested object or a template
+    // expression inside it does not end the match early.
+    const bodies = (source: string) => {
+      const out: string[] = [];
+      for (let at = source.indexOf('contentStyle={'); at >= 0; at = source.indexOf('contentStyle={', at + 1)) {
+        const open = source.indexOf('{', at + 'contentStyle='.length);
+        let depth = 0;
+        let end = open;
+        for (; end < source.length; end++) {
+          if (source[end] === '{') depth++;
+          else if (source[end] === '}' && --depth === 0) break;
+        }
+        out.push(source.slice(open + 1, end));
+      }
+      return out;
+    };
+    // An inline literal must spread TOOLTIP_STYLE or set its own background;
+    // a bare reference (`contentStyle={TOOLTIP_STYLE}`) passes as the name.
+    const ok = (body: string) => /TOOLTIP_STYLE|\bbackground(Color)?\s*:/.test(body);
+
+    expect(bodies('<Tooltip contentStyle={{ fontSize: 12, padding: { x: 1 } }} />')).toEqual([
+      '{ fontSize: 12, padding: { x: 1 } }',
+    ]);
+    expect(ok('{ padding: { x: 1 }, background: "var(--bg-elevated)" }')).toBe(true);
+    expect(ok('{ padding: { x: 1 }, fontSize: 12 }')).toBe(false);
+
     const offenders: string[] = [];
     for (const [file, source] of Object.entries(modules)) {
       if (file.includes('.test.')) continue;
-      for (const match of source.matchAll(/contentStyle=\{\{([\s\S]*?)\}\}/g)) {
-        if (!/\.\.\.TOOLTIP_STYLE|\bbackground(Color)?\s*:/.test(match[1])) offenders.push(file);
-      }
+      for (const body of bodies(source)) if (!ok(body)) offenders.push(file);
     }
     expect(offenders).toEqual([]);
   });

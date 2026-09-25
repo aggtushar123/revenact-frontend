@@ -48,7 +48,7 @@ export function ActivityTypeDonut({
   }));
 
   return (
-    <div className="w-full h-full p-6 flex flex-col">
+    <div className="relative w-full h-full p-6 flex flex-col">
       <h3 className="text-[14px] font-bold text-ink mb-4">Activities By Type</h3>
       <DrillTargets label="Activities By Type" items={drillItems} />
       <div className="flex-1 relative min-h-[300px]">

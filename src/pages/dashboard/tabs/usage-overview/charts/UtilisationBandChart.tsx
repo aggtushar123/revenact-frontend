@@ -89,7 +89,7 @@ export function UtilisationBandChart({
     : [];
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="relative w-full h-full flex flex-col">
       <div className="px-4 pt-3">
         <h3 className="text-[13px] font-bold text-ink">Where the money sits</h3>
         <p className="text-[11px] text-ink-faint mt-[1px]">

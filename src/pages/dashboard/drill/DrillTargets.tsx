@@ -17,10 +17,12 @@ export function DrillTargets({
     <ul
       aria-label={label}
       // Stays out of flow when revealed: `sr-only` already makes it
-      // absolute, and focus only un-clips it over the top edge of the
-      // nearest positioned ancestor (the card). Revealing it as a static
-      // row used to push the plot down and squash fixed-height charts.
-      className="sr-only focus-within:top-0 focus-within:inset-x-0 focus-within:z-20 focus-within:size-auto focus-within:m-0 focus-within:p-2 focus-within:overflow-visible focus-within:[clip-path:none] focus-within:[clip:auto] focus-within:whitespace-normal focus-within:flex focus-within:flex-wrap focus-within:gap-1 focus-within:bg-surface focus-within:border-b focus-within:border-line focus-within:rounded-t-xl"
+      // absolute, and focus only un-clips it, flush over the top edge of the
+      // nearest positioned ancestor: every call site's card wrapper is
+      // `relative` for this (guarded in DrillTargets.test.tsx). Revealing it
+      // as a static row used to push the plot down and squash fixed-height
+      // charts.
+      className="sr-only focus-within:top-0 focus-within:inset-x-0 focus-within:z-20 focus-within:size-auto focus-within:m-0 focus-within:p-2 focus-within:overflow-visible focus-within:[clip-path:none] focus-within:[clip:auto] focus-within:whitespace-normal focus-within:flex focus-within:flex-wrap focus-within:gap-1 focus-within:bg-surface focus-within:border-b focus-within:border-line focus-within:rounded-t-[inherit]"
     >
       {items.map((item) => (
         <li key={item.key ?? item.name}>

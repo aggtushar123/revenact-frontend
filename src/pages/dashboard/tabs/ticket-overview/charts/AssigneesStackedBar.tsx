@@ -97,7 +97,7 @@ export function AssigneesStackedBar({
   };
 
   return (
-    <div className="w-full h-full p-4 flex flex-col bg-surface border border-line-subtle rounded-lg shadow-sm h-[320px]">
+    <div className="relative w-full h-full p-4 flex flex-col bg-surface border border-line-subtle rounded-lg shadow-sm h-[320px]">
       <div className="flex flex-col mb-4">
         <h3 className="text-[13px] font-bold text-ink">Ticket Assignees by Ticket Status</h3>
       </div>

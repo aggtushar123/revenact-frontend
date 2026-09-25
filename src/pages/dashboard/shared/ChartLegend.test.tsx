@@ -16,7 +16,7 @@ describe('ChartLegend', () => {
     const list = screen.getByRole('list');
     const items = within(list).getAllByRole('listitem');
     expect(items).toHaveLength(2);
-    expect(items[0]).toHaveTextContent('Good12');
+    expect(items[0]).toHaveTextContent('Good, 12');
     expect(within(items[0]).getByText('12')).toHaveClass('font-mono-brand', 'tabular-nums');
     expect(items[1]).toHaveTextContent('Poor');
   });
