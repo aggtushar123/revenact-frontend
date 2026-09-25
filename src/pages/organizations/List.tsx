@@ -164,6 +164,7 @@ export function List() {
         row={row}
         currency={currency}
         pins={pins}
+        isSm={isSm}
         selecting={selection.selecting}
         selected={selection.selected.has(row.id)}
         selectDisabled={loading || portfolio.loading || actionRunning}

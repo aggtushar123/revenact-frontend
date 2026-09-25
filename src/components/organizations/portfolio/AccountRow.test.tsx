@@ -4,13 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AccountRow, LONG_PRESS_MS, type AccountRowProps } from './AccountRow';
 import { pizzaHut } from '../../../features/organizations/testPortfolio';
-import { resetViewport, setViewport } from '../../../test/viewport';
 
 function renderRow(overrides: Partial<AccountRowProps> = {}) {
   const props: AccountRowProps = {
     row: pizzaHut,
     currency: 'USD',
     pins: [],
+    isSm: false,
     selecting: false,
     selected: false,
     open: false,
@@ -32,12 +32,10 @@ function renderRow(overrides: Partial<AccountRowProps> = {}) {
 describe('AccountRow', () => {
   afterEach(() => {
     vi.useRealTimers();
-    resetViewport();
   });
 
   it('shows all eight row elements on desktop', () => {
-    setViewport(1440);
-    const { container } = renderRow();
+    const { container } = renderRow({ isSm: true });
     expect(screen.getByRole('link', { name: 'Pizza Hut' })).toHaveAttribute('href', '/organizations/7');
     expect(container).toHaveTextContent('Carl CSM · Live · Touched 33d ago');
     expect(screen.getByRole('img', { name: 'Health 4.9, Average' })).toBeInTheDocument();
@@ -51,7 +49,6 @@ describe('AccountRow', () => {
   });
 
   it('shows only the phone-card elements on phones, not the runway, pulse or pins', () => {
-    // Default: jsdom has no matchMedia, so useMediaQuery reads false (phone).
     const { container } = renderRow({ pins: ['nps'] });
     expect(screen.getByRole('link', { name: 'Pizza Hut' })).toHaveAttribute('href', '/organizations/7');
     expect(container).toHaveTextContent('Carl CSM · Live · Touched 33d ago');
@@ -92,9 +89,24 @@ describe('AccountRow', () => {
     expect(props.onToggleOpen).not.toHaveBeenCalled();
   });
 
+  it('tags archived and churned accounts in words', () => {
+    const archived = renderRow({ row: { ...pizzaHut, is_archived: true } });
+    expect(screen.getByText('Archived')).toBeInTheDocument();
+    archived.unmount();
+    const churned = renderRow({ isSm: true, row: { ...pizzaHut, churned: true, signal: null } });
+    expect(screen.getByText('Churned')).toBeInTheDocument();
+    churned.unmount();
+    renderRow();
+    expect(screen.queryByText(/^(Archived|Churned)$/)).not.toBeInTheDocument();
+  });
+
+  it('gives the name link a 44px target on phones', () => {
+    renderRow();
+    expect(screen.getByRole('link', { name: 'Pizza Hut' })).toHaveClass('min-h-11');
+  });
+
   it('shows pinned fields as chips on desktop', () => {
-    setViewport(1440);
-    const { container } = renderRow({ pins: ['nps', 'totalSeatUtilization'] });
+    const { container } = renderRow({ isSm: true, pins: ['nps', 'totalSeatUtilization'] });
     expect(container.querySelector('[data-pin="nps"]')).toHaveTextContent('NPS −80');
     expect(container.querySelector('[data-pin="totalSeatUtilization"]')).toHaveTextContent('Seats 16%');
   });

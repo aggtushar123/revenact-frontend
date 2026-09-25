@@ -6,7 +6,6 @@ import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 import { PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
-import { SM, useMediaQuery } from '../../../lib/useMediaQuery';
 import { HealthRing, PulsePair, RenewalRunway, SignalTag, TrendLine, touchText } from './rowParts';
 import { FOCUS } from './styles';
 
@@ -16,6 +15,9 @@ export interface AccountRowProps {
   row: PortfolioRow;
   currency: CurrencyCode;
   pins: ColumnId[];
+  /** From `sm` (the page's own media query, passed down so each row does
+   *  not add a listener of its own). */
+  isSm: boolean;
   /** Any row is selected: taps select instead of opening. */
   selecting: boolean;
   selected: boolean;
@@ -42,6 +44,7 @@ export function AccountRow({
   row,
   currency,
   pins,
+  isSm,
   selecting,
   selected,
   selectDisabled = false,
@@ -52,13 +55,13 @@ export function AccountRow({
   onToggleOpen,
   children,
 }: AccountRowProps) {
-  const isSm = useMediaQuery(SM);
   const timer = useRef<number | null>(null);
   const longPressed = useRef(false);
   const detailsId = `account-${row.id}-details`;
   const arr = row.arr == null ? '—' : formatCompactMoney(row.arr, currency);
   const checkboxDisabled = selectDisabled || (atLimit && !selected);
   const limitHint = atLimit && !selected ? '500 is the most you can select at once' : undefined;
+  const status = row.is_archived ? 'Archived' : row.churned ? 'Churned' : null;
 
   const cancelPress = () => {
     if (timer.current !== null) {
@@ -125,15 +128,20 @@ export function AccountRow({
 
         <HealthRing score={row.health.score} category={row.health.category} />
 
-        <div className="min-w-0 flex-1 sm:flex-none sm:w-56">
-          <Link
-            to={`/organizations/${row.id}`}
-            onClick={(event) => event.stopPropagation()}
-            data-field="organization"
-            className={`block truncate rounded-sm text-[13px] font-semibold text-ink hover:underline ${FOCUS}`}
-          >
-            {row.name}
-          </Link>
+        <div className="min-w-0 flex-1 sm:min-w-40 sm:basis-56">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <Link
+              to={`/organizations/${row.id}`}
+              onClick={(event) => event.stopPropagation()}
+              data-field="organization"
+              className={`flex min-h-11 min-w-0 items-center sm:block sm:min-h-0 truncate rounded-sm text-[13px] font-semibold text-ink hover:underline ${FOCUS}`}
+            >
+              <span className="truncate">{row.name}</span>
+            </Link>
+            {status ? (
+              <span className="shrink-0 rounded-full bg-subtle px-1.5 text-[11px] font-semibold text-ink-muted">{status}</span>
+            ) : null}
+          </span>
           <p className="truncate text-[11px] text-ink-muted">
             <span data-field="owner">{PORTFOLIO_FIELDS.owner.value(row)}</span> ·{' '}
             <span data-field="lifecycleStage">{row.lifecycle.label}</span> · {touchText(row.last_touch_days)}
@@ -144,7 +152,7 @@ export function AccountRow({
         {isSm ? <RenewalRunway renewal={row.renewal} /> : null}
 
         {isSm ? (
-          <span className="flex flex-1 min-w-0 flex-wrap gap-1">
+          <span className="flex min-w-0 flex-wrap gap-1">
             {pins.map((id) => {
               const field = PORTFOLIO_FIELDS[id];
               return (

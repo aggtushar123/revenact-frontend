@@ -7,7 +7,6 @@ import { AccountDetails } from './AccountDetails';
 import { HEADER_FIELDS, PANEL_ORDER, PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
 import { initech, pizzaHut } from '../../../features/organizations/testPortfolio';
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
-import { setViewport } from '../../../test/viewport';
 
 // The spec's promise: nothing the old table showed is lost. The churned
 // fixture is used because the churn fields only show when churned.
@@ -19,6 +18,7 @@ function renderOpened(row: PortfolioRow) {
           row={row}
           currency="USD"
           pins={['nps', 'tcv', 'domain']}
+          isSm
           selecting={false}
           selected={false}
           open
@@ -34,8 +34,6 @@ function renderOpened(row: PortfolioRow) {
 }
 
 describe('the 34 table fields', () => {
-  // Desktop viewport so PulsePair renders in header and pinned chips appear
-  setViewport(1440);
 
   it('are the list this test walks', () => {
     expect(ALL_COLUMNS).toHaveLength(34);
