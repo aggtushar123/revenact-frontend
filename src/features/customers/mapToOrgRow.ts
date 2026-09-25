@@ -12,11 +12,10 @@ import {
   csatColor,
 } from './formatters';
 
-// Adapts a real backend `Customer` into the `OrgRow` shape the
-// (mock-data-era) organizations table/popovers already render. Keeping the
-// table components untouched and doing the shaping here means swapping
-// mock data for real data didn't require rewriting the UI — see
-// OrganizationsTable.tsx and List.tsx.
+// Adapts a real backend `Customer` into the `OrgRow` shape the Board,
+// Details, Lifecycle and Health pages (and the org popovers) render. The
+// Organizations list no longer uses it: it reads `/organizations/portfolio/`,
+// whose rows are already shaped server-side.
 //
 // A few OrgRow fields have no backend counterpart (they were always purely
 // presentational: pill/dot colors, avatar initials, the "(Enterprise)"/

@@ -59,8 +59,7 @@ function dueColor(days: number): string {
 }
 
 /** Positioned `fixed` from a viewport rect the caller computes on click —
- * same pattern as HealthPopover/CsatPopover/EditColumnsPopover/
- * RowActionsPopover in OrganizationsTable.tsx — and, unlike those,
+ * same pattern as HealthPopover/CsatPopover — and, unlike those,
  * rendered through a portal to `document.body`. MetricsPanel's root has
  * an inline `backdropFilter` (the glass-panel effect), and per spec any
  * `filter`/`backdrop-filter` ancestor creates a new stacking context AND

@@ -406,8 +406,8 @@ ARR. Rules specific to it, enforced by
 ### Overlays
 
 `HealthPopover` (five real rubric components with weights), `CsatPopover`
-(response bands at true scale), `RenewalPopover`, `EditColumnsPopover`,
-`RowActionsPopover`, `ContactRowActionsPopover`, and the Navbar's notification
+(response bands at true scale), `RenewalPopover`, the Organizations
+`FiltersPanel` and `PinFieldsMenu`, `ContactRowActionsPopover`, and the Navbar's notification
 and account menus. All close on an outside `mousedown`.
 
 ### Forms

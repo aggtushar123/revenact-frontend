@@ -18,7 +18,7 @@ interface ContactsTableProps {
   onNext: () => void;
   onPrevious: () => void;
   /** Checkbox selection — lifted to List.tsx, the common parent, same
-   * reasoning as OrganizationsTable's own (a future bulk action could
+   * reasoning as the Organizations list's selection (a future bulk action could
    * read it from there without this table needing to know about it). */
   selectedIds: Set<number>;
   onToggleSelect: (id: number) => void;
@@ -28,7 +28,7 @@ interface ContactsTableProps {
 }
 
 // `contacts` is already just this one server-fetched, server-filtered
-// page — same "no local slicing" convention as OrganizationsTable —
+// page — the "no local slicing" convention —
 // unlike this component's old client-side search/company filtering
 // over the full CONTACTS_DATA mock.
 export function ContactsTable({

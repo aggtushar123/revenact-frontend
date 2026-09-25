@@ -539,10 +539,15 @@ App.tsx
   │     │           └── CallSenseTab → features/tasks/tasksSlice (dispatch addTask)
   │     └── (activityData, accountsData, accountActivityData)
   │
-  ├── pages/organizations/List.tsx
-  │     └── components/organizations/OrganizationsTable
-  │           ├── ActionBar, EditColumnsPopover, HealthPopover, CsatPopover, RowActionsPopover
-  │           └── MetricsPanel
+  ├── pages/organizations/List.tsx  (GET /organizations/portfolio/)
+  │     ├── OrganizationsFrame (rail slot, empty until Ask on Organizations)
+  │     └── components/organizations/portfolio/*
+  │           ├── SummaryTiles, PortfolioToolbar (FiltersPanel, PinFieldsMenu), FilterChips
+  │           ├── PortfolioSections → AccountRow (rowParts) + AccountDetails / AccountSheet
+  │           └── SelectionBar (bulk via POST /organizations/bulk/)
+  │
+  ├── pages/organizations/Board.tsx
+  │     └── components/organizations/MetricsPanel (until the board moves to the portfolio)
   │
   ├── pages/copilot/Index.tsx
   │     ├── HomeView, ChatView, CockpitView
@@ -594,7 +599,6 @@ App.tsx
 
 | Route | Status |
 |---|---|
-| `/organizations/board` | Stub (`Board.tsx` is 296 bytes) |
 | `/communications` | No route defined |
 | `/accounts` (list) | No list route, only `/accounts/:id` |
 | `/sfdc`, `/feedbacks` | No route defined |
