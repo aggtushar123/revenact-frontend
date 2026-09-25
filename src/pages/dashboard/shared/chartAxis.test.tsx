@@ -147,4 +147,19 @@ describe('truncTick', () => {
     expect(container.querySelector('title')).toBeNull();
     expect(container.querySelector('text')!.textContent).toBe('Email');
   });
+
+  it('can slant an x-axis name, rotating about its own anchor and hanging below the axis', () => {
+    const Tick = truncTick(14, -35);
+    const { container } = render(
+      <svg>
+        <Tick x={80} y={200} payload={{ value: 'Globex International Holdings' }} textAnchor="middle" />
+      </svg>,
+    );
+    const text = container.querySelector('text')!;
+    expect(text).toHaveAttribute('transform', 'rotate(-35, 80, 200)');
+    // A slanted name ends at its tick, whatever anchor the axis asked for.
+    expect(text).toHaveAttribute('text-anchor', 'end');
+    expect(text).toHaveAttribute('dy', '0.71em');
+    expect(text.querySelector('title')!.textContent).toBe('Globex International Holdings');
+  });
 });

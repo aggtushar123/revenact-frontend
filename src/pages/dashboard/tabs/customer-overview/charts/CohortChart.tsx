@@ -1,7 +1,9 @@
-import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { CohortRow } from '../../../../../features/portfolio/portfolioSlice';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, chartMargin } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 
 export interface CohortChartProps {
   rows: CohortRow[];
@@ -27,6 +29,13 @@ export function CohortChart({ rows, undated }: CohortChartProps) {
         <p className="text-[11px] text-ink-faint mt-[1px]">
           Customers by the year they joined, and how many are still here
         </p>
+        <ChartLegend
+          className="mt-2"
+          items={[
+            { label: 'Retained', color: ROLE.gain },
+            { label: 'Churned', color: ROLE.loss },
+          ]}
+        />
       </div>
 
       <div className="flex-1 w-full min-h-0 px-2 pb-1">
@@ -36,37 +45,34 @@ export function CohortChart({ rows, undated }: CohortChartProps) {
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={rows} margin={{ top: 12, right: 12, left: -22, bottom: 4 }} barSize={42}>
+            <BarChart data={rows} margin={chartMargin({ left: true })} barSize={42}>
               <XAxis
+                {...AXIS_BASE}
                 dataKey="year"
-                axisLine={false}
-                tickLine={false}
                 tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
               />
               <YAxis
-                axisLine={false}
-                tickLine={false}
-                width={40}
+                {...AXIS_BASE}
+                width={36}
                 allowDecimals={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
+                label={axisLabel('Customers')}
               />
               <Tooltip
-                cursor={{ fill: 'var(--bg-subtle)' }}
+                cursor={{ fill: CURSOR_FILL }}
                 contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
-                formatter={(value, name, item) =>
-                  name === 'retained'
+                formatter={(value, _name, item) =>
+                  item?.dataKey === 'retained'
                     ? [`${value} still here (${item?.payload?.retention ?? 0}%)`, 'Retained']
                     : [`${value} left`, 'Churned']
                 }
               />
-              <Legend verticalAlign="top" height={20} iconType="square" />
-              <Bar {...STATIC_SERIES} dataKey="retained" name="Retained" stackId="cohort" fill="var(--success)" />
+              <Bar {...STATIC_SERIES} dataKey="retained" name="Retained" stackId="cohort" fill={ROLE.gain} />
               <Bar
                 {...STATIC_SERIES}
                 dataKey="churned"
                 name="Churned"
                 stackId="cohort"
-                fill="var(--danger)"
+                fill={ROLE.loss}
                 radius={[3, 3, 0, 0]}
               />
             </BarChart>

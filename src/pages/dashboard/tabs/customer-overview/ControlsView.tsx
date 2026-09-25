@@ -154,7 +154,7 @@ export function ControlsView() {
           />
         </KpiStrip>
 
-        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
+        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[400px]">
           {stats && (
             <ConcentrationChart concentration={stats.concentration} currency={currency} />
           )}

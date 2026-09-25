@@ -96,14 +96,26 @@ interface TickProps {
 }
 
 /** A category tick that shortens long names and keeps the full one in a
- *  `<title>` (the hover tooltip): `<YAxis type="category" tick={truncTick(18)} />`. */
-export function truncTick(max = 14) {
+ *  `<title>` (the hover tooltip): `<YAxis type="category" tick={truncTick(18)} />`.
+ *  Pass an `angle` (e.g. -35) to slant crowded x-axis names:
+ *  `<XAxis tick={truncTick(14, -35)} interval={0} height={64} />`; a slanted
+ *  name rotates about its tick and ends there, hanging below the axis. */
+export function truncTick(max = 14, angle = 0) {
   return function TruncatedTick({ x = 0, y = 0, payload, textAnchor = 'end' }: TickProps) {
     const full = String(payload?.value ?? '');
     const short = truncate(full, max);
+    const slanted = angle !== 0;
     return createElement(
       'text',
-      { x, y, dy: '0.355em', textAnchor, fill: AXIS_TICK.fill, fontSize: AXIS_TICK.fontSize },
+      {
+        x,
+        y,
+        dy: slanted ? '0.71em' : '0.355em',
+        textAnchor: slanted ? 'end' : textAnchor,
+        transform: slanted ? `rotate(${angle}, ${x}, ${y})` : undefined,
+        fill: AXIS_TICK.fill,
+        fontSize: AXIS_TICK.fontSize,
+      },
       short !== full ? createElement('title', null, full) : null,
       short,
     );
