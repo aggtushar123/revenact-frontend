@@ -178,7 +178,7 @@ export function ControlsView() {
           />
         </KpiStrip>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 [&>*]:min-w-0">
           <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
             <UtilisationBandChart
               bands={stats?.bands ?? []}
@@ -193,7 +193,7 @@ export function ControlsView() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 [&>*]:min-w-0">
           <div className="xl:col-span-2 bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
             <AccountUsageList
               title="Shelfware — what to fix"

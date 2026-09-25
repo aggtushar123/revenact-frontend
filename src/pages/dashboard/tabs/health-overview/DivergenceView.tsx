@@ -152,7 +152,7 @@ export function DivergenceView() {
         )}
       </p>
 
-      <div className="flex flex-col xl:flex-row gap-4 items-stretch">
+      <div className="flex flex-col xl:flex-row gap-4 items-stretch [&>*]:min-w-0">
         {/* Definite height, not min-height: the scatter's ResponsiveContainer
             asks for height="100%", and a percentage can't resolve against a
             parent whose height comes only from min-height — the chart collapses

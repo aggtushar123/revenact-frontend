@@ -160,7 +160,7 @@ export function ControlsView() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 [&>*]:min-w-0">
           <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[300px]">
             <CohortChart
               rows={stats?.cohorts.rows ?? []}
@@ -172,7 +172,7 @@ export function ControlsView() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 [&>*]:min-w-0">
           <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
             <CompositionSplit
               title="By size"

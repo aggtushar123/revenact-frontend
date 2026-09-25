@@ -206,7 +206,7 @@ export function RenewalView() {
         />
       </KpiStrip>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 [&>*]:min-w-0">
         <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
           <RenewalQuarterChart columns={quarters} currency={currency} drillable={drillable} />
         </div>
@@ -215,7 +215,7 @@ export function RenewalView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 [&>*]:min-w-0">
         <div className="xl:col-span-2 bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
           <RenewalQueueTable queue={queue} currency={currency} />
         </div>

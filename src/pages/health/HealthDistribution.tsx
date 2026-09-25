@@ -252,7 +252,7 @@ export function HealthDistribution() {
       )}
 
       {/* Health distribution */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 [&>*]:min-w-0">
         {HEALTH_ORDER.map((category) => {
           const colors = HEALTH_COLORS[category];
           const Icon = colors.icon;
