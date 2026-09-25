@@ -1,6 +1,9 @@
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { ProductRow } from '../../../../../features/products/productsSlice';
 import { formatCompactMoney } from '../../../../../features/customers/formatters';
+import { ROLE } from '../../../shared/chartPalette';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import { ScrollTable } from '../../../shared/ScrollTable';
 
 export interface ProductScorecardProps {
   rows: ProductRow[];
@@ -48,8 +51,8 @@ export function ProductScorecard({ rows, currency }: ProductScorecardProps) {
       {rows.length === 0 ? (
         <p className="px-4 py-6 text-[12px] text-ink-faint">No products match these filters.</p>
       ) : (
-        <div className="overflow-x-auto px-2 pb-2">
-          <table className="w-full min-w-[680px] text-[11.5px] border-collapse">
+        <ScrollTable caption="Product by product" maxHeight={420} minWidth={680} className="mx-2 mb-2">
+          <table className="w-full text-[11.5px] border-collapse">
             <thead>
               <tr className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">
                 <th className="text-left font-bold px-2 py-2">Product</th>
@@ -133,6 +136,25 @@ export function ProductScorecard({ rows, currency }: ProductScorecardProps) {
               ))}
             </tbody>
           </table>
+        </ScrollTable>
+      )}
+
+      {rows.length > 0 && (
+        // What the colours in the table mean, so none of them is colour alone.
+        <div className="px-4 pb-3 flex flex-col gap-1">
+          <ChartLegend
+            items={[
+              { label: 'Seat use under 50%', color: ROLE.loss },
+              { label: 'Seat use 90% or more', color: ROLE.caution },
+            ]}
+          />
+          <ChartLegend
+            items={[
+              { label: 'Poor: CES under 50, NPS under 0', color: ROLE.loss },
+              { label: 'Fair: CES under 75, NPS under 30', color: ROLE.caution },
+              { label: 'Good: above both', color: ROLE.gain },
+            ]}
+          />
         </div>
       )}
 

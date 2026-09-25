@@ -7,7 +7,10 @@ import {
   formatMoney,
 } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, chartMargin, truncTick } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import type { LegendItem } from '../../../shared/ChartLegend';
 
 /** The three segments, in the order they stack. Also the chart's own key. */
 const LABELS: Record<string, string> = {
@@ -16,11 +19,14 @@ const LABELS: Record<string, string> = {
   lost: 'Already churned',
 };
 
-const KEY = [
-  { label: LABELS.healthy, color: 'var(--success)' },
-  { label: LABELS.unhealthy, color: 'var(--danger)' },
-  { label: LABELS.lost, color: 'var(--text-tertiary)' },
+const KEY: LegendItem[] = [
+  { label: LABELS.healthy, color: ROLE.gain },
+  { label: LABELS.unhealthy, color: ROLE.loss },
+  { label: LABELS.lost, color: ROLE.faint },
 ];
+
+/** Product names slant and cut at 14 characters, full name in a `<title>`. */
+const NAME_TICK = truncTick(14, -25);
 
 export interface ProductMoneyChartProps {
   rows: ProductRow[];
@@ -58,28 +64,17 @@ export function ProductMoneyChart({ rows, currency }: ProductMoneyChartProps) {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <div className="flex items-start justify-between gap-3 px-4 pt-3">
-        <div>
-          <h3 className="text-[13px] font-bold text-ink">ARR by product</h3>
-          <p className="text-[11px] text-ink-faint mt-[1px]">
-            What each product leads, split by the health of the accounts holding it — with the ARR
-            that has already left alongside
-          </p>
-        </div>
+      <div className="px-4 pt-3">
+        <h3 className="text-[13px] font-bold text-ink">ARR by product</h3>
+        <p className="text-[11px] text-ink-faint mt-[1px]">
+          What each product leads, split by the health of the accounts holding it — with the ARR
+          that has already left alongside
+        </p>
         {/* Our own key rather than Recharts' Legend, which orders itself by
             series and read back healthy / churned / unhealthy. The order here
-            is the order of the stack, bottom segment first. */}
-        <ul className="flex items-center gap-3 shrink-0 pt-[2px]">
-          {KEY.map((entry) => (
-            <li key={entry.label} className="flex items-center gap-1.5">
-              <span
-                className="w-[7px] h-[7px] rounded-full shrink-0"
-                style={{ backgroundColor: entry.color }}
-              />
-              <span className="text-[10.5px] text-ink-muted whitespace-nowrap">{entry.label}</span>
-            </li>
-          ))}
-        </ul>
+            is the order of the stack, bottom segment first. Under the title,
+            so it wraps rather than squeezing the subtitle. */}
+        <ChartLegend className="mt-2" items={KEY} />
       </div>
 
       <div className="flex-1 w-full min-h-0 px-2 pb-1">
@@ -94,28 +89,18 @@ export function ProductMoneyChart({ rows, currency }: ProductMoneyChartProps) {
                 card when there is only one category. */}
             <BarChart
               data={data}
-              margin={{ top: 14, right: 8, left: -6, bottom: 4 }}
+              margin={chartMargin({ left: true })}
               maxBarSize={84}
             >
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 9 }}
-                interval={0}
-                angle={-25}
-                textAnchor="end"
-                height={56}
-              />
+              <XAxis {...AXIS_BASE} dataKey="name" tick={NAME_TICK} interval={0} height={56} />
               <YAxis
-                axisLine={false}
-                tickLine={false}
+                {...AXIS_BASE}
                 width={56}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
                 tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+                label={axisLabel(`ARR (${currency})`)}
               />
               <Tooltip
-                cursor={{ fill: 'var(--bg-subtle)' }}
+                cursor={{ fill: CURSOR_FILL }}
                 contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
                 formatter={(value, name) => [
                   formatMoney(Number(value ?? 0), currency),
@@ -130,19 +115,19 @@ export function ProductMoneyChart({ rows, currency }: ProductMoneyChartProps) {
                 {...STATIC_SERIES}
                 dataKey="healthy"
                 stackId="live"
-                fill="var(--success)"
+                fill={ROLE.gain}
               />
               <Bar
                 {...STATIC_SERIES}
                 dataKey="unhealthy"
                 stackId="live"
-                fill="var(--danger)"
+                fill={ROLE.loss}
                 radius={[3, 3, 0, 0]}
               />
               <Bar
                 {...STATIC_SERIES}
                 dataKey="lost"
-                fill="var(--text-tertiary)"
+                fill={ROLE.faint}
                 radius={[3, 3, 0, 0]}
               />
             </BarChart>

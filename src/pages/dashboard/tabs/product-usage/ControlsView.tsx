@@ -121,7 +121,7 @@ export function ControlsView() {
           />
         </KpiStrip>
 
-        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
+        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[400px]">
           {stats && <ProductMoneyChart rows={stats.rows} currency={currency} />}
         </div>
 
@@ -129,7 +129,7 @@ export function ControlsView() {
           <ProductScorecard rows={stats?.rows ?? []} currency={currency} />
         </div>
 
-        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
+        <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
           {stats && <ProductChurnChart rows={stats.rows} currency={currency} />}
         </div>
       </div>
