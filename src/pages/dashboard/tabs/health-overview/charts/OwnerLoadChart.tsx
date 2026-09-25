@@ -3,6 +3,8 @@ import { formatCompactMoney, formatMoney } from '../../../../../features/custome
 import type { OwnerLoad } from '../renewal';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import { ROLE } from '../../../shared/chartPalette';
 
 export interface OwnerLoadChartProps {
   load: OwnerLoad[];
@@ -72,6 +74,13 @@ export function OwnerLoadChart({
         <p className="text-[11px] text-ink-faint mt-[1px]">
           ARR renewing in the next {horizonDays} days · the shaded part is expected loss
         </p>
+        <ChartLegend
+          className="mt-2"
+          items={[
+            { label: 'ARR renewing', color: ROLE.faint },
+            { label: 'Expected loss', color: ROLE.loss },
+          ]}
+        />
       </div>
 
       {load.length === 0 ? (

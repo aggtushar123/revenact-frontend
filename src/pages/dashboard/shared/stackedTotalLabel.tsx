@@ -1,4 +1,5 @@
 import type { HealthStatus } from '../../../features/health/types';
+import { ROLE } from './chartPalette';
 
 /** The three health bars, bottom to top, as every stacked chart here orders them. */
 export const HEALTH_STACK: HealthStatus[] = ['Poor', 'Average', 'Good'];
@@ -23,7 +24,17 @@ interface LabelContentProps {
   x?: number | string;
   y?: number | string;
   width?: number | string;
+  height?: number | string;
   index?: number;
+  value?: unknown;
+}
+
+function totalText(x: number, y: number, total: number, fontSize: number) {
+  return (
+    <text x={x} y={y} textAnchor="middle" fontSize={fontSize} fontWeight={700} fill="var(--text-secondary)">
+      {total}
+    </text>
+  );
 }
 
 /**
@@ -35,6 +46,10 @@ interface LabelContentProps {
  * with no healthy accounts, which are the ones worth reading.
  *
  * So each series gets one of these, and only the topmost non-empty one draws.
+ *
+ * Reads the row from `index`, which Recharts counts over drawn bars only, so
+ * it mislabels once a series is empty left of a bar: prefer
+ * `stackedTotalLabelList` below.
  */
 export function makeStackedTotalLabel<T extends StackedDatum>(
   status: HealthStatus,
@@ -44,18 +59,60 @@ export function makeStackedTotalLabel<T extends StackedDatum>(
   return function StackedTotalLabel({ x = 0, y = 0, width = 0, index = 0 }: LabelContentProps) {
     const datum = data[index];
     if (!datum || datum.total === 0 || topSegment(datum) !== status) return null;
+    return totalText(Number(x) + Number(width) / 2, Number(y) - 6, datum.total, fontSize);
+  };
+}
 
-    return (
-      <text
-        x={Number(x) + Number(width) / 2}
-        y={Number(y) - 6}
-        textAnchor="middle"
-        fontSize={fontSize}
-        fontWeight={700}
-        fill="var(--text-secondary)"
-      >
-        {datum.total}
-      </text>
-    );
+/**
+ * `makeStackedTotalLabel`, safe when a series has empty rows: spread onto the
+ * `LabelList` of each health `<Bar>` — `<LabelList {...stackedTotalLabelList(status, data)} />`.
+ *
+ * Recharts skips a zero-height bar, and the `index` it hands a label counts
+ * only the bars it drew, so `data[index]` points at the wrong row as soon as
+ * a series is empty somewhere to its left. The `valueAccessor` hands each
+ * label its row's own position in `data` instead.
+ */
+export function stackedTotalLabelList<T extends StackedDatum>(status: HealthStatus, data: T[], fontSize = 10) {
+  return {
+    valueAccessor: (entry: { payload?: unknown }) => data.indexOf(entry.payload as T),
+    content: function StackedTotalLabel({ x = 0, y = 0, width = 0, value }: LabelContentProps) {
+      const datum = data[Number(value)];
+      if (!datum || datum.total === 0 || topSegment(datum) !== status) return null;
+      return totalText(Number(x) + Number(width) / 2, Number(y) - 6, datum.total, fontSize);
+    },
+  };
+}
+
+/** Always zero: the marker series carries no value of its own. */
+const noValue = () => 0;
+
+/**
+ * Props for one more `<Bar>` at the end of a stack (give it the same
+ * `stackId`) that marks the categories whose stack is empty: a hairline on
+ * the baseline and `text` ("0", "$0") beside it. Recharts draws neither a
+ * bar nor a label for a zero stack, so an empty column reads as missing
+ * data rather than as nothing.
+ *
+ * `totals` is each category's stack total, in `data` order. `horizontal`
+ * is for a `layout="vertical"` chart, whose bars run left to right.
+ */
+export function emptyStackMarker(totals: number[], text: string, { horizontal = false } = {}) {
+  return {
+    dataKey: noValue,
+    name: 'empty',
+    fill: ROLE.faint,
+    tooltipType: 'none' as const,
+    minPointSize: (_value: unknown, index: number) => (totals[index] === 0 ? 2 : 0),
+    label: function EmptyStackLabel({ x = 0, y = 0, width = 0, height = 0 }: LabelContentProps) {
+      const [lx, ly] = horizontal
+        ? [Number(x) + Number(width) + 6, Number(y) + Number(height) / 2 + 3]
+        : [Number(x) + Number(width) / 2, Number(y) - 6];
+      const anchor = horizontal ? 'start' : 'middle';
+      return (
+        <text x={lx} y={ly} textAnchor={anchor} fontSize={10} fontWeight={700} fill="var(--text-tertiary)">
+          {text}
+        </text>
+      );
+    },
   };
 }

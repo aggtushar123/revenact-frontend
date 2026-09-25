@@ -5,16 +5,13 @@ import type { HealthStatus } from '../../../../../features/health/types';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import type { QuarterColumn } from '../renewal';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { CURSOR_FILL, HEALTH_COLORS, HEALTH_LEGEND, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin, moneyTick, zeroMoney } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import { emptyStackMarker } from '../../../shared/stackedTotalLabel';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
-
-const STATUS_COLORS: Record<HealthStatus, string> = {
-  Poor: 'var(--danger)',
-  Average: 'var(--warning)',
-  Good: 'var(--success)',
-};
 
 /** Worst at the bottom of the stack, so the at-risk money sits on the axis
  *  where the eye lands rather than floating on top of the healthy revenue. */
@@ -106,27 +103,22 @@ export function RenewalQuarterChart({
           )}
         </div>
       </div>
+      <ChartLegend className="px-4 mt-2" items={HEALTH_LEGEND} />
 
       <DrillTargets label="Renewal calendar" items={drillItems} />
 
       <div className="flex-1 w-full min-h-0 px-2 pb-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 18, right: 12, left: 4, bottom: 4 }} barSize={48}>
-            <XAxis
-              dataKey="name"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
-            />
+          <BarChart data={data} margin={chartMargin({ left: true })} barSize={48}>
+            <XAxis {...AXIS_BASE} dataKey="name" {...categoryAxis(data.length)} />
             <YAxis
-              axisLine={false}
-              tickLine={false}
-              width={64}
-              tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-              tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+              {...AXIS_BASE}
+              width={52}
+              tickFormatter={moneyTick(currency)}
+              label={axisLabel(`ARR renewing (${currency})`)}
             />
             <Tooltip
-              cursor={{ fill: 'var(--bg-subtle)' }}
+              cursor={{ fill: CURSOR_FILL }}
               contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               // Untyped parameters: Recharts hands these through as
               // `ValueType | undefined`, and the stack only ever carries
@@ -140,26 +132,20 @@ export function RenewalQuarterChart({
                 key={status}
                 dataKey={status}
                 stackId="arr"
-                fill={STATUS_COLORS[status]}
+                fill={HEALTH_COLORS[status]}
                 cursor={drillable ? 'pointer' : undefined}
                 onClick={drillable ? (_, index) => openSegment(columns[index], status) : undefined}
               />
             ))}
+            {/* A quarter nothing renews in keeps a hairline and "$0", so it
+                reads as empty rather than as a gap in the data. */}
+            <Bar
+              {...STATIC_SERIES}
+              {...emptyStackMarker(data.map((row) => row.total), zeroMoney(currency))}
+              stackId="arr"
+            />
           </BarChart>
         </ResponsiveContainer>
-      </div>
-
-      <div className="flex items-center gap-3 px-4 pb-3">
-        {STACK.map((status) => (
-          <span key={status} className="flex items-center gap-1.5">
-            <span
-              className="w-2 h-2 rounded-[2px]"
-              style={{ background: STATUS_COLORS[status] }}
-              aria-hidden
-            />
-            <span className="text-[11px] text-ink-muted">{status}</span>
-          </span>
-        ))}
       </div>
     </div>
   );

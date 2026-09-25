@@ -2,6 +2,14 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { HealthStatus } from '../../../../../features/health/types';
 import { formatMoney } from '../../../../../features/customers/formatters';
 import type { Coverage, RenewalRow } from '../renewal';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import { COVERAGE_SERIES } from './coverageSeries';
+
+/** The two contact ages the Last contact column colours; fresh and unknown
+ *  stay in plain ink, so they need no key. */
+const CONTACT_KEY = COVERAGE_SERIES.filter((series) => series.key === 'cold' || series.key === 'ageing').map(
+  ({ label, color }) => ({ label, color }),
+);
 
 const STATUS_STYLE: Record<HealthStatus, string> = {
   Good: 'bg-success-dim text-success',
@@ -54,6 +62,10 @@ export function RenewalQueueTable({ queue, currency, limit = 12 }: RenewalQueueT
           <p className="text-[11px] text-ink-faint mt-[1px]">
             Renewals in the next 90 days, highest expected loss first
           </p>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[11px] text-ink-faint">Last contact</span>
+            <ChartLegend items={CONTACT_KEY} />
+          </div>
         </div>
         {queue.length > shown.length && (
           <p className="text-[11px] text-ink-faint shrink-0">

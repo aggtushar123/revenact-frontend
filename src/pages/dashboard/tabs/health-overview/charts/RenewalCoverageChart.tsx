@@ -3,24 +3,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recha
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import type { Coverage, CoverageBand } from '../renewal';
-import { CONTACT_COLD_DAYS, CONTACT_FRESH_DAYS } from '../renewal';
+import { COVERAGE_SERIES } from './coverageSeries';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { CURSOR_FILL, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, chartMargin, moneyTick, zeroMoney } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import { emptyStackMarker } from '../../../shared/stackedTotalLabel';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
-
-/** Contact age, not health — green is "somebody is in this deal", red is
- *  "nobody has spoken to them". Deliberately the same three hues the health
- *  charts use: on this screen those colours already mean good/attention/bad,
- *  and inventing a second palette for a second meaning of "bad" costs more
- *  than it explains. */
-const COVERAGE_SERIES = [
-  { key: 'cold', label: `No contact ${CONTACT_COLD_DAYS}d+`, color: 'var(--danger)' },
-  { key: 'ageing', label: `${CONTACT_FRESH_DAYS}–${CONTACT_COLD_DAYS}d`, color: 'var(--warning)' },
-  { key: 'fresh', label: `Contacted <${CONTACT_FRESH_DAYS}d`, color: 'var(--success)' },
-  { key: 'unknown', label: 'No activity logged', color: 'var(--text-tertiary)' },
-] as const;
 
 export interface RenewalCoverageChartProps {
   bands: CoverageBand[];
@@ -63,6 +54,7 @@ export function RenewalCoverageChart({
         fresh: band.fresh,
         unknown: band.unknown,
         count: band.count,
+        total: band.cold + band.ageing + band.fresh + band.unknown,
       })),
     [reversedBands]
   );
@@ -120,6 +112,10 @@ export function RenewalCoverageChart({
           </p>
         )}
       </div>
+      <ChartLegend
+        className="px-4 mt-2"
+        items={COVERAGE_SERIES.map(({ label, color }) => ({ label, color }))}
+      />
 
       <DrillTargets label="Coverage gap" items={drillItems} />
 
@@ -128,26 +124,24 @@ export function RenewalCoverageChart({
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ top: 12, right: 16, left: 8, bottom: 4 }}
-            barSize={22}
+            margin={chartMargin({ x: true })}
+            barSize={18}
           >
             <XAxis
+              {...AXIS_BASE}
               type="number"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-              tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+              tickFormatter={moneyTick(currency)}
+              label={axisLabel(`ARR (${currency})`, 'x')}
             />
             <YAxis
+              {...AXIS_BASE}
               type="category"
               dataKey="name"
-              axisLine={false}
-              tickLine={false}
               width={96}
-              tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+              tick={{ ...AXIS_BASE.tick, fill: 'var(--text-secondary)', fontSize: 11 }}
             />
             <Tooltip
-              cursor={{ fill: 'var(--bg-subtle)' }}
+              cursor={{ fill: CURSOR_FILL }}
               contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
               // See RenewalQuarterChart on why these parameters are untyped.
               formatter={(value, name) => [
@@ -168,22 +162,17 @@ export function RenewalCoverageChart({
                 }
               />
             ))}
+            {/* A window with nothing renewing keeps a hairline and "$0", so
+                it reads as empty rather than as a gap in the data. */}
+            <Bar
+              {...STATIC_SERIES}
+              {...emptyStackMarker(data.map((row) => row.total), zeroMoney(currency), { horizontal: true })}
+              stackId="arr"
+            />
           </BarChart>
         </ResponsiveContainer>
       </div>
 
-      <div className="flex items-center flex-wrap gap-3 px-4 pb-3">
-        {COVERAGE_SERIES.map((series) => (
-          <span key={series.key} className="flex items-center gap-1.5">
-            <span
-              className="w-2 h-2 rounded-[2px]"
-              style={{ background: series.color }}
-              aria-hidden
-            />
-            <span className="text-[11px] text-ink-muted">{series.label}</span>
-          </span>
-        ))}
-      </div>
     </div>
   );
 }

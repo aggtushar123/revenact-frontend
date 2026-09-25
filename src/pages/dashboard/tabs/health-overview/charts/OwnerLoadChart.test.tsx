@@ -63,3 +63,16 @@ describe('OwnerLoadChart drill', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });
+
+describe('OwnerLoadChart legend', () => {
+  it('keys the bar and its shaded expected loss', () => {
+    const ada = healthRow({ id: '1', account: 'AdaAcct', owner: 'Ada Lovelace', ownerKey: 'ada', renewalDate: 'Jul 1, 2026', arr: 120_000 });
+    const { rows } = renewalRows([ada], NOW);
+    renderWithDrill(<OwnerLoadChart load={ownerLoad(rows)} currency="USD" horizonDays={180} />);
+    const legend = screen.getByText('ARR renewing').closest('ul') as HTMLElement;
+    expect(within(legend).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'ARR renewing',
+      'Expected loss',
+    ]);
+  });
+});
