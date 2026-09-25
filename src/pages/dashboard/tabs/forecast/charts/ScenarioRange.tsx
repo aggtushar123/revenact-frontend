@@ -64,7 +64,7 @@ export function ScenarioRange({ scenarios, opening, currency }: ScenarioRangePro
               scenario captions below it. */}
           <div className="relative h-4">
             <span
-              className={`absolute bottom-0.5 text-[10px] font-semibold text-ink-muted whitespace-nowrap ${anchor(opening)}`}
+              className={`absolute bottom-0.5 text-[11px] font-semibold text-ink-muted whitespace-nowrap ${anchor(opening)}`}
               style={{ left: pct(opening) }}
             >
               Today
@@ -94,7 +94,7 @@ export function ScenarioRange({ scenarios, opening, currency }: ScenarioRangePro
             {points.map((point) => (
               <span
                 key={point.key}
-                className={`absolute top-0 text-[10px] font-semibold text-ink-muted whitespace-nowrap ${anchor(point.value)}`}
+                className={`absolute top-0 text-[11px] font-semibold text-ink-muted whitespace-nowrap ${anchor(point.value)}`}
                 style={{ left: pct(point.value) }}
               >
                 {point.label}
@@ -105,7 +105,7 @@ export function ScenarioRange({ scenarios, opening, currency }: ScenarioRangePro
 
         <div
           data-testid="range-scale"
-          className="flex items-baseline justify-between mt-1 text-[10px] text-ink-faint tabular-nums"
+          className="flex items-baseline justify-between mt-1 text-[11px] text-ink-faint tabular-nums"
         >
           <span>{zeroMoney(currency)}</span>
           <span>{formatCompactMoney(top, currency)}</span>
@@ -114,14 +114,14 @@ export function ScenarioRange({ scenarios, opening, currency }: ScenarioRangePro
         <dl aria-label="Scenarios" className="grid grid-cols-3 gap-2 mt-3">
           {points.map((point) => (
             <div key={point.key}>
-              <dt className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-ink-faint">
+              <dt className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-ink-faint">
                 <span className={`w-2 h-2 rounded-[2px] ${point.tone}`} aria-hidden />
                 {point.label}
               </dt>
               <dd className="text-[15px] font-semibold text-ink tabular-nums mt-[2px]">
                 {formatCompactMoney(point.value, currency)}
               </dd>
-              <dd className="text-[10.5px] text-ink-muted tabular-nums">
+              <dd className="text-[11px] text-ink-muted tabular-nums">
                 {opening > 0 ? `${Math.round((point.value / opening) * 100)}% of today` : '—'}
               </dd>
             </div>

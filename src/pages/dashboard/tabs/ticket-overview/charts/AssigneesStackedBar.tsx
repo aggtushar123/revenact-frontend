@@ -3,7 +3,7 @@ import type { TicketAssigneeRow } from '../../../../../features/tickets/ticketsS
 import { STATUS_COLORS, STATUS_ORDER, FALLBACK_COLOR, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL, barListHeight } from '../../../shared/chartPalette';
-import { AXIS_BASE, truncTick } from '../../../shared/chartAxis';
+import { AXIS_BASE, chartMargin, truncTick } from '../../../shared/chartAxis';
 import { ChartLegend } from '../../../shared/ChartLegend';
 import { ScrollArea } from '../../../shared/ScrollTable';
 import { stackedTotalLabelList } from '../../../shared/stackedTotalLabel';
@@ -133,7 +133,7 @@ export function AssigneesStackedBar({
         <ScrollArea label="Ticket assignees by status" maxHeight={MAX_PLOT}>
           <div data-testid="assignee-plot" className="w-full" style={{ height: barListHeight(data.length, 28, 200) }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={data} margin={{ top: 4, right: 36, left: 0, bottom: 4 }} barSize={16}>
+              <BarChart layout="vertical" data={data} margin={chartMargin({ right: true })} barSize={16}>
                 {/* Hidden: every bar carries its total at its end. */}
                 <XAxis type="number" hide domain={[0, max]} allowDecimals={false} />
                 <YAxis

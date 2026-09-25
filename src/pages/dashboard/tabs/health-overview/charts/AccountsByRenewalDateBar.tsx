@@ -4,7 +4,7 @@ import type { HealthDataRow, HealthStatus } from '../mockData';
 import { renewalMonths } from '../movement';
 import type { RenewalMonth } from '../movement';
 import { HEALTH_STACK, emptyStackMarker, stackedTotalLabelList } from '../../../shared/stackedTotalLabel';
-import { CHART_HEIGHT, CURSOR_FILL, HEALTH_COLORS, HEALTH_LEGEND, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { CURSOR_FILL, HEALTH_COLORS, HEALTH_LEGEND, TOOLTIP_STYLE } from '../../../shared/chartPalette';
 import { AXIS_BASE, axisLabel, categoryAxis, chartMargin } from '../../../shared/chartAxis';
 import { ChartLegend } from '../../../shared/ChartLegend';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
@@ -101,7 +101,7 @@ export function AccountsByRenewalDateBar({
       {chartData.length === 0 ? (
         <p className="text-[12px] text-ink-faint">No readable renewal dates for the current selection.</p>
       ) : (
-        <div className="w-full" style={{ height: CHART_HEIGHT.md }}>
+        <div className="w-full" style={{ height: 320 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={chartMargin({ x: true })}>
               {/* "Sep '26": the range can span years, so every tick says which. */}

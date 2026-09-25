@@ -4,7 +4,7 @@ import type { TicketOrigin } from '../../../../../features/tickets/ticketsSlice'
 import { niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL, barListHeight } from '../../../shared/chartPalette';
-import { AXIS_BASE, truncTick } from '../../../shared/chartAxis';
+import { AXIS_BASE, chartMargin, truncTick } from '../../../shared/chartAxis';
 import { useDrill } from '../../../drill/useDrill';
 import { DrillTargets } from '../../../drill/DrillTargets';
 
@@ -120,7 +120,7 @@ export function OriginBar({
             <BarChart
               layout="vertical"
               data={ranked}
-              margin={{ top: 0, right: 34, left: 0, bottom: 0 }}
+              margin={chartMargin({ right: true })}
               barSize={16}
             >
               {/* Hidden: every bar carries its count at its end. */}

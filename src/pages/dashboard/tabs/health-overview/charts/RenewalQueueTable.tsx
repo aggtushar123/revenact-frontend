@@ -81,13 +81,18 @@ export function RenewalQueueTable({ queue, currency, limit = 12 }: RenewalQueueT
       ) : (
         <div className="flex-1 min-h-0 overflow-auto px-2 pb-3 pt-2">
           <table className="w-full border-collapse">
+            {/* Sticky, not ScrollTable: the queue is capped at `limit` rows, so
+                there is nothing to scroll to in the normal case, and this list
+                is exactly the "bounded list, no scroll wrapper" case the kit
+                carves out. The header still pins on the surface colour for the
+                rare case where the card ends up shorter than its rows. */}
             <thead>
               <tr className="text-left">
                 {['Account', 'Renews', 'ARR', 'Risk', 'Exposure', 'Last contact', 'Owner'].map(
                   (heading) => (
                     <th
                       key={heading}
-                      className="px-2 py-1.5 text-[10.5px] font-bold uppercase tracking-wider text-ink-faint whitespace-nowrap"
+                      className="sticky top-0 z-10 bg-surface px-2 py-1.5 text-[10.5px] font-bold uppercase tracking-wider text-ink-faint whitespace-nowrap"
                     >
                       {heading}
                     </th>

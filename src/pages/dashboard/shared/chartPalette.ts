@@ -54,19 +54,6 @@ export const TOOLTIP_STYLE = {
   boxShadow: 'none',
 } as const;
 
-/** Drops the named series from a tooltip payload, matched on `dataKey` or
- *  `name`: the invisible `base` of a waterfall, the `total` a stack carries
- *  only for its label. Recharts' Tooltip has no filter prop, so use it in a
- *  `content` renderer:
- *  `content={(p) => <DefaultTooltipContent {...p} contentStyle={TOOLTIP_STYLE} payload={hide(p.payload)} />}`.
- *  (For a series that should never appear, `tooltipType="none"` on the
- *  series itself is simpler still.) */
-export function hideSeries(...keys: string[]) {
-  const hidden = new Set(keys);
-  return <T extends { dataKey?: unknown; name?: unknown }>(payload: readonly T[] | undefined): T[] =>
-    (payload ?? []).filter((entry) => !hidden.has(String(entry.dataKey)) && !hidden.has(String(entry.name)));
-}
-
 /** Health status colours, one place instead of the nine files that each
  *  redeclared a `STATUS_COLORS`. */
 export const HEALTH_COLORS: Record<HealthStatus, string> = {
@@ -80,10 +67,6 @@ export const HEALTH_LEGEND: LegendItem[] = (['Good', 'Average', 'Poor'] as const
   label,
   color: HEALTH_COLORS[label],
 }));
-
-/** Plot-area heights (px) for `ChartCard`. Three sizes, so cards in one row
- *  line up instead of each hard-coding its own `h-[280px]`. */
-export const CHART_HEIGHT = { sm: 240, md: 320, lg: 400 } as const;
 
 /** A horizontal bar list's plot height from its row count, so twelve
  *  categories get room and three do not float in a tall empty card. */

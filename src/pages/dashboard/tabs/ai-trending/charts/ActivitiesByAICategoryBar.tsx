@@ -4,7 +4,7 @@ import { niceMax } from '../chartTheme';
 import { UnclassifiedNote } from './UnclassifiedNote';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL, barListHeight } from '../../../shared/chartPalette';
-import { AXIS_BASE, wrapTick } from '../../../shared/chartAxis';
+import { AXIS_BASE, chartMargin, wrapTick } from '../../../shared/chartAxis';
 import { useDrill } from '../../../drill/useDrill';
 import { DrillTargets } from '../../../drill/DrillTargets';
 
@@ -92,7 +92,7 @@ export function ActivitiesByAICategoryBar({
           grows to fit rather than scrolling. */}
       <div className="relative w-full" style={{ height: barListHeight(rows.length, 28, 200) }}>
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={rows} layout="vertical" margin={{ top: 0, right: 36, left: 0, bottom: 0 }}>
+          <BarChart data={rows} layout="vertical" margin={chartMargin({ right: true })}>
             {/* Hidden: every bar carries its count at its end, so axis ticks
                 only repeated the same numbers. */}
             <XAxis type="number" hide domain={[0, max]} allowDecimals={false} />

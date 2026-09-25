@@ -6,7 +6,7 @@ import { HEALTH_ORDER, healthByOwner } from '../controls';
 import type { OwnerHealth } from '../controls';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { TOOLTIP_STYLE, CURSOR_FILL, HEALTH_COLORS, HEALTH_LEGEND, barListHeight } from '../../../shared/chartPalette';
-import { AXIS_BASE, truncTick } from '../../../shared/chartAxis';
+import { AXIS_BASE, chartMargin, truncTick } from '../../../shared/chartAxis';
 import { ChartLegend } from '../../../shared/ChartLegend';
 import { ScrollArea } from '../../../shared/ScrollTable';
 import { stackedTotalLabelList } from '../../../shared/stackedTotalLabel';
@@ -105,7 +105,7 @@ export function HealthByOwnerStackedBar({
         <ScrollArea label="Health by owner" maxHeight={MAX_PLOT}>
           <div data-testid="owner-plot" className="w-full" style={{ height: plotHeight }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart layout="vertical" data={chartData} margin={{ top: 4, right: 36, left: 8, bottom: 4 }} barSize={18}>
+              <BarChart layout="vertical" data={chartData} margin={chartMargin({ right: true })} barSize={18}>
                 {/* Hidden: every bar carries its total at its end. */}
                 <XAxis type="number" hide domain={[0, widest]} allowDecimals={false} />
                 <YAxis
