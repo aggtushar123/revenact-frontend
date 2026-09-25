@@ -1,3 +1,6 @@
+import type { HealthStatus } from '../../../features/health/types';
+import type { LegendItem } from './ChartLegend';
+
 // The single source of chart colour for every dashboard tab.
 //
 // Two roles only: a monochrome scale for anything that isn't a status (ink,
@@ -50,6 +53,29 @@ export const TOOLTIP_STYLE = {
   color: 'var(--text-primary)',
   boxShadow: 'none',
 } as const;
+
+/** Health status colours, one place instead of the nine files that each
+ *  redeclared a `STATUS_COLORS`. */
+export const HEALTH_COLORS: Record<HealthStatus, string> = {
+  Good: ROLE.gain,
+  Average: ROLE.caution,
+  Poor: ROLE.loss,
+};
+
+/** The key for any chart coloured by health, best first. */
+export const HEALTH_LEGEND: LegendItem[] = (['Good', 'Average', 'Poor'] as const).map((label) => ({
+  label,
+  color: HEALTH_COLORS[label],
+}));
+
+/** A horizontal bar list's plot height from its row count, so twelve
+ *  categories get room and three do not float in a tall empty card. */
+export function barListHeight(rows: number, rowPx = 28, min = 200): number {
+  return Math.max(min, rows * rowPx);
+}
+
+/** One ring for every donut: spread onto `<Pie {...DONUT}>`. */
+export const DONUT = { innerRadius: '58%', outerRadius: '80%' } as const;
 
 /** Shared bar-hover cursor fill, replacing the various one-off translucent
  *  black/white literal fills — all were the same idea (a faint hover wash)

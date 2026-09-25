@@ -4,6 +4,16 @@ import userEvent from '@testing-library/user-event';
 import { renderWithDrill, healthRow } from '../testUtils';
 import { RenewalQuarterChart } from './RenewalQuarterChart';
 import { quarterColumns, renewalRows } from '../renewal';
+import { sizeCharts } from '../../../../../test/chartSize';
+
+// Sized so Recharts draws its axes and labels (see sizeCharts).
+sizeCharts();
+
+/** The label of each item in the legend that holds `first`. */
+const legendOf = (first: string) =>
+  within(screen.getByText(first).closest('ul') as HTMLElement)
+    .getAllByRole('listitem')
+    .map((item) => item.textContent);
 
 /** Local midnight, matching the other suites, so calendar-day maths is stable. */
 const NOW = new Date(2026, 5, 15); // 15 Jun 2026
@@ -52,5 +62,36 @@ describe('RenewalQuarterChart drill', () => {
   it('offers no target for an empty quarter-status segment', () => {
     renderWithDrill(<RenewalQuarterChart columns={columns} currency="USD" />);
     expect(screen.queryByRole('button', { name: /Q4 '26/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('RenewalQuarterChart legend and axes', () => {
+  const soonPoor = healthRow({ id: '1', account: 'SoonPoor', renewalDate: 'Jul 1, 2026', healthStatus: 'Poor', arr: 10_000 });
+  const laterGood = healthRow({ id: '2', account: 'LaterGood', renewalDate: 'Mar 1, 2027', healthStatus: 'Good', arr: 5_000 });
+  const { rows } = renewalRows([soonPoor, laterGood], NOW);
+  const columns = quarterColumns(rows, NOW, 4);
+
+  it('keys the three health colours, best first', () => {
+    renderWithDrill(<RenewalQuarterChart columns={columns} currency="USD" />);
+    expect(legendOf('Good')).toEqual(['Good', 'Average', 'Poor']);
+  });
+
+  it('titles the value axis with its currency', () => {
+    renderWithDrill(<RenewalQuarterChart columns={columns} currency="USD" />);
+    expect(screen.getByText('ARR renewing (USD)')).toBeInTheDocument();
+  });
+
+  it('labels an empty quarter "$0" so its column never looks missing', () => {
+    const { container } = renderWithDrill(<RenewalQuarterChart columns={columns} currency="USD" />);
+    const labels = [...container.querySelectorAll('.recharts-label-list text')].map((t) => t.textContent);
+    // Q4 '26 has no renewals in this book.
+    expect(labels).toContain('$0');
+  });
+
+  it('keeps tick text at 10px or more', () => {
+    const { container } = renderWithDrill(<RenewalQuarterChart columns={columns} currency="USD" />);
+    const ticks = [...container.querySelectorAll('.recharts-cartesian-axis-tick-labels text')];
+    expect(ticks.length).toBeGreaterThan(0);
+    for (const tick of ticks) expect(Number(tick.getAttribute('font-size'))).toBeGreaterThanOrEqual(10);
   });
 });

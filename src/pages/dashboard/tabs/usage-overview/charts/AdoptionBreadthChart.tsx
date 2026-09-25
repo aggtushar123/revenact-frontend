@@ -1,6 +1,7 @@
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { AdoptionBucket } from '../../../../../features/usage/usageSlice';
 import { formatCompactMoney } from '../../../../../features/customers/formatters';
+import { zeroMoney } from '../../../shared/chartAxis';
 
 export interface AdoptionBreadthChartProps {
   buckets: AdoptionBucket[];
@@ -23,7 +24,7 @@ export function AdoptionBreadthChart({ buckets, currency }: AdoptionBreadthChart
   const total = buckets.reduce((sum, bucket) => sum + bucket.accounts, 0);
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full flex flex-col">
       <div className="px-4 pt-3">
         <h3 className="text-[13px] font-bold text-ink">Adoption breadth</h3>
         <p className="text-[11px] text-ink-faint mt-[1px]">
@@ -34,19 +35,22 @@ export function AdoptionBreadthChart({ buckets, currency }: AdoptionBreadthChart
       {total === 0 ? (
         <p className="px-4 py-6 text-[12px] text-ink-faint">No accounts in this selection.</p>
       ) : (
-        <ul className="flex-1 min-h-0 overflow-y-auto px-4 py-3 flex flex-col gap-[10px]">
+        // A handful of buckets at most: the list is bounded, so it never scrolls.
+        <ul className="px-4 py-3 flex flex-col gap-[10px]">
           {buckets.map((bucket) => (
             <li key={bucket.key}>
               <div className="flex items-baseline justify-between gap-3">
                 <span className="text-[12px] font-medium text-ink truncate">{bucket.name}</span>
                 <span className="text-[11px] text-ink-muted tabular-nums shrink-0">
-                  {formatCompactMoney(bucket.arr, currency)} · {bucket.accounts}{' '}
+                  {bucket.arr === 0 ? zeroMoney(currency) : formatCompactMoney(bucket.arr, currency)} ·{' '}
+                  {bucket.accounts}{' '}
                   {bucket.accounts === 1 ? 'account' : 'accounts'}
                 </span>
               </div>
               <div className="mt-[3px] h-[10px] rounded-[3px] bg-subtle overflow-hidden">
                 <div
-                  className="h-full rounded-[3px] bg-accent/70"
+                  data-testid="adoption-bar"
+                  className="h-full rounded-[3px] bg-ink"
                   style={{ width: `${(bucket.arr / widest) * 100}%` }}
                 />
               </div>

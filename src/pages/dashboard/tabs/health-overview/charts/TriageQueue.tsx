@@ -3,6 +3,17 @@ import type { TriageRow } from '../triage';
 import { TrajectoryGlyph } from './TrajectoryGlyph';
 import { DualPulse } from './DualPulse';
 import { RenewalRunway } from './RenewalRunway';
+import { RENEWAL_URGENT_DAYS } from '../triage';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import { HEALTH_LEGEND, ROLE } from '../../../shared/chartPalette';
+import { ScrollArea } from '../../../shared/ScrollTable';
+
+/** Health, plus the two places red means something other than Poor. */
+const QUEUE_KEY = [
+  ...HEALTH_LEGEND,
+  { label: 'Pulses disagree', color: ROLE.loss, kind: 'outline' as const },
+  { label: `Renews ≤ ${RENEWAL_URGENT_DAYS} days`, color: ROLE.loss, kind: 'line' as const },
+];
 
 const STATUS_CHIP: Record<HealthStatus, string> = {
   Good: 'bg-success-dim text-success',
@@ -46,10 +57,13 @@ export function TriageQueue({ scored, limit = 12 }: TriageQueueProps) {
         </span>
       </div>
 
-      <div className="overflow-x-auto mt-[10px]">
+      {/* One scroller for both directions. A separate overflow-x track
+          computes its overflow-y to auto as well, which is what used to trap
+          rows; here the one region caps the height and pins the header. */}
+      <ScrollArea label="Accounts by risk score" maxHeight={640} className="overflow-auto mt-[10px]">
         <div className="min-w-[520px]">
           <div
-            className={`grid ${COLUMNS} gap-[10px] items-center px-[14px] py-[7px] border-b border-line
+            className={`sticky top-0 z-10 bg-surface grid ${COLUMNS} gap-[10px] items-center px-[14px] py-[7px] border-b border-line
                         text-[10px] font-bold uppercase tracking-wider text-ink-faint`}
           >
             <div />
@@ -116,18 +130,10 @@ export function TriageQueue({ scored, limit = 12 }: TriageQueueProps) {
             </div>
           )}
         </div>
-      </div>
+      </ScrollArea>
 
       <div className="flex flex-wrap items-center gap-3 px-[14px] py-[10px] border-t border-line-subtle">
-        <span className="inline-flex items-center gap-[5px] text-[10.5px] font-semibold text-ink-muted">
-          <span className="w-[9px] h-[9px] rounded-[2.5px] bg-success" />Good
-        </span>
-        <span className="inline-flex items-center gap-[5px] text-[10.5px] font-semibold text-ink-muted">
-          <span className="w-[9px] h-[9px] rounded-[2.5px] bg-warning" />Average
-        </span>
-        <span className="inline-flex items-center gap-[5px] text-[10.5px] font-semibold text-ink-muted">
-          <span className="w-[9px] h-[9px] rounded-[2.5px] bg-danger" />Poor
-        </span>
+        <ChartLegend items={QUEUE_KEY} />
         <span className="ml-auto text-[10.5px] text-ink-faint">
           Trajectory reads oldest to newest, left to right
         </span>

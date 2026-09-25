@@ -112,8 +112,8 @@ export function ControlsView() {
           />
         </KpiStrip>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          <div className="xl:col-span-2 bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[320px]">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 [&>*]:min-w-0">
+          <div className="xl:col-span-2 bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden h-[360px]">
             {bridge && (
               <ArrBridgeChart
                 bridge={bridge}
@@ -124,7 +124,9 @@ export function ControlsView() {
               />
             )}
           </div>
-          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
+          {/* Top-aligned: the range is short, and stretched to the bridge's
+              height it floated in empty space. */}
+          <div className="bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden xl:self-start">
             {stats && (
               <ScenarioRange
                 scenarios={stats.scenarios}
@@ -135,7 +137,7 @@ export function ControlsView() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 [&>*]:min-w-0">
           <div className="xl:col-span-2 bg-surface border border-line-subtle rounded-lg shadow-sm overflow-hidden">
             <SwingTable rows={stats?.swing ?? []} currency={currency} />
           </div>

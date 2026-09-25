@@ -327,4 +327,45 @@ describe('HealthDistribution', () => {
       screen.queryByText('Covers the whole book; the filters above do not apply to this section.')
     ).not.toBeInTheDocument();
   });
+
+  it('draws no share bar for an empty category, and writes a zero MRR as "$0"', async () => {
+    vi.stubGlobal('fetch', fetchMockWith([], []));
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByText('Good');
+    await user.click(screen.getByRole('button', { name: /^accounts$/i }));
+    // Accounts: 1 Good, 0 Average, 3 Poor.
+    const averageCard = (await screen.findByText('Average')).closest('button')!;
+    await within(averageCard).findByText('0');
+    expect(within(averageCard).getByTestId('health-share-bar')).toHaveStyle({ width: '0%' });
+    const goodCard = screen.getByText('Good').closest('button')!;
+    expect(within(goodCard).getByTestId('health-share-bar')).toHaveStyle({ width: '33%' });
+
+    await user.click(screen.getByRole('button', { name: /mrr/i }));
+    expect(within(averageCard).getByText('$0')).toBeInTheDocument();
+  });
+
+  it('lays the three tiles out in a grid that stacks on a phone', async () => {
+    vi.stubGlobal('fetch', fetchMockWith([]));
+    renderPage();
+    const grid = (await screen.findByText('Good')).closest('button')!.parentElement!;
+    expect(grid.className).toMatch(/\bgrid\b/);
+    expect(grid.className).toContain('sm:grid-cols-3');
+  });
+
+  it('scrolls the table inside its card, header pinned on an opaque surface', async () => {
+    vi.stubGlobal('fetch', fetchMockWith([customer({ id: 1, name: 'Globex' })]));
+    renderPage();
+
+    await screen.findByText('Globex');
+    const region = screen.getByRole('region', { name: /organizations/i });
+    expect(region).toHaveStyle({ maxHeight: '520px' });
+    expect(region.className).toContain('overflow-auto');
+    // The header row itself no longer carries a translucent sticky band;
+    // ScrollTable pins each th on bg-surface instead.
+    const headerRow = within(region).getAllByRole('row')[0];
+    expect(headerRow.className).not.toContain('sticky');
+    expect(headerRow.className).not.toContain('bg-subtle/40');
+  });
 });

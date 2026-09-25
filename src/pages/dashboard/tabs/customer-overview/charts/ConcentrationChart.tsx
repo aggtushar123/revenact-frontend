@@ -13,13 +13,16 @@ import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { Concentration } from '../../../../../features/portfolio/portfolioSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL, HEALTH_LEGEND } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin, pctTick } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 
 const HEALTH_COLORS: Record<string, string> = {
   good: ROLE.gain,
   average: ROLE.caution,
   poor: ROLE.loss,
 };
+
 
 export interface ConcentrationChartProps {
   concentration: Concentration;
@@ -57,8 +60,12 @@ export function ConcentrationChart({ concentration, currency }: ConcentrationCha
         <div>
           <h3 className="text-[13px] font-bold text-ink">Revenue concentration</h3>
           <p className="text-[11px] text-ink-faint mt-[1px]">
-            Largest accounts by ARR, with the running share of the book · bars coloured by health
+            Largest accounts by ARR, with the running share of the book
           </p>
+          <ChartLegend
+            className="mt-2"
+            items={[...HEALTH_LEGEND, { label: 'Cumulative share of ARR', color: ROLE.ink, kind: 'line' }]}
+          />
         </div>
         {concentration.top_three_share !== null && (
           <p
@@ -78,34 +85,25 @@ export function ConcentrationChart({ concentration, currency }: ConcentrationCha
           </p>
         ) : (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={data} margin={{ top: 14, right: 8, left: -6, bottom: 4 }}>
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 9 }}
-                interval={0}
-                angle={-35}
-                textAnchor="end"
-                height={52}
-              />
+            <ComposedChart data={data} margin={chartMargin({ left: true, right: true })}>
+              {/* Full names, flat, wrapping; slanted and shortened only when the
+                  bands get too narrow (the full name then sits in a <title>). */}
+              <XAxis {...AXIS_BASE} dataKey="name" {...categoryAxis(data.length)} />
               <YAxis
+                {...AXIS_BASE}
                 yAxisId="arr"
-                axisLine={false}
-                tickLine={false}
                 width={56}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
                 tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+                label={axisLabel(`ARR (${currency})`)}
               />
               <YAxis
+                {...AXIS_BASE}
                 yAxisId="share"
                 orientation="right"
-                axisLine={false}
-                tickLine={false}
                 width={38}
                 domain={[0, 100]}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-                tickFormatter={(value: number) => `${value}%`}
+                tickFormatter={pctTick}
+                label={axisLabel('Cumulative % of ARR', 'right')}
               />
               <Tooltip
                 cursor={{ fill: CURSOR_FILL }}

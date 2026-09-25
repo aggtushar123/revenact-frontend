@@ -16,6 +16,9 @@ import {
 } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin, pctTick } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
+
 
 export interface ProductChurnChartProps {
   rows: ProductRow[];
@@ -61,6 +64,13 @@ export function ProductChurnChart({ rows, currency }: ProductChurnChartProps) {
         <p className="text-[11px] text-ink-faint mt-[1px]">
           ARR that left, with the share of everyone the product ever led · ranked by money
         </p>
+        <ChartLegend
+          className="mt-2"
+          items={[
+            { label: 'ARR lost', color: ROLE.loss },
+            { label: 'Churn rate', color: ROLE.ink, kind: 'line' },
+          ]}
+        />
       </div>
 
       <div className="flex-1 w-full min-h-0 px-2 pb-1">
@@ -74,36 +84,25 @@ export function ProductChurnChart({ rows, currency }: ProductChurnChartProps) {
                 selected should not mean one card-wide bar. */}
             <ComposedChart
               data={data}
-              margin={{ top: 14, right: 8, left: -6, bottom: 4 }}
+              margin={chartMargin({ left: true, right: true })}
               maxBarSize={84}
             >
-              <XAxis
-                dataKey="name"
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 9 }}
-                interval={0}
-                angle={-25}
-                textAnchor="end"
-                height={56}
-              />
+              <XAxis {...AXIS_BASE} dataKey="name" {...categoryAxis(data.length)} />
               <YAxis
+                {...AXIS_BASE}
                 yAxisId="money"
-                axisLine={false}
-                tickLine={false}
                 width={56}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
                 tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+                label={axisLabel(`ARR lost (${currency})`)}
               />
               <YAxis
+                {...AXIS_BASE}
                 yAxisId="rate"
                 orientation="right"
-                axisLine={false}
-                tickLine={false}
                 width={38}
                 domain={[0, 100]}
-                tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
-                tickFormatter={(value: number) => `${value}%`}
+                tickFormatter={pctTick}
+                label={axisLabel('Churn rate %', 'right')}
               />
               <Tooltip
                 cursor={{ fill: CURSOR_FILL }}
@@ -123,7 +122,7 @@ export function ProductChurnChart({ rows, currency }: ProductChurnChartProps) {
                 {...STATIC_SERIES}
                 yAxisId="money"
                 dataKey="lost"
-                fill="var(--danger)"
+                fill={ROLE.loss}
                 radius={[3, 3, 0, 0]}
               />
               <Line

@@ -2,17 +2,14 @@ import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from 'recharts';
 import type { HealthStatus } from '../mockData';
 import type { RenewalBucket } from '../movement';
-import { HEALTH_STACK, makeStackedTotalLabel } from './stackedTotalLabel';
+import { HEALTH_STACK, emptyStackMarker, stackedTotalLabelList } from '../../../shared/stackedTotalLabel';
+import { CURSOR_FILL, HEALTH_COLORS, HEALTH_LEGEND, TOOLTIP_STYLE } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, categoryAxis, chartMargin } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { useDrill } from '../../../drill/useDrill';
 import { fromHealthRows } from '../../../drill/rows';
 import { DrillTargets } from '../../../drill/DrillTargets';
-
-const STATUS_COLORS: Record<HealthStatus, string> = {
-  Poor: 'var(--danger)',
-  Average: 'var(--warning)',
-  Good: 'var(--success)',
-};
 
 export interface RenewalRunwayChartProps {
   buckets: RenewalBucket[];
@@ -75,7 +72,7 @@ export function RenewalRunwayChart({ buckets, drillable = true }: RenewalRunwayC
     : [];
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="relative w-full h-full flex flex-col">
       <div className="flex items-start justify-between gap-3 px-4 pt-3">
         <div>
           <h3 className="text-[13px] font-bold text-ink">Renewal runway</h3>
@@ -89,42 +86,39 @@ export function RenewalRunwayChart({ buckets, drillable = true }: RenewalRunwayC
           </p>
         )}
       </div>
+      <ChartLegend className="px-4 mt-2" items={HEALTH_LEGEND} />
 
       <DrillTargets label="Renewal runway" items={drillItems} />
 
       <div className="flex-1 w-full min-h-0 px-2 pb-2">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 18, right: 12, left: -22, bottom: 4 }} barSize={54}>
+          <BarChart data={data} margin={chartMargin({ x: true })} barSize={54}>
             <XAxis
+              {...AXIS_BASE}
               dataKey="name"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
+              {...categoryAxis(data.length)}
+              label={axisLabel('Days to renewal', 'x')}
             />
+            {/* Hidden: every column carries its total, so a count scale
+                would only repeat them. */}
             <YAxis hide />
-            <Tooltip
-              cursor={{ fill: 'var(--bg-subtle)' }}
-              contentStyle={{
-                borderRadius: '8px',
-                border: '1px solid var(--border-default)',
-                backgroundColor: 'var(--bg-elevated)',
-                color: 'var(--text-primary)',
-                fontSize: 12,
-              }}
-            />
+            <Tooltip cursor={{ fill: CURSOR_FILL }} contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }} />
             {HEALTH_STACK.map((status) => (
               <Bar
                 {...STATIC_SERIES}
                 key={status}
                 dataKey={status}
                 stackId="renewal"
-                fill={STATUS_COLORS[status]}
+                fill={HEALTH_COLORS[status]}
                 cursor={drillable ? 'pointer' : undefined}
                 onClick={drillable ? (_, index) => openSegment(buckets[index], status) : undefined}
               >
-                <LabelList content={makeStackedTotalLabel(status, data, 11)} />
+                <LabelList {...stackedTotalLabelList(status, data, 11)} />
               </Bar>
             ))}
+            {/* A bucket nobody renews in keeps a hairline and "0", so it
+                reads as empty rather than as a gap in the data. */}
+            <Bar {...STATIC_SERIES} {...emptyStackMarker(data.map((row) => row.total), '0')} stackId="renewal" />
           </BarChart>
         </ResponsiveContainer>
       </div>

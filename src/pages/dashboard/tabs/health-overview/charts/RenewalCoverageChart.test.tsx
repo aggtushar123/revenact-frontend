@@ -4,6 +4,16 @@ import userEvent from '@testing-library/user-event';
 import { renderWithDrill, healthRow } from '../testUtils';
 import { RenewalCoverageChart } from './RenewalCoverageChart';
 import { coverageBands, renewalRows } from '../renewal';
+import { sizeCharts } from '../../../../../test/chartSize';
+
+// Sized so Recharts draws its axes and labels (see sizeCharts).
+sizeCharts();
+
+/** The label of each item in the legend that holds `first`. */
+const legendOf = (first: string) =>
+  within(screen.getByText(first).closest('ul') as HTMLElement)
+    .getAllByRole('listitem')
+    .map((item) => item.textContent);
 
 /** Local midnight, matching the other suites, so calendar-day maths is stable. */
 const NOW = new Date(2026, 5, 15); // 15 Jun 2026
@@ -46,5 +56,40 @@ describe('RenewalCoverageChart drill', () => {
   it('offers no target for an empty window-contact-age segment', () => {
     renderWithDrill(<RenewalCoverageChart bands={bands} currency="USD" />);
     expect(screen.queryByRole('button', { name: /Overdue/ })).not.toBeInTheDocument();
+  });
+});
+
+describe('RenewalCoverageChart legend and axes', () => {
+  const freshSoon = healthRow({ id: '1', account: 'FreshSoon', renewalDate: 'Jun 25, 2026', arr: 10_000, daysSinceTouch: 2 });
+  const { rows } = renewalRows([freshSoon], NOW);
+  const bands = coverageBands(rows);
+
+  it('keys every contact age', () => {
+    renderWithDrill(<RenewalCoverageChart bands={bands} currency="USD" />);
+    expect(legendOf('No contact 60d+')).toEqual([
+      'No contact 60d+',
+      '30–60d',
+      'Contacted <30d',
+      'No activity logged',
+    ]);
+  });
+
+  it('titles the value axis with its currency', () => {
+    renderWithDrill(<RenewalCoverageChart bands={bands} currency="USD" />);
+    expect(screen.getByText('ARR (USD)')).toBeInTheDocument();
+  });
+
+  it('labels an empty window "$0" so its row never looks missing', () => {
+    const { container } = renderWithDrill(<RenewalCoverageChart bands={bands} currency="USD" />);
+    const labels = [...container.querySelectorAll('.recharts-label-list text')].map((t) => t.textContent);
+    // Only "Next 30 days" has money; every other window is empty.
+    expect(labels.filter((label) => label === '$0')).toHaveLength(bands.length - 1);
+  });
+
+  it('keeps tick text at 10px or more', () => {
+    const { container } = renderWithDrill(<RenewalCoverageChart bands={bands} currency="USD" />);
+    const ticks = [...container.querySelectorAll('.recharts-cartesian-axis-tick-labels text')];
+    expect(ticks.length).toBeGreaterThan(0);
+    for (const tick of ticks) expect(Number(tick.getAttribute('font-size'))).toBeGreaterThanOrEqual(10);
   });
 });

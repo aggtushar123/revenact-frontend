@@ -1,6 +1,7 @@
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { SwingAccount } from '../../../../../features/forecast/forecastSlice';
 import { formatMoney } from '../../../../../features/customers/formatters';
+import { ScrollTable } from '../../../shared/ScrollTable';
 
 const HEALTH_STYLE: Record<SwingAccount['health_category'], string> = {
   good: 'bg-success-dim text-success',
@@ -52,7 +53,7 @@ export function SwingTable({ rows, currency }: SwingTableProps) {
           Nothing in this selection moves the forecast: no renewals at risk and no open pipeline.
         </p>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto px-2 pb-3 pt-2">
+        <ScrollTable caption="What moves the number" maxHeight={420} minWidth={620} className="mx-2 mb-3 mt-2">
           <table className="w-full border-collapse">
             <thead>
               <tr className="text-left">
@@ -125,7 +126,7 @@ export function SwingTable({ rows, currency }: SwingTableProps) {
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollTable>
       )}
     </div>
   );

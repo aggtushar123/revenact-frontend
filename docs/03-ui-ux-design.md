@@ -435,17 +435,49 @@ health tree and fails the build if one shows up. Two roles only:
   replacing the translucent-black rgb literals and one-off hover washes each
   chart used to invent for itself.
 
-Chart rules, from the `dataviz` and `ui-ux-pro-max` skills:
+Chart rules, from the `dataviz` and `ui-ux-pro-max` skills, backed by the
+shared kit in `src/pages/dashboard/shared/`:
 
 - Never encode meaning in hue alone. Pair colour with a line style, a shape or a
   direct label.
 - Every chart needs a legend or direct labels, and a tooltip.
-- Donuts use `innerRadius={45}` and `outerRadius={60}` to stop label clipping.
-- A stacked bar's total is drawn by `makeStackedTotalLabel`, never by pinning a
-  label to one series, because a bar with none of that series would lose its
-  total, and those are the bars worth reading.
+- An axis title is `chartAxis.ts`'s `axisLabel`, paired with `chartMargin` on
+  the same side, which reserves the room the title lands in outside the tick
+  band. Never an `inside*` label position or a negative margin — both clip
+  the ticks. A category axis is `categoryAxis`, which measures its band per
+  render and keeps names flat when they fit, slanting or truncating them only
+  when the band is too narrow; a horizontal bar list wraps long names with
+  `wrapTick` instead. A date axis reads its tick from the string via
+  `dateTick`, never from a constructed `Date`, so nothing drifts a day with
+  the viewer's timezone. A zero-value money tick is `zeroMoney`, not compact
+  notation's "$0.0". Tick text is never smaller than 10px.
+- A chart's key is `ChartLegend`; a health-coloured chart uses the shared
+  `HEALTH_LEGEND` rather than redeclaring Good/Average/Poor.
+- A table or list that can outgrow its card scrolls inside `ScrollTable` (or
+  `ScrollArea` for a `<ul>`/`<ol>`), which pins the header on the surface
+  colour and gives the region a focusable, labelled scroll box. A list that
+  is already bounded (a fixed row count, a capped query) gets no scroll
+  wrapper at all — that is decoration around content that never overflows.
+- Every `<Tooltip contentStyle>` spreads `TOOLTIP_STYLE`, never a one-off
+  literal, so it reads in dark mode; `chartPalette.test.ts` scans every chart
+  file for a `contentStyle` that skips it.
+- A stacked bar's total is drawn by `stackedTotalLabelList`, spread onto each
+  series' own `LabelList`, never by pinning a label to one fixed series —
+  Recharts skips a zero-height bar, so a label pinned to one series would go
+  missing on exactly the rows where that series is empty, which are the ones
+  worth reading. A category whose whole stack is zero still needs a visible
+  value: `emptyStackMarker` draws a hairline and a "0"/"$0" there instead of
+  leaving a gap that reads as missing data.
+- A donut spreads the shared `DONUT` preset (`innerRadius: '58%'`,
+  `outerRadius: '80%'`) rather than pixel radii, so it holds its proportions
+  at any card size.
 - Fewer than four points is a stat tile, not a line chart. More than six series
   is noise.
+- Every multi-column row in a dashboard view lets its children shrink below
+  their content (`[&>*]:min-w-0` or the item's own `min-w-0`), so a wide
+  table or long header scrolls inside its own card instead of pushing the
+  row past the viewport. `viewLayout.test.ts` enforces this across every
+  tab's views.
 
 ---
 

@@ -55,7 +55,7 @@ export function ControlsView() {
         }`}
       >
         {/* Top Row: Type Donut (1/3) + Detailed Table (2/3) */}
-        <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[500px]">
+        <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[500px] [&>*]:min-w-0">
           <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
             <ActivityTypeDonut data={stats?.by_type ?? []} query={query} drillable={!isLoading} />
           </div>
@@ -65,7 +65,7 @@ export function ControlsView() {
         </div>
 
         {/* Bottom Row: Sentiment Donut (1/3) + Sentiment Line Chart (2/3) */}
-        <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px]">
+        <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px] [&>*]:min-w-0">
           <div className="xl:w-[32%] bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0">
             <ActivitySentimentDonut data={stats?.sentiment ?? []} query={query} drillable={!isLoading} />
           </div>
@@ -77,8 +77,8 @@ export function ControlsView() {
         {/* Third Row: the AI taxonomy — area, category, subcategory. These three
             count only classified interactions, which is why each carries the
             total as well as its own rows. */}
-        <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px]">
-          <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
+        <div className="flex flex-col xl:flex-row gap-4 h-full min-h-[380px] [&>*]:min-w-0">
+          <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden border-t-4 border-t-accent">
             <ActivitiesByAIAreaDonut
               data={stats?.areas ?? []}
               classified={classified}
@@ -87,7 +87,7 @@ export function ControlsView() {
               drillable={!isLoading}
             />
           </div>
-          <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
+          <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden border-t-4 border-t-accent">
             <ActivitiesByAICategoryBar
               data={stats?.categories ?? []}
               classified={classified}
@@ -96,7 +96,7 @@ export function ControlsView() {
               drillable={!isLoading}
             />
           </div>
-          <div className="xl:w-1/3 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden shrink-0 border-t-4 border-t-accent">
+          <div className="xl:flex-1 bg-surface border border-line-subtle shadow-sm rounded-lg overflow-hidden border-t-4 border-t-accent">
             <ActivitiesByAISubCategoryBar
               data={stats?.subcategories ?? []}
               classified={classified}

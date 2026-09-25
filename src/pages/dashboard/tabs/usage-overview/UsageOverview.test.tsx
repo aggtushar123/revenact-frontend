@@ -132,8 +132,10 @@ function renderUsageOverview(url = '/dashboard/health/usage') {
 const lastUrl = (spy: ReturnType<typeof mockFetch>) =>
   spy.mock.calls[spy.mock.calls.length - 1][0];
 
-/** The stat tile carrying `label`. */
-const tile = (label: string) => screen.getByText(label).parentElement as HTMLElement;
+/** The stat tile carrying `label`. "At capacity" also names a band in the
+ *  scatter's key, so chart legends are skipped. */
+const tile = (label: string) =>
+  screen.getAllByText(label).find((el) => !el.closest('[role="list"]'))!.parentElement as HTMLElement;
 
 describe('Usage Overview', () => {
   beforeEach(() => {

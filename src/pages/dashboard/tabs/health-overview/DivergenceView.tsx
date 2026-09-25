@@ -6,6 +6,7 @@ import { PulseDivergenceScatter } from './charts/PulseDivergenceScatter';
 import { DivergenceList } from './charts/DivergenceList';
 import { useDrill } from '../../drill/useDrill';
 import { fromHealthRows } from '../../drill/rows';
+import { ScrollArea } from '../../shared/ScrollTable';
 
 /** Underlined, inline with the sentence, same colour as the number it
  *  replaces — a drill trigger, not a link, so it gets an explicit
@@ -151,7 +152,7 @@ export function DivergenceView() {
         )}
       </p>
 
-      <div className="flex flex-col xl:flex-row gap-4 items-stretch">
+      <div className="flex flex-col xl:flex-row gap-4 items-stretch [&>*]:min-w-0">
         {/* Definite height, not min-height: the scatter's ResponsiveContainer
             asks for height="100%", and a percentage can't resolve against a
             parent whose height comes only from min-height — the chart collapses
@@ -161,7 +162,13 @@ export function DivergenceView() {
           <PulseDivergenceScatter laid={laid} />
         </div>
 
-        <div className="xl:flex-1 xl:h-[460px] bg-surface border border-line-subtle rounded-lg shadow-sm overflow-y-auto flex flex-col divide-y divide-line-subtle">
+        {/* Capped at every width, not just xl: stacked below the scatter the
+            lists used to grow the page by the whole book. */}
+        <ScrollArea
+          label="Pulse disagreements"
+          maxHeight={460}
+          className="xl:flex-1 bg-surface border border-line-subtle rounded-lg shadow-sm flex flex-col divide-y divide-line-subtle"
+        >
           <DivergenceList
             tone="danger"
             title="AI sees risk the CSM doesn’t"
@@ -176,7 +183,7 @@ export function DivergenceView() {
             rows={csmColder}
             emptyMessage="No account currently has a CSM Pulse that far below its AI Pulse."
           />
-        </div>
+        </ScrollArea>
       </div>
     </div>
   );

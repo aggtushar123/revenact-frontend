@@ -1,7 +1,8 @@
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { UsageAccount } from '../../../../../features/usage/usageSlice';
 import { formatMoney } from '../../../../../features/customers/formatters';
-import { BAND_COLORS, FALLBACK_COLOR } from '../chartTheme';
+import { BAND_COLORS, BAND_SHORT, FALLBACK_COLOR } from '../chartTheme';
+import { ScrollTable } from '../../../shared/ScrollTable';
 
 export interface AccountUsageListProps {
   title: string;
@@ -41,7 +42,7 @@ export function AccountUsageList({
   showOwner = true,
 }: AccountUsageListProps) {
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="w-full flex flex-col">
       <div className="px-4 pt-3">
         <h3 className="text-[13px] font-bold text-ink">{title}</h3>
         <p className="text-[11px] text-ink-faint mt-[1px]">{subtitle}</p>
@@ -50,7 +51,9 @@ export function AccountUsageList({
       {rows.length === 0 ? (
         <p className="px-4 py-6 text-[12px] text-ink-faint">{emptyMessage}</p>
       ) : (
-        <div className="flex-1 min-h-0 overflow-auto px-2 pb-3 pt-2">
+        // Scrolls inside its card with the header pinned, instead of growing
+        // the page by every account in the list.
+        <ScrollTable caption={title} maxHeight={420} className="mx-2 mb-3 mt-2">
           <table className="w-full border-collapse">
             <thead>
               <tr className="text-left">
@@ -76,18 +79,19 @@ export function AccountUsageList({
                   key={row.id}
                   className="border-t border-line-subtle hover:bg-subtle/60 transition-colors"
                 >
-                  <td className="px-2 py-[7px] max-w-[200px]">
+                  <td className="px-2 py-[7px]">
                     <div className="flex items-center gap-2">
                       <span
                         className="w-1.5 h-1.5 rounded-full shrink-0"
                         style={{ background: BAND_COLORS[row.band ?? ''] ?? FALLBACK_COLOR }}
                         aria-hidden
                       />
-                      <span className="text-[12.5px] font-medium text-ink truncate">
-                        {row.name}
-                      </span>
+                      <span className="text-[12.5px] font-medium text-ink">{row.name}</span>
                     </div>
-                    <p className="text-[10.5px] text-ink-faint truncate mt-[1px]">
+                    {/* The band in words: the dot's colour is its only other
+                        mark, and colour alone is not a key. */}
+                    <p className="text-[10.5px] text-ink-faint mt-[1px]">
+                      {row.band && BAND_SHORT[row.band] ? `${BAND_SHORT[row.band]} · ` : ''}
                       {row.lifecycle_stage}
                       {row.products > 0 &&
                         ` · ${row.products} ${row.products === 1 ? 'product' : 'products'}`}
@@ -112,7 +116,7 @@ export function AccountUsageList({
                         : formatMoney(row.arr, currency)}
                   </td>
                   {showOwner && (
-                    <td className="px-2 py-[7px] text-[12px] text-ink-muted truncate max-w-[130px]">
+                    <td className="px-2 py-[7px] text-[12px] text-ink-muted whitespace-nowrap">
                       {row.owner}
                     </td>
                   )}
@@ -120,7 +124,7 @@ export function AccountUsageList({
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollTable>
       )}
     </div>
   );

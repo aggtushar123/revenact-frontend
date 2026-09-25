@@ -1,12 +1,26 @@
-import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, Cell, LabelList, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { TicketAssigneeRow } from '../../../../../features/tickets/ticketsSlice';
 import { STATUS_COLORS, STATUS_ORDER, FALLBACK_COLOR, niceMax } from '../chartTheme';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
-import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { ROLE, TOOLTIP_STYLE, CURSOR_FILL, barListHeight } from '../../../shared/chartPalette';
+import { AXIS_BASE, chartMargin, truncTick } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
+import { ScrollArea } from '../../../shared/ScrollTable';
+import { stackedTotalLabelList } from '../../../shared/stackedTotalLabel';
 import { useDrill } from '../../../drill/useDrill';
 import { DrillTargets } from '../../../drill/DrillTargets';
 
 const PATH = '/tickets/stats/';
+/** Assignee names print in full up to this many characters, then shorten
+ *  with the full name on hover. */
+const NAME_CHARS = 22;
+/** Width of one 10px tick character, as the shared axis kit estimates it. */
+const CHAR_PX = 6;
+/** Past this the rows scroll inside the card instead of growing it. */
+const MAX_PLOT = 420;
+
+/** The key, in stack order (left to right, as a bar reads). */
+const LEGEND = STATUS_ORDER.map((label) => ({ label, color: STATUS_COLORS[label] ?? FALLBACK_COLOR }));
 
 // Which text colour (if any) clears 4.5:1 against a segment's own fill in
 // BOTH light and dark mode — computed from the literal token values in
@@ -96,80 +110,78 @@ export function AssigneesStackedBar({
     );
   };
 
+  // Room for the longest name, so a name is only shortened when it is
+  // genuinely long.
+  const longest = Math.max(4, ...data.map((row) => row.name.length));
+  const axisWidth = Math.min(NAME_CHARS, longest) * CHAR_PX + 10;
+
   return (
-    <div className="w-full h-full p-4 flex flex-col bg-surface border border-line-subtle rounded-lg shadow-sm h-[320px]">
-      <div className="flex flex-col mb-4">
-        <h3 className="text-[13px] font-bold text-ink">Ticket Assignees by Ticket Status</h3>
-      </div>
+    <div className="relative w-full p-4 flex flex-col gap-2">
+      <h3 className="text-[13px] font-bold text-ink">Ticket Assignees by Ticket Status</h3>
+      {/* Colour alone does not carry the five statuses: two of the five (On
+          Hold, Resolved) have no in-segment count, because no text colour
+          clears 4.5:1 against their fill in both themes (see LABEL_FILL). */}
+      <ChartLegend items={LEGEND} />
 
       <DrillTargets label="Ticket Assignees by Ticket Status" items={drillItems} />
 
-      <div className="flex-1 w-full relative -ml-4">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            layout="vertical"
-            data={data}
-            margin={{ top: 0, right: 40, left: 10, bottom: 0 }}
-            barSize={16}
-            barGap={0}
-          >
-            <XAxis type="number" hide domain={[0, max]} />
-            <YAxis 
-              type="category" 
-              dataKey="name" 
-              axisLine={false} 
-              tickLine={false} 
-              width={110}
-              tick={{ fontSize: 10, fill: 'var(--text-secondary)', fontWeight: 500 }}
-            />
-            <Tooltip
-              cursor={{ fill: CURSOR_FILL }}
-              contentStyle={TOOLTIP_STYLE}
-            />
-            {/* Colour alone no longer carries the five statuses — two of the
-                five (On Hold, Resolved) also lost their in-segment count
-                label above, because no text colour clears 4.5:1 against
-                their fill in both themes (see LABEL_FILL). */}
-            <Legend verticalAlign="top" height={24} iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+      {data.length === 0 ? (
+        <p className="text-[12px] text-ink-faint">No tickets match these filters.</p>
+      ) : (
+        // One 28px row per assignee; a big team scrolls inside the card
+        // instead of squashing its bars into a fixed height.
+        <ScrollArea label="Ticket assignees by status" maxHeight={MAX_PLOT}>
+          <div data-testid="assignee-plot" className="w-full" style={{ height: barListHeight(data.length, 28, 200) }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart layout="vertical" data={data} margin={chartMargin({ right: true })} barSize={16}>
+                {/* Hidden: every bar carries its total at its end. */}
+                <XAxis type="number" hide domain={[0, max]} allowDecimals={false} />
+                <YAxis
+                  {...AXIS_BASE}
+                  type="category"
+                  dataKey="name"
+                  width={axisWidth}
+                  interval={0}
+                  tick={truncTick(NAME_CHARS)}
+                />
+                <Tooltip cursor={{ fill: CURSOR_FILL }} contentStyle={TOOLTIP_STYLE} />
 
-            {/* Total Label Hack: Invisible un-stacked bar reaching the row end */}
-            <Bar {...STATIC_SERIES}
-              dataKey="total"
-              fill="transparent"
-              legendType="none"
-              label={{ position: 'right', fill: 'var(--text-secondary)', fontSize: 11, fontWeight: 600, dx: 5 }}
-            />
-
-            {/* One segment per real status, in ticket-lifecycle order —
-                the mock hard-coded Zendesk's own six status names. `name`
-                is what the legend above reads its labels from. */}
-            {STATUS_ORDER.map((statusLabel) => (
-              <Bar
-                key={statusLabel}
-                {...STATIC_SERIES}
-                dataKey={statusLabel}
-                name={statusLabel}
-                stackId="a"
-                fill={STATUS_COLORS[statusLabel] ?? FALLBACK_COLOR}
-                label={renderCustomBarLabel}
-              >
-                {/* Every status segment of a row opens the same drill — the
-                    whole bar is one assignee, not five. Cells carry no `fill`
-                    of their own, so the Bar's own colour (and the legend
-                    swatch, which reads it) are unaffected; the blank-assignee
-                    row alone gets no cursor and no click — see `openSegment`. */}
-                {data.map((row, index) => (
-                  <Cell
-                    key={row.name || `blank-${index}`}
-                    cursor={canDrill(row) ? 'pointer' : undefined}
-                    onClick={canDrill(row) ? () => openSegment(row) : undefined}
-                  />
+                {/* One segment per real status, in ticket-lifecycle order —
+                    the mock hard-coded Zendesk's own six status names. */}
+                {STATUS_ORDER.map((statusLabel) => (
+                  <Bar
+                    key={statusLabel}
+                    {...STATIC_SERIES}
+                    dataKey={statusLabel}
+                    name={statusLabel}
+                    stackId="a"
+                    fill={STATUS_COLORS[statusLabel] ?? FALLBACK_COLOR}
+                    label={renderCustomBarLabel}
+                  >
+                    {/* The row's total rides past the end of whichever segment
+                        is last. It used to be a transparent un-stacked `total`
+                        bar, which sat beside the stack, knocked it off-centre
+                        in its row and showed up as an extra tooltip line. */}
+                    <LabelList {...stackedTotalLabelList(statusLabel, data, 11, { horizontal: true, stack: STATUS_ORDER })} />
+                    {/* Every status segment of a row opens the same drill — the
+                        whole bar is one assignee, not five. Cells carry no
+                        `fill` of their own, so the Bar's own colour is
+                        unaffected; the blank-assignee row alone gets no cursor
+                        and no click — see `openSegment`. */}
+                    {data.map((row, index) => (
+                      <Cell
+                        key={row.name || `blank-${index}`}
+                        cursor={canDrill(row) ? 'pointer' : undefined}
+                        onClick={canDrill(row) ? () => openSegment(row) : undefined}
+                      />
+                    ))}
+                  </Bar>
                 ))}
-              </Bar>
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </ScrollArea>
+      )}
     </div>
   );
 }

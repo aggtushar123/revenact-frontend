@@ -94,6 +94,26 @@ describe('ActivityDetailedTable sentiment pill', () => {
   });
 });
 
+describe('ActivityDetailedTable scrolling', () => {
+  beforeEach(() => vi.unstubAllGlobals());
+
+  // The reference pattern for every dashboard table: it scrolls inside its
+  // card with the header pinned, and a keyboard can reach the scroll region.
+  it('scrolls inside its card at 480px with the header pinned', () => {
+    renderTable();
+    const region = screen.getByRole('region', { name: 'Detailed activity breakdown' });
+    expect(region).toHaveStyle({ maxHeight: '480px' });
+    expect(region).toHaveAttribute('tabindex', '0');
+    expect(region.className).toContain('[&_thead_th]:sticky');
+    expect(within(region).getByRole('columnheader', { name: 'Account Name' })).toBeInTheDocument();
+  });
+
+  it('keeps a shortened account name whole on hover', () => {
+    renderTable();
+    expect(screen.getByText('Oracle')).toHaveAttribute('title', 'Oracle');
+  });
+});
+
 describe('ActivityDetailedTable corrections', () => {
   beforeEach(() => vi.unstubAllGlobals());
 

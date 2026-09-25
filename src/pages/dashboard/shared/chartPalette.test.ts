@@ -2,7 +2,15 @@ import { describe, it, expect } from 'vitest';
 import * as ai from '../tabs/ai-trending/chartTheme';
 import * as tickets from '../tabs/ticket-overview/chartTheme';
 import * as usage from '../tabs/usage-overview/chartTheme';
-import { niceMax, compact, percentOf, ticksTo } from './chartPalette';
+import {
+  niceMax,
+  compact,
+  percentOf,
+  ticksTo,
+  barListHeight,
+  DONUT,
+  TOOLTIP_STYLE,
+} from './chartPalette';
 
 const HEX = /#[0-9a-f]{3,8}\b|rgb\(/i;
 
@@ -107,6 +115,67 @@ describe('no info role in the dashboard', () => {
       .filter(([, source]) => NO_INFO.test(source))
       .map(([file]) => file);
 
+    expect(offenders).toEqual([]);
+  });
+});
+
+describe('chart sizing', () => {
+  it('barListHeight grows with the rows and never drops under the floor', () => {
+    expect(barListHeight(3)).toBe(200);
+    expect(barListHeight(12)).toBe(12 * 28);
+    expect(barListHeight(10, 32, 240)).toBe(320);
+    expect(barListHeight(0, 32, 240)).toBe(240);
+  });
+
+  it('DONUT is one ring for every donut', () => expect(DONUT).toEqual({ innerRadius: '58%', outerRadius: '80%' }));
+});
+
+describe('tooltips', () => {
+  it('TOOLTIP_STYLE carries its own background and ink, so it reads in dark mode', () => {
+    expect(TOOLTIP_STYLE.background).toBe('var(--bg-elevated)');
+    expect(TOOLTIP_STYLE.color).toBe('var(--text-primary)');
+  });
+
+  // A `contentStyle` literal without a background falls back to Recharts'
+  // white box, which leaves light ink on white in dark mode. Spreading
+  // TOOLTIP_STYLE is the fix; a literal that sets its own background passes too.
+  it('no dashboard or health chart passes a contentStyle without a background', () => {
+    const modules = {
+      ...import.meta.glob('../**/*.tsx', { query: '?raw', eager: true, import: 'default' }),
+      ...import.meta.glob('../../health/**/*.tsx', { query: '?raw', eager: true, import: 'default' }),
+    } as Record<string, string>;
+
+    // The literal's body, braces balanced, so a nested object or a template
+    // expression inside it does not end the match early.
+    const bodies = (source: string) => {
+      const out: string[] = [];
+      for (let at = source.indexOf('contentStyle={'); at >= 0; at = source.indexOf('contentStyle={', at + 1)) {
+        const open = source.indexOf('{', at + 'contentStyle='.length);
+        let depth = 0;
+        let end = open;
+        for (; end < source.length; end++) {
+          if (source[end] === '{') depth++;
+          else if (source[end] === '}' && --depth === 0) break;
+        }
+        out.push(source.slice(open + 1, end));
+      }
+      return out;
+    };
+    // An inline literal must spread TOOLTIP_STYLE or set its own background;
+    // a bare reference (`contentStyle={TOOLTIP_STYLE}`) passes as the name.
+    const ok = (body: string) => /TOOLTIP_STYLE|\bbackground(Color)?\s*:/.test(body);
+
+    expect(bodies('<Tooltip contentStyle={{ fontSize: 12, padding: { x: 1 } }} />')).toEqual([
+      '{ fontSize: 12, padding: { x: 1 } }',
+    ]);
+    expect(ok('{ padding: { x: 1 }, background: "var(--bg-elevated)" }')).toBe(true);
+    expect(ok('{ padding: { x: 1 }, fontSize: 12 }')).toBe(false);
+
+    const offenders: string[] = [];
+    for (const [file, source] of Object.entries(modules)) {
+      if (file.includes('.test.')) continue;
+      for (const body of bodies(source)) if (!ok(body)) offenders.push(file);
+    }
     expect(offenders).toEqual([]);
   });
 });

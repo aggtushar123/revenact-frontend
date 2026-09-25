@@ -1,20 +1,19 @@
-import { useMemo } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { HealthStatus } from '../mockData';
 import { STACK_ORDER } from '../movement';
 import type { Flow } from '../movement';
+import { HEALTH_COLORS as STATUS_COLORS } from '../../../shared/chartPalette';
 
-const STATUS_COLORS: Record<HealthStatus, string> = {
-  Poor: 'var(--danger)',
-  Average: 'var(--warning)',
-  Good: 'var(--success)',
-};
-
-// Geometry, in viewBox units. The viewBox is a fixed size and the SVG scales
-// to its container, so the column pitch is derived from the month count rather
-// than fixed: the chart fills the card at any window length, and the rendered
-// height stays proportional instead of ballooning on a wide screen.
-const VIEW_W = 960;
-const PAD = { top: 26, right: 46, bottom: 28, left: 10 };
+// Geometry, in real pixels. The chart measures its container and lays out at
+// that width with a fixed height, so text is drawn at the size it is set in
+// (a scaled viewBox drew the 10px labels at 7px in a narrow card and 17px in
+// a wide one). The column pitch comes from the month count, so the chart
+// fills the card at any window length.
+/** Width used until the container has been measured (and in a test with no
+ *  layout at all). */
+const FALLBACK_W = 960;
+/** Room either side for the first and last columns' counts. */
+const PAD = { top: 26, right: 58, bottom: 28, left: 58 };
 const COL_W = 13;
 const PLOT_H = 250;
 /** Blank space between the stacked segments of one column. */
@@ -45,8 +44,26 @@ interface Segment {
  * with no notion of the same category recurring along a time axis, which is
  * exactly what this needs.
  */
+/** The element's content width, kept current as the card resizes. */
+function useWidth<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const measure = () => setWidth(Math.round(element.getBoundingClientRect().width));
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+  return [ref, width] as const;
+}
+
 export function HealthFlowChart({ flow }: HealthFlowChartProps) {
   const { months, steps } = flow;
+  const [frameRef, measured] = useWidth<HTMLDivElement>();
+  const viewW = measured > 0 ? measured : FALLBACK_W;
 
   const layout = useMemo(() => {
     if (months.length === 0) return null;
@@ -56,8 +73,8 @@ export function HealthFlowChart({ flow }: HealthFlowChartProps) {
     const usable = PLOT_H - SEGMENT_GAP * (STACK_ORDER.length - 1);
     const heightOf = (count: number) => (count / peak) * usable;
 
-    // Spread the columns evenly across the fixed viewBox width.
-    const span = VIEW_W - PAD.left - COL_W - PAD.right;
+    // Spread the columns evenly across the measured width.
+    const span = Math.max(0, viewW - PAD.left - COL_W - PAD.right);
     const pitch = months.length > 1 ? span / (months.length - 1) : 0;
 
     const columns = months.map((month, i) => {
@@ -99,26 +116,68 @@ export function HealthFlowChart({ flow }: HealthFlowChartProps) {
       });
     });
 
-    return { columns, ribbons, width: VIEW_W, height: PAD.top + PLOT_H + PAD.bottom };
-  }, [months, steps]);
+    return { columns, ribbons, peak, width: viewW, height: PAD.top + PLOT_H + PAD.bottom };
+  }, [months, steps, viewW]);
 
+  // The frame is always rendered, so it is measured even when the first
+  // book it sees has no history yet.
   if (!layout) {
     return (
-      <p className="px-4 py-8 text-center text-[12px] text-ink-faint">
-        No health history recorded for these accounts.
-      </p>
+      <div ref={frameRef} className="w-full">
+        <p className="px-4 py-8 text-center text-[12px] text-ink-faint">
+          No health history recorded for these accounts.
+        </p>
+      </div>
     );
   }
 
-  const { columns, ribbons, width, height } = layout;
+  const { columns, ribbons, peak, width, height } = layout;
+  const first = columns[0];
   const last = columns[columns.length - 1];
 
+  /** A column's counts beside it: the first column's to its left, the
+   *  last's to its right. Only these two are annotated — repeating counts on
+   *  every month would bury the ribbons the chart exists to show. */
+  const annotate = (column: (typeof columns)[number], side: 'start' | 'end') => {
+    const x = side === 'end' ? column.x + COL_W + 7 : column.x - 7;
+    const anchor = side === 'end' ? 'start' : 'end';
+    return (
+      <g data-testid={`flow-${side}`}>
+        {STACK_ORDER.map((status) =>
+          column.month.counts[status] > 0 ? (
+            <g key={status}>
+              <text
+                x={x}
+                y={column.segments[status].y + column.segments[status].h / 2 + 3}
+                textAnchor={anchor}
+                fontSize={11.5}
+                fontWeight={700}
+                fill="var(--text-primary)"
+              >
+                {column.month.counts[status]}
+              </text>
+              <text
+                x={x}
+                y={column.segments[status].y + column.segments[status].h / 2 + 15}
+                textAnchor={anchor}
+                fontSize={10}
+                fill="var(--text-tertiary)"
+              >
+                {status}
+              </text>
+            </g>
+          ) : null,
+        )}
+      </g>
+    );
+  };
+
   return (
-    <div className="w-full">
+    <div ref={frameRef} className="w-full">
       <svg
-        viewBox={`0 0 ${width} ${height}`}
-        width="100%"
-        className="block w-full h-auto"
+        width={width}
+        height={height}
+        className="block"
         role="img"
         aria-label={
           `Health state flow across ${months.length} months, ` +
@@ -171,32 +230,12 @@ export function HealthFlowChart({ flow }: HealthFlowChartProps) {
           </text>
         ))}
 
-        {/* Only the final column is annotated with counts — repeating them on
-            every month would bury the ribbons the chart exists to show. */}
-        {STACK_ORDER.map((status) =>
-          last.month.counts[status] > 0 ? (
-            <g key={`final-${status}`}>
-              <text
-                x={last.x + COL_W + 7}
-                y={last.segments[status].y + last.segments[status].h / 2 + 3}
-                fontSize={11.5}
-                fontWeight={700}
-                fill="var(--text-primary)"
-              >
-                {last.month.counts[status]}
-              </text>
-              <text
-                x={last.x + COL_W + 7}
-                y={last.segments[status].y + last.segments[status].h / 2 + 15}
-                fontSize={9}
-                fill="var(--text-tertiary)"
-              >
-                {status}
-              </text>
-            </g>
-          ) : null,
-        )}
+        {annotate(first, 'start')}
+        {columns.length > 1 && annotate(last, 'end')}
       </svg>
+      <p className="px-2 text-[11px] text-ink-faint">
+        Tallest column = {peak} account{peak === 1 ? '' : 's'}
+      </p>
     </div>
   );
 }

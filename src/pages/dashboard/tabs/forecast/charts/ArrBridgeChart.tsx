@@ -1,10 +1,12 @@
 import { useMemo } from 'react';
-import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, Cell, LabelList, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import type { CurrencyCode } from '../../../../../features/auth/authSlice';
 import type { ForecastBridge } from '../../../../../features/forecast/forecastSlice';
 import { formatCompactMoney, formatMoney } from '../../../../../features/customers/formatters';
 import { STATIC_SERIES } from '../../../../../components/shared/chartAnimation';
 import { ROLE, TOOLTIP_STYLE, CURSOR_FILL } from '../../../shared/chartPalette';
+import { AXIS_BASE, axisLabel, chartMargin, zeroMoney } from '../../../shared/chartAxis';
+import { ChartLegend } from '../../../shared/ChartLegend';
 import { useDrill } from '../../../drill/useDrill';
 import { DrillTargets } from '../../../drill/DrillTargets';
 
@@ -86,6 +88,17 @@ export function ArrBridgeChart({
   // visual difference the chart reads as opening-then-closing rather than
   // where-we-are-headed.
   const colour = { total: ROLE.ink, down: ROLE.loss, up: ROLE.gain };
+
+  /** The figure printed on each step: signed for the movements, plain for
+   *  the two totals, so the bridge reads without hovering every bar. */
+  const stepLabel = (row: (typeof data)[number]) => {
+    // Compact notation prints zero as "$0.0"; a step that moved nothing is "$0".
+    if (row.value === 0) return zeroMoney(currency);
+    const figure = formatCompactMoney(row.value, currency);
+    if (row.kind === 'total') return figure;
+    return `${row.kind === 'down' ? '−' : '+'}${figure}`;
+  };
+  const labelled = data.map((row) => ({ ...row, label: stepLabel(row) }));
   const max = Math.max(bridge.opening_arr, bridge.forecast_arr, 1) * 1.15;
 
   const openSegment = (row: (typeof data)[number], trigger?: HTMLElement) => {
@@ -115,7 +128,7 @@ export function ArrBridgeChart({
     }));
 
   return (
-    <div className="w-full h-full flex flex-col">
+    <div className="relative w-full h-full flex flex-col">
       <div className="flex items-start justify-between gap-3 px-4 pt-3">
         <div>
           <h3 className="text-[13px] font-bold text-ink">ARR bridge</h3>
@@ -138,32 +151,37 @@ export function ArrBridgeChart({
         </div>
       </div>
 
-      <div className="px-4">
-        <DrillTargets label="ARR bridge" items={drillItems} />
-      </div>
+      <DrillTargets label="ARR bridge" items={drillItems} />
+
+      <ChartLegend
+        className="px-4 pt-2"
+        items={[
+          { label: 'Increase', color: ROLE.gain },
+          { label: 'Decrease', color: ROLE.loss },
+          { label: 'Total', color: ROLE.ink },
+          { label: 'Forecast', color: ROLE.ink, kind: 'outline' },
+        ]}
+      />
 
       <div className="flex-1 w-full min-h-0 px-2 pb-3">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data} margin={{ top: 16, right: 12, left: 4, bottom: 4 }} barSize={52}>
+          <BarChart data={labelled} margin={chartMargin({ left: true })} barSize={52}>
             <XAxis
+              {...AXIS_BASE}
               dataKey="name"
-              axisLine={false}
-              tickLine={false}
               tick={{ fill: 'var(--text-secondary)', fontSize: 11 }}
             />
             <YAxis
-              axisLine={false}
-              tickLine={false}
-              width={64}
+              {...AXIS_BASE}
+              width={56}
               domain={[0, max]}
-              tick={{ fill: 'var(--text-tertiary)', fontSize: 10 }}
               tickFormatter={(value: number) => formatCompactMoney(value, currency)}
+              label={axisLabel(`ARR (${currency})`)}
             />
             <Tooltip
               cursor={{ fill: CURSOR_FILL }}
               contentStyle={{ ...TOOLTIP_STYLE, fontSize: '12px' }}
-              formatter={(_value, name, item) => {
-                if (name === 'base') return [];
+              formatter={(_value, _name, item) => {
                 const row = item?.payload;
                 const signed = row?.signed ?? row?.value ?? 0;
                 return [
@@ -174,8 +192,11 @@ export function ArrBridgeChart({
             />
             {/* The invisible half of the waterfall: it lifts each step to
                 where the running total sits. */}
-            <Bar {...STATIC_SERIES} dataKey="base" stackId="bridge" fill="transparent" />
-            <Bar {...STATIC_SERIES} dataKey="value" stackId="bridge" radius={[3, 3, 0, 0]}>
+            <Bar {...STATIC_SERIES} dataKey="base" stackId="bridge" fill="transparent" tooltipType="none" />
+            {/* minPointSize: Recharts drops a zero-height bar and its label with
+                it, so a $0 step would leave a gap that reads as missing data.
+                A hairline keeps the column and its "$0". */}
+            <Bar {...STATIC_SERIES} dataKey="value" stackId="bridge" radius={[3, 3, 0, 0]} minPointSize={2}>
               {data.map((row) =>
                 row.name === 'Forecast' ? (
                   <Cell key={row.name} fill="transparent" stroke={ROLE.ink} strokeWidth={2} />
@@ -190,6 +211,13 @@ export function ArrBridgeChart({
                   <Cell key={row.name} fill={colour[row.kind]} />
                 )
               )}
+              <LabelList
+                dataKey="label"
+                position="top"
+                fill="var(--text-secondary)"
+                fontSize={10}
+                fontWeight={600}
+              />
             </Bar>
           </BarChart>
         </ResponsiveContainer>

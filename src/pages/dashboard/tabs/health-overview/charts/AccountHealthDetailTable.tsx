@@ -1,6 +1,7 @@
 
 
 import type { HealthDataRow } from '../mockData';
+import { ScrollTable } from '../../../shared/ScrollTable';
 
 const STATUS_COLORS = {
   Poor: 'bg-danger text-on-accent',
@@ -10,14 +11,16 @@ const STATUS_COLORS = {
 
 export function AccountHealthDetailTable({ data }: { data: HealthDataRow[] }) {
   return (
-    <div className="w-full flex flex-col h-full bg-surface relative">
+    <div className="w-full flex flex-col bg-surface relative">
       <div className="flex items-center justify-between p-4 border-b border-line-subtle shrink-0">
-        <h3 className="text-[14px] font-bold text-ink">Account Health Details</h3>
+        <h3 className="text-[14px] font-bold text-ink">Account health details</h3>
       </div>
       
-      <div className="flex-1 overflow-auto bg-surface min-h-[400px]">
+      {/* Scrolls inside the card: it used to grow the page by the whole book,
+          and eleven columns scroll sideways rather than squash. */}
+      <ScrollTable caption="Account health details" maxHeight={520} minWidth={1100}>
         <table className="w-full text-left border-collapse select-none">
-          <thead className="sticky top-0 bg-elevated z-10 shadow-sm border-b border-line">
+          <thead className="border-b border-line">
             <tr>
               {['Account ID', 'Account', 'Primary Owner', 'Lifecycle Stage', 'Renewal Date', 'Health Status', 'Health Score', 'CSM Pulse Score', 'Latest Pulse Modified', 'AI Pulse Score', 'AI Pulse Reason'].map((heading, idx) => (
                 <th key={idx} className={`py-2 px-3 text-[11px] font-mono font-bold text-ink-muted uppercase tracking-wider ${idx === 0 ? 'w-[70px] text-right pr-4' : ''}`}>
@@ -54,7 +57,7 @@ export function AccountHealthDetailTable({ data }: { data: HealthDataRow[] }) {
                   {row.renewalDate}
                 </td>
                 <td className="py-2.5 px-3">
-                  <span className={`inline-flex px-6 py-0.5 rounded-sm text-[11px] font-medium shadow-sm w-[72px] justify-center ${STATUS_COLORS[row.healthStatus]}`}>
+                  <span className={`inline-flex px-2 py-0.5 rounded-sm text-[11px] font-medium shadow-sm w-[72px] justify-center ${STATUS_COLORS[row.healthStatus]}`}>
                     {row.healthStatus}
                   </span>
                 </td>
@@ -77,7 +80,7 @@ export function AccountHealthDetailTable({ data }: { data: HealthDataRow[] }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollTable>
     </div>
   );
 }

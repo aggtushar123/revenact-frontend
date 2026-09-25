@@ -81,6 +81,17 @@ describe('MovementView', () => {
     ).toBeInTheDocument();
   });
 
+  it('keys the health colours on the flow card', () => {
+    renderWithHealth(<MovementView />, { rows: BOOK });
+    const card = screen.getByRole('heading', { name: 'Health transitions' }).closest('section') as HTMLElement;
+    const legend = within(card).getByRole('list');
+    expect(within(legend).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
+      'Good',
+      'Average',
+      'Poor',
+    ]);
+  });
+
   it('keeps the renewal runway alongside the flow', () => {
     renderWithHealth(<MovementView />, { rows: BOOK });
     expect(screen.getByRole('heading', { name: /renewal runway/i })).toBeInTheDocument();

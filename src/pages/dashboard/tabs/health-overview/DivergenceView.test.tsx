@@ -41,6 +41,17 @@ describe('DivergenceView', () => {
     ).toBeInTheDocument();
   });
 
+  it('scrolls both lists inside one capped region, at every width', () => {
+    renderWithHealth(<DivergenceView />, { rows: BOOK });
+    const region = screen.getByRole('region', { name: 'Pulse disagreements' });
+    expect(region).toHaveStyle({ maxHeight: '460px' });
+    expect(within(region).getAllByRole('heading')).toHaveLength(2);
+    // Each list's header stays in view while its rows scroll under it.
+    for (const heading of within(region).getAllByRole('heading')) {
+      expect(heading.closest('header')).toHaveClass('sticky', 'top-0', 'bg-surface');
+    }
+  });
+
   it('lists both directions of disagreement separately', () => {
     renderWithHealth(<DivergenceView />, { rows: BOOK });
 
