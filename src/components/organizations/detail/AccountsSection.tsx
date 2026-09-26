@@ -50,7 +50,7 @@ function Num({ children }: { children: ReactNode }) {
   return <span className="font-mono-brand tabular-nums text-ink">{children}</span>;
 }
 
-/** Every figure the old AccountsMetricsBanner showed (health/ARR by
+/** Every figure the old Accounts-tab summary banner showed (health/ARR by
  *  category, NPS and its promoter/passive/detractor split, average CSAT,
  *  the lifecycle-stage breakdown), computed the same way it was, so nothing
  *  is lost when the banner and its donuts go (round-1 fix, 2026-09-27). */
@@ -101,7 +101,7 @@ function summarize(items: Account[]) {
   return { total, health, arr, npsScore, promoters, passives, detractors, avgCsat, avgCsm, lifecycleLine };
 }
 
-/** Replaces the old AccountsMetricsBanner's donuts with the same figures as
+/** Replaces the old Accounts-tab summary banner's donuts with the same figures as
  *  compact text (owner decision 2026-09-26; round-1 fix, 2026-09-27: "don't
  *  lose information" — everything the banner showed is still here). */
 function AccountsSummary({ items, currency }: { items: Account[]; currency: CurrencyCode }) {
@@ -185,7 +185,7 @@ function AccountItem({
  *  fix, 2026-09-27: "don't lose information" — these were on the old table/
  *  banner and are not columns here, just a second meta line); the name opens
  *  `/accounts/:id`. A compact summary above the list replaces the old
- *  AccountsMetricsBanner's donuts with the same figures as text. Add and
+ *  old Accounts-tab summary banner's donuts with the same figures as text. Add and
  *  Edit are also on the Story tab's chip row. On phones the item's Edit
  *  wraps under its details. */
 export function AccountsSection({
@@ -200,7 +200,7 @@ export function AccountsSection({
 }: AccountsSectionProps & {
   /** The organisation's own contract currency (`details.commercial.currency`)
    *  — an Account never carries its own, so its ARR always renders in this
-   *  one, matching what the old AccountsMetricsBanner did. */
+   *  one, matching what the old Accounts-tab summary banner did. */
   currency: CurrencyCode;
   /** For deterministic renewal-runway text in tests; real callers take the
    *  default. */

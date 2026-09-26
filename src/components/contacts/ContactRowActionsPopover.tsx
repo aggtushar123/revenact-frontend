@@ -7,9 +7,8 @@ interface Props {
   onDelete: () => void;
 }
 
-// Same shape/positioning convention as the org popovers (HealthPopover)
-// — a per-row "..." menu — just a shorter Edit/Delete list (Contact has
-// no Archive/Churn-equivalent state to manage).
+// A per-row "..." menu with a short Edit/Delete list (Contact has no
+// Archive/Churn-equivalent state to manage).
 export function ContactRowActionsPopover({ onClose, style, onEdit, onDelete }: Props) {
   return (
     <>
