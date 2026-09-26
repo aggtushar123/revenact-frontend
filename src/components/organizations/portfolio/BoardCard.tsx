@@ -29,6 +29,31 @@ export interface BoardCardProps {
   onDragEnd: () => void;
 }
 
+/** The menu's tallest height (`max-h-56`) plus its `mt-1` gap. */
+const MENU_ROOM = 228;
+
+/** Whether the menu should open above its button. It hangs off the card
+ *  (absolutely positioned, no portal), so any scrolling ancestor, a desktop
+ *  column or the phone panel strip, would clip it. When the room below the
+ *  button inside every such ancestor and the window is short of the menu,
+ *  and there is more room above, it opens upward instead. */
+function opensUpward(button: HTMLElement): boolean {
+  let top = 0;
+  let bottom = window.innerHeight;
+  for (let el = button.parentElement; el; el = el.parentElement) {
+    const { overflowX, overflowY } = window.getComputedStyle(el);
+    if (/auto|scroll|hidden|clip/.test(`${overflowX} ${overflowY}`)) {
+      const bounds = el.getBoundingClientRect();
+      top = Math.max(top, bounds.top);
+      bottom = Math.min(bottom, bounds.bottom);
+    }
+  }
+  const rect = button.getBoundingClientRect();
+  const below = bottom - rect.bottom;
+  const above = rect.top - top;
+  return below < MENU_ROOM && above > below;
+}
+
 /** The Board's "Move to…" control (controller ruling R1): a button, not a
  *  native `<select>` acting on change, so nothing moves until a stage is
  *  chosen from a real menu. Arrow Up/Down move between items; Escape and an
@@ -46,6 +71,7 @@ function MoveToMenu({
 }) {
   const [openMenu, setOpenMenu] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [upward, setUpward] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -98,6 +124,7 @@ function MoveToMenu({
         onClick={(event) => {
           event.stopPropagation();
           setActiveIndex(0);
+          if (!openMenu && buttonRef.current) setUpward(opensUpward(buttonRef.current));
           setOpenMenu((was) => !was);
         }}
         className={`flex min-h-11 w-full sm:min-h-8 items-center justify-center rounded-lg border border-line bg-surface px-2 text-[13px] text-ink-muted hover:border-line-strong hover:text-ink active:bg-line-subtle disabled:opacity-50 ${FOCUS}`}
@@ -111,7 +138,7 @@ function MoveToMenu({
           aria-label={`Move ${row.name} to`}
           onKeyDown={onMenuKeyDown}
           onClick={(event) => event.stopPropagation()}
-          className="absolute inset-x-0 top-full z-20 mt-1 flex max-h-56 flex-col overflow-y-auto rounded-lg border border-line bg-elevated py-1 shadow-md"
+          className={`absolute inset-x-0 z-20 flex ${upward ? 'bottom-full mb-1' : 'top-full mt-1'} max-h-56 flex-col overflow-y-auto rounded-lg border border-line bg-elevated py-1 shadow-md`}
         >
           {targets.map((value, index) => (
             <button

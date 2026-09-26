@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -164,5 +164,39 @@ describe('BoardCard', () => {
     renderCard({ row: { ...globex, arr: null } });
     expect(within(card(1)).getByText('—')).toBeInTheDocument();
     expect(within(card(1)).queryByText('Renewal overdue')).not.toBeInTheDocument();
+  });
+
+  describe('Move to… menu placement', () => {
+    const rect = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 200, width: 200, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+
+    afterEach(() => vi.restoreAllMocks());
+
+    it('opens below the button when there is room', async () => {
+      renderCard();
+      const button = screen.getByRole('button', { name: 'Move to…' });
+      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(rect(100, 132));
+      await userEvent.click(button);
+      expect(screen.getByRole('menu')).toHaveClass('top-full');
+    });
+
+    it('opens upward near the bottom of the window, so it is not cut off', async () => {
+      renderCard();
+      const button = screen.getByRole('button', { name: 'Move to…' });
+      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(rect(window.innerHeight - 60, window.innerHeight - 28));
+      await userEvent.click(button);
+      expect(screen.getByRole('menu')).toHaveClass('bottom-full');
+      expect(screen.getByRole('menu')).not.toHaveClass('top-full');
+    });
+
+    it('opens upward near the bottom of a scrolling column that would clip it', async () => {
+      renderCard();
+      const list = card().parentElement as HTMLElement;
+      list.style.overflowY = 'auto';
+      vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(0, 400));
+      const button = screen.getByRole('button', { name: 'Move to…' });
+      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(rect(340, 372));
+      await userEvent.click(button);
+      expect(screen.getByRole('menu')).toHaveClass('bottom-full');
+    });
   });
 });
