@@ -5,6 +5,7 @@ import type { RailContext } from '../../../components/copilot/railContext';
 import { trapTab } from '../../../lib/focusTrap';
 import { SM, useMediaQuery } from '../../../lib/useMediaQuery';
 import { AskControls } from './AskControls';
+import { withFocus } from './context';
 import { useAsk } from './useAsk';
 
 /** The Ask rail beside the Dashboard or Organizations, shaped like Communications' Copilot
@@ -75,10 +76,7 @@ export function AskRail() {
   };
 
   const { context, chipLabel } = ask.surface;
-  // ask.focus is the shared DashboardFocus | null slot (Task 3); on
-  // Organizations it is only ever a companies focus, narrower than
-  // OrganizationsContext.focus's own static type, hence the cast.
-  const asked = context ? ({ ...context, focus: ask.focus } as NonNullable<typeof context>) : null;
+  const asked = context ? withFocus(context, ask.focus) : null;
   const railContext: RailContext | null = asked ? { kind: 'surface', context: asked, label: chipLabel(asked) } : null;
 
   const railProps = {

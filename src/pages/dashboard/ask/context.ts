@@ -41,4 +41,12 @@ export interface AskState {
   openFromHistory: (conversation: Conversation) => void;
 }
 
+/** The surface's context narrowed by `focus`. The shared slot is a
+ *  DashboardFocus; Organizations only takes a companies focus, so any other
+ *  kind (never written there) reads as no focus rather than a cast. */
+export function withFocus(context: SurfaceContext, focus: DashboardFocus | null): SurfaceContext {
+  if (context.surface === 'dashboard') return { ...context, focus };
+  return { ...context, focus: focus?.kind === 'companies' ? focus : null };
+}
+
 export const AskContext = createContext<AskState | null>(null);

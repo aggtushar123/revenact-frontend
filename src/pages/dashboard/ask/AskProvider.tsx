@@ -1,17 +1,19 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useCopilotThread } from '../../../components/copilot/useCopilotThread';
+import { useCopilotThread, type CopilotThread } from '../../../components/copilot/useCopilotThread';
 import { SM, XL, useMediaQuery } from '../../../lib/useMediaQuery';
 import { fetchConversation } from '../../copilot/copilotApi';
-import type { Conversation, DashboardFocus, SurfaceContext } from '../../copilot/types';
+import type { Conversation, DashboardFocus } from '../../copilot/types';
 import { ASK_PREFERENCE_KEY, readAskPreference, writeAskPreference } from './askPreference';
-import { AskContext, type AskState, type AskSurface } from './context';
+import { AskContext, withFocus, type AskState, type AskSurface } from './context';
 import { originPath } from './originPath';
 
 /** The navigation state another surface's History sends with a conversation
- *  that started on this page. */
+ *  that started on this page: the conversation History already loaded, and
+ *  its id, for when only the id survives (the page fetches it then). */
 export interface AskHandover {
   askConversationId?: number;
+  askConversation?: Conversation;
 }
 
 /** Holds one surface's conversation (the Dashboard's above its areas,
@@ -29,26 +31,55 @@ export function AskProvider({
   preferenceKey?: string;
   children: ReactNode;
 }) {
-  const { pathname, search, state } = useLocation();
+  const { pathname, search, hash, state } = useLocation();
   const navigate = useNavigate();
   const isSm = useMediaQuery(SM);
   const isXl = useMediaQuery(XL);
   // Read once, on arrival: a conversation another surface's History sent here.
-  const [handedId] = useState<number | null>(() => (state as AskHandover | null)?.askConversationId ?? null);
-  const [conversation, setConversation] = useState<Conversation | null>(null);
-  const thread = useCopilotThread(conversation, setConversation);
+  const [handover] = useState(() => (state as AskHandover | null) ?? null);
+  const [arrivedAt] = useState(pathname + search + hash);
+  const handedId = handover?.askConversationId ?? handover?.askConversation?.id ?? null;
+  const [conversation, setShownConversation] = useState<Conversation | null>(() => handover?.askConversation ?? null);
+  // Flipped once the person moves on (a send, New chat, a History pick), so a
+  // slow handover fetch landing late never replaces what they are in now.
+  const movedOn = useRef(false);
+  const setConversation = useCallback((next: Conversation | null) => {
+    movedOn.current = true;
+    setShownConversation(next);
+  }, []);
+  const rawThread = useCopilotThread(conversation, setConversation);
+  const thread = useMemo<CopilotThread>(
+    () => ({
+      ...rawThread,
+      send: (turn) => {
+        movedOn.current = true;
+        return rawThread.send(turn);
+      },
+    }),
+    [rawThread],
+  );
   // A handed-over conversation shows for this visit, whatever the saved choice.
   const [choice, setChoice] = useState<boolean | null>(() => (handedId !== null ? true : readAskPreference(preferenceKey)));
   const [sheetOpen, setSheetOpen] = useState(handedId !== null);
   const [focus, setFocus] = useState<DashboardFocus | null>(null);
   const [pendingDraft, setPendingDraft] = useState<{ text: string; nonce: number } | null>(null);
 
+  // The handover is spent once read: clear it from the history entry, so a
+  // reload or Back and Forward neither refetches it nor forces the rail open.
+  const cleared = useRef(false);
   useEffect(() => {
-    if (handedId === null) return;
+    if (!handover || cleared.current) return;
+    cleared.current = true;
+    navigate(arrivedAt, { replace: true, state: null });
+  }, [handover, arrivedAt, navigate]);
+
+  useEffect(() => {
+    // Only an id came (History's copy was lost): fetch it.
+    if (handedId === null || handover?.askConversation) return;
     let cancelled = false;
     fetchConversation(handedId).then(
       (found) => {
-        if (!cancelled) setConversation(found);
+        if (!cancelled && !movedOn.current) setShownConversation(found);
       },
       () => {
         // The rail opens empty; History still lists the conversation.
@@ -57,7 +88,7 @@ export function AskProvider({
     return () => {
       cancelled = true;
     };
-  }, [handedId]);
+  }, [handedId, handover]);
 
   // A focus names accounts on the screen it came from, so another area or
   // filter drops it (a drill closes on the same change). Adjusted during
@@ -127,14 +158,14 @@ export function AskProvider({
         // would drop this send, so leave the draft and its focus as they are.
         const context = surface.context;
         if (!context || thread.pending) return;
+        // A context from another surface would ground the answer in the
+        // wrong page: never send it.
+        if (context.surface !== surface.name) {
+          if (import.meta.env.DEV) console.warn(`Ask: a ${context.surface} context on the ${surface.name} surface was not sent.`);
+          return;
+        }
         reveal();
-        // `focus` is the shared, surface-agnostic slot (the Dashboard also
-        // offers an `attention` focus); on Organizations only
-        // `useAskFocusOnOpen` ever writes here, and it only ever builds a
-        // `{kind: 'companies'}` value, so this cast is safe in practice even
-        // though `OrganizationsContext.focus` is typed narrower than
-        // `DashboardFocus`.
-        void thread.send({ text: question, content: question, context: { ...context, focus: nextFocus } as SurfaceContext });
+        void thread.send({ text: question, content: question, context: withFocus(context, nextFocus) });
         // The send above carries its own focus; an earlier draft's focus and
         // text are spent, or the chip would name accounts nobody asked about.
         setFocus(null);
@@ -149,7 +180,7 @@ export function AskProvider({
         if (origin && origin.surface !== surface.name) {
           // Started on the other surface: it reopens on that page, beside
           // what it was about, and that page's rail picks it up.
-          const handover: AskHandover = { askConversationId: next.id };
+          const handover: AskHandover = { askConversationId: next.id, askConversation: next };
           navigate(originPath(origin), { state: handover });
           return;
         }
@@ -160,7 +191,7 @@ export function AskProvider({
         reveal();
       },
     }),
-    [surface, open, setOpen, reveal, conversation, thread, focus, clearFocus, focusOn, markSent, pendingDraft, navigate],
+    [surface, open, setOpen, reveal, conversation, setConversation, thread, focus, clearFocus, focusOn, markSent, pendingDraft, navigate],
   );
 
   return <AskContext.Provider value={value}>{children}</AskContext.Provider>;
