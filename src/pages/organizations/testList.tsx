@@ -1,6 +1,7 @@
 // Test-only helpers, never hot-reloaded: Where sits beside the render
 // helpers so a test imports one module, not two.
 /* eslint-disable react-refresh/only-export-components */
+import { useMemo, useState, type ReactNode } from 'react';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -9,14 +10,17 @@ import customersReducer from '../../features/customers/customersSlice';
 import authReducer from '../../features/auth/authSlice';
 import notificationsReducer from '../../features/notifications/notificationsSlice';
 import { Navbar } from '../../components/layout/Navbar';
+import { NavActionsSlotContext } from '../../layouts/navActionsSlot';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 import { setViewport } from '../../test/viewport';
+import { dashboardRoutes } from '../dashboard/routes';
+import { OrganizationsAskLayout } from './ask/OrganizationsAskLayout';
 import { Board } from './Board';
 import { List } from './List';
 
 // Test-only. The real auth, customers and notifications slices (the modals
 // dispatch into customers; the Navbar reads notifications). Only fetch is
-// stubbed, by the caller, with stubPortfolio().
+// stubbed, by the caller, with stubPortfolio() or stubOrganizationsAsk().
 
 export function Where() {
   const location = useLocation();
@@ -63,37 +67,64 @@ function makeStore() {
   });
 }
 
+/** DashboardLayout's Navbar actions slot. With the real Navbar (`nav`) the
+ *  Navbar renders the slot element; without it a bare one stands in
+ *  (`data-testid="nav-actions"`). */
+function SlotHost({ bare, children }: { bare: boolean; children: ReactNode }) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const value = useMemo(() => ({ slot, setSlot }), [slot]);
+  return (
+    <NavActionsSlotContext.Provider value={value}>
+      {bare ? <div ref={setSlot} data-testid="nav-actions" /> : null}
+      {children}
+    </NavActionsSlotContext.Provider>
+  );
+}
+
 /** Both Organizations routes (and the organization page they link to) on the
  *  real store and router. `nav` adds the real Navbar, whose List/Board tabs
- *  switch between them carrying the query. */
-export function renderOrganizations(url: string, { width = 1440, nav = false }: { width?: number; nav?: boolean } = {}) {
+ *  switch between them carrying the query. `ask` puts both under
+ *  OrganizationsAskLayout, as App.tsx does, with the real dashboard routes
+ *  beside them (every view a Where) for History's cross-surface handover. */
+export function renderOrganizations(
+  url: string,
+  { width = 1440, nav = false, ask = false }: { width?: number; nav?: boolean; ask?: boolean } = {},
+) {
   setViewport(width);
   const store = makeStore();
+  const pages = [
+    <Route
+      key="list"
+      path="/organizations/list"
+      element={
+        <>
+          <List />
+          <Where />
+        </>
+      }
+    />,
+    <Route
+      key="board"
+      path="/organizations/board"
+      element={
+        <>
+          <Board />
+          <Where />
+        </>
+      }
+    />,
+  ];
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
-        {nav ? <Navbar /> : null}
-        <Routes>
-          <Route
-            path="/organizations/list"
-            element={
-              <>
-                <List />
-                <Where />
-              </>
-            }
-          />
-          <Route
-            path="/organizations/board"
-            element={
-              <>
-                <Board />
-                <Where />
-              </>
-            }
-          />
-          <Route path="/organizations/:id" element={<p>Organization page</p>} />
-        </Routes>
+        <SlotHost bare={!nav}>
+          {nav ? <Navbar /> : null}
+          <Routes>
+            {ask ? <Route element={<OrganizationsAskLayout />}>{pages}</Route> : pages}
+            <Route path="/organizations/:id" element={<p>Organization page</p>} />
+            {ask ? dashboardRoutes(() => <Where />) : null}
+          </Routes>
+        </SlotHost>
       </MemoryRouter>
     </Provider>,
   );
