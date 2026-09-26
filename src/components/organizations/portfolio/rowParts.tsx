@@ -103,6 +103,19 @@ export function RenewalRunway({ renewal, className = '' }: { renewal: PortfolioR
 
 const DOT: Record<number, string> = { 1: 'bg-success', 2: 'bg-danger', 3: 'bg-warning', 0: 'bg-line-strong' };
 
+/** The stored pulse dots, oldest first, as one image described in words.
+ *  `field` marks it for the field-coverage test where it is the row's Pulse
+ *  column (the organization's), and is left off an account's dots. */
+export function PulseDots({ history, field }: { history: number[]; field?: string }) {
+  return (
+    <span data-field={field} role="img" aria-label={`Pulse history: ${pulseWords(history)}`} className="flex gap-[3px]">
+      {history.map((n, i) => (
+        <span key={i} className={`h-1.5 w-1.5 rounded-full ${DOT[n] ?? DOT[0]}`} />
+      ))}
+    </span>
+  );
+}
+
 /** "AI n · CSM n", the stored pulse dots (the old Pulse column), the AI
  *  label (the old AI Pulse Score column) and, when the server says the two
  *  pulses differ by 2 or more, a marker in words. */
@@ -114,11 +127,7 @@ export function PulsePair({ pulse, className = '' }: { pulse: PortfolioRow['puls
         AI {show(pulse.ai)} · CSM {show(pulse.csm)}
       </span>
       <span className="flex min-w-0 items-center gap-1.5 text-[11px]">
-        <span data-field="pulse" role="img" aria-label={`Pulse history: ${pulseWords(pulse.history)}`} className="flex gap-[3px]">
-          {pulse.history.map((n, i) => (
-            <span key={i} className={`h-1.5 w-1.5 rounded-full ${DOT[n] ?? DOT[0]}`} />
-          ))}
-        </span>
+        <PulseDots history={pulse.history} field="pulse" />
         <span data-field="aiPulseScore" className="truncate text-ink-muted">{pulse.ai_label || '—'}</span>
       </span>
       {pulse.disagree ? <span className="text-[11px] text-warning">pulses disagree</span> : null}
