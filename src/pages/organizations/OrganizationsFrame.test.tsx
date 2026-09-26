@@ -6,7 +6,7 @@ describe('OrganizationsFrame', () => {
   it('is the dashboard body, class for class, with the content owning its scroll', () => {
     const { container } = render(<OrganizationsFrame><p>List</p></OrganizationsFrame>);
     expect(container.firstChild).toHaveClass('relative', 'flex-1', 'min-h-0', 'w-full', 'flex', 'gap-3', 'px-4', 'pb-4');
-    expect(screen.getByText('List').parentElement).toHaveClass('flex-1', 'min-w-0', 'min-h-0', 'overflow-y-auto');
+    expect(screen.getByText('List').parentElement).toHaveClass('flex-1', 'min-w-0', 'min-h-0', 'overflow-y-auto', 'flex', 'flex-col');
   });
 
   it('puts a rail beside the content when given one', () => {

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderOrganizations } from '../pages/organizations/testList';
@@ -14,16 +14,19 @@ const column = (key: string) => document.querySelector(`[data-column="${key}"]`)
 const views = () => screen.getByRole('navigation', { name: 'Organizations views' });
 const card = (id: number) => document.querySelector(`[data-card-id="${id}"]`) as HTMLElement;
 
-/** BoardCard's "Move to…" is a menu (MoveToMenu), never a `<select>`: click
- *  the button, then the target's `menuitem`. Every movable card on the board
- *  shares the same "Move to…" label, so the lookup is scoped to one card's
- *  own DOM node by its `data-card-id`. */
+/** BoardCard's "Move to…" is an icon button ("Move <name> to…") opening a
+ *  menu (MoveToMenu), never a `<select>`: click it, then the target's
+ *  `menuitem`, scoped to one card's own DOM node by its `data-card-id`. */
 async function moveCardTo(id: number, label: string) {
-  await userEvent.click(within(card(id)).getByRole('button', { name: 'Move to…' }));
+  await userEvent.click(within(card(id)).getByRole('button', { name: /^Move .+ to…$/ }));
   await userEvent.click(within(card(id)).getByRole('menuitem', { name: label }));
 }
 
 describe('Organizations board', () => {
+  // jsdom has no scrollIntoView; the phone column tabs call it.
+  beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
     resetViewport();
@@ -68,7 +71,11 @@ describe('Organizations board', () => {
       expect(within(screen.getByRole('complementary', { name: 'Pizza Hut' })).getByText(/^Carl CSM · Renewal ·/)).toBeInTheDocument(),
     );
 
-    // 5. Drag it into Churn: the churn modal opens; confirming churns it and it leaves the board.
+    // 5. Once the move has settled (one move at a time), drag it into Churn:
+    // the churn modal opens; confirming churns it and it leaves the board.
+    await waitFor(() => expect(within(card(7)).getByRole('button', { name: 'Move Pizza Hut to…' })).toBeEnabled());
+    // Focus followed the card into its new column.
+    expect(within(column('renewal')).getByRole('button', { name: 'Close Pizza Hut' })).toHaveFocus();
     const dt = { setData: vi.fn(), effectAllowed: 'all', dropEffect: 'none' };
     fireEvent.dragStart(card(7), { dataTransfer: dt });
     fireEvent.dragOver(column('churn'), { dataTransfer: dt });
@@ -95,7 +102,6 @@ describe('Organizations board', () => {
     await act(async () => io.reveal(live.querySelector('[data-sentinel]')!));
     await waitFor(() => expect(within(live).getAllByRole('link')).toHaveLength(30));
 
-    Element.prototype.scrollIntoView = vi.fn();
     const tabs = screen.getByRole('navigation', { name: 'Board columns' });
     await userEvent.click(within(tabs).getByRole('button', { name: 'Renewal 0' }));
     expect(within(tabs).getByRole('button', { name: 'Renewal 0' })).toHaveAttribute('aria-current', 'true');

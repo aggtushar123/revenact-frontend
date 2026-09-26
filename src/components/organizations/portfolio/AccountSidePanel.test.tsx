@@ -60,6 +60,26 @@ describe('AccountSidePanel', () => {
     expect(opener).toHaveFocus();
   });
 
+  it('shows fresh data when its row prop changes while open', () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <AccountSidePanel row={pizzaHut} currency="USD" onClose={vi.fn()} />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Carl CSM · Live · Touched 33d ago')).toBeInTheDocument();
+    rerender(
+      <MemoryRouter>
+        <AccountSidePanel
+          row={{ ...pizzaHut, arr: 120000, lifecycle: { value: 'renewal', label: 'Renewal' } }}
+          currency="USD"
+          onClose={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Carl CSM · Renewal · Touched 33d ago')).toBeInTheDocument();
+    expect(screen.getByText('$120.0K')).toBeInTheDocument();
+  });
+
   it('closes from its Close button', async () => {
     const onClose = vi.fn();
     render(

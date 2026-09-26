@@ -1,11 +1,11 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAppSelector, useOrgCurrency } from '../../hooks';
 import { apiFetch } from '../../lib/apiClient';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
 import type { Customer } from '../../features/customers/customersSlice';
-import { exportPortfolio } from '../../features/organizations/portfolioApi';
-import { BOARD_GROUP, boardParams, hasFilters, toApiQuery } from '../../features/organizations/portfolioParams';
+import { exportPortfolio, fetchPortfolio } from '../../features/organizations/portfolioApi';
+import { BOARD_GROUP, boardParams, hasFilters, includesChurned, toApiQuery } from '../../features/organizations/portfolioParams';
 import type { LifecycleValue, PortfolioRow } from '../../features/organizations/portfolioTypes';
 import { OrganizationFormModal } from '../../components/organizations/OrganizationFormModal';
 import { ChurnOrganizationModal } from '../../components/organizations/ChurnOrganizationModal';
@@ -45,7 +45,8 @@ export function Board() {
   const [columnBumps, setColumnBumps] = useState<Record<string, number>>({});
   const reload = useCallback(() => setVersion((v) => v + 1), []);
 
-  const portfolio = usePortfolio(params, version + frameBump);
+  // A move's frame reload skips the M probe: a lifecycle move can't change M.
+  const portfolio = usePortfolio(params, version + frameBump, undefined, version);
 
   const [openRow, setOpenRow] = useState<PortfolioRow | null>(null);
   // Any column's page landing swaps the opened card for its fresh copy, so
@@ -65,9 +66,9 @@ export function Board() {
   }, []);
   const board = useBoardMove({ onSaved, onChurn: setChurning });
 
-  // A different list landing (a filter, sort or group change) forgets the
-  // last move, so a column mounting later never replays it. Adjusted during
-  // render, not in an effect.
+  // A move is forgotten once its reloads land (the board calls
+  // `board.settle`). A different list landing (a filter, sort or group
+  // change) forgets it at once. Adjusted during render, not in an effect.
   const { loadedQuery } = portfolio;
   const [seenQuery, setSeenQuery] = useState(loadedQuery);
   if (seenQuery !== loadedQuery) {
@@ -89,6 +90,38 @@ export function Board() {
 
   const toggleOpen = useCallback((row: PortfolioRow) => setOpenRow((current) => (current?.id === row.id ? null : row)), []);
   const closeOpen = useCallback(() => setOpenRow(null), []);
+
+  // When a fresh frame lands (a filter, a churn, a move, an edit) the opened
+  // card may have left the view. Ask for that one account under the view's
+  // filters; if it no longer matches (or is churned while churned accounts
+  // are hidden), close its panel or sheet instead of showing a stale row.
+  const openId = openRow?.id ?? null;
+  const lastKey = useRef(portfolio.loadedKey);
+  useEffect(() => {
+    const landed = lastKey.current !== portfolio.loadedKey;
+    lastKey.current = portfolio.loadedKey;
+    if (!landed || openId === null || portfolio.loadedKey === null) return;
+    const close = () => setOpenRow((current) => (current?.id === openId ? null : current));
+    if (params.ids.length > 0 && !params.ids.includes(openId)) {
+      close();
+      return;
+    }
+    let cancelled = false;
+    fetchPortfolio(toApiQuery({ ...params, group: '', ids: [openId] }, { limit: '1' })).then(
+      (data) => {
+        if (cancelled) return;
+        const row = data.results.find((r) => r.id === openId);
+        if (!row || (row.churned && !includesChurned(params))) close();
+        else setOpenRow((current) => (current?.id === openId ? row : current));
+      },
+      () => {
+        // Unknown: keep the panel rather than close it on a network blip.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [portfolio.loadedKey, openId, params]);
 
   const openEdit = useCallback(async (id: number) => {
     setNotice(null);
@@ -113,7 +146,11 @@ export function Board() {
 
   return (
     <OrganizationsFrame>
-      <div className="flex h-full min-h-0 flex-col gap-4 pb-4">
+      {/* From sm the page fills the frame (a flex column chain with min-h-0
+          down to each column's own scroller), so the page doesn't scroll
+          and the columns do. A short window keeps a 360px board and lets the
+          frame scroll. Phones scroll the page. */}
+      <div data-part="board-page" className={`flex flex-col gap-4 pb-4 ${isSm ? 'min-h-0 flex-1' : ''}`}>
         <div className="flex shrink-0 flex-col gap-4">
           <SummaryTiles
             summary={portfolio.data?.summary ?? null}
@@ -149,8 +186,16 @@ export function Board() {
             }}
           />
           {notice ? (
-            <p role="alert" className="text-[13px] text-danger">
+            <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
               {notice}
+              <button
+                type="button"
+                onClick={() => setNotice(null)}
+                aria-label="Dismiss"
+                className={`inline-flex w-11 h-11 sm:w-8 sm:h-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-subtle active:bg-line-subtle ${FOCUS}`}
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
             </p>
           ) : null}
           {board.error ? (
@@ -170,7 +215,7 @@ export function Board() {
             {board.notice ?? ''}
           </p>
         </div>
-        <div className="flex min-h-[24rem] flex-1 gap-3">
+        <div data-part="board-area" className={`flex gap-3 ${isSm ? 'min-h-[360px] flex-1' : ''}`}>
           <PortfolioBoard
             params={params}
             portfolio={portfolio}
@@ -180,7 +225,7 @@ export function Board() {
             isSm={isSm}
             filtered={hasFilters(params)}
             move={board.move}
-            saving={board.saving}
+            saving={board.busy}
             openId={openRow?.id ?? null}
             onOpen={toggleOpen}
             onMove={board.moveTo}
@@ -188,6 +233,7 @@ export function Board() {
             onClearFilters={clearFilters}
             onAdd={(stage) => setAdding({ stage })}
             onShowChurned={() => update({ include_churned: true })}
+            onMoveSettled={board.settle}
           />
           {isSm && openRow ? <AccountSidePanel row={openRow} currency={currency} onClose={closeOpen} onEdit={openEdit} /> : null}
         </div>
@@ -198,20 +244,12 @@ export function Board() {
       {adding ? (
         <OrganizationFormModal
           defaultLifecycleStage={adding.stage ?? defaultLifecycleStage}
-          onClose={() => {
-            setAdding(null);
-            reload();
-          }}
+          onSaved={reload}
+          onClose={() => setAdding(null)}
         />
       ) : null}
       {editing ? (
-        <OrganizationFormModal
-          customer={editing}
-          onClose={() => {
-            setEditing(null);
-            reload();
-          }}
-        />
+        <OrganizationFormModal customer={editing} onSaved={reload} onClose={() => setEditing(null)} />
       ) : null}
       {churning ? (
         <ChurnOrganizationModal

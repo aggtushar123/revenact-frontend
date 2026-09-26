@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { renderBoard } from './testList';
 import { resetViewport } from '../../test/viewport';
@@ -19,7 +19,7 @@ const column = (key: string) => document.querySelector(`[data-column="${key}"]`)
 const heading = (key: string) => within(column(key)).getByRole('heading');
 const card = (id: number) => document.querySelector(`[data-card-id="${id}"]`) as HTMLElement;
 const dataTransfer = () => ({ setData: vi.fn(), effectAllowed: 'all', dropEffect: 'none' });
-const moveButton = (id: number) => within(card(id)).queryByRole('button', { name: 'Move to…' });
+const moveButton = (id: number) => within(card(id)).queryByRole('button', { name: /^Move .+ to…$/ });
 /** Ruling R1: Move to… is a button opening a menu; nothing moves until a stage is chosen. */
 const chooseMove = async (id: number, name: string, stage: string) => {
   await userEvent.click(moveButton(id) as HTMLElement);
@@ -30,15 +30,27 @@ const ready = async () => {
   await screen.findByRole('link', { name: 'Globex' });
 };
 
-/** Holds every PATCH until release(); everything else goes straight to the stub. */
-function holdPatches(spy: ReturnType<typeof stubPortfolio>) {
+/** Holds every request `matches` picks until release(); everything else
+ *  goes straight to the stub. */
+function holdRequests(spy: ReturnType<typeof stubPortfolio>, matches: (url: URL, init?: RequestInit) => boolean) {
   const waiting: (() => void)[] = [];
+  let holding = true;
   vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
-    if (init?.method === 'PATCH') await new Promise<void>((resolve) => waiting.push(resolve));
+    if (holding && matches(new URL(String(input)), init)) await new Promise<void>((resolve) => waiting.push(resolve));
     return spy(input, init);
   });
-  return { release: () => waiting.splice(0).forEach((resolve) => resolve()) };
+  return {
+    release: () => waiting.splice(0).forEach((resolve) => resolve()),
+    stop: () => {
+      holding = false;
+      waiting.splice(0).forEach((resolve) => resolve());
+    },
+    held: () => waiting.length,
+  };
 }
+
+/** Holds every PATCH until release(). */
+const holdPatches = (spy: ReturnType<typeof stubPortfolio>) => holdRequests(spy, (_url, init) => init?.method === 'PATCH');
 
 describe('Organizations board (portfolio)', () => {
   afterEach(() => {
@@ -113,7 +125,68 @@ describe('Organizations board (portfolio)', () => {
     await waitFor(() => expect(moveButton(1)).toBeEnabled());
     expect(heading('renewal')).toHaveTextContent('Renewal · 1 · $69.6K');
     expect(heading('live')).toHaveTextContent('Live · 0 · $0');
+    // Once, in its new column only: no duplicate after the bumped reads.
+    expect(within(column('renewal')).getAllByRole('link', { name: 'Pizza Hut' })).toHaveLength(1);
+    expect(within(column('live')).queryByRole('link', { name: 'Pizza Hut' })).not.toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: 'Pizza Hut' })).toHaveLength(1);
+  });
+
+  it('puts focus on the moved card in its new column after a keyboard move, never on the page', async () => {
+    const user = userEvent.setup();
+    stubPortfolio();
+    renderBoard();
+    await ready();
+    (moveButton(7) as HTMLElement).focus();
+    await user.keyboard('{Enter}');
+    const menu = screen.getByRole('menu', { name: 'Move Pizza Hut to' });
+    await user.keyboard('{End}');
+    expect(within(menu).getByRole('menuitem', { name: 'Other' })).toHaveFocus();
+    await user.keyboard('{ArrowUp}{ArrowUp}{ArrowUp}{Enter}');
+    const open = within(column('renewal')).getByRole('button', { name: 'Open Pizza Hut' });
+    expect(open).toHaveFocus();
+    await waitFor(() => expect(moveButton(1)).toBeEnabled());
+    expect(within(column('renewal')).getByRole('button', { name: 'Open Pizza Hut' })).toHaveFocus();
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it("allows one move at a time until its reloads land, so the first card never reverts", async () => {
+    const spy = stubPortfolio();
+    renderBoard();
+    await ready();
+    const reads = holdRequests(spy, (url) => url.searchParams.get('group_value') === 'renewal');
+    await chooseMove(7, 'Pizza Hut', 'Renewal');
+    await waitFor(() => expect(patchBodies(spy)).toHaveLength(1));
+    await waitFor(() => expect(reads.held()).toBe(1));
+    // Saved, and the frame has reloaded, but Renewal's own page hasn't landed.
     expect(within(column('renewal')).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+    expect(moveButton(1)).toBeDisabled();
+    reads.stop();
+    await waitFor(() => expect(moveButton(1)).toBeEnabled());
+    expect(within(column('renewal')).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+    await chooseMove(1, 'Globex', 'Live');
+    await waitFor(() => expect(within(column('live')).getByRole('link', { name: 'Globex' })).toBeInTheDocument());
+    expect(within(column('renewal')).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+    await waitFor(() => expect(moveButton(1)).toBeEnabled());
+    expect(within(column('renewal')).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+  });
+
+  it('switches Group without reading columns from the old frame (no owner read with a lifecycle key)', async () => {
+    const spy = stubPortfolio();
+    renderBoard();
+    await ready();
+    const frames = holdRequests(spy, (url) => url.searchParams.get('group') === 'owner' && !url.searchParams.has('group_value'));
+    const before = portfolioQueries(spy).length;
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Group' }), 'owner');
+    await waitFor(() => expect(frames.held()).toBe(1));
+    // The old frame's columns stay as they were while the new one loads.
+    expect(within(column('live')).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+    expect(screen.queryByText('No organizations in Live.')).not.toBeInTheDocument();
+    frames.stop();
+    await waitFor(() => expect(column('2')).toContainElement(screen.getByRole('link', { name: 'Pizza Hut' })));
+    const after = portfolioQueries(spy).slice(before);
+    const lifecycleKeys = ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'churn', 'expansion', 'other'];
+    expect(after.filter((q) => q.get('group') === 'owner' && lifecycleKeys.includes(q.get('group_value') ?? ''))).toEqual([]);
+    expect(screen.queryByText('No organizations in Live.')).not.toBeInTheDocument();
   });
 
   it("puts the card back with the server's reason when the save fails", async () => {
@@ -203,6 +276,50 @@ describe('Organizations board (portfolio)', () => {
     expect(screen.queryByRole('complementary', { name: 'Pizza Hut' })).not.toBeInTheDocument();
   });
 
+  it('closes the side panel when its card leaves the view (churned while churned accounts are hidden)', async () => {
+    stubPortfolio({ customer: customerFixture });
+    renderBoard();
+    await ready();
+    await userEvent.click(screen.getByRole('button', { name: 'Open Pizza Hut' }));
+    expect(screen.getByRole('complementary', { name: 'Pizza Hut' })).toBeInTheDocument();
+    await chooseMove(7, 'Pizza Hut', 'Churn');
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm Churn' }));
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Pizza Hut' })).not.toBeInTheDocument());
+  });
+
+  it('keeps the side panel open, with fresh data, when a reload keeps its card in view', async () => {
+    stubPortfolio({ customer: customerFixture });
+    renderBoard();
+    await ready();
+    await userEvent.click(screen.getByRole('button', { name: 'Open Pizza Hut' }));
+    await chooseMove(7, 'Pizza Hut', 'Renewal');
+    await waitFor(() => expect(moveButton(1)).toBeEnabled());
+    expect(within(screen.getByRole('complementary', { name: 'Pizza Hut' })).getByText(/^Carl CSM · Renewal ·/)).toBeInTheDocument();
+  });
+
+  it('closes the side panel when a filter leaves its card out', async () => {
+    stubPortfolio();
+    renderBoard();
+    await ready();
+    await userEvent.click(screen.getByRole('button', { name: 'Open Pizza Hut' }));
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search by name or Revenact ID' }), 'Globex');
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Pizza Hut' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole('complementary', { name: 'Pizza Hut' })).not.toBeInTheDocument());
+  });
+
+  it('fills the frame height from sm: the frame, page and board are one flex column chain', async () => {
+    stubPortfolio();
+    renderBoard();
+    await ready();
+    const page = document.querySelector('[data-part="board-page"]') as HTMLElement;
+    expect(page.parentElement).toHaveClass('flex', 'flex-col', 'min-h-0', 'overflow-y-auto');
+    expect(page).toHaveClass('flex', 'flex-1', 'flex-col', 'min-h-0');
+    const area = document.querySelector('[data-part="board-area"]') as HTMLElement;
+    expect(area).toHaveClass('flex', 'flex-1', 'min-h-[360px]');
+    expect(area.firstElementChild).toHaveClass('flex', 'flex-1', 'flex-col', 'min-h-0');
+    expect(column('live').lastElementChild).toHaveClass('min-h-0', 'flex-1', 'overflow-y-auto');
+  });
+
   it('lays columns out as snapping panels with column tabs on phones, and opens cards in the bottom sheet', async () => {
     const spy = stubPortfolio();
     renderBoard('/organizations/board', { width: 375 });
@@ -224,14 +341,18 @@ describe('Organizations board (portfolio)', () => {
   });
 
   it("adds into a stage from a column's +, and without a stage from the toolbar (ruling R2)", async () => {
-    stubPortfolio();
+    const spy = stubPortfolio();
     renderBoard();
     await ready();
     expect(within(column('churn')).queryByRole('button', { name: /^Add organization to / })).not.toBeInTheDocument();
     await userEvent.click(within(column('renewal')).getByRole('button', { name: 'Add organization to Renewal' }));
     expect(await screen.findByRole('combobox', { name: /lifecycle/i })).toHaveValue('renewal');
+    const before = portfolioQueries(spy).length;
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(screen.queryByRole('combobox', { name: /lifecycle/i })).not.toBeInTheDocument();
+    // Cancelling changed nothing, so nothing reloads.
+    await act(async () => {});
+    expect(portfolioQueries(spy)).toHaveLength(before);
 
     await userEvent.click(screen.getByRole('button', { name: /^Add organization$/ }));
     expect(await screen.findByRole('combobox', { name: /lifecycle/i })).toHaveValue('onboarding');
@@ -248,6 +369,17 @@ describe('Organizations board (portfolio)', () => {
 
     await userEvent.click(await screen.findByRole('link', { name: 'Pizza Hut' }));
     expect(screen.getByText('Organization page')).toBeInTheDocument();
+  });
+
+  it('lets the edit-open error be dismissed', async () => {
+    stubPortfolio({ customer: undefined });
+    renderBoard();
+    await ready();
+    await userEvent.click(screen.getByRole('button', { name: 'Open Pizza Hut' }));
+    await userEvent.click(within(screen.getByRole('complementary', { name: 'Pizza Hut' })).getByRole('button', { name: 'Edit details' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Not stubbed');
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('shows a designed error with Try again when the board cannot load', async () => {

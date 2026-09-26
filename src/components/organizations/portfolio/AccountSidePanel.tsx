@@ -39,8 +39,11 @@ export function AccountSidePanel({
     };
   }, []);
 
+  // Escape inside the panel closes it. Only keys pressed inside the aside
+  // reach this handler (the DOM scopes it), which is what keeps a card's
+  // Move to… menu, outside the panel, from closing it too.
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (event.key === 'Escape' && !event.defaultPrevented) {
+    if (event.key === 'Escape') {
       event.preventDefault();
       onClose();
     }
