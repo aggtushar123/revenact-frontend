@@ -215,6 +215,8 @@ export interface Account {
   pulse: number[];
   ai_pulse_score: 'very_satisfied' | 'satisfied' | 'moderate' | 'high_risk' | '';
   ai_pulse_reason: string;
+  /** The AI pulse as a number (1-5), null when unscored; AccountSerializer's `ai_pulse_value`. Optional because older fixtures omit it. */
+  ai_pulse_value?: number | null;
   /** How the relationship feels right now — the backend's pulse.py blend of five signals. */
   account_pulse: AccountPulse;
   nps_score: number | null;
