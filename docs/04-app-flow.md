@@ -337,11 +337,12 @@ tags an Organizations conversation with "Organizations" followed by the
 server's own `labels`, joined with " · " ("Organizations · Owner: Carl CSM";
 there is no `origin_label` field), and reopening one goes to its view with
 its filters, then shows the thread. A conversation that started on the
-Dashboard, picked here, navigates to its dashboard view with
-`askConversationId` in the navigation state, and the Dashboard's rail fetches
-and shows it for that visit (and the reverse) — a History pick always
-navigates to the surface the conversation started on, whichever page is
-showing it. Shared replies on Organizations are withheld from mentioned-only
+Dashboard, picked here, navigates to its dashboard view carrying the
+conversation History already loaded (and its id) in the navigation state; the
+Dashboard's rail shows that conversation for the visit at once, and only
+fetches it by id when just the id survives (and the reverse) — a History
+pick always navigates to the surface the conversation started on, whichever
+page is showing it. Shared replies on Organizations are withheld from mentioned-only
 readers by the same write-time snapshot rule as the Dashboard's; see
 [API_CONTRACTS §"Shared sessions"](../../revenact-backend/docs/API_CONTRACTS.md).
 
