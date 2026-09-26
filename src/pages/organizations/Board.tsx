@@ -21,6 +21,9 @@ import { useBoardMove } from '../../components/organizations/portfolio/useBoardM
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
 import { FOCUS } from '../../components/organizations/portfolio/styles';
+import { AskRail } from '../dashboard/ask/AskRail';
+import { useReportPortfolioOptions } from './ask/portfolioOptions';
+import { useAskFocusOnOpen } from './ask/useAskFocus';
 import { OrganizationsFrame } from './OrganizationsFrame';
 
 /** /organizations/board: the portfolio as columns (spec 2026-09-25 §1
@@ -87,6 +90,10 @@ export function Board() {
   const currency = portfolio.data?.currency ?? orgCurrency;
   const options = portfolio.data?.filters ?? null;
   const failed = !portfolio.data && portfolio.error !== null;
+  // Ask Revenact (spec §3): chips named from this read's options; an opened
+  // card (side panel or sheet) narrows the next question to it.
+  useReportPortfolioOptions(options);
+  useAskFocusOnOpen(openRow?.id ?? null);
 
   const toggleOpen = useCallback((row: PortfolioRow) => setOpenRow((current) => (current?.id === row.id ? null : row)), []);
   const closeOpen = useCallback(() => setOpenRow(null), []);
@@ -145,7 +152,7 @@ export function Board() {
   };
 
   return (
-    <OrganizationsFrame>
+    <OrganizationsFrame rail={<AskRail />}>
       {/* From sm the page fills the frame (a flex column chain with min-h-0
           down to each column's own scroller), so the page doesn't scroll
           and the columns do. A short window keeps a 360px board and lets the

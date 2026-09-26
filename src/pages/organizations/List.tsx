@@ -24,6 +24,9 @@ import type { PortfolioRowRenderer } from '../../components/organizations/portfo
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
 import { useSelection } from '../../components/organizations/portfolio/useSelection';
+import { AskRail } from '../dashboard/ask/AskRail';
+import { useReportPortfolioOptions } from './ask/portfolioOptions';
+import { useAskFocusOnOpen } from './ask/useAskFocus';
 import { OrganizationsFrame } from './OrganizationsFrame';
 
 type Targets = { ids: number[]; names: string[] };
@@ -112,6 +115,10 @@ export function List() {
 
   const currency = portfolio.data?.currency ?? orgCurrency;
   const options = portfolio.data?.filters ?? null;
+  // Ask Revenact (spec §3): the chips name owners and products from this
+  // read's options, and an opened row narrows the next question to it.
+  useReportPortfolioOptions(options);
+  useAskFocusOnOpen(openRow?.id ?? null);
 
   const toggleOpen = useCallback((row: PortfolioRow) => setOpenRow((current) => (current?.id === row.id ? null : row)), []);
   const closeSheet = useCallback(() => setOpenRow(null), []);
@@ -195,7 +202,7 @@ export function List() {
   };
 
   return (
-    <OrganizationsFrame>
+    <OrganizationsFrame rail={<AskRail />}>
       <div className="flex flex-col gap-4 pb-6">
         <SummaryTiles
           summary={portfolio.data?.summary ?? null}
