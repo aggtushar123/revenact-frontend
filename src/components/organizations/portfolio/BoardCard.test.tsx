@@ -21,6 +21,8 @@ function renderCard(overrides: Partial<BoardCardProps> = {}) {
   };
   render(
     <MemoryRouter>
+      {/* A focusable element outside the card, for the outside-click focus tests. */}
+      <button type="button">Elsewhere</button>
       <ul>
         <BoardCard {...props} />
       </ul>
@@ -105,7 +107,7 @@ describe('BoardCard', () => {
     expect(button).toHaveFocus();
   });
 
-  it('closes the menu on a click outside and returns focus to the button', async () => {
+  it('closes the menu on a click outside, without moving focus', async () => {
     const user = userEvent.setup();
     renderCard();
     const button = screen.getByRole('button', { name: 'Move to…' });
@@ -113,7 +115,17 @@ describe('BoardCard', () => {
     expect(within(card()).getByRole('menu')).toBeInTheDocument();
     await user.click(document.body);
     expect(within(card()).queryByRole('menu')).not.toBeInTheDocument();
-    expect(button).toHaveFocus();
+  });
+
+  it('leaves focus on the element an outside click landed on', async () => {
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(screen.getByRole('button', { name: 'Move to…' }));
+    expect(within(card()).getByRole('menu')).toBeInTheDocument();
+    const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
+    await user.click(elsewhere);
+    expect(within(card()).queryByRole('menu')).not.toBeInTheDocument();
+    expect(elsewhere).toHaveFocus();
   });
 
   it('drags from sm, handing over its id', () => {

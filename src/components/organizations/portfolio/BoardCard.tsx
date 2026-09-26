@@ -50,6 +50,10 @@ function MoveToMenu({
   const menuRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
+  // Escape and choosing an item hand focus back to the button. An outside
+  // click doesn't: the user moved focus somewhere on purpose, so the
+  // browser's own focus change is left alone instead of being fought right
+  // after (the same rule as PinFieldsMenu's `restoreFocus`).
   const closeMenu = () => {
     setOpenMenu(false);
     buttonRef.current?.focus();
@@ -61,13 +65,10 @@ function MoveToMenu({
 
   useEffect(() => {
     if (!openMenu) return;
-    // A native `click` (not `mousedown`): the browser's own mousedown-driven
-    // focus/blur has already settled by then, so the focus() below sticks
-    // instead of being clobbered by that default action right after.
     const onOutsideClick = (event: MouseEvent) => {
       const target = event.target as Node;
       if (menuRef.current?.contains(target) || buttonRef.current?.contains(target)) return;
-      closeMenu();
+      setOpenMenu(false);
     };
     document.addEventListener('click', onOutsideClick);
     return () => document.removeEventListener('click', onOutsideClick);
