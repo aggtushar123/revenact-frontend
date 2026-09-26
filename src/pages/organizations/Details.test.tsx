@@ -1,637 +1,376 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Provider } from 'react-redux';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { configureStore } from '@reduxjs/toolkit';
-import customersReducer from '../../features/customers/customersSlice';
-import authReducer from '../../features/auth/authSlice';
-import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
-import { Details } from './Details';
-import { ALL_CAPABILITIES } from '../../test/capabilities';
+import {
+  manyItems,
+  portfolioRequests,
+  postBodies,
+  requestPaths,
+  storyQueries,
+  stubOrganizationPage,
+} from '../../features/organizations/testStory';
+import { resetViewport } from '../../test/viewport';
+import { renderOrganizationPage } from './testDetail';
 
-// Minimal but real shape, matching revenact-backend's CustomerSerializer —
-// see customersSlice.test.ts / docs/API_CONTRACTS.md -> customers.
-const globex = {
-  id: 10,
-  name: 'Globex Corp',
-  address: '123 Main St',
-  domain: 'globex.example',
-  owner: null,
-  created_by: null,
-  modified_by: null,
-  created_at: '2026-08-31T00:00:00Z',
-  updated_at: '2026-08-31T00:00:00Z',
-  lifecycle_stage: 'onboarding' as const,
-  health_score: '5.0',
-  health_category: 'average' as const,
-  pulse: [],
-  ai_pulse_score: '' as const,
-  ai_pulse_reason: '',
-  account_pulse: {
-    value: '2.3',
-    label: 'At risk' as const,
-    category: 2 as const,
-    breakdown: [
-      { key: 'ai_pulse' as const, label: 'AI pulse', weight: '3.0', reading: '2.0', note: 'what the model reads' },
-      { key: 'csm_pulse' as const, label: 'CSM pulse', weight: '2.5', reading: null, note: 'not set' },
-      { key: 'sentiment' as const, label: 'Recent sentiment', weight: '2.0', reading: '3.0', note: '1 positive, 1 negative of 2 in the last 30 days' },
-      { key: 'touch' as const, label: 'Last contact', weight: '1.5', reading: '4.8', note: '4 days ago' },
-      { key: 'support' as const, label: 'Open tickets', weight: '1.0', reading: '1.0', note: '12 open' },
-    ],
-  },
-  nps_score: null,
-  csat_score: null,
-  joined_date: null,
-  renewal_date: null,
-  contract_start_date: null,
-  contract_end_date: null,
-  currency: 'USD' as const,
-  currency_display: 'US Dollar ($)',
-  arr_billed_at_account: '0.00',
-  arr_billed_at_hq: '0.00',
-  implementation_fee: '0.00',
-  total_contract_value: '0.00',
-  total_forecasted_renewal_revenue: '0.00',
-  primary_product: null,
-  primary_product_name: '',
-  additional_products_count: null,
-  top_source_channel: '',
-  total_contracted_seats: null,
-  total_active_seats: null,
-  seat_utilization_percentage: null,
-  total_hires: null,
-  scope_web_app: '',
-  ces_percentage: null,
-  churn_date: null,
-  churn_reason: '' as const,
-  churn_reason_display: '',
-  churn_comment: '',
-  is_archived: false,
+// Integration tier: the real page, store and router; only fetch is stubbed,
+// with bodies in the shapes of spec 2026-09-26 §2 (stubOrganizationPage).
+const where = () => new URL(`http://x${screen.getByTestId('where').textContent}`);
+const itemKeys = () => [...document.querySelectorAll('[data-story-item]')].map((el) => el.getAttribute('data-story-item'));
+const landed = () => screen.findByRole('heading', { level: 1, name: 'Pizza Hut' });
+const lastStory = (spy: Parameters<typeof storyQueries>[0]) => {
+  const all = storyQueries(spy);
+  return all[all.length - 1];
 };
 
-function renderDetails(id: string) {
-  const store = configureStore({
-    reducer: { customers: customersReducer, auth: authReducer, copilotSessions: copilotSessionsReducer },
-    preloadedState: {
-      auth: {
-        user: {
-          id: 1,
-          email: 'alice@acme.io',
-          name: 'Alice',
-          avatar: '',
-          role: 'admin' as const,
-          role_id: 1,
-          role_name: 'Admin',
-          permissions: ALL_CAPABILITIES,
-          function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
-          organisation: {
-            id: 1,
-            name: 'Acme Inc',
-            slug: 'acme-inc',
-            currency: 'USD' as const,
-            currency_display: 'US Dollar ($)',
-            default_lifecycle_stage: '',
-            ai_agent_enabled: true,
-            ai_agent_tone: 'professional' as const,
-            ai_agent_tone_display: 'Professional',
-          },
-          is_active: true,
-        },
-        accessToken: 'token',
-        refreshToken: 'refresh',
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      },
-    },
-  });
-  render(
-    <Provider store={store}>
-      <MemoryRouter initialEntries={[`/organizations/${id}`]}>
-        <Routes>
-          <Route path="/organizations/:id" element={<Details />} />
-        </Routes>
-      </MemoryRouter>
-    </Provider>
-  );
-}
-
-describe('Organization Details page (/organizations/:id)', () => {
+describe('the organization page (/organizations/:id)', () => {
   beforeEach(() => {
+    Element.prototype.scrollIntoView = vi.fn();
+  });
+  afterEach(() => {
     vi.unstubAllGlobals();
+    resetViewport();
+    document.body.style.overflow = '';
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   });
 
-  it('fetches the org by the id in the URL and renders its real data on the General tab', async () => {
+  it('lands in four requests: the name row, the tiles, the account chips and the story', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    const header = document.querySelector('[data-part="header"]') as HTMLElement;
+    expect(within(header).getByText('Carl CSM').closest('p')).toHaveTextContent('Carl CSM · Live · Touched 33d ago');
+    expect(within(header).getByText('Renewal overdue')).toBeInTheDocument();
+    expect(within(header).getByRole('button', { name: 'ARR $69.6K. Show commercial details' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'EMEA 1' })).toBeInTheDocument();
+    // The Show filters have an "All 5" too: the account chips are their own group.
+    const chips = screen.getByRole('group', { name: 'Filter by account' });
+    expect(within(chips).getByRole('button', { name: 'All 5' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(chips).getByRole('button', { name: 'Organization 3' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Needs attention' })).toBeInTheDocument();
+    expect(itemKeys()).toEqual(['email:41', 'call:12', 'ticket:88', 'task:5', 'health:3']);
+    expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true');
+    expect([...requestPaths(spy)].sort()).toEqual([
+      'GET /customers/7/',
+      'GET /customers/7/accounts/',
+      'GET /organizations/7/story/',
+      'GET /organizations/portfolio/',
+    ]);
+    expect(Object.fromEntries(portfolioRequests(spy)[0])).toEqual({ ids: '7', include_churned: '1', limit: '1' });
+    expect(storyQueries(spy)[0].toString()).toBe('limit=30');
+  });
+
+  it('has none of the removed parts (spec §1.10)', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    await screen.findByRole('button', { name: 'EMEA 1' });
+    for (const gone of [
+      /Enable new 360 UI/,
+      /Ask Copilot/,
+      /coming soon/i,
+      /^Slack$/,
+      /^Sessions$/,
+      /Success Plans/,
+      /Custom Objects/,
+      /Canvas List/,
+      /All attributes/i,
+      /Pinned attributes/i,
+      /Account Pulse/,
+      /Promoters/,
+    ]) {
+      expect(screen.queryByText(gone)).not.toBeInTheDocument();
+    }
+    expect(document.querySelector('img')).toBeNull();
+  });
+
+  it('filters the story by account in the URL, and shows the chips on the Story tab only', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'EMEA 1' }));
+    expect(where().searchParams.get('account')).toBe('31');
+    await waitFor(() => expect(itemKeys()).toEqual(['email:41']));
+    expect(lastStory(spy).get('account')).toBe('31');
+    expect(screen.getByRole('button', { name: 'EMEA 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Edit EMEA' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }));
+    expect(where().searchParams.get('tab')).toBe('people');
+    expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+    expect(where().searchParams.get('account')).toBe('31');
+  });
+
+  it('opens a deep link on its tab, and reads the story only on Story', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage('/organizations/7?tab=details');
+    await landed();
+    expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+    const panel = screen.getByRole('tabpanel', { name: 'Details' });
+    expect(within(panel).getByText('Total contract value')).toBeInTheDocument();
+    const facts = within(panel).getByRole('region', { name: 'Contact and CSAT' });
+    expect(await within(facts).findByText('No CSAT survey has been answered yet.')).toBeInTheDocument();
+    expect(within(panel).getByRole('region', { name: 'AI attributes' })).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+    expect(storyQueries(spy)).toHaveLength(0);
+    await userEvent.click(screen.getByRole('tab', { name: 'Story' }));
+    await waitFor(() => expect(storyQueries(spy)).toHaveLength(1));
+  });
+
+  it('shows a skeleton on Details and Knowledge until the organization lands', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage('/organizations/7?tab=details');
+    expect(screen.getByRole('status', { name: 'Loading details' })).toBeInTheDocument();
+    await landed();
+    expect(screen.queryByRole('status', { name: 'Loading details' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Knowledge' }));
+    expect(await screen.findByRole('region', { name: 'Headlines' })).toBeInTheDocument();
+  });
+
+  it('shows the Knowledge skeleton on a deep link until the organization lands', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage('/organizations/7?tab=knowledge');
+    expect(screen.getByRole('status', { name: 'Loading knowledge' })).toBeInTheDocument();
+    await landed();
+    expect(await screen.findByRole('region', { name: 'Headlines' })).toBeInTheDocument();
+  });
+
+  it('jumps from a tile to its Details panel, and opens the health breakdown', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    scroll.mockClear();
+    await userEvent.click(screen.getByRole('button', { name: /^ARR/ }));
+    expect(where().searchParams.get('tab')).toBe('details');
+    const commercial = document.querySelector('[data-panel="commercial"]');
+    await waitFor(() => expect(commercial).toHaveFocus());
+    // The panel itself scrolled into view, not only the tab row.
+    expect(scroll.mock.contexts).toContain(commercial);
+    await userEvent.click(screen.getByRole('button', { name: /^Pulse/ }));
+    await waitFor(() => expect(document.querySelector('[data-panel="voice"]')).toHaveFocus());
+    await userEvent.click(screen.getByRole('button', { name: /^Health 4\.9/ }));
+    const breakdown = await screen.findByRole('region', { name: 'Health breakdown' });
+    expect(within(breakdown).getByText('Product usage')).toBeInTheDocument();
+  });
+
+  it('moves between the tabs from the keyboard, each reading its data when opened', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    screen.getByRole('tab', { name: 'Story' }).focus();
+    await userEvent.keyboard('{ArrowRight}{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'People' })).toHaveFocus();
+    expect(where().searchParams.get('tab')).toBe('people');
+    await waitFor(() => expect(requestPaths(spy)).toContain('GET /customers/7/contacts/'));
+    await userEvent.keyboard('{ArrowRight}');
+    await waitFor(() => expect(requestPaths(spy)).toContain('GET /customers/7/opportunities/'));
+    await userEvent.keyboard('{ArrowRight}');
+    expect(await screen.findByRole('region', { name: 'Headlines' })).toBeInTheDocument();
+    await userEvent.keyboard('{End}');
+    expect(screen.getByRole('region', { name: 'Calls' })).toBeInTheDocument();
+    expect(where().searchParams.get('tab')).toBe('files');
+  });
+
+  it('filters by kind, source and search, all kept in the URL', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Tickets 1' }));
+    expect(where().searchParams.get('group')).toBe('tickets');
+    await waitFor(() => expect(itemKeys()).toEqual(['ticket:88']));
+    await userEvent.click(screen.getByRole('button', { name: /^Sources/ }));
+    expect(screen.getAllByRole('checkbox').map((box) => box.closest('label')?.textContent)).toEqual(['Tickets']);
+    await userEvent.keyboard('{Escape}');
+    await userEvent.click(within(screen.getByRole('group', { name: 'Show' })).getByRole('button', { name: /^All/ }));
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search the story' }), 'retraining');
+    await waitFor(() => expect(where().searchParams.get('q')).toBe('retraining'));
+    await waitFor(() => expect(itemKeys()).toEqual(['call:12']));
+    expect(lastStory(spy).get('q')).toBe('retraining');
+    expect(where().searchParams.has('group')).toBe(false);
+  });
+
+  it('takes Needs attention rows to what needs attention', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage();
+    await userEvent.click(await screen.findByRole('button', { name: /^1 overdue task/ }));
+    expect(where().searchParams.get('group')).toBe('tasks');
+    await waitFor(() => expect(itemKeys()).toEqual(['task:5']));
+    await userEvent.click(screen.getByRole('button', { name: '3 unanswered questions' }));
+    expect(where().searchParams.get('tab')).toBe('knowledge');
+  });
+
+  it('opens an email as its real thread (?thread= on the story), and gives focus back to it', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage();
+    const title = await screen.findByRole('button', { name: 'Re: Renewal pricing' });
+    await userEvent.click(title);
+    const dialog = screen.getByRole('dialog', { name: 'Re: Renewal pricing' });
+    expect(await within(dialog).findByText('Can we see the quote before the board meets on Friday?')).toBeInTheDocument();
+    expect(within(dialog).getByText('Sharing the renewal quote ahead of your board meeting.')).toBeInTheDocument();
+    expect(lastStory(spy).get('thread')).toBe('t-1');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
+    expect(title).toHaveFocus();
+  });
+
+  it('adds a task on the chosen account and shows it in the story', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage('/organizations/7?account=31');
+    await screen.findByRole('button', { name: 'EMEA 1' });
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the story' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'New task' }));
+    const dialog = screen.getByRole('dialog', { name: 'New task' });
+    expect(dialog).toHaveAccessibleDescription('On EMEA');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Task title' }), 'Book the retraining');
+    fireEvent.change(within(dialog).getByLabelText('Due date'), { target: { value: '2026-10-01' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save task' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(postBodies(spy, '/customers/7/accounts/31/tasks/')).toEqual([
+      { title: 'Book the retraining', due_date: '2026-10-01', priority: 'medium', assignee_id: null },
+    ]);
+    expect(await screen.findByRole('button', { name: 'Book the retraining' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'EMEA 2' })).toBeInTheDocument();
+    expect(screen.getByText('Added to the story.')).toBeInTheDocument();
+  });
+
+  it('edits, archives and churns from the name row', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    const edit = screen.getByRole('button', { name: 'Edit' });
+    await waitFor(() => expect(edit).toBeEnabled());
+    await userEvent.click(edit);
+    expect(await screen.findByRole('heading', { name: 'Edit Pizza Hut' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza Hut' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
+    expect(screen.getByText('Archive Pizza Hut?')).toBeInTheDocument();
+    // The confirm dims the page with the scrim token, which darkens in both themes.
+    expect(screen.getByText('Archive Pizza Hut?').closest('.fixed')).toHaveClass('bg-scrim');
+    await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    await waitFor(() => expect(postBodies(spy, '/organizations/bulk/')).toEqual([{ ids: [7], action: 'archive', value: null }]));
+    expect(await screen.findByText('Archived')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza Hut' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Churn']);
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Churn' }));
+    expect(screen.getByText('Churn Pizza Hut?')).toBeInTheDocument();
+  });
+
+  it('lists every connected account on Details, each linking to its page and editable, at 375px too', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage('/organizations/7?tab=details', { width: 375 });
+    const section = await screen.findByRole('region', { name: 'Accounts' });
+    await waitFor(() => expect(within(section).getAllByRole('listitem')).toHaveLength(2));
+    expect(within(section).getByRole('link', { name: 'EMEA' })).toHaveAttribute('href', '/accounts/31');
+    expect(within(section).getByText('Usage is steady and the renewal talks are friendly.')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+    await userEvent.click(within(section).getByRole('button', { name: 'Edit EMEA' }));
+    expect(screen.getByRole('heading', { name: 'Edit EMEA' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(within(section).getByRole('button', { name: 'Add account' }));
+    expect(screen.getByRole('heading', { name: 'Add Account' })).toBeInTheDocument();
+  });
+
+  it('adds an account from the chip row, and edits the chosen one', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Add account' }));
+    expect(screen.getByRole('heading', { name: 'Add Account' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'EMEA 1' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Edit EMEA' }));
+    expect(screen.getByRole('heading', { name: 'Edit EMEA' })).toBeInTheDocument();
+  });
+
+  it('keeps the page and says so when a reload fails, with Try again', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    // The next header read fails: archive, then the reload after it.
+    stubOrganizationPage({ failPortfolio: 1 });
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza Hut' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Could not refresh this organization: Try later.');
+    expect(screen.getByRole('heading', { level: 1, name: 'Pizza Hut' })).toBeInTheDocument();
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(await screen.findByText('Archived')).toBeInTheDocument();
+  });
+
+  it('says why Edit is off when the record did not load, and Try again brings it back', async () => {
+    stubOrganizationPage({ failCustomer: 1 });
+    renderOrganizationPage();
+    await landed();
+    expect(await screen.findByText('Edit is unavailable: Try later.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+    const header = document.querySelector('[data-part="header"]') as HTMLElement;
+    await userEvent.click(within(header).getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled());
+    expect(screen.queryByText('Edit is unavailable: Try later.')).not.toBeInTheDocument();
+  });
+
+  it('says an organization this viewer cannot see is not found', async () => {
+    stubOrganizationPage({ row: null });
+    renderOrganizationPage('/organizations/99');
+    expect(await screen.findByText('Organization not found')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to organizations' })).toHaveAttribute('href', '/organizations/list');
+  });
+
+  it('asks for nothing when the id is not a number', () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage('/organizations/abc');
+    expect(screen.getByText('Organization not found')).toBeInTheDocument();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('shows a failed header read with Try again', async () => {
+    stubOrganizationPage({ failPortfolio: 1 });
+    renderOrganizationPage();
+    expect(await screen.findByText('Try later.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await landed();
+  });
+
+  it('shows a failed story with Try again, then pages the rest', async () => {
+    const spy = stubOrganizationPage({ items: manyItems(35), failStory: 1 });
+    renderOrganizationPage();
+    await landed();
+    expect(await screen.findByText('Try later.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(itemKeys()).toHaveLength(30));
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+    await waitFor(() => expect(itemKeys()).toHaveLength(35));
+    expect(lastStory(spy).get('cursor')).toBe('30');
+  });
+
+  it('lays the tiles out as a grid from sm', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    expect(screen.getByRole('button', { name: /^ARR/ }).parentElement).toHaveClass('grid', 'grid-cols-4');
+  });
+
+  it('on phones: a tile strip, scrolling tabs, and sheets from the bottom', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage('/organizations/7', { width: 375 });
+    await landed();
+    const strip = screen.getByRole('button', { name: /^ARR/ }).parentElement;
+    expect(strip).toHaveClass('overflow-x-auto', 'snap-x');
+    expect(strip).not.toHaveClass('grid');
+    expect(screen.getByRole('tablist')).toHaveClass('overflow-x-auto');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add to the story' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'New note' }));
+    expect(screen.getByRole('dialog', { name: 'New note' }).closest('[data-shape]')).toHaveAttribute('data-shape', 'sheet');
+  });
+
+  it('keeps a visited tab mounted: People, Story, People reads the contacts once and never blanks them', async () => {
+    const spy = stubOrganizationPage();
+    // One real contact, so a blanked list would show.
+    const contactReads: string[] = [];
     vi.stubGlobal(
       'fetch',
-      vi.fn((url: string) => {
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || (url.includes('/activities/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')))))) ? [] : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-
-    // Lifecycle stage is derived straight from the fetched Customer, via
-    // the same mapCustomerToOrgRow() the organizations list uses. It
-    // renders twice (the metrics banner and the pinned attributes list).
-    expect(await screen.findAllByText('Onboarding')).toHaveLength(2);
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/accounts/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('shows the computed Account Pulse in the banner, not a label derived from health', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        const body = url.includes('/customers/10/') && !url.includes('/customers/10/', url.indexOf('/customers/10/') + 1) && url.endsWith('/customers/10/') ? globex : [];
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-
-    expect(await screen.findByText('Account Pulse')).toBeInTheDocument();
-    expect(screen.getByText('At risk')).toBeInTheDocument();
-    expect(screen.getByText('2.3 / 5')).toBeInTheDocument();
-    expect(screen.getByLabelText('Account pulse')).toHaveAttribute('title', expect.stringContaining('Open tickets: 1.0 (12 open, weight 1.0)'));
-    expect(screen.queryByText('CSM Pulse')).not.toBeInTheDocument();
-  });
-
-  it('fetches and renders this organization\'s own real activities on the General tab', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.includes('/activities/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                type: 'health_check_review',
-                type_display: 'Health Check Review',
-                occurred_at: '2026-02-28',
-                links: 2,
-                watchers: 3,
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))))) ? [] : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-
-    expect(await screen.findByText('Health Check Review')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/activities/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('fetches this organization\'s own real emails on the General tab, under the Emails filter', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.includes('/emails/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                subject: 'Quarterly Business Review - Q4 2025 Recap',
-                sender_name: 'Edgar Holmes',
-                recipient_name: 'Sarah Chen',
-                body: 'Hi Sarah, please find attached the QBR deck for Q4.',
-                sent_at: '2026-01-15T15:45:00Z',
-                links: 5,
-                watchers: 3,
-                is_starred: true,
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))))
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Emails' }));
-
-    expect(await screen.findByText('Quarterly Business Review - Q4 2025 Recap')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/emails/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('fetches this organization\'s own real tasks on the General tab, under the Tasks filter', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.includes('/tasks/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                title: 'Prepare QBR deck for Q1',
-                assignee_name: 'Edgar Holmes',
-                due_date: '2026-03-15',
-                priority: 'high',
-                status: 'in-progress',
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')))
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Tasks' }));
-
-    expect(await screen.findByText('Prepare QBR deck for Q1')).toBeInTheDocument();
-    expect(screen.getByText('Edgar Holmes')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/tasks/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('fetches this organization\'s own real notes on the General tab, under the Notes filter', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.includes('/notes/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                title: 'Call Notes: Product Feedback Session',
-                author_name: 'Edgar Holmes',
-                body: 'Customer expressed interest in AI-powered analytics.',
-                logged_at: '2026-03-04',
-                links: 2,
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || (url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/'))
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Notes' }));
-
-    expect(await screen.findByText('Call Notes: Product Feedback Session')).toBeInTheDocument();
-    expect(screen.getByText('2 Links')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/notes/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('fetches this organization\'s own real tickets on the General tab, under the Tickets filter', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.includes('/tickets/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                ticket_number: 'TKT-1042',
-                title: 'Dashboard loading slow on large datasets',
-                assignee_name: 'Support Team',
-                status: 'in-progress',
-                priority: 'high',
-                opened_at: '2026-03-03',
-                links: 2,
-                connector_name: null, connector_provider: null, department: '', department_display: '', description: '', requester_name: '', requester_email: '', external_url: '', synced_at: null,
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Tickets' }));
-
-    expect(await screen.findByText(/Dashboard loading slow on large datasets/)).toBeInTheDocument();
-    expect(screen.getByText('2 Links')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/tickets/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('fetches this organization\'s own real surveys on the General tab, under the Surveys filter', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.includes('/surveys/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                survey_type: 'nps',
-                survey_type_display: 'NPS',
-                status: 'sent',
-                status_display: 'Sent',
-                score: null,
-                sent_at: '2026-09-01',
-                responded_at: null,
-                companies: [{ id: 10, name: 'Globex Corp' }],
-                account_id: null,
-                account_name: null,
-                created_at: '2026-09-01T00:00:00Z',
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
-
-    // 'NPS' alone is ambiguous — the Details page's own NPS metrics
-    // card (unrelated to Surveys) already renders that exact text, so
-    // assert on the survey card's own unique "Sent <date>" line instead.
-    expect(await screen.findByText('Sent Sep 1, 2026')).toBeInTheDocument();
-    expect(screen.getByText('Sent')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/surveys/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('logging a survey and its response both go through the real API', async () => {
-    let surveys: unknown[] = [];
-    const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-      if (url.includes('/surveys/') && options?.method === 'POST') {
-        const created = {
-          id: 5,
-          survey_type: 'nps',
-          survey_type_display: 'NPS',
-          status: 'sent',
-          status_display: 'Sent',
-          score: null,
-          sent_at: '2026-09-01',
-          responded_at: null,
-          companies: [{ id: 10, name: 'Globex Corp' }],
-          account_id: null,
-          account_name: null,
-          created_at: '2026-09-01T00:00:00Z',
-        };
-        surveys = [created];
-        return Promise.resolve({ ok: true, status: 201, json: async () => created });
-      }
-      if (/\/surveys\/\d+\/$/.test(url) && options?.method === 'PATCH') {
-        const body = JSON.parse(options.body!);
-        surveys = surveys.map((s) => ({ ...(s as object), ...body }));
-        return Promise.resolve({ ok: true, status: 200, json: async () => surveys[0] });
-      }
-      if (url.includes('/surveys/')) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => surveys });
-      }
-      const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-        ? []
-        : globex;
-      return Promise.resolve({ ok: true, status: 200, json: async () => body });
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
-    await screen.findByText('No surveys logged yet');
-
-    await user.click(screen.getByRole('button', { name: 'Log Survey' }));
-    await user.click(screen.getByRole('button', { name: 'Log' }));
-
-    expect(await screen.findByText('Sent')).toBeInTheDocument();
-    const postCall = fetchMock.mock.calls.find(([, o]) => o?.method === 'POST')!;
-    expect(JSON.parse((postCall[1] as { body: string }).body).survey_type).toBe('nps');
-
-    await user.click(screen.getByRole('button', { name: 'Log Response' }));
-    await user.type(screen.getByPlaceholderText('Score'), '80');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(await screen.findByText('80')).toBeInTheDocument();
-    const patchCall = fetchMock.mock.calls.find(([, o]) => o?.method === 'PATCH')!;
-    expect(JSON.parse((patchCall[1] as { body: string }).body)).toEqual({ status: 'responded', score: 80 });
-  });
-
-  const SURVEY_STATUS_DISPLAY: Record<string, string> = {
-    sent: 'Sent',
-    responded: 'Responded',
-    expired: 'Expired',
-  };
-
-  function surveyDetailFetchMock(initial: Record<string, unknown>) {
-    let survey = initial;
-    return vi.fn((url: string, options?: { method?: string; body?: string }) => {
-      if (/\/surveys\/\d+\/$/.test(url) && options?.method === 'PATCH') {
-        const body = JSON.parse(options.body!);
-        // Same "status/status_display always travel together" shape the
-        // real SurveySerializer returns — a plain `{...body}` merge
-        // would leave a stale status_display behind.
-        survey = {
-          ...survey,
-          ...body,
-          ...(body.status && { status_display: SURVEY_STATUS_DISPLAY[body.status] }),
-        };
-        return Promise.resolve({ ok: true, status: 200, json: async () => survey });
-      }
-      if (/\/surveys\/\d+\/$/.test(url) && options?.method === 'DELETE') {
-        survey = null as unknown as Record<string, unknown>;
-        return Promise.resolve({ ok: true, status: 204, json: async () => null });
-      }
-      if (url.includes('/surveys/')) {
-        return Promise.resolve({ ok: true, status: 200, json: async () => (survey ? [survey] : []) });
-      }
-      const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-        ? []
-        : globex;
-      return Promise.resolve({ ok: true, status: 200, json: async () => body });
-    });
-  }
-
-  const sentNpsFixture = {
-    id: 7,
-    survey_type: 'nps',
-    survey_type_display: 'NPS',
-    status: 'sent',
-    status_display: 'Sent',
-    score: null,
-    sent_at: '2026-08-01',
-    responded_at: null,
-    companies: [{ id: 10, name: 'Globex Corp' }],
-    account_id: null,
-    account_name: null,
-    created_at: '2026-08-01T00:00:00Z',
-  };
-
-  it('editing a survey\'s Sent date from the Surveys filter PATCHes it in place', async () => {
-    const fetchMock = surveyDetailFetchMock(sentNpsFixture);
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
-
-    renderDetails('10');
-    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
-    await screen.findByText('Sent Aug 1, 2026');
-
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    const sentInput = screen.getByDisplayValue('2026-08-01');
-    await user.clear(sentInput);
-    await user.type(sentInput, '2026-08-10');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/surveys/7/'),
-        expect.objectContaining({ method: 'PATCH' })
-      )
-    );
-    const patchCall = fetchMock.mock.calls.find(([, o]) => o?.method === 'PATCH')!;
-    expect(JSON.parse((patchCall[1] as { body: string }).body)).toEqual({
-      survey_type: 'nps',
-      sent_at: '2026-08-10',
-    });
-    expect(await screen.findByText('Sent Aug 10, 2026')).toBeInTheDocument();
-  });
-
-  it('marking a sent survey Expired from the Surveys filter PATCHes its status', async () => {
-    const fetchMock = surveyDetailFetchMock(sentNpsFixture);
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
-
-    renderDetails('10');
-    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
-    await user.click(await screen.findByRole('button', { name: 'Mark Expired' }));
-
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/surveys/7/'),
-        expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ status: 'expired' }) })
-      )
-    );
-    expect(await screen.findByText('Expired')).toBeInTheDocument();
-  });
-
-  it('deleting a survey from the Surveys filter\'s confirm dialog DELETEs it and removes the card', async () => {
-    const fetchMock = surveyDetailFetchMock(sentNpsFixture);
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
-
-    renderDetails('10');
-    await user.click(await screen.findByRole('button', { name: 'Surveys' }));
-    await screen.findByText('Sent Aug 1, 2026');
-
-    await user.click(screen.getByRole('button', { name: 'Delete' }));
-    const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
-    await user.click(confirmButtons[confirmButtons.length - 1]);
-
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.stringContaining('/surveys/7/'),
-        expect.objectContaining({ method: 'DELETE' })
-      )
-    );
-    expect(await screen.findByText('No surveys logged yet')).toBeInTheDocument();
-  });
-
-  it('fetches this organization\'s own real calendar events on the General tab, under the Calendar Events filter', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.includes('/calendar-events/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                title: 'Quarterly Business Review',
-                description: 'Q1 2026 QBR with stakeholders',
-                type: 'review',
-                event_date: '2026-03-15',
-                start_time: '10:00:00',
-                end_time: '11:30:00',
-                attendee_count: 3,
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: 'Calendar Events' }));
-
-    expect(await screen.findByText('Quarterly Business Review')).toBeInTheDocument();
-    expect(screen.getByText('10:00 AM — 11:30 AM')).toBeInTheDocument();
-    expect(screen.getByText('3 attendees')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/calendar-events/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('fetches and renders this organization\'s own real contacts on the Contacts tab', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.includes('/contacts/')) {
-          return Promise.resolve({
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (new URL(String(input)).pathname.endsWith('/customers/7/contacts/')) {
+          contactReads.push(String(input));
+          return {
             ok: true,
             status: 200,
             json: async () => [
@@ -640,846 +379,36 @@ describe('Organization Details page (/organizations/:id)', () => {
                 name: 'Sarah Chen',
                 role: 'executive_sponsor',
                 role_display: 'Executive Sponsor',
-                email: 'sarah.chen@globex.example',
+                email: 'sarah.chen@pizzahut.example',
                 phone: '+1 (408) 555-0123',
                 status: 'active',
                 sentiment: 'positive',
                 last_contacted_at: '2026-08-31T00:00:00Z',
-                companies: [{ id: 10, name: 'Globex Corp' }],
+                companies: [{ id: 7, name: 'Pizza Hut' }],
                 account_name: null,
-                sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null,
+                sentiment_source: 'manual',
+                sentiment_evidence: {},
+                sentiment_computed_at: null,
               },
             ],
-          });
+          };
         }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
+        return spy(input, init);
+      }),
     );
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
-
-    expect(await screen.findByText('Sarah Chen')).toBeInTheDocument();
-    expect(screen.getByText('Executive Sponsor')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/contacts/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  describe('Contacts tab search/Add/Edit/Delete', () => {
-    const sarahChen = {
-      id: 1,
-      name: 'Sarah Chen',
-      role: 'executive_sponsor',
-      role_display: 'Executive Sponsor',
-      email: 'sarah.chen@globex.example',
-      phone: '+1 (408) 555-0123',
-      status: 'active',
-      sentiment: 'positive',
-      last_contacted_at: '2026-08-31T00:00:00Z',
-      companies: [{ id: 10, name: 'Globex Corp' }],
-      account_name: null,
-      sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null,
-    };
-    const jamesWilson = {
-      ...sarahChen,
-      id: 2,
-      name: 'James Wilson',
-      role_display: 'Champion',
-      email: 'j.wilson@globex.example',
-    };
-
-    async function openContactsTab(fetchMock: ReturnType<typeof vi.fn>) {
-      vi.stubGlobal('fetch', fetchMock);
-      renderDetails('10');
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
-      await screen.findByText('Sarah Chen');
-      return user;
-    }
-
-    function baseFetchMock(contactsResponse: unknown) {
-      return vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => contactsResponse });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-    }
-
-    it('filters the already-loaded contacts client-side as you type', async () => {
-      const user = await openContactsTab(baseFetchMock([sarahChen, jamesWilson]));
-      expect(screen.getByText('James Wilson')).toBeInTheDocument();
-
-      await user.type(screen.getByPlaceholderText('Search contacts by name, role or email...'), 'sarah');
-
-      expect(screen.queryByText('James Wilson')).not.toBeInTheDocument();
-      expect(screen.getByText('Sarah Chen')).toBeInTheDocument();
-    });
-
-    it('shows both organisation-level and account-level contacts together, labeled by Account', async () => {
-      const accountLevelContact = {
-        ...jamesWilson,
-        id: 3,
-        name: 'Priya Nair',
-        account_name: 'North America',
-      };
-      await openContactsTab(baseFetchMock([sarahChen, accountLevelContact]));
-
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
-      // Sarah Chen (org-level, account_name: null) shows "Organization";
-      // Priya Nair (account-level) shows her account's own name.
-      expect(screen.getByText('Organization')).toBeInTheDocument();
-      expect(screen.getByText('North America')).toBeInTheDocument();
-    });
-
-    it('adding a contact with an Account picked posts to the account-level endpoint instead', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'GET' && url.endsWith('/customers/10/accounts/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [{ id: 17, name: 'North America', customers: [{ id: 10, name: 'Globex Corp' }] }],
-          });
-        }
-        if (method === 'POST' && url.endsWith('/customers/10/accounts/17/contacts/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 201,
-            json: async () => ({ ...sarahChen, id: 99, name: 'New Person', account_name: 'North America' }),
-          });
-        }
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
-        }
-        const body = url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Add Contact' }));
-      await user.type(screen.getByLabelText('Name *'), 'New Person');
-      await user.type(screen.getByLabelText('Email *'), 'new.person@globex.example');
-      await user.selectOptions(await screen.findByLabelText('Account (optional)'), '17');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Contact' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/customers/10/accounts/17/contacts/'),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-    });
-
-    it('adding a contact posts to /customers/10/contacts/ (organization-level)', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'POST' && url.endsWith('/customers/10/contacts/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 201,
-            json: async () => ({ ...sarahChen, id: 99, name: 'New Person' }),
-          });
-        }
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Add Contact' }));
-      await user.type(screen.getByLabelText('Name *'), 'New Person');
-      await user.type(screen.getByLabelText('Email *'), 'new.person@globex.example');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Contact' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/customers/10/contacts/'),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-    });
-
-    it('editing a contact PATCHes /api/v1/contacts/<id>/ and updates it in place', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'PATCH' && url.endsWith('/contacts/1/')) {
-          const body = JSON.parse(options!.body!);
-          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...sarahChen, ...body }) });
-        }
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Actions for Sarah Chen' }));
-      await user.click(screen.getByRole('button', { name: 'Edit Contact' }));
-      const nameInput = screen.getByLabelText('Name *');
-      await user.clear(nameInput);
-      await user.type(nameInput, 'Sarah Chen-Wu');
-      await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/contacts/1/'),
-          expect.objectContaining({ method: 'PATCH' })
-        )
-      );
-      expect(await screen.findByText('Sarah Chen-Wu')).toBeInTheDocument();
-    });
-
-    it('deleting a contact DELETEs /api/v1/contacts/<id>/ and removes the row', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'DELETE' && url.endsWith('/contacts/1/')) {
-          return Promise.resolve({ ok: true, status: 204, json: async () => null });
-        }
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Actions for Sarah Chen' }));
-      await user.click(screen.getByRole('button', { name: 'Delete Contact' }));
-      await user.click(screen.getByRole('button', { name: 'Delete' }));
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/contacts/1/'),
-          expect.objectContaining({ method: 'DELETE' })
-        )
-      );
-      expect(screen.queryByText('Sarah Chen')).not.toBeInTheDocument();
-    });
-  });
-
-  it('fetches and renders this organization\'s own real opportunities and risks on the Pipelines tab', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                title: 'Renewal Expansion Opportunity',
-                mrr: '30000.00',
-                stage: 'qualification',
-                stage_display: 'Qualification',
-                priority: 'high',
-                priority_display: 'High',
-                department: '' as const, department_display: '',
-                companies: [{ id: 10, name: 'Globex Corp' }],
-                account_name: null,
-              },
-            ],
-          });
-        }
-        if (url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                title: 'Renewal Risk — Contract Expiry',
-                mrr: '8500.00',
-                stage: 'open',
-                stage_display: 'Open',
-                priority: 'high',
-                priority_display: 'High',
-                department: '' as const, department_display: '',
-                companies: [{ id: 10, name: 'Globex Corp' }],
-                account_name: null,
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
-
-    expect(await screen.findByText('Renewal Expansion Opportunity')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/opportunities/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-
-    await user.click(screen.getByRole('button', { name: /^Risks/ }));
-    expect(await screen.findByText('Renewal Risk — Contract Expiry')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/risks/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  it('fetches and renders this organization\'s own real canvases on the Canvas List tab', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        if (url.endsWith('/customers/10/canvases/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                name: 'Renewal Strategy Q3',
-                nodes: [{ id: 'n1', type: 'contact', position: { x: 0, y: 0 }, data: { contact_id: 2 } }],
-                edges: [],
-                companies: [{ id: 10, name: 'Globex Corp' }],
-                account_id: null,
-                account_name: null,
-                created_at: '2026-08-01T00:00:00Z',
-                updated_at: '2026-08-05T00:00:00Z',
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/') || url.includes('/opportunities/') || url.includes('/risks/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
-    );
-
-    renderDetails('10');
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: /^Canvas List/ }));
-
-    expect(await screen.findByText('Renewal Strategy Q3')).toBeInTheDocument();
-    expect(screen.getByText('1 contact')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/canvases/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-
-    await user.click(screen.getByRole('button', { name: 'New Canvas' }));
-    expect(screen.queryByText('Renewal Strategy Q3')).not.toBeInTheDocument();
-  });
-
-  describe('Pipelines tab search/Add/Edit/Delete', () => {
-    const orgOpp = {
-      id: 1,
-      title: 'Renewal Expansion Opportunity',
-      mrr: '30000.00',
-      stage: 'qualification',
-      stage_display: 'Qualification',
-      priority: 'high',
-      priority_display: 'High',
-      department: '' as const, department_display: '',
-      companies: [{ id: 10, name: 'Globex Corp' }],
-      account_name: null,
-    };
-    const accountLevelOpp = {
-      ...orgOpp,
-      id: 2,
-      title: 'Seat Expansion Opportunity',
-      account_name: 'North America',
-    };
-    const orgRisk = {
-      id: 1,
-      title: 'Renewal Risk — Contract Expiry',
-      mrr: '8500.00',
-      stage: 'open',
-      stage_display: 'Open',
-      priority: 'high',
-      priority_display: 'High',
-      department: '' as const, department_display: '',
-      companies: [{ id: 10, name: 'Globex Corp' }],
-      account_name: null,
-    };
-
-    async function openPipelinesTab(fetchMock: ReturnType<typeof vi.fn>) {
-      vi.stubGlobal('fetch', fetchMock);
-      renderDetails('10');
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
-      await screen.findByText('Renewal Expansion Opportunity');
-      return user;
-    }
-
-    function baseFetchMock({ opportunities, risks }: { opportunities: unknown; risks: unknown }) {
-      return vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => opportunities });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => risks });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-    }
-
-    it('filters the already-loaded opportunities client-side as you type', async () => {
-      const user = await openPipelinesTab(
-        baseFetchMock({ opportunities: [orgOpp, accountLevelOpp], risks: [] })
-      );
-      expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
-
-      await user.type(screen.getByPlaceholderText('Search opportunities by title...'), 'Seat');
-
-      expect(screen.queryByText('Renewal Expansion Opportunity')).not.toBeInTheDocument();
-      expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
-    });
-
-    it('shows both organisation-level and account-level opportunities together, labeled by Account', async () => {
-      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp, accountLevelOpp], risks: [] }));
-
-      expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
-      expect(screen.getByText('Globex Corp')).toBeInTheDocument();
-      expect(screen.getByText('Globex Corp • North America')).toBeInTheDocument();
-    });
-
-    it('the Board toggle switches to a Kanban board grouped by stage', async () => {
-      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp, accountLevelOpp], risks: [] }));
-
-      // List (the default) has no stage-column headers of its own —
-      // stage is just a per-row pill.
-      expect(screen.queryByText('Discovery')).not.toBeInTheDocument();
-
-      const user = userEvent.setup();
-      await user.click(screen.getByTitle('Board view'));
-
-      // Both opportunities are 'qualification' — same column, both
-      // cards still visible (not narrowed by drag state or anything).
-      expect(screen.getByText('Qualification')).toBeInTheDocument();
-      expect(screen.getByText('Renewal Expansion Opportunity')).toBeInTheDocument();
-      expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
-      // Every other stage column still renders, just empty — "Closed
-      // Won" isn't checked here since it collides with the summary
-      // banner's own "Closed Won" stat card title above the board.
-      expect(screen.getByText('Discovery')).toBeInTheDocument();
-      expect(screen.getByText('Negotiation')).toBeInTheDocument();
-    });
-
-    it('the Board toggle works for Risks too, grouped by its own 4 stages', async () => {
-      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp], risks: [orgRisk] }));
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: /^Risks/ }));
-      await user.click(screen.getByTitle('Board view'));
-
-      expect(screen.getByText('Open')).toBeInTheDocument();
-      expect(screen.getByText('Renewal Risk — Contract Expiry')).toBeInTheDocument();
-      expect(screen.getByText('Mitigated')).toBeInTheDocument();
-      expect(screen.getByText('Abandoned')).toBeInTheDocument();
-    });
-
-    it('clicking a column\'s own + opens Add with that column\'s stage preselected', async () => {
-      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp], risks: [] }));
-      const user = userEvent.setup();
-      await user.click(screen.getByTitle('Board view'));
-
-      // "Negotiation" column's own + button, not the toolbar's "Add
-      // Opportunity" (which defaults to Discovery).
-      // "Negotiation" text sits in an inner wrapper alongside the
-      // count pill; its own "+" button is a sibling one level up, in
-      // the column header row both share.
-      const negotiationHeader = screen.getByText('Negotiation').closest('div')!.parentElement!;
-      await user.click(within(negotiationHeader).getByRole('button'));
-
-      expect(await screen.findByRole('heading', { name: 'Add Opportunity' })).toBeInTheDocument();
-      expect(screen.getByRole('combobox', { name: /stage/i })).toHaveValue('negotiation');
-    });
-
-    it('adding an opportunity posts to /customers/10/opportunities/ (organization-level)', async () => {
-      // A reassignable backing array (not mutated in place — Redux
-      // freezes whatever a fulfilled action's payload was, so a later
-      // .push() against that same frozen array reference throws) — the
-      // refetch that follows a successful create (see
-      // OpportunityFormModal's own `onSaved`) needs its own GET to
-      // actually reflect the new row, same as a real backend would.
-      let opportunitiesData: unknown[] = [orgOpp];
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'POST' && url.endsWith('/customers/10/opportunities/')) {
-          const created = { ...orgOpp, id: 99, title: 'New Opp' };
-          opportunitiesData = [...opportunitiesData, created];
-          return Promise.resolve({ ok: true, status: 201, json: async () => created });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => opportunitiesData });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Add Opportunity' }));
-      await user.type(screen.getByLabelText('Title *'), 'New Opp');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Opportunity' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/customers/10/opportunities/'),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-      expect(await screen.findByText('New Opp')).toBeInTheDocument();
-    });
-
-    it('editing an opportunity PATCHes /api/v1/opportunities/<id>/ and updates it in place', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'PATCH' && url.endsWith('/opportunities/1/')) {
-          const body = JSON.parse(options!.body!);
-          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...orgOpp, ...body }) });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [orgOpp] });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByText('Renewal Expansion Opportunity'));
-      const titleInput = screen.getByLabelText('Title *');
-      await user.clear(titleInput);
-      await user.type(titleInput, 'Renamed Opportunity');
-      await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/opportunities/1/'),
-          expect.objectContaining({ method: 'PATCH' })
-        )
-      );
-      expect(await screen.findByText('Renamed Opportunity')).toBeInTheDocument();
-    });
-
-    it('deleting an opportunity from its edit modal DELETEs /api/v1/opportunities/<id>/ and removes the row', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'DELETE' && url.endsWith('/opportunities/1/')) {
-          return Promise.resolve({ ok: true, status: 204, json: async () => null });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [orgOpp] });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByText('Renewal Expansion Opportunity'));
-      await user.click(screen.getByRole('button', { name: 'Delete' }));
-      const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
-      await user.click(confirmButtons[confirmButtons.length - 1]);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/opportunities/1/'),
-          expect.objectContaining({ method: 'DELETE' })
-        )
-      );
-      expect(screen.queryByText('Renewal Expansion Opportunity')).not.toBeInTheDocument();
-    });
-
-    it('switching to the Risks sub-tab shows risks instead, and Add Risk posts to /customers/10/risks/', async () => {
-      // Same reassignable-backing-array reasoning as the Opportunity
-      // Add test above.
-      let risksData: unknown[] = [orgRisk];
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'POST' && url.endsWith('/customers/10/risks/')) {
-          const created = { ...orgRisk, id: 99, title: 'New Risk' };
-          risksData = [...risksData, created];
-          return Promise.resolve({ ok: true, status: 201, json: async () => created });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [orgOpp] });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => risksData });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: /^Risks/ }));
-      expect(await screen.findByText('Renewal Risk — Contract Expiry')).toBeInTheDocument();
-      expect(screen.queryByText('Renewal Expansion Opportunity')).not.toBeInTheDocument();
-
-      await user.click(screen.getByRole('button', { name: 'Add Risk' }));
-      await user.type(screen.getByLabelText('Title *'), 'New Risk');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Risk' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/customers/10/risks/'),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-      expect(await screen.findByText('New Risk')).toBeInTheDocument();
-    });
-  });
-
-  it('shows a loading state before the fetch resolves', () => {
-    vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
-
-    renderDetails('10');
-
-    expect(screen.getByText('Loading organization…')).toBeInTheDocument();
-  });
-
-  it('shows the backend error instead of crashing (e.g. a 404 for another org\'s id)', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue({ ok: false, status: 404, json: async () => ({ detail: 'Not found.' }) })
-    );
-
-    renderDetails('999');
-
-    expect(await screen.findByText('Not found.')).toBeInTheDocument();
-  });
-
-  describe('Accounts tab (one Customer has many Accounts)', () => {
-    const account = {
-      id: 1,
-      customers: [{ id: 10, name: 'Globex Corp' }],
-      name: 'North America Enterprise',
-      domain: '',
-      owner: null,
-      created_at: '2026-08-31T00:00:00Z',
-      updated_at: '2026-08-31T00:00:00Z',
-      lifecycle_stage: 'live' as const,
-      health_score: '9.5',
-      health_category: 'good' as const,
-      pulse: [1, 1, 1, 1, 0],
-      ai_pulse_score: 'very_satisfied' as const,
-      ai_pulse_reason: 'Strong executive sponsorship.',
-      nps_score: 100,
-      csat_score: '100.00',
-      renewal_date: '2026-03-02',
-      arr: '33600.00',
-    };
-
-    async function openAccountsTab(accounts: unknown[]) {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) => {
-          const body = (url.includes('/activities/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/')))))) ? [] : url.includes('/accounts/') ? accounts : globex;
-          return Promise.resolve({ ok: true, status: 200, json: async () => body });
-        })
-      );
-      renderDetails('10');
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
-    }
-
-    it('shows real accounts fetched for this organization, and reflects the count in the tab badge', async () => {
-      await openAccountsTab([account]);
-
-      expect(await screen.findByText('North America Enterprise')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Accounts\(1\)$/ })).toBeInTheDocument();
-    });
-
-    it('shows a loading state before the accounts fetch resolves', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) => {
-          if ((url.includes('/activities/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/'))))))) {
-            return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-          }
-          if (url.includes('/accounts/')) return new Promise(() => {});
-          return Promise.resolve({ ok: true, status: 200, json: async () => globex });
-        })
-      );
-      renderDetails('10');
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
-
-      expect(await screen.findByText('Loading accounts…')).toBeInTheDocument();
-    });
-
-    it('shows an empty state when the organization has no accounts yet', async () => {
-      await openAccountsTab([]);
-
-      expect(await screen.findByText('No accounts for this organization yet.')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /^Accounts\(0\)$/ })).toBeInTheDocument();
-    });
-
-    it('shows the backend error instead of crashing', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) => {
-          if ((url.includes('/activities/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/'))))))) {
-            return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-          }
-          if (url.includes('/accounts/')) {
-            return Promise.resolve({ ok: false, status: 404, json: async () => ({ detail: 'Not found.' }) });
-          }
-          return Promise.resolve({ ok: true, status: 200, json: async () => globex });
-        })
-      );
-      renderDetails('10');
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
-
-      expect(await screen.findAllByText('Not found.')).not.toHaveLength(0);
-    });
-
-    it('renders the CSM score without NaN when an account has no pulse history yet (a freshly-Added one)', async () => {
-      // pulse: [] is the real default for a brand-new Account (see
-      // customers/models.py) — the metrics banner's CSM average used to
-      // divide 0/0 for a row like this, producing a NaN strokeDashoffset
-      // React logs as an error. Guarding it is the fix; this pins it down.
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-      await openAccountsTab([{ ...account, pulse: [] }]);
-      await screen.findByText('North America Enterprise');
-
-      const nanWarning = consoleError.mock.calls.find((args) =>
-        args.some((arg) => String(arg).includes('strokeDashoffset'))
-      );
-      expect(nanWarning).toBeUndefined();
-      consoleError.mockRestore();
-    });
-
-    describe('Add/Edit Account', () => {
-      // Stateful mock: GET/POST/PATCH against /customers/10/accounts/...
-      // all operate on the same in-memory list, mirroring the real
-      // backend's behavior closely enough to drive the modal end to end.
-      function makeAccountsMutationFetchMock(initial: (typeof account)[]) {
-        let accounts = [...initial];
-        let nextId = 1 + Math.max(0, ...accounts.map((a) => a.id));
-        return vi.fn((url: string, options?: { method?: string; body?: string }) => {
-          const method = options?.method ?? 'GET';
-          if (url.includes('/auth/members/')) {
-            return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-          }
-          if (method === 'POST' && url.endsWith('/customers/10/accounts/')) {
-            const body = JSON.parse(options!.body!);
-            const created = {
-              ...account,
-              ...body,
-              id: nextId++,
-              customers: [{ id: 10, name: 'Globex Corp' }],
-              owner: null,
-            };
-            accounts = [created, ...accounts];
-            return Promise.resolve({ ok: true, status: 201, json: async () => created });
-          }
-          const patchMatch = /\/customers\/10\/accounts\/(\d+)\/$/.exec(url);
-          if (method === 'PATCH' && patchMatch) {
-            const id = Number(patchMatch[1]);
-            const body = JSON.parse(options!.body!);
-            accounts = accounts.map((a) => (a.id === id ? { ...a, ...body } : a));
-            return Promise.resolve({ ok: true, status: 200, json: async () => accounts.find((a) => a.id === id) });
-          }
-          if ((url.includes('/activities/') || (url.includes('/emails/') || (url.includes('/tasks/') || (url.includes('/notes/') || (url.includes('/tickets/') || url.includes('/calendar-events/'))))))) {
-            return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-          }
-          if (url.includes('/accounts/')) {
-            return Promise.resolve({ ok: true, status: 200, json: async () => accounts });
-          }
-          return Promise.resolve({ ok: true, status: 200, json: async () => globex });
-        });
-      }
-
-      it('adding an account posts to /customers/<id>/accounts/ and shows it in the table', async () => {
-        vi.stubGlobal('fetch', makeAccountsMutationFetchMock([]));
-        const user = userEvent.setup();
-
-        renderDetails('10');
-        await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
-        await screen.findByText('No accounts for this organization yet.');
-
-        await user.click(screen.getByRole('button', { name: 'Add Account' }));
-        await user.type(screen.getByLabelText('Name *'), 'EMEA');
-        await user.click(screen.getByRole('button', { name: 'Create Account' }));
-
-        expect(await screen.findByText('EMEA')).toBeInTheDocument();
-        expect(screen.queryByText('Create Account')).not.toBeInTheDocument(); // modal closed
-      });
-
-      it('editing an account prefills the form and PATCHes the change', async () => {
-        vi.stubGlobal('fetch', makeAccountsMutationFetchMock([account]));
-        const user = userEvent.setup();
-
-        renderDetails('10');
-        await user.click(await screen.findByRole('button', { name: /^Accounts/ }));
-        await screen.findByText('North America Enterprise');
-
-        await user.click(screen.getByRole('button', { name: 'Edit North America Enterprise' }));
-
-        const nameInput = await screen.findByLabelText('Name *');
-        expect(nameInput).toHaveValue('North America Enterprise');
-        await user.clear(nameInput);
-        await user.type(nameInput, 'North America Renamed');
-        await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-        expect(await screen.findByText('North America Renamed')).toBeInTheDocument();
-      });
-    });
+    renderOrganizationPage();
+    await landed();
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }));
+    const people = screen.getByRole('tabpanel', { name: 'People' });
+    expect(await within(people).findByText('Sarah Chen')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Story' }));
+    expect(people).not.toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: 'Story' })).toBeVisible();
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }));
+    expect(screen.getByRole('tabpanel', { name: 'People' })).toBe(people);
+    expect(within(people).getByText('Sarah Chen')).toBeVisible();
+    expect(contactReads).toHaveLength(1);
+    // Story stayed mounted too: going back to it did not read it again.
+    expect(storyQueries(spy)).toHaveLength(1);
   });
 });

@@ -62,7 +62,7 @@ export function DetailTabs({
             type="button"
             role="tab"
             aria-selected={selected}
-            aria-controls={selected ? detailPanelId(idBase) : undefined}
+            aria-controls={selected ? detailPanelId(idBase, tab.key) : undefined}
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(tab.key)}
             onKeyDown={(event) => onKey(event, index)}

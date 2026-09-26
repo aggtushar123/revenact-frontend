@@ -10,7 +10,7 @@ function Host() {
   return (
     <>
       <DetailTabs idBase="t" active={tab} onChange={setTab} />
-      <div role="tabpanel" id={detailPanelId('t')} aria-labelledby={detailTabId('t', tab)}>
+      <div role="tabpanel" id={detailPanelId('t', tab)} aria-labelledby={detailTabId('t', tab)}>
         {tab}
       </div>
     </>
@@ -32,7 +32,7 @@ describe('DetailTabs (spec §1.5)', () => {
     expect(tabs.map((tab) => tab.textContent)).toEqual(['Story', 'Details', 'People', 'Deals & risks', 'Knowledge', 'Files']);
     expect(tabs.map((tab) => tab.getAttribute('tabindex'))).toEqual(['0', '-1', '-1', '-1', '-1', '-1']);
     expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-controls', 't-panel');
+    expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-controls', 't-panel-story');
     expect(screen.getByRole('tabpanel', { name: 'Story' })).toBeInTheDocument();
   });
 

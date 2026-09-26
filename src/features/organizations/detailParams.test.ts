@@ -54,6 +54,6 @@ describe('the organization page URL state', () => {
 
   it('names the tab and its panel for aria wiring', () => {
     expect(detailTabId('x', 'people')).toBe('x-tab-people');
-    expect(detailPanelId('x')).toBe('x-panel');
+    expect(detailPanelId('x', 'people')).toBe('x-panel-people');
   });
 });

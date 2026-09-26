@@ -70,4 +70,5 @@ export function hasStoryFilters(p: DetailParams): boolean {
 }
 
 export const detailTabId = (base: string, tab: DetailTab) => `${base}-tab-${tab}`;
-export const detailPanelId = (base: string) => `${base}-panel`;
+/** One panel per tab: a visited tab stays mounted, hidden, while another shows. */
+export const detailPanelId = (base: string, tab: DetailTab) => `${base}-panel-${tab}`;

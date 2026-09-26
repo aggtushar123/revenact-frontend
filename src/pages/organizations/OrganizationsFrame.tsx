@@ -4,7 +4,7 @@ import { createContext, useContext, type ReactNode } from 'react';
  *  inside it renders just its content rather than a second frame. */
 const InFrame = createContext(false);
 
-/** The Organizations list's and board's frame: DashboardFrame's body, class for class
+/** The Organizations frame (the list, the board and an organization's page): DashboardFrame's body, class for class
  *  (px-4 pb-4, gap-3, no top padding because the transparent top bar above
  *  gives it), with a content column that owns its scroll (a flex column, so
  *  the Board can fill its height; the List just stacks) and a slot for the
