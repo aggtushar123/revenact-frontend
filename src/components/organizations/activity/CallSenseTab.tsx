@@ -35,19 +35,22 @@ function durationLabel(minutes: number | null): string {
   return m ? `${h} h ${m} min` : `${h} h`;
 }
 
-function LogCallForm({
+/** The log-a-call form on its own, so the organization page's "+ Add" can
+ *  show it in a sheet. It clears itself and calls `onDone` once logged. */
+export function CallForm({
   onLog,
   saving,
   error,
   contacts,
+  onDone,
 }: {
   onLog: (input: LogCallInput) => Promise<boolean>;
   saving: boolean;
   error: string | null;
   /** This company's contacts, offered as participants. */
   contacts: Contact[];
+  onDone?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [participants, setParticipants] = useState<number[]>([]);
   const [title, setTitle] = useState('');
   const [host, setHost] = useState('');
@@ -76,10 +79,64 @@ function LogCallForm({
     if (ok) {
       setTitle(''); setHost(''); setWhen(''); setDuration(''); setSummary(''); setTranscriptText(''); setRecordingUrl(''); setParticipants([]);
       if (fileInput.current) fileInput.current.value = '';
-      setOpen(false);
+      onDone?.();
     }
   }
 
+  return (
+    <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-4 gap-2" aria-label="Log a call">
+      <input aria-label="Call title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title, e.g. Renewal readiness check-in" className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+      <input aria-label="Host" value={host} onChange={(e) => setHost(e.target.value)} placeholder="Host (you, by default)" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+      <input aria-label="When" required type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+      <input aria-label="Duration in minutes" type="number" min={1} value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Minutes" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+      <input aria-label="Recording link" value={recordingUrl} onChange={(e) => setRecordingUrl(e.target.value)} placeholder="Recording link (optional)" className="md:col-span-3 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+      <textarea aria-label="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Summary — leave blank to have it written from the transcript" rows={3} className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
+      <textarea aria-label="Transcript" value={transcriptText} onChange={(e) => setTranscriptText(e.target.value)} placeholder="Paste the transcript…" rows={3} className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
+      <label className="md:col-span-3 flex items-center gap-2 text-[12px] text-ink-muted">
+        <Mic className="w-3.5 h-3.5" /> or upload the transcript file
+        <input ref={fileInput} type="file" accept=".txt,.vtt,.srt,.md" aria-label="Transcript file" className="text-[12px]" />
+      </label>
+      {contacts.length > 0 && (
+        <fieldset className="md:col-span-4 flex items-center gap-2 flex-wrap text-[12px] text-ink-muted" aria-label="Who was on the call">
+          <legend className="sr-only">Who was on the call</legend>
+          <Users className="w-3.5 h-3.5" /> Who was on it (their sentiment is read from this call):
+          {contacts.map((c) => {
+            const on = participants.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => setParticipants((p) => (on ? p.filter((id) => id !== c.id) : [...p, c.id]))}
+                className={`px-2 py-0.5 rounded-full border text-[11.5px] font-semibold ${on ? 'bg-accent-dim border-accent/40 text-accent' : 'bg-surface border-line text-ink-muted hover:border-line-strong'}`}
+              >
+                {c.name}
+              </button>
+            );
+          })}
+          <span className="text-ink-faint">Anyone the transcript names is added too.</span>
+        </fieldset>
+      )}
+      <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12.5px] font-bold disabled:opacity-50">
+        {saving ? 'Logging…' : 'Log call'}
+      </button>
+      {error && <div className="md:col-span-4 text-[12px] text-danger font-semibold" role="alert">{error}</div>}
+    </form>
+  );
+}
+
+function LogCallForm({
+  onLog,
+  saving,
+  error,
+  contacts,
+}: {
+  onLog: (input: LogCallInput) => Promise<boolean>;
+  saving: boolean;
+  error: string | null;
+  contacts: Contact[];
+}) {
+  const [open, setOpen] = useState(false);
   return (
     <div className="px-6 py-3 border-b border-line-subtle flex flex-col gap-2 bg-surface shrink-0">
       <div className="flex items-center justify-between gap-3">
@@ -88,46 +145,7 @@ function LogCallForm({
           <Plus className="w-3.5 h-3.5" /> {open ? 'Cancel' : 'Log a call'}
         </button>
       </div>
-      {open && (
-        <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-4 gap-2" aria-label="Log a call">
-          <input aria-label="Call title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title, e.g. Renewal readiness check-in" className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <input aria-label="Host" value={host} onChange={(e) => setHost(e.target.value)} placeholder="Host (you, by default)" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <input aria-label="When" required type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <input aria-label="Duration in minutes" type="number" min={1} value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="Minutes" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <input aria-label="Recording link" value={recordingUrl} onChange={(e) => setRecordingUrl(e.target.value)} placeholder="Recording link (optional)" className="md:col-span-3 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <textarea aria-label="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Summary — leave blank to have it written from the transcript" rows={3} className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
-          <textarea aria-label="Transcript" value={transcriptText} onChange={(e) => setTranscriptText(e.target.value)} placeholder="Paste the transcript…" rows={3} className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
-          <label className="md:col-span-3 flex items-center gap-2 text-[12px] text-ink-muted">
-            <Mic className="w-3.5 h-3.5" /> or upload the transcript file
-            <input ref={fileInput} type="file" accept=".txt,.vtt,.srt,.md" aria-label="Transcript file" className="text-[12px]" />
-          </label>
-          {contacts.length > 0 && (
-            <fieldset className="md:col-span-4 flex items-center gap-2 flex-wrap text-[12px] text-ink-muted" aria-label="Who was on the call">
-              <legend className="sr-only">Who was on the call</legend>
-              <Users className="w-3.5 h-3.5" /> Who was on it (their sentiment is read from this call):
-              {contacts.map((c) => {
-                const on = participants.includes(c.id);
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => setParticipants((p) => (on ? p.filter((id) => id !== c.id) : [...p, c.id]))}
-                    className={`px-2 py-0.5 rounded-full border text-[11.5px] font-semibold ${on ? 'bg-accent-dim border-accent/40 text-accent' : 'bg-surface border-line text-ink-muted hover:border-line-strong'}`}
-                  >
-                    {c.name}
-                  </button>
-                );
-              })}
-              <span className="text-ink-faint">Anyone the transcript names is added too.</span>
-            </fieldset>
-          )}
-          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12.5px] font-bold disabled:opacity-50">
-            {saving ? 'Logging…' : 'Log call'}
-          </button>
-          {error && <div className="md:col-span-4 text-[12px] text-danger font-semibold" role="alert">{error}</div>}
-        </form>
-      )}
+      {open && <CallForm onLog={onLog} saving={saving} error={error} contacts={contacts} onDone={() => setOpen(false)} />}
     </div>
   );
 }

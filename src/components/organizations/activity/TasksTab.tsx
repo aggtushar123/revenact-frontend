@@ -71,9 +71,10 @@ export interface TasksTabProps {
 
 export type NewTask = { title: string; due_date: string; priority: Task['priority']; assignee_id?: number | null };
 
-function NewTaskForm({ onCreate }: { onCreate: (task: NewTask) => Promise<boolean> }) {
+/** The new-task form on its own, so the organization page's "+ Add" can show
+ *  it in a sheet. It clears itself and calls `onDone` once the task is saved. */
+export function TaskForm({ onCreate, onDone }: { onCreate: (task: NewTask) => Promise<boolean>; onDone?: () => void }) {
   const members = useMembers();
-  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<Task['priority']>('medium');
@@ -90,10 +91,34 @@ function NewTaskForm({ onCreate }: { onCreate: (task: NewTask) => Promise<boolea
       setTitle('');
       setDueDate('');
       setAssignee('');
-      setOpen(false);
+      onDone?.();
     }
   }
 
+  return (
+    <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-4 gap-2">
+      <input aria-label="Task title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+      <input aria-label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+      <select aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value as Task['priority'])} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent">
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+      <select aria-label="Assignee" value={assignee} onChange={(e) => setAssignee(e.target.value)} className="md:col-span-3 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent">
+        <option value="">Assign to me</option>
+        {members.map((m) => (
+          <option key={m.id} value={m.id}>{m.name}</option>
+        ))}
+      </select>
+      <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
+        {saving ? 'Saving…' : 'Save task'}
+      </button>
+    </form>
+  );
+}
+
+function NewTaskForm({ onCreate }: { onCreate: (task: NewTask) => Promise<boolean> }) {
+  const [open, setOpen] = useState(false);
   return (
     <div className="px-6 py-2 border-b border-line-subtle flex flex-col gap-2 bg-surface">
       <div className="flex items-center justify-between gap-3">
@@ -102,26 +127,7 @@ function NewTaskForm({ onCreate }: { onCreate: (task: NewTask) => Promise<boolea
           {open ? 'Cancel' : 'New task'}
         </button>
       </div>
-      {open && (
-        <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-4 gap-2">
-          <input aria-label="Task title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <input aria-label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <select aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value as Task['priority'])} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent">
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-          <select aria-label="Assignee" value={assignee} onChange={(e) => setAssignee(e.target.value)} className="md:col-span-3 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent">
-            <option value="">Assign to me</option>
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>{m.name}</option>
-            ))}
-          </select>
-          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save task'}
-          </button>
-        </form>
-      )}
+      {open && <TaskForm onCreate={onCreate} onDone={() => setOpen(false)} />}
     </div>
   );
 }

@@ -12,8 +12,15 @@ export interface NotesTabProps {
   onCreate?: (note: { title: string; body: string }) => Promise<boolean>;
 }
 
-function NewNoteForm({ onCreate }: { onCreate: (note: { title: string; body: string }) => Promise<boolean> }) {
-  const [open, setOpen] = useState(false);
+/** The new-note form on its own, so the organization page's "+ Add" can show
+ *  it in a sheet. It clears itself and calls `onDone` once the note is saved. */
+export function NoteForm({
+  onCreate,
+  onDone,
+}: {
+  onCreate: (note: { title: string; body: string }) => Promise<boolean>;
+  onDone?: () => void;
+}) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
@@ -27,10 +34,25 @@ function NewNoteForm({ onCreate }: { onCreate: (note: { title: string; body: str
     if (ok) {
       setTitle('');
       setBody('');
-      setOpen(false);
+      onDone?.();
     }
   }
 
+  return (
+    <form onSubmit={submit} className="flex flex-col gap-2">
+      <input aria-label="Note title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
+      <textarea aria-label="Note body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="What do you want the team above you to know?" rows={4} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
+      <div className="flex justify-end">
+        <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
+          {saving ? 'Saving…' : 'Save note'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function NewNoteForm({ onCreate }: { onCreate: (note: { title: string; body: string }) => Promise<boolean> }) {
+  const [open, setOpen] = useState(false);
   return (
     <div className="px-6 py-2 border-b border-line-subtle flex flex-col gap-2 bg-surface">
       <div className="flex items-center justify-between gap-3">
@@ -39,17 +61,7 @@ function NewNoteForm({ onCreate }: { onCreate: (note: { title: string; body: str
           {open ? 'Cancel' : 'New note'}
         </button>
       </div>
-      {open && (
-        <form onSubmit={submit} className="flex flex-col gap-2">
-          <input aria-label="Note title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <textarea aria-label="Note body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="What do you want the team above you to know?" rows={4} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
-          <div className="flex justify-end">
-            <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
-              {saving ? 'Saving…' : 'Save note'}
-            </button>
-          </div>
-        </form>
-      )}
+      {open && <NoteForm onCreate={onCreate} onDone={() => setOpen(false)} />}
     </div>
   );
 }

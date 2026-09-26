@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { ClipboardList, Plus, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { useAppDispatch } from '../../../hooks';
 import {
@@ -45,13 +45,91 @@ export interface SurveysTabProps {
 // delivery — see Survey model's own backend docstring on why); "Log
 // Response" is a small inline score entry per still-`sent` row, not a
 // second modal, since it's just one number.
-export function SurveysTab({ surveys, isLoading, error, entityType, entityId, customerId }: SurveysTabProps) {
+export interface LogSurveyFormProps {
+  customerId: number;
+  /** Set to log it on one of the organization's accounts. */
+  accountId?: number;
+  /** CES is asked of an organization only. */
+  allowCes: boolean;
+  onLogged: () => void | Promise<void>;
+  onCancel: () => void;
+}
+
+/** "Log Survey" on its own: records that a survey was sent (no email goes
+ *  out). SurveysTab shows it inline; the organization page's "+ Add" shows it
+ *  in a sheet. */
+export function LogSurveyForm({ customerId, accountId, allowCes, onLogged, onCancel }: LogSurveyFormProps) {
   const dispatch = useAppDispatch();
-  const [showLogForm, setShowLogForm] = useState(false);
+  const typeId = useId();
+  const sentId = useId();
   const [newType, setNewType] = useState<Survey['survey_type']>('nps');
   const [newSentAt, setNewSentAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [isLogging, setIsLogging] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
+
+  async function handleLogSurvey() {
+    setLogError(null);
+    setIsLogging(true);
+    try {
+      if (accountId === undefined) {
+        await dispatch(createSurveyForCustomer({ customerId, survey_type: newType, sent_at: newSentAt })).unwrap();
+      } else {
+        await dispatch(createSurveyForAccount({ customerId, accountId, survey_type: newType, sent_at: newSentAt })).unwrap();
+      }
+      setIsLogging(false);
+      await onLogged();
+    } catch (err) {
+      setLogError(typeof err === 'string' ? err : err instanceof ApiError ? err.message : 'Could not log that survey.');
+      setIsLogging(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-end gap-2 p-3 bg-surface rounded-xl border border-line-subtle shadow-sm">
+        <div className="flex flex-col gap-1">
+          <label htmlFor={typeId} className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Type</label>
+          <select
+            id={typeId}
+            value={newType}
+            onChange={(e) => setNewType(e.target.value as Survey['survey_type'])}
+            className="px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+          >
+            <option value="nps">NPS</option>
+            <option value="csat">CSAT</option>
+            {allowCes && <option value="ces">CES</option>}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor={sentId} className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Sent</label>
+          <input
+            id={sentId}
+            type="date"
+            value={newSentAt}
+            onChange={(e) => setNewSentAt(e.target.value)}
+            className="px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
+          />
+        </div>
+        <button
+          type="button"
+          onClick={handleLogSurvey}
+          disabled={isLogging}
+          className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isLogging ? 'Logging…' : 'Log'}
+        </button>
+        <button type="button" onClick={onCancel} className="px-2 py-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink">
+          Cancel
+        </button>
+      </div>
+      {logError && <p className="text-[12.5px] text-danger">{logError}</p>}
+    </div>
+  );
+}
+
+export function SurveysTab({ surveys, isLoading, error, entityType, entityId, customerId }: SurveysTabProps) {
+  const dispatch = useAppDispatch();
+  const [showLogForm, setShowLogForm] = useState(false);
   const [respondingId, setRespondingId] = useState<number | null>(null);
   const [responseScore, setResponseScore] = useState('');
   const [responseError, setResponseError] = useState<string | null>(null);
@@ -73,33 +151,6 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
       dispatch(fetchSurveysForCustomer(Number(entityId)));
     } else if (customerId !== undefined) {
       dispatch(fetchSurveysForAccount({ customerId, accountId: Number(entityId) }));
-    }
-  }
-
-  async function handleLogSurvey() {
-    setLogError(null);
-    setIsLogging(true);
-    try {
-      if (entityType === 'organization') {
-        await dispatch(
-          createSurveyForCustomer({ customerId: Number(entityId), survey_type: newType, sent_at: newSentAt })
-        ).unwrap();
-      } else if (customerId !== undefined) {
-        await dispatch(
-          createSurveyForAccount({
-            customerId,
-            accountId: Number(entityId),
-            survey_type: newType,
-            sent_at: newSentAt,
-          })
-        ).unwrap();
-      }
-      await refetch();
-      setShowLogForm(false);
-    } catch (err) {
-      setLogError(err instanceof ApiError ? err.message : 'Could not log that survey.');
-    } finally {
-      setIsLogging(false);
     }
   }
 
@@ -180,45 +231,18 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
         </div>
       )}
 
-      {showLogForm && (
-        <div className="flex items-end gap-2 p-3 bg-surface rounded-xl border border-line-subtle shadow-sm">
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Type</label>
-            <select
-              value={newType}
-              onChange={(e) => setNewType(e.target.value as Survey['survey_type'])}
-              className="px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
-            >
-              <option value="nps">NPS</option>
-              <option value="csat">CSAT</option>
-              {entityType === 'organization' && <option value="ces">CES</option>}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Sent</label>
-            <input
-              type="date"
-              value={newSentAt}
-              onChange={(e) => setNewSentAt(e.target.value)}
-              className="px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
-            />
-          </div>
-          <button
-            onClick={handleLogSurvey}
-            disabled={isLogging}
-            className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLogging ? 'Logging…' : 'Log'}
-          </button>
-          <button
-            onClick={() => { setShowLogForm(false); setLogError(null); }}
-            className="px-2 py-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink"
-          >
-            Cancel
-          </button>
-        </div>
+      {showLogForm && canLog && (
+        <LogSurveyForm
+          customerId={entityType === 'organization' ? Number(entityId) : (customerId as number)}
+          accountId={entityType === 'account' ? Number(entityId) : undefined}
+          allowCes={entityType === 'organization'}
+          onLogged={async () => {
+            await refetch();
+            setShowLogForm(false);
+          }}
+          onCancel={() => setShowLogForm(false)}
+        />
       )}
-      {logError && <p className="text-[12.5px] text-danger">{logError}</p>}
 
       {surveys.length === 0 ? (
         <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
