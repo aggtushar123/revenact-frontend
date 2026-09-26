@@ -1,4 +1,4 @@
-import { useId, useState, type DragEvent, type ReactNode } from 'react';
+import { useEffect, useId, useState, type DragEvent, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
@@ -26,12 +26,18 @@ export interface BoardColumnProps {
   move: BoardMove | null;
   filtered: boolean;
   openId: number | null;
+  /** The card that just moved here and should take focus. */
+  focusId: number | null;
   /** The card being dragged, if any (held by the board, not read back from dataTransfer). */
   dragging: PortfolioRow | null;
   onOpen: (row: PortfolioRow) => void;
   onMove: (row: PortfolioRow, to: LifecycleValue) => void;
   onDragStart: (row: PortfolioRow) => void;
   onDragEnd: () => void;
+  onFocused: (id: number) => void;
+  /** This column has swapped a saved move's guess for its own fresh page
+   *  (or its read failed, so it never will). */
+  onHandedOver: (key: string, token: number) => void;
   onRowsLoaded: (rows: PortfolioRow[]) => void;
   onShowChurned: () => void;
   /** Lifecycle columns other than Churn (ruling R2): the header's "+" adds
@@ -42,7 +48,7 @@ export interface BoardColumnProps {
 }
 
 /** Card-shaped loading placeholders. */
-export function CardSkeleton({ label, count }: { label: string; count: number }) {
+function CardSkeleton({ label, count }: { label: string; count: number }) {
   return (
     <div role="status" aria-label={`Loading ${label}`}>
       <ul aria-hidden="true" className="flex flex-col gap-2">
@@ -79,11 +85,14 @@ export function BoardColumn({
   move,
   filtered,
   openId,
+  focusId,
   dragging,
   onOpen,
   onMove,
   onDragStart,
   onDragEnd,
+  onFocused,
+  onHandedOver,
   onRowsLoaded,
   onShowChurned,
   onAdd,
@@ -96,11 +105,20 @@ export function BoardColumn({
   const overlay = useOverlayActive(move?.token ?? null, page.loadedKey);
   const loaded = enabled ? page.rows : [];
   const rows = overlay ? withMovedRow(loaded, spec.key, move) : loaded;
+  // Once the move has saved and this column's fresh page has replaced the
+  // guess, tell the board, which forgets the move when every read has.
+  const handedOver = move?.saved === true && enabled && (!overlay || page.error !== null);
+  useEffect(() => {
+    if (handedOver && move) onHandedOver(spec.key, move.token);
+  }, [handedOver, move, spec.key, onHandedOver]);
   const sentinelRef = useEndSentinel(
     () => void page.loadMore(),
     enabled && page.next !== null && !page.loadingMore && page.moreError === null,
   );
   const dropEnabled = canMove && !saving && dragging !== null && dragging.lifecycle.value !== spec.key;
+  // A drag cancelled with Escape sends no dragleave here: forget the hover
+  // with the drag, so the next drag doesn't light this column up unvisited.
+  if (over && dragging === null) setOver(false);
 
   const onDragOver = (event: DragEvent<HTMLElement>) => {
     if (!dropEnabled) return;
@@ -162,6 +180,8 @@ export function BoardColumn({
             onMove={onMove}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
+            takeFocus={focusId === row.id}
+            onFocused={onFocused}
           />
         ))}
         <li ref={sentinelRef} data-sentinel="" aria-hidden="true" className="h-px" />
@@ -179,7 +199,7 @@ export function BoardColumn({
       onDrop={onDrop}
       className={`flex min-h-0 shrink-0 flex-col gap-2 rounded-xl p-1 transition-colors duration-[var(--dur-fast)] ${
         isSm ? 'w-72' : 'w-full snap-start'
-      } ${over ? 'bg-accent-dim ring-2 ring-accent' : ''}`}
+      } ${over && dropEnabled ? 'bg-accent-dim ring-2 ring-accent' : ''}`}
     >
       <div className="flex items-center gap-1">
         <h2 id={headingId} className="min-w-0 flex-1 truncate px-1 text-[13px] font-semibold text-ink">
@@ -208,7 +228,7 @@ export function BoardColumn({
           </button>
         ) : null}
       </div>
-      <div className={isSm ? 'min-h-0 flex-1 overflow-y-auto' : ''}>
+      <div data-scroll-root={isSm ? '' : undefined} className={isSm ? 'min-h-0 flex-1 overflow-y-auto' : ''}>
         {body}
         <MoreButton
           next={enabled ? page.next : null}

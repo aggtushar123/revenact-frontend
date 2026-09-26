@@ -6,7 +6,10 @@ import { useEffect, useRef, useState } from 'react';
  *  again (a page landed) re-observes, and a browser observer fires at once
  *  if the end is still in view, so a short column keeps filling. Without
  *  IntersectionObserver (jsdom, very old browsers) it does nothing and the
- *  visible "Show more" button does the job. */
+ *  visible "Show more" button does the job. The observer's root is the
+ *  nearest `[data-scroll-root]` ancestor (a desktop Board column's own
+ *  scroller), since a margin on the viewport can't reach past an ancestor's
+ *  clip; without one it is the viewport (phones, where the page scrolls). */
 export function useEndSentinel(onEnd: () => void, active: boolean): (element: Element | null) => void {
   const [element, setElement] = useState<Element | null>(null);
   const onEndRef = useRef(onEnd);
@@ -20,7 +23,7 @@ export function useEndSentinel(onEnd: () => void, active: boolean): (element: El
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) onEndRef.current();
       },
-      { rootMargin: '200px' },
+      { root: element.closest('[data-scroll-root]'), rootMargin: '200px' },
     );
     observer.observe(element);
     return () => observer.disconnect();

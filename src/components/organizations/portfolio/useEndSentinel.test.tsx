@@ -31,6 +31,30 @@ describe('useEndSentinel', () => {
     expect(onEnd).toHaveBeenCalledTimes(1);
   });
 
+  it("observes relative to the nearest scroll root, so the 200px early margin works inside a column", () => {
+    const io = installIntersectionObserver();
+    function InColumn() {
+      const ref = useEndSentinel(() => {}, true);
+      return (
+        <div data-testid="scroller" data-scroll-root="">
+          <ul>
+            <li data-testid="end" ref={ref} />
+          </ul>
+        </div>
+      );
+    }
+    render(<InColumn />);
+    const options = io.optionsFor(screen.getByTestId('end'));
+    expect(options?.root).toBe(screen.getByTestId('scroller'));
+    expect(options?.rootMargin).toBe('200px');
+  });
+
+  it('observes relative to the viewport outside a scroll root', () => {
+    const io = installIntersectionObserver();
+    render(<Paged onEnd={() => {}} active />);
+    expect(io.optionsFor(screen.getByTestId('end'))?.root ?? null).toBeNull();
+  });
+
   it('calls the latest onEnd', () => {
     const io = installIntersectionObserver();
     const first = vi.fn();

@@ -6,18 +6,26 @@ import type { LifecycleValue, PortfolioRow } from '../../../features/organizatio
 import type { BoardMove } from './boardMove';
 
 export interface BoardMoveState {
-  /** The latest move. It shows at once and stays until the reloads it
-   *  triggers land (useOverlayActive). Null after a failure, so the card
-   *  goes back. */
+  /** The current move. It shows at once, is marked `saved` when the PATCH
+   *  succeeds, and stays until the board reports that every reload it
+   *  triggered has landed (`settle`), so a column that remounts later never
+   *  replays it. Null after a failure, so the card goes back. */
   move: BoardMove | null;
+  /** The PATCH is in flight. */
   saving: boolean;
+  /** A move is saving or settling. Moving is off until it clears: one at a
+   *  time, so a second move can't drop the first card's guess before its
+   *  fresh pages land. */
+  busy: boolean;
   /** "Moved Pizza Hut to Adoption.", for a polite live region. */
   notice: string | null;
   /** The failure, ending with the server's reason. */
   error: string | null;
   moveTo: (row: PortfolioRow, to: LifecycleValue) => void;
   dismissError: () => void;
-  /** Forget the last move (a different list landed). */
+  /** The move `token`'s reloads have all landed: forget it. */
+  settle: (token: number) => void;
+  /** Forget the move whatever it is (a different list landed). */
   reset: () => void;
 }
 
@@ -44,7 +52,7 @@ export function useBoardMove({
   const moveTo = useCallback(
     (row: PortfolioRow, to: LifecycleValue) => {
       const from = row.lifecycle.value;
-      if (to === from || saving) return;
+      if (to === from || saving || move !== null) return;
       setError(null);
       setNotice(null);
       if (to === 'churn') {
@@ -59,6 +67,10 @@ export function useBoardMove({
         .unwrap()
         .then(
           () => {
+            // Guarded by token only because a list change may have reset
+            // the move meanwhile; a second move can't start while this one
+            // is saving or settling.
+            setMove((current) => (current?.token === next.token ? { ...current, saved: true } : current));
             setNotice(`Moved ${row.name} to ${LIFECYCLE_LABELS[to]}.`);
             onSaved(next);
           },
@@ -70,11 +82,12 @@ export function useBoardMove({
         )
         .finally(() => setSaving(false));
     },
-    [dispatch, onChurn, onSaved, saving],
+    [dispatch, move, onChurn, onSaved, saving],
   );
 
   const dismissError = useCallback(() => setError(null), []);
+  const settle = useCallback((token: number) => setMove((current) => (current?.token === token ? null : current)), []);
   const reset = useCallback(() => setMove(null), []);
 
-  return { move, saving, notice, error, moveTo, dismissError, reset };
+  return { move, saving, busy: saving || move !== null, notice, error, moveTo, dismissError, settle, reset };
 }

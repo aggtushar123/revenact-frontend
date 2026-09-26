@@ -15,6 +15,8 @@ export interface BoardMove {
   row: PortfolioRow;
   from: LifecycleValue;
   to: LifecycleValue;
+  /** The PATCH has succeeded; the move now waits for its reloads to land. */
+  saved?: boolean;
 }
 
 export interface BoardColumnSpec {

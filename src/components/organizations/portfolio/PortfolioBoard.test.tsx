@@ -56,21 +56,29 @@ function renderBoard(search = '', { rows = ALL_ROWS, frame = {}, ...overrides }:
     onClearFilters: vi.fn(),
     onAdd: vi.fn(),
     onShowChurned: vi.fn(),
+    onMoveSettled: vi.fn(),
     ...overrides,
   };
-  render(
+  const view = render(
     <MemoryRouter>
       <PortfolioBoard {...props} />
     </MemoryRouter>,
   );
+  rerender = (next) =>
+    view.rerender(
+      <MemoryRouter>
+        <PortfolioBoard {...next} />
+      </MemoryRouter>,
+    );
   return props;
 }
+let rerender: (props: PortfolioBoardProps) => void = () => {};
 
 const column = (key: string) => document.querySelector(`[data-column="${key}"]`) as HTMLElement;
 const heading = (key: string) => within(column(key)).getByRole('heading');
 const card = (id: number) => document.querySelector(`[data-card-id="${id}"]`) as HTMLElement;
 const dataTransfer = () => ({ setData: vi.fn(), effectAllowed: 'all', dropEffect: 'none' });
-const moveButton = (id: number) => within(card(id)).queryByRole('button', { name: 'Move to…' });
+const moveButton = (id: number) => within(card(id)).queryByRole('button', { name: /^Move .+ to…$/ });
 const many = Array.from({ length: 30 }, (_, i) => ({ ...pizzaHut, id: 100 + i, name: `Account ${i + 1}` }));
 
 describe('PortfolioBoard', () => {
@@ -167,6 +175,29 @@ describe('PortfolioBoard', () => {
     expect(column('renewal')).not.toHaveClass('ring-2');
   });
 
+  it('drops the ring when the drag ends without a drop, and forgets a drag cancelled anywhere', async () => {
+    stubPortfolio();
+    const { onMove } = renderBoard();
+    await within(column('live')).findByRole('link', { name: 'Pizza Hut' });
+    const dt = dataTransfer();
+    fireEvent.dragStart(card(7), { dataTransfer: dt });
+    fireEvent.dragOver(column('renewal'), { dataTransfer: dt });
+    expect(column('renewal')).toHaveClass('ring-2');
+    // Escape cancels the drag: no dragleave reaches the column, only dragend.
+    fireEvent.dragEnd(card(7));
+    expect(column('renewal')).not.toHaveClass('ring-2');
+
+    // A drag that ends somewhere the card never hears about (dropped outside
+    // the window, or its card unmounted mid-drag) is cleared by the window's
+    // dragend, so a later stray drop moves nothing.
+    fireEvent.dragStart(card(7), { dataTransfer: dt });
+    fireEvent(window, new Event('dragend'));
+    fireEvent.dragOver(column('renewal'), { dataTransfer: dt });
+    fireEvent.drop(column('renewal'), { dataTransfer: dt });
+    expect(column('renewal')).not.toHaveClass('ring-2');
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
   it('takes a drop on the drop-only Churn column (the page opens the churn modal)', async () => {
     stubPortfolio();
     const { onMove } = renderBoard();
@@ -207,7 +238,49 @@ describe('PortfolioBoard', () => {
     expect(heading('renewal')).toHaveTextContent('Renewal · 1 · $69.6K');
     expect(heading('live')).toHaveTextContent('Live · 0 · $0');
     expect(within(column('renewal')).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
-    expect(within(column('renewal')).getByRole('button', { name: 'Move to…' })).toBeDisabled();
+    expect(within(column('renewal')).getByRole('button', { name: 'Move Pizza Hut to…' })).toBeDisabled();
+  });
+
+  it('keeps the old columns and reads nothing new while a new frame loads', async () => {
+    const spy = stubPortfolio();
+    const props = renderBoard();
+    await within(column('live')).findByRole('link', { name: 'Pizza Hut' });
+    const before = portfolioQueries(spy).length;
+    const owner = boardParams(parseParams(new URLSearchParams('group=owner'), BOARD_GROUP));
+    rerender({ ...props, params: owner, portfolio: { ...props.portfolio, loading: true } });
+    await act(async () => {});
+    expect(portfolioQueries(spy)).toHaveLength(before);
+    expect(within(column('live')).getByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
+    expect(screen.queryByText('No organizations in Live.')).toBeNull();
+
+    const query = toApiQuery(owner, { limit: '1' });
+    rerender({
+      ...props,
+      params: owner,
+      portfolio: { ...props.portfolio, data: buildPortfolio(new URLSearchParams(query)), loadedKey: `${query}#0#0`, loadedQuery: query },
+    });
+    await waitFor(() => expect(portfolioQueries(spy).slice(before).some((q) => q.get('group') === 'owner')).toBe(true));
+    const reads = portfolioQueries(spy).slice(before);
+    expect(reads.every((q) => q.get('group') === 'owner')).toBe(true);
+    expect(reads.some((q) => ['live', 'adoption'].includes(q.get('group_value') ?? ''))).toBe(false);
+  });
+
+  it('settles a saved move once the frame and both columns have reloaded', async () => {
+    stubPortfolio();
+    const onMoveSettled = vi.fn();
+    const move = { token: 1, row: pizzaHut, from: 'live' as const, to: 'renewal' as const, saved: true };
+    const props = renderBoard('', { move, saving: true, onMoveSettled });
+    await within(column('adoption')).findByRole('link', { name: 'Globex' });
+    // The frame still shows its pre-move answer: not settled.
+    expect(onMoveSettled).not.toHaveBeenCalled();
+
+    const moved = ALL_ROWS.map((row) => (row.id === 7 ? { ...row, lifecycle: { value: 'renewal' as const, label: 'Renewal' } } : row));
+    const query = toApiQuery(props.params, { limit: '1' });
+    rerender({
+      ...props,
+      portfolio: { ...props.portfolio, data: buildPortfolio(new URLSearchParams(query), moved), loadedKey: `${query}#1#0` },
+    });
+    await waitFor(() => expect(onMoveSettled).toHaveBeenCalledWith(1));
   });
 
   it('moves a card from its Move to… menu without dragging', async () => {
@@ -263,9 +336,20 @@ describe('PortfolioBoard', () => {
       expect(within(tabs).getByRole('button', { name: 'Live 1' })).toHaveAttribute('aria-current', 'true');
 
       const panels = document.querySelector('[data-part="panels"]') as HTMLElement;
-      Object.defineProperty(panels, 'clientWidth', { configurable: true, value: 375 });
-      Object.defineProperty(panels, 'scrollLeft', { configurable: true, value: 2 * (375 + 12) });
-      fireEvent.scroll(panels);
+      const scrollTo = (index: number) => {
+        Object.defineProperty(panels, 'clientWidth', { configurable: true, value: 375 });
+        Object.defineProperty(panels, 'scrollLeft', { configurable: true, value: index * (375 + 12) });
+        fireEvent.scroll(panels);
+      };
+      // The smooth scroll to Live passes Kickoff and Adoption on the way:
+      // the tab stays on Live instead of flickering through them.
+      scrollTo(1);
+      scrollTo(2);
+      expect(within(tabs).getByRole('button', { name: 'Live 1' })).toHaveAttribute('aria-current', 'true');
+      scrollTo(3);
+      expect(within(tabs).getByRole('button', { name: 'Live 1' })).toHaveAttribute('aria-current', 'true');
+      // Arrived: a swipe after that is followed again.
+      scrollTo(2);
       expect(within(tabs).getByRole('button', { name: 'Adoption 1' })).toHaveAttribute('aria-current', 'true');
     });
 

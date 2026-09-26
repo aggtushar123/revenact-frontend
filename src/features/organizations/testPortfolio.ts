@@ -174,6 +174,9 @@ function summarise(rows: PortfolioRow[]): PortfolioSummary {
 /** What the backend answers for `query`, over `rows`: filters, health groups
  *  (Poor, Average, Good), whole-set summary, `group_value` scoping, and a
  *  cursor (opaque to the page; an offset here). */
+/** The `owner` group key: the owner's id, or 'unassigned'. */
+const ownerKey = (row: PortfolioRow) => (row.owner ? String(row.owner.id) : 'unassigned');
+
 export function buildPortfolio(query: URLSearchParams, rows: PortfolioRow[] = ALL_ROWS): PortfolioResponse {
   const list = (key: string) => (query.get(key) ?? '').split(',').filter(Boolean);
   const ids = list('ids').map(Number);
@@ -209,14 +212,21 @@ export function buildPortfolio(query: URLSearchParams, rows: PortfolioRow[] = AL
               count: groupRows.length,
               arr: sumArr(groupRows),
             }))
-        : [];
+        : group === 'owner'
+          ? [...new Set(set.map(ownerKey))].map((key) => {
+              const groupRows = set.filter((row) => ownerKey(row) === key);
+              return { key, label: groupRows[0].owner?.name ?? 'Unassigned', count: groupRows.length, arr: sumArr(groupRows) };
+            })
+          : [];
   const groupValue = query.get('group_value');
   const scoped =
     groupValue && group === 'health'
       ? set.filter((row) => row.health.category === groupValue)
       : groupValue && group === 'lifecycle'
         ? set.filter((row) => row.lifecycle.value === groupValue)
-        : set;
+        : groupValue && group === 'owner'
+          ? set.filter((row) => ownerKey(row) === groupValue)
+          : set;
   const limit = Number(query.get('limit') ?? 50);
   const start = Number(query.get('cursor') ?? 0);
   return {
