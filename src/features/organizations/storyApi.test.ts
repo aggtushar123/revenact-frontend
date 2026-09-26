@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fetchStory, fetchThread, storyPath, storyQuery } from './storyApi';
-import { manyItems, requestPaths, storyQueries, stubOrganizationPage } from './testStory';
+import { manyItems, requestPaths, storyQueries, stubOrganizationPage, THREAD_ITEMS } from './testStory';
+import type { StoryResponse } from './storyTypes';
 
 const ALL = { group: '' as const, sources: [], account: '', q: '' };
 
@@ -60,5 +61,37 @@ describe('fetchStory', () => {
     expect(thread.every((item) => item.kind === 'email' && item.link.thread_id === 't-1')).toBe(true);
     expect(requestPaths(spy)).toEqual(['GET /organizations/7/story/']);
     expect(Object.fromEntries(storyQueries(spy)[0])).toEqual({ thread: 't-1', limit: '100' });
+  });
+
+  it('follows the cursor across a paged thread, returning every message oldest first', async () => {
+    // THREAD_ITEMS is [41 (newer), 40 (older)], newest first, as the backend
+    // sends it. Split across two pages, with next_cursor set on the first.
+    const counts: StoryResponse['counts'] = {
+      by_group: { all: 0, conversations: 0, tickets: 0, tasks: 0, feedback: 0, health: 0 },
+      by_kind: { activity: 0, calendar_event: 0, call: 0, email: 0, health: 0, note: 0, survey: 0, task: 0, ticket: 0 },
+      by_account: { all: 0, none: 0 },
+    };
+    const attention: StoryResponse['attention'] = {
+      renewal: null,
+      tickets: null,
+      overdue_tasks: null,
+      questions: null,
+      anomaly: null,
+    };
+    const spy = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(String(input));
+      const onPageTwo = url.searchParams.get('cursor') === 'page-2';
+      const body: StoryResponse = onPageTwo
+        ? { items: [THREAD_ITEMS[1]], next_cursor: null, counts, attention }
+        : { items: [THREAD_ITEMS[0]], next_cursor: 'page-2', counts, attention };
+      return { ok: true, status: 200, json: async () => body };
+    });
+    vi.stubGlobal('fetch', spy);
+
+    const thread = await fetchThread(7, 't-1');
+
+    expect(thread.map((item) => item.id)).toEqual([40, 41]);
+    expect(storyQueries(spy).map((query) => query.get('cursor'))).toEqual([null, 'page-2']);
+    expect(storyQueries(spy).map((query) => query.get('thread'))).toEqual(['t-1', 't-1']);
   });
 });
