@@ -10,6 +10,10 @@ interface Row {
   key: string;
   tone: string;
   text: string;
+  /** The main text is a count in words (a renewal countdown, a number of
+   *  tickets/tasks/questions): render it in DM Mono, as the List does. The
+   *  anomaly's title is server prose, not a count, and stays plain. */
+  numeric?: boolean;
   detail?: string;
   action?: () => void;
 }
@@ -37,6 +41,7 @@ export function AttentionBlock({
       key: 'renewal',
       tone: renewal.overdue ? 'text-danger' : 'text-warning',
       text: renewal.overdue ? `Renewal ${-renewal.days}d overdue` : renewal.days === 0 ? 'Renews today' : `Renews in ${renewal.days}d`,
+      numeric: true,
       detail: formatDate(renewal.date),
       action: () => onJump('contract'),
     });
@@ -46,6 +51,7 @@ export function AttentionBlock({
       key: 'tickets',
       tone: 'text-danger',
       text: plural(tickets.count, 'open High or Critical ticket', 'open High or Critical tickets'),
+      numeric: true,
       detail: `oldest ${tickets.oldest_days}d`,
       action: () => onFilter('tickets'),
     });
@@ -53,8 +59,9 @@ export function AttentionBlock({
   if (overdue_tasks) {
     rows.push({
       key: 'tasks',
-      tone: 'text-warning',
+      tone: 'text-danger',
       text: plural(overdue_tasks.count, 'overdue task', 'overdue tasks'),
+      numeric: true,
       detail: `oldest ${overdue_tasks.oldest_days}d`,
       action: () => onFilter('tasks'),
     });
@@ -64,6 +71,7 @@ export function AttentionBlock({
       key: 'questions',
       tone: 'text-warning',
       text: plural(questions.count, 'unanswered question', 'unanswered questions'),
+      numeric: true,
       action: () => onOpenTab('knowledge'),
     });
   }
@@ -89,7 +97,7 @@ export function AttentionBlock({
           const content = (
             <>
               <CircleAlert className={`h-4 w-4 shrink-0 ${row.tone}`} aria-hidden="true" />
-              <span className="min-w-0 truncate text-ink">{row.text}</span>
+              <span className={`min-w-0 truncate text-ink ${row.numeric ? 'font-mono-brand tabular-nums' : ''}`}>{row.text}</span>
               {row.detail ? (
                 <>
                   {' · '}
