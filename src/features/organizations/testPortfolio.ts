@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import { LIFECYCLE_VALUES } from './portfolioParams';
+import { LIFECYCLE_LABELS } from '../customers/formatters';
 import type {
   BulkRequest,
   BulkResult,
@@ -259,6 +260,33 @@ export interface PortfolioStub {
   customer?: unknown;
   /** GET /auth/members/ (the bulk owner targets). */
   members?: unknown[];
+  /** The book the default portfolio answer reads (default ALL_ROWS). It is
+   *  copied, and a PATCH to /customers/<id>/ writes into the copy, so a
+   *  reload after a move sees the move. */
+  rows?: PortfolioRow[];
+  /** Answer PATCH /customers/<id>/ yourself (for a failure, say). */
+  patch?: (id: number, body: Record<string, unknown>) => { status: number; body: unknown };
+}
+
+/** What PATCH /customers/<id>/ does to the stub's book: a new stage. Churn
+ *  marks the row churned, and a churned row carries no signal (backend rule). */
+function applyPatch(book: PortfolioRow[], id: number, body: Record<string, unknown>) {
+  const index = book.findIndex((row) => row.id === id);
+  if (index < 0) return { status: 404, body: { detail: 'Not found.' } };
+  const stage = body.lifecycle_stage as LifecycleValue | undefined;
+  if (stage) {
+    const churned = book[index].churned || stage === 'churn';
+    book[index] = {
+      ...book[index],
+      lifecycle: { value: stage, label: LIFECYCLE_LABELS[stage] },
+      churned,
+      signal: churned ? null : book[index].signal,
+    };
+  }
+  return {
+    status: 200,
+    body: { ...customerFixture, id, name: book[index].name, lifecycle_stage: book[index].lifecycle.value },
+  };
 }
 
 function json(status: number, body: unknown) {
@@ -271,11 +299,12 @@ function json(status: number, body: unknown) {
 }
 
 export function stubPortfolio(stub: PortfolioStub = {}) {
+  const book = [...(stub.rows ?? ALL_ROWS)];
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const path = url.pathname.replace(/^\/api\/v1/, '');
     if (path === '/organizations/portfolio/') {
-      const out = (stub.portfolio ?? ((q: URLSearchParams) => buildPortfolio(q)))(url.searchParams);
+      const out = (stub.portfolio ?? ((q: URLSearchParams) => buildPortfolio(q, book)))(url.searchParams);
       return 'results' in out ? json(200, out) : json(out.status, out.body);
     }
     if (path === '/organizations/portfolio/export.csv') {
@@ -290,7 +319,14 @@ export function stubPortfolio(stub: PortfolioStub = {}) {
       const body = JSON.parse(String(init.body)) as BulkRequest;
       return json(200, (stub.bulk ?? ((b: BulkRequest) => ({ updated: b.ids, failed: [] })))(body));
     }
-    if (/^\/customers\/\d+\/$/.test(path) && stub.customer) return json(200, stub.customer);
+    const customer = /^\/customers\/(\d+)\/$/.exec(path);
+    if (customer && init?.method === 'PATCH') {
+      const id = Number(customer[1]);
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      const out = stub.patch ? stub.patch(id, body) : applyPatch(book, id, body);
+      return json(out.status, out.body);
+    }
+    if (customer && stub.customer) return json(200, stub.customer);
     if (path === '/auth/members/') return json(200, stub.members ?? []);
     return json(404, { detail: `Not stubbed: ${path}` });
   });
@@ -312,4 +348,15 @@ export function bulkBodies(spy: FetchSpy): BulkRequest[] {
   return spy.mock.calls
     .filter(([input, init]) => String(input).endsWith('/organizations/bulk/') && init?.method === 'POST')
     .map(([, init]) => JSON.parse(String(init?.body)) as BulkRequest);
+}
+
+/** Every PATCH /customers/<id>/ so far, oldest first. */
+export function patchBodies(spy: FetchSpy): { id: number; body: Record<string, unknown> }[] {
+  return spy.mock.calls
+    .map(([input, init]) => ({ path: new URL(String(input)).pathname, init }))
+    .filter(({ path, init }) => init?.method === 'PATCH' && /\/customers\/\d+\/$/.test(path))
+    .map(({ path, init }) => ({
+      id: Number(/\/customers\/(\d+)\/$/.exec(path)![1]),
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+    }));
 }
