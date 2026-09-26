@@ -369,6 +369,13 @@ describe('PortfolioBoard', () => {
       expect(screen.queryByRole('navigation', { name: 'Board columns' })).not.toBeInTheDocument();
       expect(column('live')).toHaveClass('w-72');
     });
+
+    it('narrows its columns beside the Ask rail', () => {
+      stubPortfolio();
+      renderBoard('', { narrow: true });
+      expect(column('live')).toHaveClass('w-64');
+      expect(column('live')).not.toHaveClass('w-72');
+    });
   });
 
   describe('states', () => {

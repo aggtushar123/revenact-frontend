@@ -107,7 +107,7 @@ export function AccountRow({
         onPointerUp={cancelPress}
         onPointerLeave={cancelPress}
         onPointerCancel={cancelPress}
-        className="flex flex-wrap sm:flex-nowrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5 cursor-pointer select-none sm:select-auto"
+        className="flex flex-wrap @min-[60rem]:flex-nowrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5 cursor-pointer select-none sm:select-auto"
       >
         <label
           onClick={(event) => event.stopPropagation()}
