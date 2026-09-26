@@ -16,10 +16,11 @@
 
 - Header reads (spec §2): `GET /organizations/portfolio/?ids={id}&include_churned=1` (plus `limit=1`), which "gives one row with everything the List shows"; `ids` names archived rows too. `GET /customers/{id}/` adds `health_breakdown`, `csat_breakdown`, email, phone and industry.
 - Accounts: `GET /customers/{id}/accounts/` gives the chips. "Their counts come from the story's `counts.by_account`."
-- Story: `GET /api/v1/organizations/{id}/story/` (called as `/organizations/{id}/story/` through `apiFetch`, which prefixes `/api/v1`). Parameters: `group` ∈ {conversations, tickets, tasks, feedback, health}; `source` (comma list of exact kinds); `account` (an account id, or `none` for the organization itself); `q`; `cursor`; `limit` (default 30, max 100). "Unknown values are dropped, never a 400."
-- Story response: `{items, next_cursor, counts: {by_group, by_account}, attention}`. Each item is `{id, kind, source, occurred_at, account: {id, name} | null, title, summary, actor: {id, name} | null, link}`. "`counts` and `attention` cover the whole filtered set, not the page." The value sets and nested shapes are fixed in Task 1 (pre-flight 10) and must match the backend plan.
-- Paging: one keyset cursor, opaque, `null` on the last page, passed back verbatim (URL-encoded). A stale cursor means page one. The page reads 30 at a time (`STORY_PAGE_SIZE`).
-- Privacy is the server's (the twice-filter): the page shows exactly what arrives. The anomaly's `title` is `null` unless the viewer sees everything, and the page then says "An anomaly was detected".
+- Story: `GET /api/v1/organizations/{id}/story/` (called as `/organizations/{id}/story/` through `apiFetch`, which prefixes `/api/v1`). **The backend is the source of truth** (`revenact-backend/docs/superpowers/plans/2026-09-26-organization-story-backend.md` and `services/organizations/story/` on `feat/organization-story`); Task 1 mirrors it. `IsAuthenticated`; an organisation outside `visible_customers` is a **404** (it does not confirm the organisation exists). Parameters: `group` ∈ {conversations, tickets, tasks, feedback, health}; `source` (comma list of exact kinds); `account` (a positive account id, or `none` for the organization's own records; an id outside this organization's accounts in scope reads nothing, not a 404); `q` (trimmed, at most 200 characters); `thread` (an email `thread_id`: that thread's emails only; it narrows `items`, never `counts` or `attention`); `cursor`; `limit` (default 30, max 100; below 1 reads as 30). "Unknown values are dropped, never a 400."
+- Story response: `{items, next_cursor, counts: {by_group, by_kind, by_account}, attention}`. Each item is `{id, kind, source, occurred_at, all_day, account: {id, name} | null, title, summary, actor: {id: number | null, name} | null, link: {thread_id: string | null, url: string | null}}`. `by_group` (keys `all` and the five groups) and `by_kind` (every kind) follow `account` and `q` but not `group` or `source`; `by_account` (keys `all`, `none` and every in-scope account id as a string) follows `group`, `source` and `q` but not `account`. `attention` follows `account` only. The shapes are fixed in Task 1 (pre-flight 10).
+- Paging: one keyset cursor over `(occurred_at, kind, id)`, opaque, `null` on the last page, passed back verbatim (URL-encoded). The cursor is bound to `group`, `source`, `account`, `q` and `thread`: a cursor cut under other filters, or a malformed one, reads as page one. The page reads 30 at a time (`STORY_PAGE_SIZE`).
+- The story is what has happened: anything dated from tomorrow (UTC) on (an upcoming meeting, a future-dated ticket) is left out of items and counts. A task is in the story at its `created_at`, not its due date (overdue tasks are the attention block's job). Health items are month-end `HealthSnapshot` changes of health category, AI pulse or CSM pulse only; lifecycle changes are not stored and never appear.
+- Privacy is the server's (the twice-filter): the page shows exactly what arrives. The anomaly's `title` is always a string; for a viewer who does not see everything the server withholds the real title and sends "Similar reports across 1 of your companies", which the page shows as it came.
 - Existing endpoints stay for create and edit: `/customers/{id}/…` tasks, notes, surveys, calls; `PATCH /customers/{id}/` (edit, churn); `POST /organizations/bulk/` (archive); `/customers/{id}/accounts/` (add and edit an account).
 - Delivery 1 has no Ask on this page: no rail, no ✦ pill, no "Ask Copilot" link. The Navbar renders its empty actions slot, as on the List before delivery 3.
 - House rules (spec §1 and `.claude/skills/revenact-design/SKILL.md` §1 and §4):
@@ -46,15 +47,15 @@
 | 3 | Name row: initials avatar (no third-party logo), name, `owner · lifecycle · Touched Nd ago`, signal, Edit, ⋯ with Churn and Archive "gated as on the List". | The List offers Archive and Churn with no client-side capability check (the server applies its rules and reports each failure); Churn runs per account through `ChurnOrganizationModal`; Archive goes through `POST /organizations/bulk/`. | `OrganizationHeader` (Task 5) uses `row.initials`. ⋯ lists Archive unless the row is archived and Churn unless it has churned, and hides itself when neither applies. Archive confirms with `ConfirmDialog` and shows the server's failure reason there; Churn opens `ChurnOrganizationModal` for this one id. Edit opens `OrganizationFormModal` with the customer already read (disabled until it lands). |
 | 4 | Tiles: Health (ring, trend, tap for the breakdown), ARR (customer's currency), Renewal (runway), Pulse (AI · CSM, dots, disagree). A tile jumps to its Details panel. Phones: a snapping strip. | `HealthPopover` exists, unused, as a fixed hover tooltip with an `rgba` shadow and 10-12px type. The portfolio row's `arr` is in the org currency; `details.commercial.arr_billed_at_account` is in the customer's own. | `HeaderTiles` (Task 6) reuses `HealthRing`, `TrendLine`, `RenewalRunway` and `PulsePair`. The Health tile toggles an inline `HealthBreakdown` (a token-only list of the five rubric components from `health_breakdown`). ARR shows `arr_billed_at_account` in `details.commercial.currency`. ARR, Renewal and Pulse jump to the Commercial, Contract timeline and Voice panels: the tab switches to Details and the panel scrolls into view and takes focus. From `sm` the tiles are a four-column grid; below it, a `snap-x` strip. |
 | 5 | Pulse: the List's form; the blended "Account Pulse" is dropped. | `MetricsBanner` shows `account_pulse`; `PinnedAttributes` draws five fake teal dots. | Only `PulsePair` appears (tile), and the AI reason is in Details' Voice panel. Neither the banner nor the pinned panel survives the rewrite. |
-| 6 | Account chips `All · <Account> <n>`, counts from `counts.by_account`, `?account=` in the URL; `account=none` means "Organisation". | Nothing names the `by_account` keys, or whether a count ignores the account filter. | `by_account` is keyed by account id with `'none'` for records on the organization itself, and it ignores the account filter (so every chip keeps its number while one is chosen); `by_group` ignores the group and source filters. `AccountChips` (Task 7) shows All (the sum), each account (0 when absent) and an "Organization" chip when it has items or is chosen. |
+| 6 | Account chips `All · <Account> <n>`, counts from `counts.by_account`, `?account=` in the URL; `account=none` means "Organisation". | Nothing names the `by_account` keys, or whether a count ignores the account filter. | The backend names them: `by_account` has `all` (the total), `none` (records on the organization itself) and one key per account in scope (its id as a string, 0 included); it follows `group`, `source` and `q` but ignores `account` (so every chip keeps its number while one is chosen). `by_group` (`all` plus the five groups) and `by_kind` follow `account` and `q` and ignore `group` and `source`. `AccountChips` (Task 7) shows All (`by_account.all`), each account (`by_account[id]`, 0 when absent, i.e. out of the viewer's scope) and an "Organization" chip when `none` has items or is chosen. |
 | 7 | A chip filters Story, People and Deals & risks; delivery 2 turns People and Deals into list items "filtered by account". | `ContactsTab` and `PipelinesTab` have no account filter to take. | In delivery 1 the chips show on the Story tab only and filter only the story. `?account=` stays in the URL while other tabs are open, so delivery 2 can read it. |
 | 8 | Six tabs; the Accounts tab is not among them. | The Accounts tab holds account Add/Edit (`AccountFormModal`), a banner, a spreadsheet table with dead controls and a drill to `/accounts/:id`, which falls back to mock data on refresh (spec §6). | The Accounts tab goes. The chip row ends with **Add account** (`AccountFormModal` create, then the accounts reload) and, while an account chip is chosen, **Edit <account>** (`AccountFormModal` edit). No drill to `/accounts/:id` from this page. |
 | 9 | "Success Plans, Custom Objects and Canvases become tabs when built." | Custom Objects and Canvas List are real tabs today; `/accounts/:id` renders the same components. | They leave this page with the rest of the old tab bar. `CustomObjectsTab` and `CanvasListTab` stay in `components/shared/` for `/accounts/:id`. |
-| 10 | §2 names the story fields but not their values. | No backend plan exists yet (it is written in parallel). | Task 1 fixes them, and the backend plan must match: `kind` ∈ {activity, call, email, calendar_event, ticket, task, note, survey, health} (a Call is its own kind, carrying its CallSense summary in `summary`; `health` covers HealthSnapshot health and pulse changes); `id` is the record's own number (unique with `kind`); `source` is the connector or mailbox name, `''` when logged in Revenact; `occurred_at` is ISO, a plain date for records without a time; `link` is an `https://` URL in the source system, an in-app path starting with `/`, or null. `attention` is `{renewal: {date, days} \| null, urgent_tickets: {count, oldest_days} \| null, overdue_tasks: {count} \| null, open_questions: {count} \| null, anomaly: {title \| null, detected_at} \| null}`, each null when nothing needs attention. |
-| 11 | Filters: All · Conversations · Tickets · Tasks & notes · Feedback · Health & usage, a Sources picker (exact types) and search. "A source with no real data never appears." | The feed's 13 chips include placeholders (Pulse, Conversations, Revenact Support), a fake Slack filter and browser-only Sessions. | `STORY_GROUPS` and `STORY_KINDS` (Task 1) list only the nine real kinds. The Sources picker offers the chosen group's kinds; choosing a group drops sources outside it. `group`, `source` and `q` live in the URL too, so a filtered story survives refresh and Back; search writes `q` 300ms after typing stops (or on Enter), with `replace`. Filters with a zero count still show. |
-| 12 | "+ Add: Log activity, New task, New note, Log survey. These are the existing create flows." | Each flow is an inline form toggled inside its own tab (`TasksTab`, `NotesTab`, `SurveysTab`, `CallSenseTab`). `Activity` has no create endpoint: the only activity-logging flow is CallSense's "Log a call". | Task 12 lifts each form out as an exported component (`TaskForm`, `NoteForm`, `CallForm`, `LogSurveyForm`), leaving the tabs' behaviour and labels unchanged. `AddFlow` (Task 13) shows the chosen one in a `Sheet`; the menu reads **Log a call · New task · New note · Log survey**. It creates on the organization, or on the chosen account when an account chip is active. On success the sheet closes, the story reloads and a polite status says "Added to the story." |
-| 13 | "Opening an email shows its thread." | `EmailThreadPanel` invents a kickoff message for every logged email (`buildThread`), loads pravatar avatars, and its Reply, Forward, quick-reply and emoji controls do nothing. | A new `EmailThread` (Task 11) reads the email list the old Emails filter read (`/customers/{id}/emails/`, or the account's when the item has one, each under its own visibility rule) and shows the opened email with every email sharing its `thread_id`, oldest first. No reply controls on this page; replying stays in Communications. `EmailThreadPanel` stays for `/accounts/:id`. |
-| 14 | "Other items open their existing detail." | Tasks, notes, activities, calendar events and health changes have no detail page; a ticket has its `external_url`; surveys are edited on `/surveys`. | A non-email item's title toggles it open in place (the full summary) and, when the server sends a `link`, an "Open in <source>" link (external, new tab, `rel="noopener noreferrer"`, `https://` only) or an in-app link. |
+| 10 | §2 names the story fields but not their values. | The backend plan (`2026-09-26-organization-story-backend.md`) and its code on `feat/organization-story` (`services/organizations/story/params.py`, `cursor.py`, `items.py`, `health.py`, `scope.py`, `sources.py`, `build.py`) fix them; the code wins where the two differ. | Task 1 mirrors the backend exactly. `kind` ∈ {activity, calendar_event, call, email, health, note, survey, task, ticket} (a Call is its own kind, its `summary` is `Call.summary`); groups: conversations = activity, call, email, calendar_event; tickets = ticket; tasks = task, note; feedback = survey; health = health. `id` is the record's own pk (unique with `kind`). `source` is the provider in lower case: a connector's (`zendesk`, `jira`, `freshdesk`, `webhook`, `intercom`, `salesforce`, `hubspot`, `slack`, `gmail`, `ms_teams`, `zoom`, `github`, `figma`), a mailbox's (`google`, `microsoft`, `imap`), or `revenact` for anything logged in the app; the page names it with `sourceName`. `occurred_at` is always an ISO 8601 UTC timestamp; `all_day: true` marks a date-only record (activity, calendar event, ticket, note, survey, health), whose date is the date part of `occurred_at` (midnight UTC), not a moment. `actor` is `{id, name}` with `id` a user id when the row links a user and `null` when only a name is stored, or `null` (activity, calendar event, survey, health). `link` is `{thread_id, url}`: `thread_id` is an email's thread (null when blank); `url` is a ticket's `external_url` or a call's `recording_url`, sent only when it starts with `http://` or `https://`, else null. `attention` (backend Task 7) is exactly `{renewal: {date, days, overdue} \| null, tickets: {count, oldest_days} \| null, overdue_tasks: {count, oldest_days} \| null, questions: {count} \| null, anomaly: {id, title, first_seen_at, last_seen_at} \| null}`, each null when nothing needs attention: renewal only when overdue or due within 30 days and never for a churned organization; tickets are open High or Critical; `anomaly.title` is always a string (withheld as "Similar reports across 1 of your companies" unless the viewer sees everything). |
+| 11 | Filters: All · Conversations · Tickets · Tasks & notes · Feedback · Health & usage, a Sources picker (exact types) and search. "A source with no real data never appears." | The feed's 13 chips include placeholders (Pulse, Conversations, Revenact Support), a fake Slack filter and browser-only Sessions. | `STORY_GROUPS` and `STORY_KINDS` (Task 1) list only the nine real kinds. The Sources picker offers the chosen group's kinds that have data (`counts.by_kind[kind] > 0`, the backend's answer to "a source with no real data never appears in Sources"), plus any already chosen; choosing a group drops sources outside it. `group`, `source` and `q` live in the URL too, so a filtered story survives refresh and Back; search writes `q` 300ms after typing stops (or on Enter), with `replace`. Filters with a zero count still show. |
+| 12 | "+ Add: Log activity, New task, New note, Log survey. These are the existing create flows." | Each flow is an inline form toggled inside its own tab (`TasksTab`, `NotesTab`, `SurveysTab`, `CallSenseTab`). `Activity` has no create endpoint (`CustomerActivityListView` is list-only; backend pre-flight 22). A call create endpoint does exist: `_CallListView` is a `ListCreateAPIView` behind `POST /customers/{id}/calls/` and `POST /customers/{id}/accounts/{account_id}/calls/`, which CallSense's "Log a call" uses. | Task 12 lifts each form out as an exported component (`TaskForm`, `NoteForm`, `CallForm`, `LogSurveyForm`), leaving the tabs' behaviour and labels unchanged. `AddFlow` (Task 13) shows the chosen one in a `Sheet`; the menu reads **Log a call · New task · New note · Log survey**. It creates on the organization, or on the chosen account when an account chip is active. On success the sheet closes, the story reloads and a polite status says "Added to the story." |
+| 13 | "Opening an email shows its thread." | `EmailThreadPanel` invents a kickoff message for every logged email (`buildThread`), loads pravatar avatars, and its Reply, Forward, quick-reply and emoji controls do nothing. | The backend has no thread endpoint; it adds `thread=<thread_id>` to the story (backend pre-flight 14): that thread's emails only, across the organization and its accounts, under the same rules, newest first; it narrows `items`, not `counts` or `attention`. A new `EmailThread` (Task 11) reads `GET /organizations/{id}/story/?thread=<link.thread_id>&limit=100` (every page, through `fetchThread`) and shows the messages oldest first, each with its sender (`actor`), time and summary (the backend's one-line, 240-character `summary`; the full message stays in Communications). An email whose `link.thread_id` is null (logged in Revenact) has no thread and opens in place like any other item. No reply controls on this page; replying stays in Communications. `EmailThreadPanel` stays for `/accounts/:id`. |
+| 14 | "Other items open their existing detail." | Tasks, notes, activities, calendar events and health changes have no detail page; a ticket has its `external_url`, a call its `recording_url`; surveys are edited on `/surveys`. | A non-email item's title toggles it open in place (the full summary) and, when the server sends `link.url`, an "Open in <source>" link (external, new tab, `rel="noopener noreferrer"`, `http(s)://` only, as the backend already guarantees). The backend sends no in-app paths, so there are no in-app links. |
 | 15 | Calls carry their CallSense summary. | CallSense is a feed sub-tab listing calls with recording, participants and transcript. | The story shows a call's summary (the backend's `summary`). The full CallSense list moves to the **Files** tab under a "Calls" heading, beside the files, as "current content". |
 | 16 | Knowledge is today's Company View. | Headlines (an AI digest with Regenerate) and AI attributes are real and have no place in the six tabs. | Headlines go under Company View on the Knowledge tab. `AIAttributesPanel` goes under the six panels on the Details tab. |
 | 17 | The next page loads at the end of the list. | `useEndSentinel` and `MoreButton` exist in `portfolio/`. | `StoryStream` (Task 10) reuses both: a 1px sentinel after the last day and a visible Show more as the fallback. The observer's root is the viewport (the frame is unchanged). |
@@ -64,18 +65,18 @@
 | 21 | The Surveys page's row-click lands on this page's Surveys filter. | `SurveysPage.tsx:86` navigates with `state.activityFilter: 'Surveys'`. | It navigates to `/organizations/{id}?group=feedback` (Task 16). `ActivityFeed`'s `initialFilter` stays for `/accounts/:id`. |
 | 22 | Every new part meets the house rules. | `portfolio/houseRules.test.ts` scans its own folder only. | Task 3 lifts its scanners into `src/test/houseRules.ts` (`houseRuleSuite`), adds a no-third-party-image rule, and points a second suite at `detail/` (and, from Task 16, at `pages/organizations/Details.tsx`). |
 | 23 | The account tag reads "Organisation" when an item has no account. | The app's UI copy says "organization". | The tag and the chip read **Organization**, matching the app's US spelling rule. |
-| 24 | Items are grouped by day. | A call has a datetime; an activity a plain date. | `dayKey` reads a datetime in the viewer's time zone and keeps a plain date as it is; a plain date shows no time. Days read "Today", "Yesterday" or "31 Aug 2026". |
+| 24 | Items are grouped by day. | `occurred_at` is always a UTC timestamp; `all_day` marks a date-only record (cast to midnight UTC). | `dayKey(item)` reads a timed item in the viewer's time zone and an `all_day` item as the date part of `occurred_at` (so a note never slips to the day before west of UTC); an `all_day` item shows no time. Days read "Today", "Yesterday" or "31 Aug 2026". |
+| 25 | The story's scope in time and kind. | Backend pre-flight 7, 9 and 10. | Future-dated records are excluded (nothing on or after tomorrow's midnight UTC), a task appears at its `created_at`, and Health & usage holds only health-category, AI-pulse and CSM-pulse changes between month-end snapshots. The page adds no rule of its own; the test stub mirrors all three. |
 
 ## File map
 
 Create:
 - `src/features/organizations/`:
   - `storyTypes.ts`: the §2 story types.
-  - `storyKinds.ts` (+ `.test.ts`): groups, kinds, labels, the + Add flows.
-  - `storyApi.ts` (+ `.test.ts`): `storyQuery`, `fetchStory`.
+  - `storyKinds.ts` (+ `.test.ts`): groups, kinds, labels, source names, the + Add flows.
+  - `storyApi.ts` (+ `.test.ts`): `storyQuery`, `fetchStory`, `fetchThread`.
   - `storyDays.ts` (+ `.test.ts`): day keys, labels, grouping.
   - `detailParams.ts` (+ `.test.ts`): the page's URL state and tab ids.
-  - `emailThread.ts` (+ `.test.ts`): `threadOf`.
   - `testStory.ts`: fixtures and `stubOrganizationPage`.
 - `src/test/houseRules.ts` (+ `houseRules.test.ts`): the shared house-rules suite.
 - `src/components/organizations/detail/`:
@@ -118,10 +119,10 @@ Kept on purpose (used by `/accounts/:id` or other pages): `ActivityFeed`, `Pinne
 **Interfaces:**
 - Consumes: `apiFetch` (`src/lib/apiClient.ts`); `buildPortfolio`, `customerFixture`, `pizzaHut` (`testPortfolio.ts`); `PortfolioRow`, `BulkRequest` (`portfolioTypes.ts`); `Account`, `Customer` (`customersSlice.ts`).
 - Produces:
-  - Types: `StoryGroup`, `StoryKind`, `StoryRef`, `StoryItem`, `StoryAttention`, `StoryCounts`, `StoryResponse` (exactly as below).
-  - `STORY_GROUPS: {key: StoryGroup | ''; label: string}[]`, `GROUP_KEYS: StoryGroup[]`, `STORY_KINDS: {kind; label; group}[]`, `KIND_GROUP: Record<StoryKind, StoryGroup>`, `KIND_NAME: Record<StoryKind, string>`, `isStoryKind(v: string): v is StoryKind`, `isStoryGroup(v: string): v is StoryGroup`, `kindsIn(group: StoryGroup | ''): StoryKind[]`, `type AddKind = 'call' | 'task' | 'note' | 'survey'`, `ADD_FLOWS: {key: AddKind; label: string}[]`.
-  - `STORY_PAGE_SIZE = 30`, `storyPath(orgId: number): string`, `interface StoryFilters {group: StoryGroup | ''; sources: StoryKind[]; account: string; q: string}`, `storyQuery(f: StoryFilters, limit?: number): string`, `fetchStory(orgId: number, query: string, cursor?: string | null): Promise<StoryResponse>`.
-  - Test-only (`testStory.ts`): `EMEA`, `NORTH_AMERICA` (`StoryRef`), `ACCOUNTS: Account[]`, `pizzaHutCustomer: Customer`, `STORY_ITEMS: StoryItem[]`, `PIZZA_ATTENTION`, `QUIET_ATTENTION: StoryAttention`, `THREAD_EMAILS`, `MEMBERS`, `manyItems(n: number): StoryItem[]`, `buildStory(query, book, attention): StoryResponse`, `stubOrganizationPage(stub?: OrganizationPageStub)` (returns the fetch spy), `storyQueries(spy): URLSearchParams[]`, `portfolioRequests(spy): URLSearchParams[]`, `postBodies(spy, path: string): Record<string, unknown>[]`, `requestPaths(spy): string[]`.
+  - Types: `StoryGroup`, `StoryKind`, `StoryRef`, `StoryActor`, `StoryLink`, `StoryItem`, `StoryAttention`, `StoryCounts`, `StoryResponse` (exactly as below, mirroring the backend's `items.py`, `build.py` and its plan's Task 7).
+  - `STORY_GROUPS: {key: StoryGroup | ''; label: string}[]`, `GROUP_KEYS: StoryGroup[]`, `STORY_KINDS: {kind; label; group}[]`, `KIND_GROUP: Record<StoryKind, StoryGroup>`, `KIND_NAME: Record<StoryKind, string>`, `isStoryKind(v: string): v is StoryKind`, `isStoryGroup(v: string): v is StoryGroup`, `kindsIn(group: StoryGroup | ''): StoryKind[]`, `offeredSources(group, byKind, selected): StoryKind[]`, `sourceName(source: string): string`, `type AddKind = 'call' | 'task' | 'note' | 'survey'`, `ADD_FLOWS: {key: AddKind; label: string}[]`.
+  - `STORY_PAGE_SIZE = 30`, `THREAD_PAGE_SIZE = 100`, `storyPath(orgId: number): string`, `interface StoryFilters {group: StoryGroup | ''; sources: StoryKind[]; account: string; q: string}`, `storyQuery(f: StoryFilters, limit?: number): string`, `fetchStory(orgId: number, query: string, cursor?: string | null): Promise<StoryResponse>`, `fetchThread(orgId: number, threadId: string): Promise<StoryItem[]>`.
+  - Test-only (`testStory.ts`): `EMEA`, `NORTH_AMERICA` (`StoryRef`), `ACCOUNTS: Account[]`, `pizzaHutCustomer: Customer`, `STORY_ITEMS: StoryItem[]`, `PIZZA_ATTENTION`, `QUIET_ATTENTION: StoryAttention`, `THREAD_ITEMS: StoryItem[]`, `MEMBERS`, `manyItems(n: number): StoryItem[]`, `buildStory(query, book, attention, accountIds): StoryResponse`, `stubOrganizationPage(stub?: OrganizationPageStub)` (returns the fetch spy), `storyQueries(spy): URLSearchParams[]`, `portfolioRequests(spy): URLSearchParams[]`, `postBodies(spy, path: string): Record<string, unknown>[]`, `requestPaths(spy): string[]`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -137,6 +138,8 @@ import {
   isStoryGroup,
   isStoryKind,
   kindsIn,
+  offeredSources,
+  sourceName,
 } from './storyKinds';
 
 describe('story groups and kinds (spec §1.6 and "Where today\'s 13 feed filters go")', () => {
@@ -174,7 +177,22 @@ describe('story groups and kinds (spec §1.6 and "Where today\'s 13 feed filters
     expect(isStoryGroup('sessions')).toBe(false);
   });
 
-  it('offers the four existing create flows', () => {
+  it('offers a group\'s sources that have data, keeps a chosen one, and offers all until counts land', () => {
+    const byKind = { activity: 0, calendar_event: 0, call: 1, email: 1, health: 1, note: 0, survey: 0, task: 1, ticket: 1 };
+    expect(offeredSources('tasks', byKind, [])).toEqual(['task']);
+    expect(offeredSources('tasks', byKind, ['note'])).toEqual(['task', 'note']);
+    expect(offeredSources('tasks', null, [])).toEqual(['task', 'note']);
+  });
+
+  it('names where a record came from, and nothing for a record logged in Revenact', () => {
+    expect(sourceName('zendesk')).toBe('Zendesk');
+    expect(sourceName('google')).toBe('Gmail');
+    expect(sourceName('ms_teams')).toBe('Microsoft Teams');
+    expect(sourceName('revenact')).toBe('');
+    expect(sourceName('newcomer')).toBe('newcomer');
+  });
+
+  it('offers the four existing create flows (a call has a create endpoint; an activity has none)', () => {
     expect(ADD_FLOWS.map((flow) => flow.label)).toEqual(['Log a call', 'New task', 'New note', 'Log survey']);
   });
 });
@@ -183,8 +201,8 @@ describe('story groups and kinds (spec §1.6 and "Where today\'s 13 feed filters
 `src/features/organizations/storyApi.test.ts`:
 ```ts
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fetchStory, storyPath, storyQuery } from './storyApi';
-import { manyItems, storyQueries, stubOrganizationPage } from './testStory';
+import { fetchStory, fetchThread, storyPath, storyQuery } from './storyApi';
+import { manyItems, requestPaths, storyQueries, stubOrganizationPage } from './testStory';
 
 const ALL = { group: '' as const, sources: [], account: '', q: '' };
 
@@ -222,8 +240,28 @@ describe('fetchStory', () => {
     stubOrganizationPage();
     const data = await fetchStory(7, storyQuery({ ...ALL, group: 'tickets' }));
     expect(data.items.map((item) => `${item.kind}:${item.id}`)).toEqual(['ticket:88']);
-    expect(data.counts.by_group).toEqual({ conversations: 2, tickets: 1, tasks: 1, feedback: 0, health: 1 });
-    expect(data.counts.by_account).toEqual({ '32': 1 });
+    expect(data.counts.by_group).toEqual({ all: 5, conversations: 2, tickets: 1, tasks: 1, feedback: 0, health: 1 });
+    expect(data.counts.by_kind).toEqual({
+      activity: 0,
+      calendar_event: 0,
+      call: 1,
+      email: 1,
+      health: 1,
+      note: 0,
+      survey: 0,
+      task: 1,
+      ticket: 1,
+    });
+    expect(data.counts.by_account).toEqual({ all: 1, none: 0, '31': 0, '32': 1 });
+  });
+
+  it('reads one email thread through ?thread=, every page, oldest first', async () => {
+    const spy = stubOrganizationPage();
+    const thread = await fetchThread(7, 't-1');
+    expect(thread.map((item) => item.id)).toEqual([40, 41]);
+    expect(thread.every((item) => item.kind === 'email' && item.link.thread_id === 't-1')).toBe(true);
+    expect(requestPaths(spy)).toEqual(['GET /organizations/7/story/']);
+    expect(Object.fromEntries(storyQueries(spy)[0])).toEqual({ thread: 't-1', limit: '100' });
   });
 });
 ```
@@ -237,10 +275,9 @@ Expected: FAIL with "Failed to resolve import './storyKinds'" (and './storyApi',
 
 `src/features/organizations/storyTypes.ts`:
 ```ts
-// Mirrors GET /api/v1/organizations/{id}/story/ (spec
-// docs/superpowers/specs/2026-09-26-organization-detail-design.md §2). The
-// spec names the fields; the value sets and nested shapes here are the plan's
-// reading of it (pre-flight 10), shared with the backend plan.
+// Mirrors GET /api/v1/organizations/{id}/story/. The backend is the source of
+// truth: revenact-backend services/organizations/story/ (params.py, items.py,
+// build.py) and its plan's Task 7 (attention). Change the two together.
 
 /** The story's filter groups (`group`). All is the absence of one. */
 export type StoryGroup = 'conversations' | 'tickets' | 'tasks' | 'feedback' | 'health';
@@ -248,60 +285,82 @@ export type StoryGroup = 'conversations' | 'tickets' | 'tasks' | 'feedback' | 'h
 /** The exact record kinds (`source` takes a comma list of these). */
 export type StoryKind =
   | 'activity'
+  | 'calendar_event'
   | 'call'
   | 'email'
-  | 'calendar_event'
-  | 'ticket'
-  | 'task'
+  | 'health'
   | 'note'
   | 'survey'
-  | 'health';
+  | 'task'
+  | 'ticket';
 
 export interface StoryRef {
   id: number;
   name: string;
 }
 
+/** Who did it. `id` is a user id when the record links a user, null when it
+ *  stores only a name (a sender, a call host, a ticket requester). */
+export interface StoryActor {
+  id: number | null;
+  name: string;
+}
+
+export interface StoryLink {
+  /** An email's thread (read with `?thread=`); null for every other kind and
+   *  for an email with no thread. */
+  thread_id: string | null;
+  /** A ticket's external URL or a call's recording, only ever http(s); null
+   *  otherwise. */
+  url: string | null;
+}
+
 export interface StoryItem {
   /** The record's own id; unique together with `kind`. */
   id: number;
   kind: StoryKind;
-  /** Where the record came from: a connector's or mailbox provider's name
-   *  ("Zendesk", "Gmail"), or '' when it was logged in Revenact. */
+  /** Where the record came from, in lower case: a connector's or mailbox's
+   *  provider ('zendesk', 'zoom', 'google', ...), or 'revenact' when it was
+   *  logged in the app. `sourceName` puts it in words. */
   source: string;
-  /** ISO 8601: a datetime, or a plain date (YYYY-MM-DD) for records that keep no time. */
+  /** Always an ISO 8601 UTC timestamp. */
   occurred_at: string;
+  /** A date-only record: its day is the date part of `occurred_at` (midnight
+   *  UTC), and it has no time of day. */
+  all_day: boolean;
   /** The account it is filed against; null when it is on the organization itself. */
   account: StoryRef | null;
   title: string;
-  /** One line. A call's is its CallSense summary. '' when there is none. */
+  /** One line, at most 240 characters. A call's is its CallSense summary. '' when there is none. */
   summary: string;
-  /** Who did it (sender, assignee, author); null when nobody is recorded. */
-  actor: StoryRef | null;
-  /** The record's own page: an https URL in its source system, or an in-app
-   *  path starting with '/'. Null when it has none. */
-  link: string | null;
+  /** Null when nobody is recorded (activities, meetings, surveys, health). */
+  actor: StoryActor | null;
+  link: StoryLink;
 }
 
-/** What needs attention across the whole filtered set; each part is null
- *  when nothing needs it. */
+/** Needs attention (backend plan Task 7). It follows the account filter only;
+ *  each part is null when nothing needs it. */
 export interface StoryAttention {
-  /** Only when overdue (days < 0) or due within 30 days. */
-  renewal: { date: string; days: number } | null;
-  /** Open High or Critical tickets, and the age of the oldest. */
-  urgent_tickets: { count: number; oldest_days: number } | null;
-  overdue_tasks: { count: number } | null;
-  /** Unanswered Knowledge questions. */
-  open_questions: { count: number } | null;
-  /** The latest anomaly. `title` is null unless the viewer sees everything. */
-  anomaly: { title: string | null; detected_at: string } | null;
+  /** Only when overdue or due within 30 days; never for a churned organization. */
+  renewal: { date: string; days: number; overdue: boolean } | null;
+  /** Open High or Critical tickets, and the age of the oldest in days. */
+  tickets: { count: number; oldest_days: number } | null;
+  /** Open tasks past their due date, and how many days the oldest is late. */
+  overdue_tasks: { count: number; oldest_days: number } | null;
+  /** Unanswered Knowledge questions on the organization. */
+  questions: { count: number } | null;
+  /** The latest live anomaly. `title` is withheld server-side ("Similar
+   *  reports across 1 of your companies") unless the viewer sees everything. */
+  anomaly: { id: number; title: string; first_seen_at: string; last_seen_at: string } | null;
 }
 
 export interface StoryCounts {
-  /** Every group, under the account and search filters (not group or source). */
-  by_group: Record<StoryGroup, number>;
-  /** By account id, 'none' for records on the organization itself, under the
-   *  group, source and search filters (not the account filter). */
+  /** `all` and every group, under the account and search filters (not group or source). */
+  by_group: Record<StoryGroup | 'all', number>;
+  /** Every kind, under the account and search filters (not group or source). */
+  by_kind: Record<StoryKind, number>;
+  /** `all`, `none` (records on the organization itself) and every account in
+   *  scope by id, under the group, source and search filters (not the account filter). */
   by_account: Record<string, number>;
 }
 
@@ -373,8 +432,49 @@ export function kindsIn(group: StoryGroup | ''): StoryKind[] {
   return STORY_KINDS.filter((k) => !group || k.group === group).map((k) => k.kind);
 }
 
+/** The Sources picker's kinds: the group's kinds that have data (`by_kind`,
+ *  the backend's "a source with no real data never appears in Sources"),
+ *  plus any already chosen so it can be unchosen. Every kind until the
+ *  counts land. */
+export function offeredSources(
+  group: StoryGroup | '',
+  byKind: Record<StoryKind, number> | null,
+  selected: StoryKind[],
+): StoryKind[] {
+  return kindsIn(group).filter((kind) => !byKind || byKind[kind] > 0 || selected.includes(kind));
+}
+
+/** Where a record came from, in words: the provider values of the backend's
+ *  `Connector.Provider` and `MailboxConnection.Provider`. A record logged in
+ *  Revenact names no source (''); an unknown provider reads as it came. */
+const SOURCE_NAMES: Record<string, string> = {
+  revenact: '',
+  zendesk: 'Zendesk',
+  jira: 'Jira',
+  freshdesk: 'Freshdesk',
+  webhook: 'Webhook',
+  intercom: 'Intercom',
+  salesforce: 'Salesforce',
+  hubspot: 'HubSpot',
+  slack: 'Slack',
+  gmail: 'Gmail',
+  ms_teams: 'Microsoft Teams',
+  zoom: 'Zoom',
+  github: 'GitHub',
+  figma: 'Figma',
+  google: 'Gmail',
+  microsoft: 'Outlook',
+  imap: 'IMAP',
+};
+
+export function sourceName(source: string): string {
+  return SOURCE_NAMES[source] ?? source;
+}
+
 /** "+ Add" on the story (spec §1.6): the existing create flows. Activity has
- *  no create endpoint; CallSense's "Log a call" is how an activity is logged. */
+ *  no create endpoint; a call has one (POST /customers/{id}/calls/ and the
+ *  account's), which CallSense's "Log a call" uses, so it stands in for
+ *  "Log activity". */
 export type AddKind = 'call' | 'task' | 'note' | 'survey';
 export const ADD_FLOWS: { key: AddKind; label: string }[] = [
   { key: 'call', label: 'Log a call' },
@@ -388,7 +488,7 @@ export const ADD_FLOWS: { key: AddKind; label: string }[] = [
 ```ts
 // The organization story endpoint (spec §2), through apiFetch (/api/v1 prefix).
 import { apiFetch } from '../../lib/apiClient';
-import type { StoryGroup, StoryKind, StoryResponse } from './storyTypes';
+import type { StoryGroup, StoryKind, StoryItem, StoryResponse } from './storyTypes';
 
 export const STORY_PAGE_SIZE = 30;
 
@@ -403,7 +503,8 @@ export interface StoryFilters {
 }
 
 /** The query for these filters in one fixed order, so equal filters make an
- *  equal string (the paging key). */
+ *  equal string (the paging key). The backend binds its cursor to the same
+ *  filters, so a changed filter always starts from page one. */
 export function storyQuery(f: StoryFilters, limit = STORY_PAGE_SIZE): string {
   const query = new URLSearchParams();
   if (f.group) query.set('group', f.group);
@@ -419,6 +520,25 @@ export function fetchStory(orgId: number, query: string, cursor?: string | null)
   const full = cursor ? `${query}&cursor=${encodeURIComponent(cursor)}` : query;
   return apiFetch<StoryResponse>(`${storyPath(orgId)}?${full}`);
 }
+
+export const THREAD_PAGE_SIZE = 100;
+
+/** One email thread, oldest first: the story read with `thread` (the backend
+ *  has no thread endpoint). It returns that thread's emails only, across the
+ *  organization and its accounts, under the same rules; no other filter is
+ *  sent, so the whole thread shows whatever chip is on. Its counts and
+ *  attention are not narrowed and are not used here. */
+export async function fetchThread(orgId: number, threadId: string): Promise<StoryItem[]> {
+  const query = new URLSearchParams({ thread: threadId, limit: String(THREAD_PAGE_SIZE) }).toString();
+  const items: StoryItem[] = [];
+  let cursor: string | null = null;
+  do {
+    const page: StoryResponse = await fetchStory(orgId, query, cursor);
+    items.push(...page.items);
+    cursor = page.next_cursor;
+  } while (cursor);
+  return items.reverse();
+}
 ```
 
 `src/features/organizations/testStory.ts`:
@@ -426,20 +546,23 @@ export function fetchStory(orgId: number, query: string, cursor?: string | null)
 import { vi } from 'vitest';
 import type { Account, Customer } from '../customers/customersSlice';
 import type { BulkRequest, PortfolioRow } from './portfolioTypes';
-import { GROUP_KEYS, KIND_GROUP } from './storyKinds';
-import type { StoryAttention, StoryGroup, StoryItem, StoryRef, StoryResponse } from './storyTypes';
+import { GROUP_KEYS, KIND_GROUP, STORY_KINDS } from './storyKinds';
+import type { StoryActor, StoryAttention, StoryCounts, StoryItem, StoryKind, StoryRef, StoryResponse } from './storyTypes';
 import { buildPortfolio, customerFixture, pizzaHut } from './testPortfolio';
 
-// Test-only: §2-shaped story bodies and one fetch stub for the organization
+// Test-only: story bodies in the backend's shapes (revenact-backend
+// services/organizations/story/) and one fetch stub for the organization
 // page. It answers the header's two reads, the accounts, the story (with the
-// backend's facet counts and paging; the cursor is an offset here), the email
-// lists, the create endpoints "+ Add" uses (each adds its record to the
-// story), archive and PATCH, and empty lists for the other tabs' reads.
+// backend's facet counts, its `thread` read, its horizon and paging; the
+// cursor is an offset here), the create endpoints "+ Add" uses (each adds its
+// record to the story as the backend would render it), archive and PATCH,
+// and empty lists for the other tabs' reads.
 
 export const EMEA: StoryRef = { id: 31, name: 'EMEA' };
 export const NORTH_AMERICA: StoryRef = { id: 32, name: 'North America' };
-const CARL: StoryRef = { id: 2, name: 'Carl CSM' };
-const ALICE: StoryRef = { id: 1, name: 'Alice' };
+const CARL: StoryActor = { id: 2, name: 'Carl CSM' };
+const ALICE: StoryActor = { id: 1, name: 'Alice' };
+const NO_LINK = { thread_id: null, url: null };
 
 function accountFixture(ref: StoryRef): Account {
   return {
@@ -486,185 +609,190 @@ export const pizzaHutCustomer = {
   csat_breakdown: { responses: 0, bands: [] },
 } as unknown as Customer;
 
-/** Pizza Hut's story, newest first. Times are noon UTC (and 11:00) so the
- *  calendar day is the same in every time zone a test runs in. */
+/** Pizza Hut's story, newest first, as the backend renders it. Timed items
+ *  are at noon UTC (and 11:00) so the calendar day is the same in every time
+ *  zone a test runs in; date-only items (`all_day`) are at midnight UTC. */
 export const STORY_ITEMS: StoryItem[] = [
   {
     id: 41,
     kind: 'email',
-    source: 'Gmail',
-    occurred_at: '2026-09-25T12:00:00Z',
+    source: 'google',
+    occurred_at: '2026-09-25T12:00:00+00:00',
+    all_day: false,
     account: EMEA,
     title: 'Re: Renewal pricing',
-    summary: 'Asked for the renewal quote before the board meeting.',
-    actor: { id: 90, name: 'Dana Buyer' },
-    link: null,
+    summary: 'Can we see the quote before the board meets on Friday?',
+    actor: { id: null, name: 'Dana Buyer' },
+    link: { thread_id: 't-1', url: null },
   },
   {
     id: 12,
     kind: 'call',
-    source: '',
-    occurred_at: '2026-09-25T11:00:00Z',
+    source: 'revenact',
+    occurred_at: '2026-09-25T11:00:00+00:00',
+    all_day: false,
     account: null,
     title: 'Quarterly check-in',
     summary: 'The admin left and usage fell. Agreed a retraining session.',
-    actor: CARL,
-    link: null,
+    actor: { id: null, name: 'Carl CSM' },
+    link: NO_LINK,
   },
   {
     id: 88,
     kind: 'ticket',
-    source: 'Zendesk',
-    occurred_at: '2026-09-24T12:00:00Z',
+    source: 'zendesk',
+    occurred_at: '2026-09-24T00:00:00+00:00',
+    all_day: true,
     account: NORTH_AMERICA,
     title: 'SSO login fails',
-    summary: 'High · open',
-    actor: null,
-    link: 'https://acme.zendesk.example/tickets/88',
+    summary: 'ZD-88 · High · Open',
+    actor: { id: null, name: 'Sam Admin' },
+    link: { thread_id: null, url: 'https://acme.zendesk.example/tickets/88' },
   },
   {
     id: 5,
     kind: 'task',
-    source: '',
-    occurred_at: '2026-09-20T12:00:00Z',
+    source: 'revenact',
+    occurred_at: '2026-09-20T12:00:00+00:00',
+    all_day: false,
     account: null,
     title: 'Send the renewal quote',
-    summary: 'Due 22 Sep 2026 · High',
+    summary: 'Due 2026-09-22 · High · Pending',
     actor: CARL,
-    link: null,
+    link: NO_LINK,
   },
   {
     id: 3,
     kind: 'health',
-    source: '',
-    occurred_at: '2026-08-31',
+    source: 'revenact',
+    occurred_at: '2026-08-31T00:00:00+00:00',
+    all_day: true,
     account: null,
-    title: 'Health fell to 4.9',
-    summary: 'From 5.5 to 4.9; now Average.',
+    title: 'Health fell to Average',
+    summary: 'Health 5.5 → 4.9 · AI pulse 3 → 2',
     actor: null,
-    link: null,
+    link: NO_LINK,
+  },
+];
+
+/** Thread t-1 as `?thread=t-1` returns it (newest first): the email in the
+ *  story (41) and the message it answers (40), filed on the organization
+ *  itself. 40 is left out of the default book so the other counts stay small. */
+export const THREAD_ITEMS: StoryItem[] = [
+  STORY_ITEMS[0],
+  {
+    id: 40,
+    kind: 'email',
+    source: 'google',
+    occurred_at: '2026-09-24T10:00:00+00:00',
+    all_day: false,
+    account: null,
+    title: 'Renewal pricing',
+    summary: 'Sharing the renewal quote ahead of your board meeting.',
+    actor: CARL,
+    link: { thread_id: 't-1', url: null },
   },
 ];
 
 export const PIZZA_ATTENTION: StoryAttention = {
-  renewal: { date: '2026-08-09', days: -47 },
-  urgent_tickets: { count: 2, oldest_days: 9 },
-  overdue_tasks: { count: 1 },
-  open_questions: { count: 3 },
-  anomaly: { title: null, detected_at: '2026-09-21' },
+  renewal: { date: '2026-08-09', days: -47, overdue: true },
+  tickets: { count: 2, oldest_days: 9 },
+  overdue_tasks: { count: 1, oldest_days: 4 },
+  questions: { count: 3 },
+  anomaly: {
+    id: 17,
+    title: 'Similar reports across 1 of your companies',
+    first_seen_at: '2026-09-19T08:00:00+00:00',
+    last_seen_at: '2026-09-21T08:00:00+00:00',
+  },
 };
 
 export const QUIET_ATTENTION: StoryAttention = {
   renewal: null,
-  urgent_tickets: null,
+  tickets: null,
   overdue_tasks: null,
-  open_questions: null,
+  questions: null,
   anomaly: null,
 };
-
-/** EMEA's email list: the opened email (41), its reply-to (40) in the same
- *  thread, and an unrelated one. */
-export const THREAD_EMAILS = [
-  {
-    id: 40,
-    subject: 'Renewal pricing',
-    sender_name: 'Carl CSM',
-    recipient_name: 'Dana Buyer',
-    body: 'Sharing the renewal quote ahead of your board meeting.',
-    sent_at: '2026-09-24T10:00:00Z',
-    links: 0,
-    watchers: 0,
-    is_starred: false,
-    direction: 'sent',
-    from_address: 'carl@acme.example',
-    to_addresses: ['dana@pizzahut.example'],
-    thread_id: 't-1',
-    mailbox_owner: CARL,
-  },
-  {
-    id: 41,
-    subject: 'Re: Renewal pricing',
-    sender_name: 'Dana Buyer',
-    recipient_name: 'Carl CSM',
-    body: 'Can we see the quote before the board meets on Friday?',
-    sent_at: '2026-09-25T12:00:00Z',
-    links: 0,
-    watchers: 0,
-    is_starred: false,
-    direction: 'received',
-    from_address: 'dana@pizzahut.example',
-    to_addresses: ['carl@acme.example'],
-    thread_id: 't-1',
-    mailbox_owner: CARL,
-  },
-  {
-    id: 39,
-    subject: 'Webinar invite',
-    sender_name: 'Events',
-    recipient_name: 'Dana Buyer',
-    body: 'Join our webinar.',
-    sent_at: '2026-09-20T12:00:00Z',
-    links: 0,
-    watchers: 0,
-    is_starred: false,
-    direction: 'sent',
-    from_address: 'events@acme.example',
-    to_addresses: ['dana@pizzahut.example'],
-    thread_id: 't-2',
-    mailbox_owner: CARL,
-  },
-];
 
 export const MEMBERS = [
   { id: 1, name: 'Alice', function: 'cs' },
   { id: 2, name: 'Carl CSM', function: 'cs' },
 ];
 
-/** `n` notes on the organization, newest first, an hour apart. */
+/** `n` tasks on the organization, newest first, created an hour apart (a
+ *  task is in the story at its `created_at`). */
 export function manyItems(n: number): StoryItem[] {
   return Array.from({ length: n }, (_, i) => ({
     id: 1000 + i,
-    kind: 'note' as const,
-    source: '',
+    kind: 'task' as const,
+    source: 'revenact',
     occurred_at: new Date(Date.UTC(2026, 8, 20, 12) - i * 3_600_000).toISOString(),
+    all_day: false,
     account: null,
-    title: `Note ${i + 1}`,
-    summary: `Body ${i + 1}`,
+    title: `Task ${i + 1}`,
+    summary: 'Due 2026-10-01 · Medium · Pending',
     actor: ALICE,
-    link: null,
+    link: NO_LINK,
   }));
 }
 
-const newestFirst = (items: StoryItem[]) => [...items].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
+const newestFirst = (items: StoryItem[]) =>
+  [...items].sort((a, b) => Date.parse(b.occurred_at) - Date.parse(a.occurred_at) || b.kind.localeCompare(a.kind) || b.id - a.id);
 
-/** The backend's story rules over a book: every filter, the facet counts
- *  (each facet without its own filter), and an offset cursor. */
-export function buildStory(query: URLSearchParams, book: StoryItem[], attention: StoryAttention): StoryResponse {
+/** Tomorrow's midnight UTC: the backend leaves out anything dated from then on. */
+function horizon(): number {
+  const now = new Date();
+  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+}
+
+/** The backend's story rules over a book: the horizon, every filter, the
+ *  facet counts (each facet without its own filter, `all` totals, every
+ *  account in scope listed), search never matching health, and an offset
+ *  cursor. `accountIds` are the organization's accounts in scope. */
+export function buildStory(
+  query: URLSearchParams,
+  book: StoryItem[],
+  attention: StoryAttention,
+  accountIds: number[],
+): StoryResponse {
   const group = query.get('group') ?? '';
   const sources = (query.get('source') ?? '').split(',').filter(Boolean);
   const account = query.get('account') ?? '';
-  const q = (query.get('q') ?? '').toLowerCase();
+  const q = (query.get('q') ?? '').trim().toLowerCase();
   const inGroup = (item: StoryItem) => !group || KIND_GROUP[item.kind] === group;
   const inSources = (item: StoryItem) => sources.length === 0 || sources.includes(item.kind);
   const inAccount = (item: StoryItem) =>
     !account || (account === 'none' ? item.account === null : String(item.account?.id) === account);
-  const matches = (item: StoryItem) => !q || `${item.title} ${item.summary}`.toLowerCase().includes(q);
-  const sorted = newestFirst(book);
+  const matches = (item: StoryItem) =>
+    !q || (item.kind !== 'health' && `${item.title} ${item.summary} ${item.actor?.name ?? ''}`.toLowerCase().includes(q));
+  const until = horizon();
+  const sorted = newestFirst(book).filter((item) => Date.parse(item.occurred_at) < until);
   const set = sorted.filter((item) => inGroup(item) && inSources(item) && inAccount(item) && matches(item));
-  const byGroup = Object.fromEntries(GROUP_KEYS.map((key) => [key, 0])) as Record<StoryGroup, number>;
-  for (const item of sorted) if (inAccount(item) && matches(item)) byGroup[KIND_GROUP[item.kind]] += 1;
-  const byAccount: Record<string, number> = {};
+
+  const byKind = Object.fromEntries(STORY_KINDS.map((k) => [k.kind, 0])) as Record<StoryKind, number>;
+  for (const item of sorted) if (inAccount(item) && matches(item)) byKind[item.kind] += 1;
+  const byGroup = { all: 0, ...Object.fromEntries(GROUP_KEYS.map((key) => [key, 0])) } as StoryCounts['by_group'];
+  for (const k of STORY_KINDS) {
+    byGroup[k.group] += byKind[k.kind];
+    byGroup.all += byKind[k.kind];
+  }
+  const byAccount: Record<string, number> = { all: 0, none: 0 };
+  for (const id of accountIds) byAccount[String(id)] = 0;
   for (const item of sorted) {
     if (!inGroup(item) || !inSources(item) || !matches(item)) continue;
     const key = item.account ? String(item.account.id) : 'none';
-    byAccount[key] = (byAccount[key] ?? 0) + 1;
+    if (!(key in byAccount)) continue;
+    byAccount[key] += 1;
+    byAccount.all += 1;
   }
+
   const limit = Number(query.get('limit') ?? 30);
   const start = Number(query.get('cursor') ?? 0);
   return {
     items: set.slice(start, start + limit),
     next_cursor: start + limit < set.length ? String(start + limit) : null,
-    counts: { by_group: byGroup, by_account: byAccount },
+    counts: { by_group: byGroup, by_kind: byKind, by_account: byAccount },
     attention,
   };
 }
@@ -678,8 +806,9 @@ export interface OrganizationPageStub {
   /** The story's book (default STORY_ITEMS). "+ Add" appends to a copy. */
   items?: StoryItem[];
   attention?: StoryAttention;
-  /** Email lists by path, e.g. '/customers/7/accounts/31/emails/'. */
-  emails?: Record<string, unknown[]>;
+  /** What `?thread=<id>` returns, by thread id (default: t-1 is THREAD_ITEMS).
+   *  A thread not listed reads the book's emails in that thread. */
+  threads?: Record<string, StoryItem[]>;
   /** How many portfolio reads fail (500 "Try later.") before they succeed. */
   failPortfolio?: number;
   /** How many story reads fail (500 "Try later.") before they succeed. */
@@ -742,7 +871,19 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
         storyFailures -= 1;
         return json(500, { detail: 'Try later.' });
       }
-      return json(200, buildStory(url.searchParams, book, stub.attention ?? PIZZA_ATTENTION));
+      const accountIds = accounts.map((a) => a.id);
+      const thread = url.searchParams.get('thread');
+      if (thread) {
+        // `thread` narrows the items to that thread's emails, never the counts.
+        const rest = new URLSearchParams(url.searchParams);
+        rest.delete('thread');
+        const whole = buildStory(rest, book, stub.attention ?? PIZZA_ATTENTION, accountIds);
+        const emails =
+          stub.threads?.[thread] ??
+          (thread === 't-1' ? THREAD_ITEMS : book.filter((item) => item.kind === 'email' && item.link.thread_id === thread));
+        return json(200, { ...whole, items: newestFirst(emails), next_cursor: null });
+      }
+      return json(200, buildStory(url.searchParams, book, stub.attention ?? PIZZA_ATTENTION, accountIds));
     }
 
     if (path === '/organizations/bulk/' && method === 'POST') {
@@ -769,18 +910,22 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
       created += 1;
       const id = 900 + created;
       const now = new Date().toISOString();
+      const today = `${now.slice(0, 10)}T00:00:00+00:00`;
       const title = String(body.title ?? '');
+      // Each new record joins the book as the backend renders it (items.py).
+      const logged = { id, source: 'revenact', account: ref, link: NO_LINK };
       if (create[3] === 'tasks') {
-        book.push({ id, kind: 'task', source: '', occurred_at: now, account: ref, title, summary: `Due ${String(body.due_date)}`, actor: ALICE, link: null });
+        book.push({ ...logged, kind: 'task', occurred_at: now, all_day: false, title, summary: `Due ${String(body.due_date)} · Medium · Pending`, actor: ALICE });
         return json(201, { id, title, assignee_name: 'Alice', assignee: ALICE, created_by: ALICE, due_date: body.due_date, priority: body.priority, status: 'pending' });
       }
       if (create[3] === 'notes') {
-        book.push({ id, kind: 'note', source: '', occurred_at: now, account: ref, title, summary: String(body.body ?? ''), actor: ALICE, link: null });
+        book.push({ ...logged, kind: 'note', occurred_at: today, all_day: true, title, summary: String(body.body ?? ''), actor: ALICE });
         return json(201, { id, title, author_name: 'Alice', author: ALICE, body: body.body, logged_at: now.slice(0, 10), links: 0 });
       }
       if (create[3] === 'surveys') {
         const type = String(body.survey_type ?? 'nps');
-        book.push({ id, kind: 'survey', source: '', occurred_at: String(body.sent_at), account: ref, title: `${type.toUpperCase()} survey sent`, summary: '', actor: ALICE, link: '/surveys' });
+        const sent = String(body.sent_at ?? now).slice(0, 10);
+        book.push({ ...logged, kind: 'survey', occurred_at: `${sent}T00:00:00+00:00`, all_day: true, title: `${type.toUpperCase()} survey`, summary: 'Sent · awaiting a response', actor: null });
         return json(201, {
           id,
           survey_type: type,
@@ -796,7 +941,8 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
           created_at: now,
         });
       }
-      book.push({ id, kind: 'call', source: '', occurred_at: String(body.occurred_at ?? now), account: ref, title, summary: String(body.summary ?? ''), actor: ALICE, link: null });
+      const at = body.occurred_at ? new Date(String(body.occurred_at)).toISOString() : now;
+      book.push({ ...logged, kind: 'call', occurred_at: at, all_day: false, title, summary: String(body.summary ?? ''), actor: { id: null, name: 'Alice' } });
       return json(201, {
         id,
         title,
@@ -821,7 +967,6 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
     if (method === 'GET') {
       if (orgPath && path === orgPath) return json(200, stub.customer ?? pizzaHutCustomer);
       if (orgPath && path === `${orgPath}accounts/`) return json(200, accounts);
-      if (stub.emails && path in stub.emails) return json(200, stub.emails[path]);
       if (path === '/auth/members/') return json(200, MEMBERS);
       if (/^\/customers\/\d+\/brief\/$/.test(path)) return json(200, EMPTY_BRIEF);
       if (/^\/customers\/\d+\/responsible\/$/.test(path)) return json(200, { responsible: [] });
@@ -869,7 +1014,7 @@ export function requestPaths(spy: Calls): string[] {
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run src/features/organizations/storyKinds.test.ts src/features/organizations/storyApi.test.ts`
-Expected: PASS (6 tests).
+Expected: PASS (9 tests).
 
 - [ ] **Step 5: Type-check and commit**
 
@@ -897,7 +1042,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Consumes: `isStoryGroup`, `isStoryKind`, `kindsIn` (Task 1); `StoryFilters` (Task 1); `formatDate` (`features/customers/formatters.ts`).
 - Produces:
   - `type DetailTab = 'story' | 'details' | 'people' | 'deals' | 'knowledge' | 'files'`, `DETAIL_TABS: {key: DetailTab; label: string}[]`, `interface DetailParams {tab; account: string; group: StoryGroup | ''; sources: StoryKind[]; q: string}`, `parseDetailParams(search: URLSearchParams): DetailParams`, `toDetailSearch(p: DetailParams): URLSearchParams`, `withPatch(p: DetailParams, patch: Partial<DetailParams>): DetailParams`, `storyFilters(p: DetailParams): StoryFilters`, `hasStoryFilters(p: DetailParams): boolean`, `detailTabId(base: string, tab: DetailTab): string`, `detailPanelId(base: string): string`.
-  - `localDay(date: Date): string`, `dayKey(iso: string): string`, `timeLabel(iso: string): string`, `dayLabel(key: string, today: string): string`, `groupByDay<T extends {occurred_at: string}>(items: T[]): {key: string; items: T[]}[]`.
+  - `type Timed = {occurred_at: string; all_day: boolean}`, `localDay(date: Date): string`, `dayKey(item: Timed): string`, `timeLabel(item: Timed): string`, `dayLabel(key: string, today: string): string`, `groupByDay<T extends Timed>(items: T[]): {key: string; items: T[]}[]`.
   - `useDetailParams(): {params: DetailParams; update: (patch: Partial<DetailParams>, options?: {replace?: boolean}) => void}` (`update` is stable).
 
 - [ ] **Step 1: Write the failing tests**
@@ -970,19 +1115,24 @@ import { describe, expect, it } from 'vitest';
 import { dayKey, dayLabel, groupByDay, localDay, timeLabel } from './storyDays';
 
 // Local times built with the Date constructor, so each lands on the stated
-// calendar day in whatever time zone the tests run.
-const at = (y: number, m: number, d: number, h: number, min = 0) => new Date(y, m - 1, d, h, min).toISOString();
+// calendar day in whatever time zone the tests run. A date-only record comes
+// from the backend as midnight UTC with `all_day: true`.
+const at = (y: number, m: number, d: number, h: number, min = 0) => ({
+  occurred_at: new Date(y, m - 1, d, h, min).toISOString(),
+  all_day: false,
+});
+const onDay = (date: string) => ({ occurred_at: `${date}T00:00:00+00:00`, all_day: true });
 
 describe('story days', () => {
-  it('reads a datetime in the viewer\'s zone and keeps a plain date as it is', () => {
+  it("reads a timed item in the viewer's zone and an all-day item as its UTC date", () => {
     expect(dayKey(at(2026, 9, 25, 14, 5))).toBe('2026-09-25');
-    expect(dayKey('2026-08-31')).toBe('2026-08-31');
+    expect(dayKey(onDay('2026-08-31'))).toBe('2026-08-31');
     expect(localDay(new Date(2026, 0, 5))).toBe('2026-01-05');
   });
 
   it('shows a time only when the record keeps one', () => {
     expect(timeLabel(at(2026, 9, 25, 14, 5))).toBe('2:05 PM');
-    expect(timeLabel('2026-08-31')).toBe('');
+    expect(timeLabel(onDay('2026-08-31'))).toBe('');
   });
 
   it('names today, yesterday and older days', () => {
@@ -994,10 +1144,10 @@ describe('story days', () => {
 
   it('groups by day in the order the items came, one group per day', () => {
     const items = [
-      { id: 1, occurred_at: at(2026, 9, 25, 15) },
-      { id: 2, occurred_at: at(2026, 9, 25, 9) },
-      { id: 3, occurred_at: '2026-09-24' },
-      { id: 4, occurred_at: at(2026, 9, 25, 8) },
+      { id: 1, ...at(2026, 9, 25, 15) },
+      { id: 2, ...at(2026, 9, 25, 9) },
+      { id: 3, ...onDay('2026-09-24') },
+      { id: 4, ...at(2026, 9, 25, 8) },
     ];
     expect(groupByDay(items).map((g) => [g.key, g.items.map((i) => i.id)])).toEqual([
       ['2026-09-25', [1, 2, 4]],
@@ -1142,23 +1292,27 @@ import { formatDate } from '../customers/formatters';
 // Day grouping for the story stream (spec §1.6 "grouped by day, newest first").
 
 const pad = (n: number) => String(n).padStart(2, '0');
-const isDateOnly = (iso: string) => /^\d{4}-\d{2}-\d{2}$/.test(iso);
+
+/** What the day grouping reads from a story item: `occurred_at` is always a
+ *  UTC timestamp, and `all_day` marks a date-only record (midnight UTC). */
+export type Timed = { occurred_at: string; all_day: boolean };
 
 /** YYYY-MM-DD of a moment in the viewer's time zone. */
 export function localDay(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** The calendar day an item happened on, in the viewer's time zone. A plain
- *  date (a record that keeps no time) stays that date. */
-export function dayKey(iso: string): string {
-  return isDateOnly(iso) ? iso : localDay(new Date(iso));
+/** The calendar day an item happened on: a timed item in the viewer's time
+ *  zone; an all-day item is the date part of its timestamp, so it never
+ *  moves to the day before west of UTC. */
+export function dayKey(item: Timed): string {
+  return item.all_day ? item.occurred_at.slice(0, 10) : localDay(new Date(item.occurred_at));
 }
 
-/** "2:05 PM", or '' for a plain date. */
-export function timeLabel(iso: string): string {
-  if (isDateOnly(iso)) return '';
-  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+/** "2:05 PM", or '' for an all-day item. */
+export function timeLabel(item: Timed): string {
+  if (item.all_day) return '';
+  return new Date(item.occurred_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 /** "Today", "Yesterday" or "31 Aug 2026". */
@@ -1170,10 +1324,10 @@ export function dayLabel(key: string, today: string): string {
 }
 
 /** One group per day, days in the order they first appear. */
-export function groupByDay<T extends { occurred_at: string }>(items: T[]): { key: string; items: T[] }[] {
+export function groupByDay<T extends Timed>(items: T[]): { key: string; items: T[] }[] {
   const days = new Map<string, T[]>();
   for (const item of items) {
-    const key = dayKey(item.occurred_at);
+    const key = dayKey(item);
     const day = days.get(key);
     if (day) day.push(item);
     else days.set(key, [item]);
@@ -2593,7 +2747,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `Account` (`customersSlice.ts`); `DETAIL_TABS`, `DetailTab`, `detailTabId`, `detailPanelId` (Task 2); `FOCUS`, `QUIET` (`styles.ts`); `ACCOUNTS` (Task 1).
 - Produces:
-  - `AccountChips({accounts: Account[]; loading: boolean; error: string | null; counts: Record<string, number> | null; selected: string; onSelect: (value: string) => void; onRetry: () => void; onAdd: () => void; onEdit: (account: Account) => void})`. Chips: All (sum of counts), each account (`counts[id] ?? 0`), and Organization (`'none'`) when it has items or is chosen. Pressing the chosen account chip again returns to All (`onSelect('')`).
+  - `AccountChips({accounts: Account[]; loading: boolean; error: string | null; counts: Record<string, number> | null; selected: string; onSelect: (value: string) => void; onRetry: () => void; onAdd: () => void; onEdit: (account: Account) => void})`. Chips: All (`counts.all`), each account (`counts[id] ?? 0`), and Organization (`counts.none`) when it has items or is chosen. `counts` is the backend's `by_account`: `all`, `none` and every in-scope account id. Pressing the chosen account chip again returns to All (`onSelect('')`).
   - `DetailTabs({idBase: string; active: DetailTab; onChange: (tab: DetailTab) => void})`: `role="tablist"`, roving tab index, arrows/Home/End with automatic activation, the active tab scrolled into view.
 
 - [ ] **Step 1: Write the failing tests**
@@ -2614,7 +2768,7 @@ function renderChips(props: Partial<ComponentProps<typeof AccountChips>> = {}) {
       accounts={ACCOUNTS}
       loading={false}
       error={null}
-      counts={{ '31': 1, '32': 1, none: 3 }}
+      counts={{ all: 5, none: 3, '31': 1, '32': 1 }}
       selected=""
       {...handlers}
       {...props}
@@ -2637,8 +2791,8 @@ describe('AccountChips (spec §1.4)', () => {
     expect(chips().map((chip) => chip.textContent)).toEqual(['All', 'EMEA', 'North America']);
   });
 
-  it('gives an account with no items a 0 and hides Organization when it has none', () => {
-    renderChips({ counts: { '31': 2 } });
+  it('gives an account the story does not list a 0, and hides Organization when it has none', () => {
+    renderChips({ counts: { all: 2, none: 0, '31': 2 } });
     expect(chips().map((chip) => chip.textContent)).toEqual(['All 2', 'EMEA 2', 'North America 0']);
   });
 
@@ -2780,7 +2934,8 @@ export function AccountChips({
   accounts: Account[];
   loading: boolean;
   error: string | null;
-  /** `counts.by_account` from the story; null until it lands. */
+  /** `counts.by_account` from the story (`all`, `none`, each account in
+   *  scope by id); null until it lands. */
   counts: Record<string, number> | null;
   /** An account id, 'none', or '' for All. */
   selected: string;
@@ -2789,7 +2944,7 @@ export function AccountChips({
   onAdd: () => void;
   onEdit: (account: Account) => void;
 }) {
-  const total = counts ? Object.values(counts).reduce((sum, n) => sum + n, 0) : null;
+  const total = counts ? (counts.all ?? 0) : null;
   const orgCount = counts?.none ?? 0;
   const current = accounts.find((account) => String(account.id) === selected) ?? null;
 
@@ -2960,7 +3115,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: `StoryAttention`, `StoryGroup` (Task 1), `DetailTab` (Task 2), `PanelKey`, `formatDate`, `FOCUS`; `PIZZA_ATTENTION`, `QUIET_ATTENTION` (Task 1).
-- Produces: `AttentionBlock({attention: StoryAttention; onFilter: (group: StoryGroup) => void; onOpenTab: (tab: DetailTab) => void; onJump: (panel: PanelKey) => void})`. Renders nothing when every part is null. Renewal → `onJump('contract')`; urgent tickets → `onFilter('tickets')`; overdue tasks → `onFilter('tasks')`; open questions → `onOpenTab('knowledge')`; the anomaly is text only.
+- Produces: `AttentionBlock({attention: StoryAttention; onFilter: (group: StoryGroup) => void; onOpenTab: (tab: DetailTab) => void; onJump: (panel: PanelKey) => void})`. Reads the backend's keys (`renewal`, `tickets`, `overdue_tasks`, `questions`, `anomaly`; backend plan Task 7). Renders nothing when every part is null. Renewal (`overdue` sets the tone) → `onJump('contract')`; tickets → `onFilter('tickets')`; overdue tasks → `onFilter('tasks')`; questions → `onOpenTab('knowledge')`; the anomaly is text only: its `title` as sent (already withheld for a viewer who does not see everything) and its `last_seen_at` date.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2986,17 +3141,17 @@ describe('AttentionBlock (spec §1.6 "Needs attention")', () => {
     expect(within(block).getAllByRole('listitem').map((item) => item.textContent)).toEqual([
       'Renewal 47d overdue · 9 Aug 2026',
       '2 open High or Critical tickets · oldest 9d',
-      '1 overdue task',
+      '1 overdue task · oldest 4d',
       '3 unanswered questions',
-      'An anomaly was detected · 21 Sep 2026',
+      'Similar reports across 1 of your companies · 21 Sep 2026',
     ]);
   });
 
-  it('names the anomaly when the viewer may see its title, and a renewal that is coming', () => {
+  it("shows the anomaly's title as the server sends it, and a renewal that is coming", () => {
     renderBlock({
       ...QUIET_ATTENTION,
-      renewal: { date: '2026-10-10', days: 14 },
-      anomaly: { title: 'Logins fell 60%', detected_at: '2026-09-21T08:00:00Z' },
+      renewal: { date: '2026-10-10', days: 14, overdue: false },
+      anomaly: { id: 9, title: 'Logins fell 60%', first_seen_at: '2026-09-20T08:00:00+00:00', last_seen_at: '2026-09-21T08:00:00+00:00' },
     });
     expect(screen.getByText('Renews in 14d')).toBeInTheDocument();
     expect(screen.getByText('Logins fell 60%')).toBeInTheDocument();
@@ -3006,12 +3161,12 @@ describe('AttentionBlock (spec §1.6 "Needs attention")', () => {
     const { onFilter, onOpenTab, onJump } = renderBlock();
     await userEvent.click(screen.getByRole('button', { name: /^Renewal 47d overdue/ }));
     await userEvent.click(screen.getByRole('button', { name: /^2 open High or Critical tickets/ }));
-    await userEvent.click(screen.getByRole('button', { name: '1 overdue task' }));
+    await userEvent.click(screen.getByRole('button', { name: /^1 overdue task/ }));
     await userEvent.click(screen.getByRole('button', { name: '3 unanswered questions' }));
     expect(onJump).toHaveBeenCalledWith('contract');
     expect(onFilter.mock.calls.map(([group]) => group)).toEqual(['tickets', 'tasks']);
     expect(onOpenTab).toHaveBeenCalledWith('knowledge');
-    expect(screen.queryByRole('button', { name: /anomaly/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Similar reports/ })).not.toBeInTheDocument();
   });
 
   it('is not shown when nothing needs attention', () => {
@@ -3062,43 +3217,51 @@ export function AttentionBlock({
   onJump: (panel: PanelKey) => void;
 }) {
   const headingId = useId();
-  const { renewal, urgent_tickets, overdue_tasks, open_questions, anomaly } = attention;
+  const { renewal, tickets, overdue_tasks, questions, anomaly } = attention;
   const rows: Row[] = [];
   if (renewal) {
     rows.push({
       key: 'renewal',
-      tone: renewal.days < 0 ? 'text-danger' : 'text-warning',
-      text: renewal.days < 0 ? `Renewal ${-renewal.days}d overdue` : renewal.days === 0 ? 'Renews today' : `Renews in ${renewal.days}d`,
+      tone: renewal.overdue ? 'text-danger' : 'text-warning',
+      text: renewal.overdue ? `Renewal ${-renewal.days}d overdue` : renewal.days === 0 ? 'Renews today' : `Renews in ${renewal.days}d`,
       detail: formatDate(renewal.date),
       action: () => onJump('contract'),
     });
   }
-  if (urgent_tickets) {
+  if (tickets) {
     rows.push({
       key: 'tickets',
       tone: 'text-danger',
-      text: plural(urgent_tickets.count, 'open High or Critical ticket', 'open High or Critical tickets'),
-      detail: `oldest ${urgent_tickets.oldest_days}d`,
+      text: plural(tickets.count, 'open High or Critical ticket', 'open High or Critical tickets'),
+      detail: `oldest ${tickets.oldest_days}d`,
       action: () => onFilter('tickets'),
     });
   }
   if (overdue_tasks) {
-    rows.push({ key: 'tasks', tone: 'text-warning', text: plural(overdue_tasks.count, 'overdue task', 'overdue tasks'), action: () => onFilter('tasks') });
+    rows.push({
+      key: 'tasks',
+      tone: 'text-warning',
+      text: plural(overdue_tasks.count, 'overdue task', 'overdue tasks'),
+      detail: `oldest ${overdue_tasks.oldest_days}d`,
+      action: () => onFilter('tasks'),
+    });
   }
-  if (open_questions) {
+  if (questions) {
     rows.push({
       key: 'questions',
       tone: 'text-warning',
-      text: plural(open_questions.count, 'unanswered question', 'unanswered questions'),
+      text: plural(questions.count, 'unanswered question', 'unanswered questions'),
       action: () => onOpenTab('knowledge'),
     });
   }
   if (anomaly) {
+    // The server already withholds the title from a viewer who does not see
+    // everything; the page shows what it sends.
     rows.push({
       key: 'anomaly',
       tone: 'text-warning',
-      text: anomaly.title ?? 'An anomaly was detected',
-      detail: formatDate(anomaly.detected_at.slice(0, 10)),
+      text: anomaly.title,
+      detail: formatDate(anomaly.last_seen_at.slice(0, 10)),
     });
   }
   if (rows.length === 0) return null;
@@ -3168,10 +3331,10 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Test: `src/components/organizations/detail/StoryToolbar.test.tsx`
 
 **Interfaces:**
-- Consumes: `STORY_GROUPS`, `STORY_KINDS`, `kindsIn`, `ADD_FLOWS`, `AddKind` (Task 1); `Menu` (Task 5); `useDismiss`; `BUTTON`, `FOCUS`, `QUIET`.
+- Consumes: `STORY_GROUPS`, `STORY_KINDS`, `offeredSources`, `ADD_FLOWS`, `AddKind`, `StoryCounts` (Task 1); `Menu` (Task 5); `useDismiss`; `BUTTON`, `FOCUS`, `QUIET`.
 - Produces:
   - `SourcesPicker({offered: StoryKind[]; selected: StoryKind[]; onChange: (next: StoryKind[]) => void})`: a button "Sources" (with "· n" when some are chosen) opening a checkbox panel and an "Every source" reset.
-  - `StoryToolbar({group; sources; q; byGroup: Record<StoryGroup, number> | null; isSm: boolean; onGroup: (group: StoryGroup | '') => void; onSources: (sources: StoryKind[]) => void; onSearch: (q: string) => void; onAdd: (what: AddKind) => void})`. Search calls `onSearch(trimmed)` 300ms after typing stops, or at once on Enter; the draft follows `q` when it changes from outside. The Add button's name is "Add to the story".
+  - `StoryToolbar({group; sources; q; byGroup: StoryCounts['by_group'] | null; byKind: StoryCounts['by_kind'] | null; isSm: boolean; onGroup: (group: StoryGroup | '') => void; onSources: (sources: StoryKind[]) => void; onSearch: (q: string) => void; onAdd: (what: AddKind) => void})`. All's count is `byGroup.all`. Search calls `onSearch(trimmed)` 300ms after typing stops, or at once on Enter; the draft follows `q` when it changes from outside. The Add button's name is "Add to the story".
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3183,12 +3346,14 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { StoryToolbar } from './StoryToolbar';
 
-const COUNTS = { conversations: 2, tickets: 1, tasks: 1, feedback: 0, health: 1 };
+const COUNTS = { all: 5, conversations: 2, tickets: 1, tasks: 1, feedback: 0, health: 1 };
+const BY_KIND = { activity: 0, calendar_event: 0, call: 1, email: 1, health: 1, note: 0, survey: 0, task: 1, ticket: 1 };
 
 function renderToolbar(props: Partial<ComponentProps<typeof StoryToolbar>> = {}) {
   const handlers = { onGroup: vi.fn(), onSources: vi.fn(), onSearch: vi.fn(), onAdd: vi.fn() };
-  const view = render(<StoryToolbar group="" sources={[]} q="" byGroup={COUNTS} isSm {...handlers} {...props} />);
-  return { ...handlers, rerender: (next: Partial<ComponentProps<typeof StoryToolbar>>) => view.rerender(<StoryToolbar group="" sources={[]} q="" byGroup={COUNTS} isSm {...handlers} {...props} {...next} />) };
+  const base = { group: '' as const, sources: [], q: '', byGroup: COUNTS, byKind: BY_KIND, isSm: true, ...handlers };
+  const view = render(<StoryToolbar {...base} {...props} />);
+  return { ...handlers, rerender: (next: Partial<ComponentProps<typeof StoryToolbar>>) => view.rerender(<StoryToolbar {...base} {...props} {...next} />) };
 }
 
 const filters = () => within(screen.getByRole('group', { name: 'Show' })).getAllByRole('button');
@@ -3208,7 +3373,7 @@ describe('StoryToolbar (spec §1.6)', () => {
   });
 
   it('shows the filters without numbers until the story has counted', () => {
-    renderToolbar({ byGroup: null });
+    renderToolbar({ byGroup: null, byKind: null });
     expect(filters().map((button) => button.textContent)).toEqual(['All', 'Conversations', 'Tickets', 'Tasks & notes', 'Feedback', 'Health & usage']);
   });
 
@@ -3220,13 +3385,14 @@ describe('StoryToolbar (spec §1.6)', () => {
     expect(onGroup.mock.calls.map(([group]) => group)).toEqual(['conversations', '']);
   });
 
-  it("offers the chosen filter's exact sources and resets them", async () => {
+  it("offers the chosen filter's exact sources that have data, and resets them", async () => {
     const { onSources } = renderToolbar({ group: 'conversations', sources: ['email'] });
     const sources = screen.getByRole('button', { name: 'Sources · 1' });
     await userEvent.click(sources);
     expect(sources).toHaveAttribute('aria-expanded', 'true');
     const boxes = screen.getAllByRole('checkbox');
-    expect(boxes.map((box) => box.closest('label')?.textContent)).toEqual(['Calls', 'Activities', 'Emails', 'Calendar events']);
+    // by_kind has no activities or calendar events, so neither is offered.
+    expect(boxes.map((box) => box.closest('label')?.textContent)).toEqual(['Calls', 'Emails']);
     expect(screen.getByRole('checkbox', { name: 'Emails' })).toBeChecked();
     await userEvent.click(screen.getByRole('checkbox', { name: 'Calls' }));
     await userEvent.click(screen.getByRole('checkbox', { name: 'Emails' }));
@@ -3366,8 +3532,8 @@ export function SourcesPicker({
 ```tsx
 import { useEffect, useId, useRef, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
-import { ADD_FLOWS, STORY_GROUPS, kindsIn, type AddKind } from '../../../features/organizations/storyKinds';
-import type { StoryGroup, StoryKind } from '../../../features/organizations/storyTypes';
+import { ADD_FLOWS, STORY_GROUPS, offeredSources, type AddKind } from '../../../features/organizations/storyKinds';
+import type { StoryCounts, StoryGroup, StoryKind } from '../../../features/organizations/storyTypes';
 import { BUTTON, FOCUS } from '../portfolio/styles';
 import { Menu } from './Menu';
 import { SourcesPicker } from './SourcesPicker';
@@ -3381,6 +3547,7 @@ export function StoryToolbar({
   sources,
   q,
   byGroup,
+  byKind,
   isSm,
   onGroup,
   onSources,
@@ -3390,8 +3557,10 @@ export function StoryToolbar({
   group: StoryGroup | '';
   sources: StoryKind[];
   q: string;
-  /** `counts.by_group` from the story; null until it lands. */
-  byGroup: Record<StoryGroup, number> | null;
+  /** `counts.by_group` from the story (`all` and the five groups); null until it lands. */
+  byGroup: StoryCounts['by_group'] | null;
+  /** `counts.by_kind` from the story; null until it lands. */
+  byKind: StoryCounts['by_kind'] | null;
   isSm: boolean;
   onGroup: (group: StoryGroup | '') => void;
   onSources: (sources: StoryKind[]) => void;
@@ -3418,7 +3587,7 @@ export function StoryToolbar({
     return () => window.clearTimeout(timer);
   }, [draft, q]);
 
-  const total = byGroup ? Object.values(byGroup).reduce((sum, n) => sum + n, 0) : null;
+  const total = byGroup ? byGroup.all : null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -3469,7 +3638,7 @@ export function StoryToolbar({
             className={`min-h-11 w-full rounded-lg border border-line bg-surface pl-8 pr-2 text-[15px] text-ink placeholder:text-ink-muted sm:min-h-9 sm:text-[13px] ${FOCUS}`}
           />
         </form>
-        <SourcesPicker offered={kindsIn(group)} selected={sources} onChange={onSources} />
+        <SourcesPicker offered={offeredSources(group, byKind, sources)} selected={sources} onChange={onSources} />
         <Menu
           label="Add to the story"
           trigger={
@@ -3511,9 +3680,9 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Test: `src/components/organizations/detail/StoryStream.test.tsx`
 
 **Interfaces:**
-- Consumes: `StoryItem`, `StoryKind` (Task 1), `KIND_NAME` (Task 1), `timeLabel`, `dayLabel`, `groupByDay`, `localDay` (Task 2), `StoryState` (Task 4), `EmptyState`, `ErrorBlock`, `MoreButton` (`portfolio/PortfolioSections.tsx`), `useEndSentinel`, `FOCUS`, `QUIET`; `installIntersectionObserver` (`src/test/intersection.ts`).
+- Consumes: `StoryItem`, `StoryKind` (Task 1), `KIND_NAME`, `sourceName` (Task 1), `timeLabel`, `dayLabel`, `groupByDay`, `localDay` (Task 2), `StoryState` (Task 4), `EmptyState`, `ErrorBlock`, `MoreButton` (`portfolio/PortfolioSections.tsx`), `useEndSentinel`, `FOCUS`, `QUIET`; `installIntersectionObserver` (`src/test/intersection.ts`).
 - Produces:
-  - `StoryItemRow({item: StoryItem; onOpenEmail: (item: StoryItem) => void})`: `<li data-story-item="<kind>:<id>">`. An email's title is a button that calls `onOpenEmail`; another item's title (when it has a summary or a link) toggles it open (`aria-expanded`), showing the full summary and an "Open in <source>" link.
+  - `StoryItemRow({item: StoryItem; onOpenEmail: (item: StoryItem) => void})`: `<li data-story-item="<kind>:<id>">`. An email with a `link.thread_id` has a title button that calls `onOpenEmail`; any other item (an email with no thread included), when it has a summary or a `link.url`, has a title that toggles it open (`aria-expanded`), showing the full summary and an "Open in <source>" link to `link.url`.
   - `StoryStream({story: StoryState; filtered: boolean; today?: string; onClearFilters: () => void; onOpenEmail: (item: StoryItem) => void})`.
 
 - [ ] **Step 1: Write the failing test**
@@ -3533,7 +3702,11 @@ import type { StoryState } from './useStory';
 const response = (items: StoryItem[]): StoryResponse => ({
   items,
   next_cursor: null,
-  counts: { by_group: { conversations: 0, tickets: 0, tasks: 0, feedback: 0, health: 0 }, by_account: {} },
+  counts: {
+    by_group: { all: 0, conversations: 0, tickets: 0, tasks: 0, feedback: 0, health: 0 },
+    by_kind: { activity: 0, calendar_event: 0, call: 0, email: 0, health: 0, note: 0, survey: 0, task: 0, ticket: 0 },
+    by_account: { all: 0, none: 0 },
+  },
   attention: QUIET_ATTENTION,
 });
 
@@ -3579,19 +3752,23 @@ describe('StoryStream (spec §1.6 "Stream")', () => {
     expect(within(screen.getByRole('region', { name: 'Today' })).getAllByRole('listitem')).toHaveLength(2);
   });
 
-  it('gives each item its kind, account, who and source, and its time when it has one', () => {
+  it('gives each item its kind, account, who and source, and its time unless it is all-day', () => {
     renderStream(state());
     expect(within(row('email:41')).getByText('EMEA')).toBeInTheDocument();
     expect(within(row('email:41')).getByText('Email · Dana Buyer · via Gmail')).toBeInTheDocument();
     expect(within(row('call:12')).getByText('Organization')).toBeInTheDocument();
     expect(within(row('call:12')).getByText('The admin left and usage fell. Agreed a retraining session.')).toBeInTheDocument();
+    // Logged in Revenact: no "via".
     expect(within(row('call:12')).getByText('Call · Carl CSM')).toBeInTheDocument();
+    expect(within(row('ticket:88')).getByText('Ticket · Sam Admin · via Zendesk')).toBeInTheDocument();
+    expect(within(row('health:3')).getByText('Health change')).toBeInTheDocument();
     expect(row('call:12').querySelector('time')).not.toBeNull();
+    expect(row('ticket:88').querySelector('time')).toBeNull();
     expect(row('health:3').querySelector('time')).toBeNull();
     expect(row('email:41').querySelector('img')).toBeNull();
   });
 
-  it('opens an email as its thread', async () => {
+  it('opens an email that has a thread as its thread', async () => {
     const { onOpenEmail } = renderStream(state());
     const title = within(row('email:41')).getByRole('button', { name: 'Re: Renewal pricing' });
     expect(title).toHaveAttribute('aria-haspopup', 'dialog');
@@ -3611,15 +3788,22 @@ describe('StoryStream (spec §1.6 "Stream")', () => {
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
   });
 
-  it('links in the app for an in-app path, never for anything else, and has no toggle with nothing to show', async () => {
+  it('opens an email with no thread in place, links only http(s), and has no toggle with nothing to show', async () => {
+    const onDay = { occurred_at: '2026-09-20T00:00:00+00:00', all_day: true };
     const items: StoryItem[] = [
-      { ...STORY_ITEMS[3], id: 60, kind: 'survey', title: 'NPS survey sent', summary: '', link: '/surveys' },
-      { ...STORY_ITEMS[3], id: 61, kind: 'note', title: 'Odd link', summary: 'x', link: 'javascript:alert(1)' },
-      { ...STORY_ITEMS[3], id: 62, kind: 'task', title: 'Bare task', summary: '', link: null },
+      { ...STORY_ITEMS[0], id: 59, title: 'Logged email', summary: 'Typed in Revenact.', source: 'revenact', link: { thread_id: null, url: null } },
+      { ...STORY_ITEMS[1], id: 60, title: 'Recorded call', link: { thread_id: null, url: 'http://rec.example/60' } },
+      { ...STORY_ITEMS[3], ...onDay, id: 61, kind: 'note', title: 'Odd link', summary: 'x', link: { thread_id: null, url: 'javascript:alert(1)' } },
+      { ...STORY_ITEMS[3], id: 62, kind: 'task', title: 'Bare task', summary: '', link: { thread_id: null, url: null } },
     ];
-    renderStream(state({ items }));
-    await userEvent.click(within(row('survey:60')).getByRole('button', { name: 'NPS survey sent' }));
-    expect(within(row('survey:60')).getByRole('link', { name: 'Open the survey' })).toHaveAttribute('href', '/surveys');
+    const { onOpenEmail } = renderStream(state({ items }));
+    const logged = within(row('email:59')).getByRole('button', { name: 'Logged email' });
+    expect(logged).not.toHaveAttribute('aria-haspopup');
+    await userEvent.click(logged);
+    expect(logged).toHaveAttribute('aria-expanded', 'true');
+    expect(onOpenEmail).not.toHaveBeenCalled();
+    await userEvent.click(within(row('call:60')).getByRole('button', { name: 'Recorded call' }));
+    expect(within(row('call:60')).getByRole('link', { name: 'Open the recording' })).toHaveAttribute('href', 'http://rec.example/60');
     await userEvent.click(within(row('note:61')).getByRole('button', { name: 'Odd link' }));
     expect(within(row('note:61')).queryByRole('link')).not.toBeInTheDocument();
     expect(within(row('task:62')).queryByRole('button')).not.toBeInTheDocument();
@@ -3680,7 +3864,6 @@ Expected: FAIL with "Failed to resolve import './StoryStream'".
 `src/components/organizations/detail/StoryItemRow.tsx`:
 ```tsx
 import { useId, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Activity,
   CalendarDays,
@@ -3694,7 +3877,7 @@ import {
   StickyNote,
   type LucideIcon,
 } from 'lucide-react';
-import { KIND_NAME } from '../../../features/organizations/storyKinds';
+import { KIND_NAME, sourceName } from '../../../features/organizations/storyKinds';
 import { timeLabel } from '../../../features/organizations/storyDays';
 import type { StoryItem, StoryKind } from '../../../features/organizations/storyTypes';
 import { FOCUS } from '../portfolio/styles';
@@ -3713,38 +3896,33 @@ const ICON: Record<StoryKind, LucideIcon> = {
 
 const LINK = `mt-1 inline-flex min-h-11 items-center gap-1 rounded-sm text-[13px] font-semibold text-ink underline sm:min-h-0 ${FOCUS}`;
 
-/** The record's own page: https in its source system (a new tab), or an
- *  in-app path. Anything else is not a link. */
+/** `link.url`: a ticket in its source system or a call's recording, in a new
+ *  tab. The backend sends only http(s) URLs; the check stays because the
+ *  value lands in an href. The backend sends no in-app paths. */
 function ItemLink({ item }: { item: StoryItem }) {
-  const link = item.link ?? '';
-  if (link.startsWith('https://')) {
-    return (
-      <a href={link} target="_blank" rel="noopener noreferrer" className={LINK}>
-        Open in {item.source || 'its source'}
-        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-      </a>
-    );
-  }
-  if (link.startsWith('/') && !link.startsWith('//')) {
-    return (
-      <Link to={link} className={LINK}>
-        Open the {KIND_NAME[item.kind].toLowerCase()}
-      </Link>
-    );
-  }
-  return null;
+  const url = item.link.url ?? '';
+  if (!/^https?:\/\//i.test(url)) return null;
+  const name = sourceName(item.source);
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className={LINK}>
+      {item.kind === 'call' && !name ? 'Open the recording' : `Open in ${name || 'its source'}`}
+      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+    </a>
+  );
 }
 
 /** One story item (spec §1.6): icon, title, time, a one-line summary, then
- *  the account tag and kind · who · source. An email opens its thread; any
- *  other item with more to show opens in place. */
+ *  the account tag and kind · who · source. An email with a thread opens it;
+ *  any other item with more to show opens in place. */
 export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEmail: (item: StoryItem) => void }) {
   const [expanded, setExpanded] = useState(false);
   const detailId = useId();
   const Icon = ICON[item.kind] ?? Activity;
-  const time = timeLabel(item.occurred_at);
-  const expandable = item.kind !== 'email' && Boolean(item.summary || item.link);
-  const meta = [KIND_NAME[item.kind] ?? 'Record', item.actor?.name, item.source ? `via ${item.source}` : null]
+  const time = timeLabel(item);
+  const threaded = item.kind === 'email' && Boolean(item.link.thread_id);
+  const expandable = !threaded && Boolean(item.summary || item.link.url);
+  const source = sourceName(item.source);
+  const meta = [KIND_NAME[item.kind] ?? 'Record', item.actor?.name, source ? `via ${source}` : null]
     .filter(Boolean)
     .join(' · ');
   const titleButton = `max-w-full truncate rounded-sm text-left hover:underline ${FOCUS}`;
@@ -3757,7 +3935,7 @@ export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEma
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
           <h3 className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">
-            {item.kind === 'email' ? (
+            {threaded ? (
               <button type="button" aria-haspopup="dialog" onClick={() => onOpenEmail(item)} className={titleButton}>
                 {item.title}
               </button>
@@ -3914,60 +4092,26 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ### Task 11: Opening an email shows its thread
 
 **Files:**
-- Create: `src/features/organizations/emailThread.ts`
 - Create: `src/components/organizations/detail/EmailThread.tsx`
-- Test: `src/features/organizations/emailThread.test.ts`, `src/components/organizations/detail/EmailThread.test.tsx`
+- Test: `src/components/organizations/detail/EmailThread.test.tsx`
 
 **Interfaces:**
-- Consumes: `Email` (`customersSlice.ts`), `apiFetch`, `errorMessage`, `QUIET`, `Sheet` (Task 3), `THREAD_EMAILS`, `stubOrganizationPage` (Task 1).
-- Produces:
-  - `threadOf(emails: Email[], id: number): Email[]`: the email and every email sharing its non-empty `thread_id`, oldest first; `[]` when it is not in the list.
-  - `EmailThread({customerId: number; accountId: number | null; emailId: number; title: string; isSm: boolean; onClose: () => void})`: reads `/customers/{id}/emails/` (or `/customers/{id}/accounts/{accountId}/emails/`) and shows the thread in a `Sheet` titled `title`.
+- Consumes: `fetchThread`, `sourceName` (Task 1), `StoryItem`, `errorMessage`, `QUIET`, `Sheet` (Task 3), `THREAD_ITEMS`, `stubOrganizationPage`, `requestPaths`, `storyQueries` (Task 1).
+- Produces: `EmailThread({orgId: number; threadId: string; openedId: number; title: string; isSm: boolean; onClose: () => void})`: reads the thread through the story endpoint (`GET /organizations/{orgId}/story/?thread=<threadId>&limit=100`, every page; backend pre-flight 14) and shows it oldest first in a `Sheet` titled `title`.
 
-- [ ] **Step 1: Write the failing tests**
-
-`src/features/organizations/emailThread.test.ts`:
-```ts
-import { describe, expect, it } from 'vitest';
-import type { Email } from '../customers/customersSlice';
-import { threadOf } from './emailThread';
-import { THREAD_EMAILS } from './testStory';
-
-const emails = THREAD_EMAILS as Email[];
-
-describe('threadOf', () => {
-  it('is the email and every email in its thread, oldest first', () => {
-    expect(threadOf(emails, 41).map((email) => email.id)).toEqual([40, 41]);
-  });
-
-  it('is the email alone when it has no thread, and nothing when it is not listed', () => {
-    const lone = { ...emails[2], id: 7, thread_id: '' };
-    expect(threadOf([...emails, lone], 7).map((email) => email.id)).toEqual([7]);
-    expect(threadOf(emails, 999)).toEqual([]);
-  });
-});
-```
+- [ ] **Step 1: Write the failing test**
 
 `src/components/organizations/detail/EmailThread.test.tsx`:
 ```tsx
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { requestPaths, stubOrganizationPage, THREAD_EMAILS } from '../../../features/organizations/testStory';
+import { requestPaths, storyQueries, stubOrganizationPage } from '../../../features/organizations/testStory';
 import { EmailThread } from './EmailThread';
 
-function renderThread(props: Partial<{ accountId: number | null; emailId: number }> = {}) {
+function renderThread() {
   const onClose = vi.fn();
-  render(
-    <EmailThread
-      customerId={7}
-      accountId={props.accountId === undefined ? 31 : props.accountId}
-      emailId={props.emailId ?? 41}
-      title="Re: Renewal pricing"
-      isSm
-      onClose={onClose}
-    />,
-  );
+  render(<EmailThread orgId={7} threadId="t-1" openedId={41} title="Re: Renewal pricing" isSm onClose={onClose} />);
   return onClose;
 }
 
@@ -3977,45 +4121,42 @@ describe('EmailThread (spec §1.6 "Opening an email shows its thread")', () => {
     document.body.style.overflow = '';
   });
 
-  it("reads the account's emails and shows the real thread, oldest first, with no reply controls", async () => {
-    const spy = stubOrganizationPage({ emails: { '/customers/7/accounts/31/emails/': THREAD_EMAILS } });
+  it('reads the thread from the story with ?thread= and shows it oldest first, with no reply controls', async () => {
+    const spy = stubOrganizationPage();
     renderThread();
     const dialog = screen.getByRole('dialog', { name: 'Re: Renewal pricing' });
     expect(within(dialog).getByRole('status', { name: 'Opening the email' })).toBeInTheDocument();
     const messages = await within(dialog).findAllByRole('listitem');
     expect(messages.map((message) => message.querySelector('p')?.textContent)).toEqual(['Carl CSM', 'Dana Buyer']);
     expect(messages[1]).toHaveAttribute('aria-current', 'true');
+    expect(within(dialog).getByText('Sharing the renewal quote ahead of your board meeting.')).toBeInTheDocument();
     expect(within(dialog).getByText('Can we see the quote before the board meets on Friday?')).toBeInTheDocument();
-    expect(within(dialog).queryByText('Join our webinar.')).not.toBeInTheDocument();
+    expect(within(dialog).getByText('Organization · via Gmail')).toBeInTheDocument();
+    expect(within(dialog).getByText('EMEA · via Gmail')).toBeInTheDocument();
     expect(dialog).toHaveAccessibleDescription('2 messages');
     expect(within(dialog).queryByRole('button', { name: /Reply|Forward/ })).not.toBeInTheDocument();
     expect(dialog.querySelector('img')).toBeNull();
-    expect(requestPaths(spy)).toEqual(['GET /customers/7/accounts/31/emails/']);
-  });
-
-  it("reads the organization's own emails for an item with no account", async () => {
-    const spy = stubOrganizationPage({ emails: { '/customers/7/emails/': THREAD_EMAILS } });
-    renderThread({ accountId: null });
-    await screen.findAllByRole('listitem');
-    expect(requestPaths(spy)).toEqual(['GET /customers/7/emails/']);
+    expect(requestPaths(spy)).toEqual(['GET /organizations/7/story/']);
+    expect(Object.fromEntries(storyQueries(spy)[0])).toEqual({ thread: 't-1', limit: '100' });
   });
 
   it('says so when the email is no longer there for this viewer', async () => {
-    stubOrganizationPage({ emails: { '/customers/7/accounts/31/emails/': [] } });
+    stubOrganizationPage({ threads: { 't-1': [] } });
     renderThread();
     expect(await screen.findByText('This email is no longer available to you.')).toBeInTheDocument();
   });
 
   it('shows a failed read with Try again', async () => {
-    const spy = stubOrganizationPage();
-    renderThread({ accountId: 99 });
-    expect(await screen.findByRole('alert')).toHaveTextContent('Not stubbed: GET /customers/7/accounts/99/emails/');
+    const spy = stubOrganizationPage({ failStory: 1 });
+    renderThread();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Try later.');
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findAllByRole('listitem')).toHaveLength(2);
     expect(requestPaths(spy)).toHaveLength(2);
   });
 
   it('closes from Close', async () => {
-    stubOrganizationPage({ emails: { '/customers/7/accounts/31/emails/': THREAD_EMAILS } });
+    stubOrganizationPage();
     const onClose = renderThread();
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(onClose).toHaveBeenCalledOnce();
@@ -4023,88 +4164,74 @@ describe('EmailThread (spec §1.6 "Opening an email shows its thread")', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests to verify they fail**
+- [ ] **Step 2: Run the test to verify it fails**
 
-Run: `npx vitest run src/features/organizations/emailThread.test.ts src/components/organizations/detail/EmailThread.test.tsx`
-Expected: FAIL with "Failed to resolve import './emailThread'" and "'./EmailThread'".
+Run: `npx vitest run src/components/organizations/detail/EmailThread.test.tsx`
+Expected: FAIL with "Failed to resolve import './EmailThread'".
 
 - [ ] **Step 3: Implement**
-
-`src/features/organizations/emailThread.ts`:
-```ts
-import type { Email } from '../customers/customersSlice';
-
-/** An email's thread from a list of emails: it and every email sharing its
- *  thread_id, oldest first. An email with no thread_id is its own thread;
- *  one not in the list (no longer visible) has none. */
-export function threadOf(emails: Email[], id: number): Email[] {
-  const opened = emails.find((email) => email.id === id);
-  if (!opened) return [];
-  const thread = opened.thread_id ? emails.filter((email) => email.thread_id === opened.thread_id) : [opened];
-  return [...thread].sort((a, b) => a.sent_at.localeCompare(b.sent_at));
-}
-```
 
 `src/components/organizations/detail/EmailThread.tsx`:
 ```tsx
 import { useEffect, useState } from 'react';
-import { apiFetch } from '../../../lib/apiClient';
-import type { Email } from '../../../features/customers/customersSlice';
-import { threadOf } from '../../../features/organizations/emailThread';
+import { fetchThread } from '../../../features/organizations/storyApi';
+import { sourceName } from '../../../features/organizations/storyKinds';
+import type { StoryItem } from '../../../features/organizations/storyTypes';
 import { errorMessage } from '../portfolio/usePortfolio';
 import { QUIET } from '../portfolio/styles';
 import { Sheet } from './Sheet';
 
-type Load = { key: string; emails: Email[] } | { key: string; error: string };
+type Load = { key: string; items: StoryItem[] } | { key: string; error: string };
 
 const when = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
-function Message({ email, current }: { email: Email; current: boolean }) {
+function Message({ item, current }: { item: StoryItem; current: boolean }) {
+  const source = sourceName(item.source);
   return (
     <li aria-current={current ? 'true' : undefined} className="py-3">
-      <p className="text-[13px] font-semibold text-ink">{email.sender_name}</p>
+      <p className="text-[13px] font-semibold text-ink">{item.actor?.name ?? 'Unknown sender'}</p>
       <p className="text-[11px] text-ink-muted">
-        To {email.recipient_name || email.to_addresses?.join(', ') || '—'} ·{' '}
-        <time dateTime={email.sent_at} className="font-mono-brand tabular-nums">
-          {when(email.sent_at)}
+        <time dateTime={item.occurred_at} className="font-mono-brand tabular-nums">
+          {when(item.occurred_at)}
         </time>
       </p>
-      <p className="mt-2 whitespace-pre-line break-words text-[13px] text-ink">{email.body}</p>
-      {email.mailbox_owner ? <p className="mt-1 text-[11px] text-ink-muted">Filed from {email.mailbox_owner.name}'s mailbox</p> : null}
+      {item.summary ? <p className="mt-2 whitespace-pre-line break-words text-[13px] text-ink">{item.summary}</p> : null}
+      <p className="mt-1 text-[11px] text-ink-muted">{[item.account?.name ?? 'Organization', source ? `via ${source}` : null].filter(Boolean).join(' · ')}</p>
     </li>
   );
 }
 
-/** One email's thread (spec §1.6). It reads the email list the old Emails
- *  filter read, the organization's or the account's, so each message is
- *  under its own visibility rule, and shows the real messages that share
- *  the thread. Replying stays in Communications. */
+/** One email's thread (spec §1.6). The backend has no thread endpoint: the
+ *  story read with `thread` returns that thread's emails, across the
+ *  organization and its accounts, each under its own visibility rule. Each
+ *  message shows its sender, time and the story's one-line summary; the full
+ *  message and replying stay in Communications. */
 export function EmailThread({
-  customerId,
-  accountId,
-  emailId,
+  orgId,
+  threadId,
+  openedId,
   title,
   isSm,
   onClose,
 }: {
-  customerId: number;
-  accountId: number | null;
-  emailId: number;
+  orgId: number;
+  threadId: string;
+  /** The email that was opened; it is marked current in the thread. */
+  openedId: number;
   title: string;
   isSm: boolean;
   onClose: () => void;
 }) {
   const [attempt, setAttempt] = useState(0);
-  const path = accountId ? `/customers/${customerId}/accounts/${accountId}/emails/` : `/customers/${customerId}/emails/`;
-  const key = `${path}#${attempt}`;
+  const key = `${orgId}#${threadId}#${attempt}`;
   const [load, setLoad] = useState<Load | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    apiFetch<Email[]>(path).then(
-      (emails) => {
-        if (!cancelled) setLoad({ key, emails: Array.isArray(emails) ? emails : [] });
+    fetchThread(orgId, threadId).then(
+      (items) => {
+        if (!cancelled) setLoad({ key, items });
       },
       (err: unknown) => {
         if (!cancelled) setLoad({ key, error: errorMessage(err, 'Could not open this email.') });
@@ -4113,10 +4240,11 @@ export function EmailThread({
     return () => {
       cancelled = true;
     };
-  }, [key, path]);
+  }, [key, orgId, threadId]);
 
   const current = load && load.key === key ? load : null;
-  const thread = current && 'emails' in current ? threadOf(current.emails, emailId) : null;
+  // The opened email may have gone (or no longer be visible) since the story loaded.
+  const thread = current && 'items' in current && current.items.some((item) => item.id === openedId) ? current.items : null;
 
   return (
     <Sheet title={title} description={thread && thread.length > 1 ? `${thread.length} messages` : undefined} isSm={isSm} onClose={onClose}>
@@ -4133,10 +4261,10 @@ export function EmailThread({
             Try again
           </button>
         </div>
-      ) : thread && thread.length ? (
+      ) : thread ? (
         <ol className="flex flex-col divide-y divide-line-subtle">
-          {thread.map((email) => (
-            <Message key={email.id} email={email} current={email.id === emailId} />
+          {thread.map((item) => (
+            <Message key={item.id} item={item} current={item.id === openedId} />
           ))}
         </ol>
       ) : (
@@ -4149,13 +4277,13 @@ export function EmailThread({
 
 - [ ] **Step 4: Run the tests to verify they pass**
 
-Run: `npx vitest run src/features/organizations/emailThread.test.ts src/components/organizations/detail/EmailThread.test.tsx src/components/organizations/detail/houseRules.test.ts`
-Expected: PASS (2 + 5 tests, and the house rules).
+Run: `npx vitest run src/components/organizations/detail/EmailThread.test.tsx src/components/organizations/detail/houseRules.test.ts`
+Expected: PASS (4 tests, and the house rules).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/features/organizations/emailThread.ts src/features/organizations/emailThread.test.ts src/components/organizations/detail/EmailThread.tsx src/components/organizations/detail/EmailThread.test.tsx
+git add src/components/organizations/detail/EmailThread.tsx src/components/organizations/detail/EmailThread.test.tsx
 git commit -m "feat(organizations): open a story email as its real thread
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
@@ -5012,8 +5140,8 @@ import {
   ACCOUNTS,
   PIZZA_ATTENTION,
   STORY_ITEMS,
-  THREAD_EMAILS,
   postBodies,
+  storyQueries,
   stubOrganizationPage,
 } from '../../../features/organizations/testStory';
 import { makeDetailStore } from '../../../pages/organizations/testDetail';
@@ -5023,7 +5151,11 @@ import type { StoryState } from './useStory';
 const DATA: StoryResponse = {
   items: STORY_ITEMS,
   next_cursor: null,
-  counts: { by_group: { conversations: 2, tickets: 1, tasks: 1, feedback: 0, health: 1 }, by_account: { '31': 1, '32': 1, none: 3 } },
+  counts: {
+    by_group: { all: 5, conversations: 2, tickets: 1, tasks: 1, feedback: 0, health: 1 },
+    by_kind: { activity: 0, calendar_event: 0, call: 1, email: 1, health: 1, note: 0, survey: 0, task: 1, ticket: 1 },
+    by_account: { all: 5, none: 3, '31': 1, '32': 1 },
+  },
   attention: PIZZA_ATTENTION,
 };
 
@@ -5072,7 +5204,7 @@ describe('StoryTab (spec §1.6)', () => {
     const { onUpdate, onOpenTab, onJump } = renderTab();
     expect(screen.getByRole('region', { name: 'Needs attention' })).toBeInTheDocument();
     expect(document.querySelectorAll('[data-story-item]')).toHaveLength(5);
-    await userEvent.click(screen.getByRole('button', { name: '1 overdue task' }));
+    await userEvent.click(screen.getByRole('button', { name: /^1 overdue task/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Tickets 1' }));
     await userEvent.click(screen.getByRole('button', { name: '3 unanswered questions' }));
     await userEvent.click(screen.getByRole('button', { name: /^Renewal 47d overdue/ }));
@@ -5112,12 +5244,13 @@ describe('StoryTab (spec §1.6)', () => {
     expect(screen.getByRole('button', { name: 'Add to the story' })).toHaveFocus();
   });
 
-  it("opens an email as its thread, from the email's own account", async () => {
-    stubOrganizationPage({ emails: { '/customers/7/accounts/31/emails/': THREAD_EMAILS } });
-    renderTab();
+  it('opens an email as its thread, read with ?thread= whatever account is chosen', async () => {
+    const spy = stubOrganizationPage();
+    renderTab(story(), 'account=31');
     await userEvent.click(screen.getByRole('button', { name: 'Re: Renewal pricing' }));
     const dialog = screen.getByRole('dialog', { name: 'Re: Renewal pricing' });
     expect(await within(dialog).findAllByRole('listitem')).toHaveLength(2);
+    expect(Object.fromEntries(storyQueries(spy)[0])).toEqual({ thread: 't-1', limit: '100' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
     expect(screen.getByRole('button', { name: 'Re: Renewal pricing' })).toHaveFocus();
   });
@@ -5192,6 +5325,7 @@ export function StoryTab({
         sources={params.sources}
         q={params.q}
         byGroup={story.data?.counts.by_group ?? null}
+        byKind={story.data?.counts.by_kind ?? null}
         isSm={isSm}
         onGroup={(group) => onUpdate({ group })}
         onSources={(sources) => onUpdate({ sources })}
@@ -5225,11 +5359,11 @@ export function StoryTab({
           }}
         />
       ) : null}
-      {email ? (
+      {email?.link.thread_id ? (
         <EmailThread
-          customerId={orgId}
-          accountId={email.account?.id ?? null}
-          emailId={email.id}
+          orgId={orgId}
+          threadId={email.link.thread_id}
+          openedId={email.id}
           title={email.title}
           isSm={isSm}
           onClose={() => setEmail(null)}
@@ -5806,7 +5940,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {
-  THREAD_EMAILS,
   manyItems,
   portfolioRequests,
   postBodies,
@@ -5968,21 +6101,22 @@ describe('the organization page (/organizations/:id)', () => {
   it('takes Needs attention rows to what needs attention', async () => {
     stubOrganizationPage();
     renderOrganizationPage();
-    await userEvent.click(await screen.findByRole('button', { name: '1 overdue task' }));
+    await userEvent.click(await screen.findByRole('button', { name: /^1 overdue task/ }));
     expect(where().searchParams.get('group')).toBe('tasks');
     await waitFor(() => expect(itemKeys()).toEqual(['task:5']));
     await userEvent.click(screen.getByRole('button', { name: '3 unanswered questions' }));
     expect(where().searchParams.get('tab')).toBe('knowledge');
   });
 
-  it('opens an email as its real thread, and gives focus back to it', async () => {
-    stubOrganizationPage({ emails: { '/customers/7/accounts/31/emails/': THREAD_EMAILS } });
+  it('opens an email as its real thread (?thread= on the story), and gives focus back to it', async () => {
+    const spy = stubOrganizationPage();
     renderOrganizationPage();
     const title = await screen.findByRole('button', { name: 'Re: Renewal pricing' });
     await userEvent.click(title);
     const dialog = screen.getByRole('dialog', { name: 'Re: Renewal pricing' });
     expect(await within(dialog).findByText('Can we see the quote before the board meets on Friday?')).toBeInTheDocument();
     expect(within(dialog).getByText('Sharing the renewal quote ahead of your board meeting.')).toBeInTheDocument();
+    expect(lastStory(spy).get('thread')).toBe('t-1');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
     expect(title).toHaveFocus();
   });
@@ -6646,7 +6780,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Create: `src/e2e/organizationDetail.test.tsx`
 
 **Interfaces:**
-- Consumes: `renderOrganizationPage(url, {nav, list})` (Task 16), `stubOrganizationPage`, `THREAD_EMAILS`, `postBodies` (Task 1), `resetViewport`.
+- Consumes: `renderOrganizationPage(url, {nav, list})` (Task 16), `stubOrganizationPage` (its default thread t-1), `postBodies` (Task 1), `resetViewport`.
 - Produces: nothing.
 
 - [ ] **Step 1: Write the test**
@@ -6656,7 +6790,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { THREAD_EMAILS, postBodies, stubOrganizationPage } from '../features/organizations/testStory';
+import { postBodies, stubOrganizationPage } from '../features/organizations/testStory';
 import { renderOrganizationPage } from '../pages/organizations/testDetail';
 import { resetViewport } from '../test/viewport';
 
@@ -6678,7 +6812,7 @@ describe('the organization page, end to end (spec §5)', () => {
   });
 
   it('opens an organization, filters by an account, opens an email, adds a task and sees it in the story', { timeout: 30000 }, async () => {
-    const spy = stubOrganizationPage({ emails: { '/customers/7/accounts/31/emails/': THREAD_EMAILS } });
+    const spy = stubOrganizationPage();
     renderOrganizationPage('/organizations/list', { nav: true, list: true });
 
     // 1. Open Pizza Hut from the List; the page wears the Organizations frame.
@@ -6696,7 +6830,8 @@ describe('the organization page, end to end (spec §5)', () => {
     expect(where().searchParams.get('account')).toBe('31');
     await waitFor(() => expect(itemKeys()).toEqual(['email:41']));
 
-    // 3. Open the email: its real thread, then back to where we were.
+    // 3. Open the email: its real thread (the message on the organization
+    // itself included, though EMEA is chosen), then back to where we were.
     const email = screen.getByRole('button', { name: 'Re: Renewal pricing' });
     await userEvent.click(email);
     const thread = screen.getByRole('dialog', { name: 'Re: Renewal pricing' });
@@ -7068,17 +7203,17 @@ Save screenshots at 1440 and 375 in both themes for the PR description. Then the
 | §1.3 Tiles: Health (ring, trend, breakdown), ARR (customer's currency), Renewal (runway), Pulse (AI · CSM, dots, disagree); jump to Details; phone strip | 6, 16 |
 | §1.4 Account chips with `by_account` counts, `?account=` | 7, 16 (pre-flight 6-8) |
 | §1.5 Tabs: real tablist, `?tab=`, horizontal scroll on phones | 2, 7, 16 |
-| §1.6 Needs attention (renewal, urgent tickets, overdue tasks, questions, anomaly with withheld title) | 8, 14 |
+| §1.6 Needs attention (renewal, open High/Critical tickets, overdue tasks, questions, anomaly with a server-withheld title), in the backend's `attention` keys | 8, 14 (pre-flight 10) |
 | §1.6 Filters, Sources, search | 1, 2, 9, 14 |
 | §1.6 + Add with the existing create flows | 12, 13, 14 |
-| §1.6 Stream: by day, Lucide icons, account tag, one-line summary, who, time; CallSense summary on calls; email thread; other items' detail; paging | 10, 11, 14 (pre-flight 13-15) |
+| §1.6 Stream: by day (`all_day` aware), Lucide icons, account tag, one-line summary, who, time; CallSense summary on calls; email thread via `?thread=`; other items' detail with `link.url`; paging | 10, 11, 14 (pre-flight 13-15, 24, 25) |
 | §1.7 Details: the List's six panels, stacked on phones, Edit details | 15, 16 |
 | §1.8 People, Deals & risks, Files: current content in the new frame | 15 |
 | §1.9 Knowledge: today's Company View | 15 |
 | §1.10 Removals (Slack, fake Pulse, invented NPS, placeholders, 360 toggle, dead controls, Clearbit/pravatar, pinned panel, All-attributes modal, Overview) | 16, 18, 21 (pre-flight 19) |
 | §1.11 Phones: conditional layouts, full-width content (Ask sheet is delivery 3) | 3, 6, 7, 9, 16, 22 |
 | "Where today's 13 feed filters go" | 1 (kinds and groups), 15 (Files holds CallSense; Headlines under Knowledge), pre-flight 11 |
-| §2 Header reads, accounts, story endpoint (params, response, paging, links), existing endpoints stay, landing cost | 1, 4, 16 |
+| §2 Header reads, accounts, story endpoint (params incl. `thread`, response incl. `by_kind` and `all_day`, paging, `link` object, 404), existing endpoints stay, landing cost | 1, 4, 11, 16 |
 | §4 delivery 1 frontend | whole plan |
 | §5 Unit tests (tiles, chips, stream item, attention, filters, Sources) | 5-11, 13, 14 |
 | §5 Integration through the real store and router, `fetch` mocked in §2 shapes | 16 (and 4, 12-15) |
@@ -7091,8 +7226,9 @@ Save screenshots at 1440 and 375 in both themes for the PR description. Then the
 **Placeholder scan:** no step says "TBD", "handle edge cases" or "similar to Task N". Every code step has its code; every test step has its test; every edit names the exact text it replaces, or the exact start and end of the block it replaces where the old block carries trailing whitespace (the Navbar branch, the `Details View` section).
 
 **Type consistency, checked across tasks:**
-- `StoryGroup`, `StoryKind`, `StoryItem`, `StoryAttention`, `StoryResponse` (Task 1) are used by Tasks 2, 4, 8-11, 14 and the stub. `STORY_GROUPS`, `STORY_KINDS`, `KIND_GROUP`, `KIND_NAME`, `kindsIn`, `isStoryKind`, `isStoryGroup`, `ADD_FLOWS`, `AddKind` (Task 1) are used by Tasks 2, 9, 10, 13, 14.
-- `storyQuery(f: StoryFilters, limit?)` and `fetchStory(orgId, query, cursor?)` (Task 1) are used by `useStory` (Task 4) and the page (Task 16) with `storyFilters(params)` (Task 2).
+- `StoryGroup`, `StoryKind`, `StoryActor`, `StoryLink`, `StoryItem`, `StoryAttention`, `StoryCounts`, `StoryResponse` (Task 1) mirror the backend (`items.py`, `build.py`, backend plan Task 7) and are used by Tasks 2, 4, 8-11, 14 and the stub. `STORY_GROUPS`, `STORY_KINDS`, `KIND_GROUP`, `KIND_NAME`, `kindsIn`, `offeredSources`, `sourceName`, `isStoryKind`, `isStoryGroup`, `ADD_FLOWS`, `AddKind` (Task 1) are used by Tasks 2, 9, 10, 11, 13, 14.
+- `storyQuery(f: StoryFilters, limit?)` and `fetchStory(orgId, query, cursor?)` (Task 1) are used by `useStory` (Task 4) and the page (Task 16) with `storyFilters(params)` (Task 2); `fetchThread(orgId, threadId)` (Task 1) by `EmailThread` (Task 11), which `StoryTab` (Task 14) opens only for an email whose `link.thread_id` is set.
+- `dayKey`, `timeLabel` and `groupByDay` (Task 2) take items (`{occurred_at, all_day}`), as `StoryItemRow` and `StoryStream` (Task 10) pass them.
 - `DetailParams`, `DetailTab`, `DETAIL_TABS`, `parseDetailParams`, `withPatch`, `hasStoryFilters`, `detailTabId`, `detailPanelId` (Task 2) are used by Tasks 7, 8, 14 and 16; `useDetailParams().update(patch, {replace})` is `StoryTab`'s `onUpdate`.
 - `useOrganization(id, version)` → `{row, customer, loading, notFound, error, customerError, retry}` and `useStory(orgId, query, version, enabled)` → `StoryState` (Task 4) are used by the page (Task 16); `StoryState` by `StoryStream` (Task 10) and `StoryTab` (Task 14).
 - `Sheet({title, description, isSm, onClose, children})` (Task 3) is used by `EmailThread` (Task 11) and `AddFlow` (Task 13). `Menu({label, trigger, triggerClassName, items, align})` (Task 5) is used by `OrganizationHeader` (Task 5) and `StoryToolbar` (Task 9).
