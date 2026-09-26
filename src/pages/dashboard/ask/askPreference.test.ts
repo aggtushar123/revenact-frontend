@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { ASK_PREFERENCE_KEY, readAskPreference, writeAskPreference } from './askPreference';
+import { ASK_PREFERENCE_KEY, ORGANIZATIONS_ASK_KEY, readAskPreference, writeAskPreference } from './askPreference';
 
 describe('askPreference', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -18,5 +18,13 @@ describe('askPreference', () => {
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('denied'); });
     expect(readAskPreference()).toBeNull();
     expect(() => writeAskPreference(true)).not.toThrow();
+  });
+
+  it("keeps another surface's choice under its own key", () => {
+    writeAskPreference(false, ORGANIZATIONS_ASK_KEY);
+    expect(localStorage.getItem(ORGANIZATIONS_ASK_KEY)).toBe('closed');
+    expect(readAskPreference(ORGANIZATIONS_ASK_KEY)).toBe(false);
+    expect(readAskPreference()).toBeNull();
+    expect(localStorage.getItem(ASK_PREFERENCE_KEY)).toBeNull();
   });
 });

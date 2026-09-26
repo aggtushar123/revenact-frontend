@@ -1,20 +1,23 @@
 export const ASK_PREFERENCE_KEY = 'revenact_dashboard_ask';
+/** Organizations' rail keeps its own choice: hiding it there says nothing
+ *  about the Dashboard, and the reverse. */
+export const ORGANIZATIONS_ASK_KEY = 'revenact_organizations_ask';
 
-/** The person's own open/closed choice for the rail, or null before one. A
+/** The person's own open/closed choice for a rail, or null before one. A
  *  private window or blocked storage reads as "no choice", so the default
  *  (open from xl) applies. */
-export function readAskPreference(): boolean | null {
+export function readAskPreference(key = ASK_PREFERENCE_KEY): boolean | null {
   try {
-    const value = localStorage.getItem(ASK_PREFERENCE_KEY);
+    const value = localStorage.getItem(key);
     return value === 'open' ? true : value === 'closed' ? false : null;
   } catch {
     return null;
   }
 }
 
-export function writeAskPreference(open: boolean): void {
+export function writeAskPreference(open: boolean, key = ASK_PREFERENCE_KEY): void {
   try {
-    localStorage.setItem(ASK_PREFERENCE_KEY, open ? 'open' : 'closed');
+    localStorage.setItem(key, open ? 'open' : 'closed');
   } catch {
     /* forgotten next visit; the default applies */
   }

@@ -2,7 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { DrillProvider } from './drill/DrillContext';
 import { DrillPanel } from './drill/DrillPanel';
 import { FilterNamesProvider } from './ask/FilterNamesProvider';
-import { AskProvider } from './ask/AskProvider';
+import { DashboardAskProvider } from './ask/DashboardAskProvider';
 import { AskRail } from './ask/AskRail';
 
 /** The dashboard's own scroll container and page padding, with the Ask
@@ -24,7 +24,7 @@ import { AskRail } from './ask/AskRail';
 export function DashboardFrame() {
   return (
     <FilterNamesProvider>
-      <AskProvider>
+      <DashboardAskProvider>
         <DrillProvider>
           <div className="relative flex-1 min-h-0 w-full flex gap-3 px-4 pb-4">
             <div className="flex-1 min-w-0 min-h-0 overflow-y-auto">
@@ -34,7 +34,7 @@ export function DashboardFrame() {
             <DrillPanel />
           </div>
         </DrillProvider>
-      </AskProvider>
+      </DashboardAskProvider>
     </FilterNamesProvider>
   );
 }
