@@ -7,9 +7,9 @@
 **Architecture:** `AskProvider` stops calling `useDashboardContext()` itself. It takes an `AskSurface` value (`{name, context, chipLabel}`) and a `preferenceKey` instead.
 - The Dashboard passes its surface through a thin `DashboardAskProvider`.
 - Organizations passes its surface through `OrganizationsAskLayout`, a pathless layout route above the List and the Board, so one conversation survives the tab switch.
-- `useOrganizationsContext()` turns the URL into `{surface, view, filters, focus}`. The filters are the portfolio params in the API's own string form (`features/organizations/askContext.ts`).
+- `useOrganizationsContext()` turns the URL into `{surface, view, filters, focus}`. The filters are the portfolio params in the API's own string form, only the set keys sent (`features/organizations/askContext.ts`).
 - The pages report their portfolio filter options, so the chips name owners ("Owner: Carl CSM").
-- `CopilotRail` learns a surface-neutral `RailContext` (`kind: 'surface'`) and a `chipLabel` prop. The History tag comes from `originTag()`, which uses the server's `origin_label` for Organizations.
+- `CopilotRail` learns a surface-neutral `RailContext` (`kind: 'surface'`) and a `chipLabel` prop. The History tag comes from `originTag()`, which joins the server's `origin.labels` for Organizations (there is no `origin_label` field).
 - Restoring history is surface-aware. A same-surface conversation navigates and shows as today. One from the other surface navigates to its page with `askConversationId` in the navigation state, and that page's provider fetches and shows it.
 - Layout: the rail wins its 320px. Board columns narrow to `w-64`. Below `xl` a card opens as the bottom sheet rather than the side panel. List rows and tiles wrap by container query, not by viewport.
 
@@ -17,21 +17,21 @@
 
 **Spec:** `docs/superpowers/specs/2026-09-25-organizations-portfolio-design.md`. This plan covers §3 "Ask Revenact on Organizations" (binding), the Ask parts of §1 (decisions table "Ask Revenact", the page anatomy's rail and pill, "Glass only on the Ask rail", "Phones: Ask Revenact is a full-screen sheet opened from ✦"), §4 item 3 (frontend half) and the Ask parts of §5. Deliveries 1 and 2 (List and Board) are merged into `feat/organizations-board`, which this branch is cut from.
 
-**Branch:** `feat/organizations-ask` (already checked out; cut from `feat/organizations-board`). Do not switch branches. The companion backend plan (`revenact-backend`, same branch name) adds the surface, grounding, `origin_label` and metering; per spec §4 the backend merges and deploys first.
+**Branch:** `feat/organizations-ask` (already checked out; cut from `feat/organizations-board`). Do not switch branches. The companion backend plan (`revenact-backend`, same branch name) adds the surface, grounding, `origin.labels` and metering; per spec §4 the backend merges and deploys first.
 
 ## Global Constraints
 
 - **Wire contract, `POST /copilot/messages/`:** body `{conversation_id?, content, context?}`. The Organizations `context` is exactly
-  `{surface: 'organizations', view: 'list' | 'board', filters: {search, owner, lifecycle, health, product, renews_within, nps, ids, include_churned, sort, group}, focus: null | {kind: 'companies', ids: [<id>]}}`.
-  - All eleven filter keys are always present, as strings: `''` when unset; `lifecycle`, `health`, `product` and `ids` comma-joined; `include_churned` is `'1'` or `''`; `sort` always set (default `-arr`); `group` is `''` for no grouping.
+  `{surface: 'organizations', view: 'list' | 'board', filters: {...only the set keys...}, focus: null | {kind: 'companies', ids: [<id>]}}`.
+  - **`filters` carries only the keys that are set, in the portfolio's own string form.** An unset key is left out entirely — never sent as `''`. `lifecycle`, `health`, `product` and `ids` are comma-joined when set; `include_churned` is sent only as `'1'` (omitted when false); `sort` is sent only when it differs from the default (`-arr`); `ids` is omitted whenever empty (the backend reads a literal `ids: ''` as "names nothing", so an unset ids filter must never be sent that way).
+  - `group` follows the same rule, with one more case: it is sent only when the page's grouping differs from the view's own default (`health` on the List, `lifecycle` on the Board) — omitted otherwise, so the server applies that default. `group: ''` is sent only when the person explicitly chose no grouping (the List's "None"; the Board never offers this — `boardParams` keeps its group non-empty).
+  - `focus`, when not null, is always `{kind: 'companies', ids: [...]}`; the server `400`s on any other `kind`.
   - `cursor`, `group_value` and `limit` are never sent.
-  - On the Board, `group` is never `''` (`boardParams`).
   - The Dashboard's context is unchanged: `{surface: 'dashboard', area, view, filters: {owner, lifecycle, customer}, focus}`.
 - **Wire contract, conversations:**
-  - `origin` is the first surface context without its `focus` (Dashboard or Organizations shape).
-  - `GET /copilot/conversations/` and `GET /copilot/conversations/<id>/` add `origin_label: string | null`, built by the server (e.g. `"Organizations · Owner: Carl CSM"`), and null without an origin.
-  - The frontend shows `origin_label` only for Organizations origins. Dashboard tags stay `viewLabel(area, view)`, whatever the server sends.
-  - Each message's `context` echoes the validated context of either surface.
+  - There is no `origin_label` field. `origin` is the first surface context without its `focus` — for Organizations that is `{surface, view, filters, labels}`, where `labels` is a list of strings the server builds from the caller's own filter options (e.g. `["Owner: Carl CSM"]`). The Dashboard's origin shape is unchanged (no `labels`).
+  - Each user `Message.context` also carries `labels` for an Organizations turn (the server's validated context); the client never sends `labels` itself.
+  - The History tag for an Organizations conversation is `["Organizations", ...origin.labels].join(' · ')`. Restoring it opens `/organizations/<origin.view>?<URLSearchParams(origin.filters)>`.
 - **Dashboard unchanged:** every existing test under `src/pages/dashboard`, `src/components/copilot`, `src/pages/communications`, `src/pages/copilot` and `src/e2e/dashboardAsk.test.tsx` passes. The only edits to existing tests are `CopilotRail.test.tsx`'s mechanical renames (`kind: 'dashboard'` → `kind: 'surface'`, `names` → `chipLabel`), and every assertion in it stays as it is. `revenact_dashboard_ask` keeps its meaning.
 - **Glass:** only the rail is glass (`CopilotRail variant="glass"`, whose conversation section is `.rv-card-glass`). Rows, cards, tiles, the side panel and every sheet stay solid `bg-surface`. The owner approved glass for this rail on 2026-09-26, and the `revenact-design` skill's exception is updated in the docs task.
 - **Breakpoints** (`src/lib/useMediaQuery.ts`): `SM = 640px`, `XL = 1280px`.
@@ -67,15 +67,15 @@
 | # | Spec / owner decision says | Code today | Resolution in this plan |
 |---|---|---|---|
 | 1 | "The provider generalises to take a context builder per surface"; the Dashboard's behaviour stays byte-for-byte. | `AskProvider` calls `useDashboardContext()` inside itself; `AskRail` calls it again plus `useFilterNames()` for the chip. | `AskProvider({surface, preferenceKey})` takes an `AskSurface` value `{name, context, chipLabel}` and exposes it as `ask.surface`; `AskRail` reads only `ask.surface`. The Dashboard's surface is built by `DashboardAskProvider` (the same two hooks, in the same place in the tree). The value object was already rebuilt every render (`useDashboardContext` returns a fresh object), so memoisation is unchanged. Task 3 runs every dashboard suite. |
-| 2 | `useOrganizationsContext` builds `{surface: "organizations", view, filters: {portfolio params except cursor}, focus}`. | `PortfolioParams` holds arrays and a boolean; the backend's portfolio view parses query strings. | `filters` is the API's own string form, all eleven keys present (`toContextFilters`), so the backend can validate it with its portfolio query parser. `view` comes from the pathname. The Board's params go through `boardParams` first (its `group` is what it shows, never `''`). `fromContextFilters` reads it back through `parseParams`, so a value the page would reject is dropped the same way. |
-| 3 | Backend accepts `view ∈ {list, board}`; its plan is written in parallel. | `DashboardContextSerializer` accepts `surface: 'dashboard'` only. | The contract is fixed in Global Constraints for the companion plan to match. Until the backend deploys, a send answers `400`, which the rail already shows as a generic error with Retry (no new UI). Backend merges first (spec §4). |
+| 2 | `useOrganizationsContext` builds `{surface: "organizations", view, filters: {portfolio params except cursor}, focus}`. Backend ruling: `filters` carries only the set keys, in the portfolio's own string form; never `''` for an unset key; `group` only when it differs from the view's default, `group: ''` only for an explicit "None". | `PortfolioParams` holds arrays and a boolean; the backend's portfolio view parses query strings. | `toContextFilters(params, view)` builds a **sparse** `OrganizationsFilters` (all keys optional): it sets a key only when the param is non-empty, joins `lifecycle`/`health`/`product`/`ids` with commas, sends `include_churned` only as `'1'`, sends `sort` only when it differs from `-arr`, and sends `group` only when it differs from `defaultGroupOf(view)` (or `''` when the param is explicitly empty). `ids` is never sent as `''` (the backend reads that as "names nothing"): an empty `ids` param is simply omitted. `view` comes from the pathname. The Board's params go through `boardParams` first (its `group` is never `''`, since the Board offers no "None"). `fromContextFilters` reads the sparse object back through `parseParams` (any key not present behaves as unset), so a value the page would reject is dropped the same way. |
+| 3 | Backend accepts `view ∈ {list, board}`, required and closed (a `400` on a missing or unknown value); `focus.kind` accepts `companies` only (`400` on anything else, e.g. `attention`); its plan is written in parallel. | `DashboardContextSerializer` accepts `surface: 'dashboard'` only, and its focus also accepts `attention`. | The contract is fixed in Global Constraints for the companion plan to match. `OrganizationsContext.focus` is typed `OrganizationsFocus \| null` (`{kind: 'companies'; ids: number[]}`), narrower than the Dashboard's `DashboardFocus`, since Organizations never offers an attention entry point — only `useAskFocusOnOpen` ever builds one, and it only ever builds `{kind: 'companies', ...}`. Until the backend deploys, a send answers `400`, which the rail already shows as a generic error with Retry (no new UI). Backend merges first (spec §4). |
 | 4 | Rail and ✦ pill on both `/organizations/list` and `/organizations/board`: pill in the Navbar slot, rail in `OrganizationsFrame`'s `rail`. | The Navbar already renders `data-nav-actions-slot` on both routes (`isOrgView`); `OrganizationsFrame`'s `rail` is null. The List and Board are sibling routes, so a provider inside each page would reset the conversation on every tab switch. | A pathless layout route, `OrganizationsAskLayout`, wraps `list` and `board` in `App.tsx` and holds the provider. Each page passes `<AskRail />` to `OrganizationsFrame`'s `rail`; `AskRail` portals the pill through the existing `AskControls`. No Navbar logic changes (one comment). |
 | 5 | Glass on the rail only, as on the Dashboard; update the skill's exception. | `.claude/skills/revenact-design/SKILL.md` rule 4 and `docs/03-ui-ux-design.md` name Communications and the Dashboard's rail only. | The rail is `CopilotRail variant="glass"` from `sm`; the phone sheet is `plain`. A test asserts exactly one `.rv-card-glass` on the list (the rail's). Task 9 widens the exception to "the Ask rail on the Dashboard and Organizations (rail only)". |
 | 6 | Opening a List row or a Board card's side panel or sheet sets `focus: {kind: "companies", ids: [id]}` for one question. | The provider sets focus only through `draft()` and `ask()`, and both open the rail. Rows and cards keep `openRow` in page state. | New `focusOn(focus)` on `AskState` sets the focus without opening the rail or drafting. `useAskFocusOnOpen(openId)` calls it whenever an account opens. The existing rules still drop it (the send via `markSent`, the chip's ×, a URL change). **Closing the account keeps the focus**, as a dashboard drill's focus outlives the drill panel. Opening another account replaces it. |
 | 7 | Chips name the filters ("Organizations · Owner: Carl CSM"). | Dashboard names come from `FilterNamesProvider`. Organizations' option names are in the portfolio response's `filters` (`owners`, `lifecycles`, `products`), held inside List/Board. | `PortfolioOptionsContext` + `useReportPortfolioOptions(options)`: each page reports its last read's options to the layout. `organizationsLabel` is `"Organizations"`, then `filterChips(...)`'s own chip labels, then the focus label, joined by ` · `. |
 | 8 | Chips on every question, on this surface. | `CopilotRail` chips come only from `names` (dashboard `FilterNames`) through `contextLabel`, typed `DashboardOrigin`. `RailContext` has `kind: 'dashboard'`. | Types widen to `SurfaceContext = DashboardContext \| OrganizationsContext` (messages, turns, `sendMessage`). `RailContext`'s structured kind is renamed `'surface'`. `names` is replaced by `chipLabel?: (context) => string`, and without it there are still no chips (Communications). `surfaceLabel(context, names)` dispatches by surface. |
 | 9 | History: reopening restores filters and view on `/organizations/list` or `/organizations/board`. | `originPath` builds dashboard URLs only. `AskProvider` navigates for any origin. `HistoryPopover` and `CopilotSidebar` call `viewLabel(origin.area, …)`, which would print "undefined" for an Organizations origin. | `originPath` dispatches by `surface` (`organizationsPath` for Organizations). `openFromHistory` navigates and shows in place when the origin's surface is the provider's own. **For the other surface it navigates there with `{askConversationId}` in the navigation state**, and that page's provider fetches the conversation and opens its rail for the visit. So an Organizations conversation picked on the Dashboard still lands on its view with its filters, and vice versa. Communications and `/copilot` still open in place. |
-| 10 | History tag "Organizations · Owner: Carl CSM", supplied by the backend. | `ConversationSummary` has no such field; the tag is `viewLabel`. | `ConversationSummary.origin_label?: string \| null`. `originTag(summary)` returns `origin_label` (or "Organizations" when absent) for Organizations, and `viewLabel` for the Dashboard. The tag uses the sidebar's Organizations icon (`Network`) and screen-reader text "Started on ". It is capped at 60% of the row and truncates. |
+| 10 | History tag "Organizations · Owner: Carl CSM". There is no `origin_label` field: the backend returns `origin = {surface, view, filters, labels: string[]}` on both the conversation summary and detail, and each user `Message.context` also carries `labels`. | `ConversationSummary` has no such field; the tag is `viewLabel`. | `ConversationSummary.origin?: SurfaceOrigin \| null`, where `OrganizationsOrigin` carries `labels: string[]`. `originTag(summary)` returns `["Organizations", ...origin.labels].join(' · ')` for Organizations, and `viewLabel` for the Dashboard. The tag uses the sidebar's Organizations icon (`Network`) and screen-reader text "Started on ". It is capped at 60% of the row and truncates. |
 | 11 | On desktop the Board's columns get less width when the rail is open. | Columns and their skeleton are `w-72` from `sm`. | `PortfolioBoard`/`BoardColumn` take `narrow` → `w-64`. The Board passes `narrow={railOpen}`. |
 | 12 | The side panel and the rail must not fight; decide which wins. | `AccountSidePanel` is `w-[26rem]` beside the columns. At 1280px with the rail open, about 416px would be left for columns; below `xl` there is no room for both. | **The rail wins.** From `xl` both show (columns narrow and scroll sideways). Below `xl`, with the rail open, a card opens in `AccountSheet` (the phone sheet, which is modal). Opening the rail below `xl` closes an open side panel (adjusted during render), and the card's focus stays for the next question. With the rail closed nothing changes. |
 | 13 | The rail must fit the List. | `AccountRow`'s header is `sm:flex-nowrap` with fixed parts, needing about 930px. At 1280px with the rail the content column is about 844px, so the row overflows sideways (it already does between 640 and about 1060px without the rail). `SummaryTiles` goes five-across at `lg` whatever the column width. | Container queries. List and Board wrap `SummaryTiles`, and the List wraps `PortfolioSections`, in `<div className="@container">`. The row becomes `@min-[60rem]:flex-nowrap`, and the tiles `@min-[50rem]:grid-cols-5`. Rows wrap onto two lines in a narrow column instead of overflowing. The wrappers hold no fixed-position descendants (the sheets and modals render outside them). |
@@ -127,21 +127,22 @@ Modify:
 - Test: `src/features/organizations/askContext.test.ts`
 
 **Interfaces:**
-- Consumes: `parseParams`, `toUrlSearch`, `DEFAULT_GROUP`, `BOARD_GROUP`, `PortfolioParams` (`features/organizations/portfolioParams.ts`); `filterChips` (`filterChips.ts`); `PortfolioResponse` (`portfolioTypes.ts`); `focusLabel` (`components/copilot/dashboardLabels.ts`); `DashboardFocus` (`pages/copilot/types.ts`).
+- Consumes: `parseParams`, `DEFAULT_GROUP`, `BOARD_GROUP`, `DEFAULT_SORT`, `PortfolioParams` (`features/organizations/portfolioParams.ts`); `filterChips` (`filterChips.ts`); `PortfolioResponse` (`portfolioTypes.ts`); `focusLabel` (`components/copilot/dashboardLabels.ts`).
 - Produces (types, `pages/copilot/types.ts`):
   - `OrganizationsView = 'list' | 'board'`
-  - `OrganizationsFilters` (eleven string keys)
-  - `OrganizationsContext {surface: 'organizations'; view; filters; focus: DashboardFocus | null}`
-  - `OrganizationsOrigin = Omit<OrganizationsContext, 'focus'>`
+  - `OrganizationsFilters` (eleven string keys, **all optional** — only a set key is present)
+  - `OrganizationsFocus {kind: 'companies'; ids: number[]}` (the only focus kind Organizations ever sends; the backend `400`s on any other `kind`)
+  - `OrganizationsContext {surface: 'organizations'; view; filters; focus: OrganizationsFocus | null; labels?: string[]}` — `labels` is never set by the client; it is present only on a context the server has validated and echoed back (a stored `Message.context`)
+  - `OrganizationsOrigin {surface: 'organizations'; view; filters; labels: string[]}` — a conversation's origin always carries the server's `labels`, so this is its own shape rather than `Omit<OrganizationsContext, 'focus'>`
   - `SurfaceContext = DashboardContext | OrganizationsContext`
   - `SurfaceOrigin = DashboardOrigin | OrganizationsOrigin`
   - `SurfaceName = SurfaceContext['surface']`
 - Produces (`features/organizations/askContext.ts`):
   - `defaultGroupOf(view: OrganizationsView): GroupKey`
-  - `toContextFilters(p: PortfolioParams): OrganizationsFilters`
+  - `toContextFilters(p: PortfolioParams, view: OrganizationsView): OrganizationsFilters` — sparse: a key is present only when the param is set, `group` only when it differs from `defaultGroupOf(view)` (or `''` for an explicit "None")
   - `fromContextFilters(filters: OrganizationsFilters, view: OrganizationsView): PortfolioParams`
-  - `organizationsPath(origin: OrganizationsOrigin): string`
-  - `organizationsLabel(context: OrganizationsOrigin & {focus?: DashboardFocus | null}, options?: PortfolioResponse['filters'] | null): string`
+  - `organizationsPath(origin: OrganizationsOrigin): string` — `/organizations/<view>?<URLSearchParams(filters)>`, filters used exactly as stored (they are already the page's own URL parameters)
+  - `organizationsLabel(context: OrganizationsOrigin & {focus?: OrganizationsFocus | null}, options?: PortfolioResponse['filters'] | null): string`
 
 - [ ] **Step 1: Add the types**
 
@@ -152,35 +153,56 @@ In `src/pages/copilot/types.ts`, directly after the line `export type DashboardO
 export type OrganizationsView = 'list' | 'board';
 
 /** The portfolio's params as GET /organizations/portfolio/ reads them (spec
- *  §2), every key present: '' when unset, lists comma-joined,
- *  `include_churned` '1' or '', `group` '' for no grouping. The paging
- *  params (`cursor`, `group_value`, `limit`) are never part of it. */
+ *  §2), **only the set keys present** — an unset key is left out, never sent
+ *  as `''` (the backend reads a literal `ids: ''` as "names nothing", and a
+ *  missing `group` as the view's own default). Lists are comma-joined,
+ *  `include_churned` is present only as `'1'`, `sort` only when it differs
+ *  from the default, `group` only when it differs from the view's default
+ *  (or `''` for an explicit "None", which the Board never offers). The
+ *  paging params (`cursor`, `group_value`, `limit`) are never part of it. */
 export interface OrganizationsFilters {
-  search: string;
-  owner: string;
-  lifecycle: string;
-  health: string;
-  product: string;
-  renews_within: string;
-  nps: string;
-  ids: string;
-  include_churned: string;
-  sort: string;
-  group: string;
+  search?: string;
+  owner?: string;
+  lifecycle?: string;
+  health?: string;
+  product?: string;
+  renews_within?: string;
+  nps?: string;
+  ids?: string;
+  include_churned?: string;
+  sort?: string;
+  group?: string;
+}
+
+/** The only focus shape Organizations ever sends; the server `400`s on any
+ *  other `kind` (e.g. the Dashboard's `attention`). */
+export interface OrganizationsFocus {
+  kind: 'companies';
+  ids: number[];
 }
 
 /** Where an Organizations question was asked (spec §3). The server
  *  recomputes the filtered list for the asker; the client never sends
- *  figures. */
+ *  figures, and never sends `labels` — the server builds them from the
+ *  asker's own filter options and echoes them back on a stored context. */
 export interface OrganizationsContext {
   surface: 'organizations';
   view: OrganizationsView;
   filters: OrganizationsFilters;
-  focus: DashboardFocus | null;
+  focus: OrganizationsFocus | null;
+  labels?: string[];
 }
 
-/** A conversation's first Organizations context without its focus. */
-export type OrganizationsOrigin = Omit<OrganizationsContext, 'focus'>;
+/** A conversation's first Organizations context without its focus. Unlike
+ *  `OrganizationsContext`, `labels` is required: an origin is only ever
+ *  built server-side, from the first message's validated context, which
+ *  always carries them. */
+export interface OrganizationsOrigin {
+  surface: 'organizations';
+  view: OrganizationsView;
+  filters: OrganizationsFilters;
+  labels: string[];
+}
 
 /** Every structured context a question can carry, told apart by `surface`. */
 export type SurfaceContext = DashboardContext | OrganizationsContext;
@@ -193,64 +215,73 @@ export type SurfaceName = SurfaceContext['surface'];
 `src/features/organizations/askContext.test.ts`:
 ```ts
 import { describe, expect, it } from 'vitest';
-import type { OrganizationsFilters } from '../../pages/copilot/types';
 import { fromContextFilters, organizationsLabel, organizationsPath, toContextFilters } from './askContext';
 import { BOARD_GROUP, boardParams, parseParams } from './portfolioParams';
 import { FILTER_OPTIONS } from './testPortfolio';
 
-const NONE: OrganizationsFilters = {
-  search: '', owner: '', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'health',
-};
 const listParams = (query: string) => parseParams(new URLSearchParams(query));
 const boardOf = (query: string) => boardParams(parseParams(new URLSearchParams(query), BOARD_GROUP));
 
 describe('organizations ask context', () => {
-  it('carries every portfolio param as the API reads it, paging aside', () => {
-    expect(toContextFilters(listParams(''))).toEqual(NONE);
+  it("carries only the set portfolio params, in the API's own string form", () => {
+    expect(toContextFilters(listParams(''), 'list')).toEqual({});
     expect(
       toContextFilters(
         listParams('search=pizza&owner=2&lifecycle=live,renewal&health=poor&product=1&renews_within=90&nps=detractor&ids=3,7&include_churned=1&sort=-renewal&group=owner'),
+        'list',
       ),
     ).toEqual({
       search: 'pizza', owner: '2', lifecycle: 'live,renewal', health: 'poor', product: '1', renews_within: '90', nps: 'detractor', ids: '3,7', include_churned: '1', sort: '-renewal', group: 'owner',
     });
-    expect(toContextFilters(listParams('group=none')).group).toBe('');
-    // The board never asks ungrouped: group=none reads as lifecycle there.
-    expect(toContextFilters(boardOf('group=none')).group).toBe('lifecycle');
+    // An explicit "None" is sent as '', never omitted.
+    expect(toContextFilters(listParams('group=none'), 'list')).toEqual({ group: '' });
+    // The view's own default is omitted, never sent as itself.
+    expect(toContextFilters(listParams(''), 'list')).not.toHaveProperty('group');
+    // The board never asks ungrouped: group=none reads as lifecycle there, its own default, so it too is omitted.
+    expect(toContextFilters(boardOf('group=none'), 'board')).not.toHaveProperty('group');
+  });
+
+  it('never sends an unset key as an empty string (the backend reads ids: "" as "names nothing")', () => {
+    const none = toContextFilters(listParams(''), 'list');
+    expect(none).not.toHaveProperty('ids');
+    expect(none).not.toHaveProperty('include_churned');
+    expect(none).not.toHaveProperty('sort');
+    expect(none).not.toHaveProperty('search');
   });
 
   it('reads a context back to the same params', () => {
     const list = listParams('owner=2&lifecycle=live&group=none&sort=name');
-    expect(fromContextFilters(toContextFilters(list), 'list')).toEqual(list);
+    expect(fromContextFilters(toContextFilters(list, 'list'), 'list')).toEqual(list);
     const board = boardOf('health=good');
-    expect(fromContextFilters(toContextFilters(board), 'board')).toEqual(board);
+    expect(fromContextFilters(toContextFilters(board, 'board'), 'board')).toEqual(board);
   });
 
   it('drops a value the page would not accept', () => {
-    expect(fromContextFilters({ ...NONE, lifecycle: 'live,bogus', owner: 'x' }, 'list')).toMatchObject({ lifecycle: ['live'], owner: '' });
+    expect(fromContextFilters({ lifecycle: 'live,bogus', owner: 'x' }, 'list')).toMatchObject({ lifecycle: ['live'], owner: '' });
   });
 
-  it('goes back to the view with its filters', () => {
-    expect(organizationsPath({ surface: 'organizations', view: 'list', filters: NONE })).toBe('/organizations/list');
-    expect(organizationsPath({ surface: 'organizations', view: 'list', filters: { ...NONE, owner: '2', lifecycle: 'live,renewal' } })).toBe(
+  it('goes back to the view with its filters, using the stored filters as-is', () => {
+    expect(organizationsPath({ surface: 'organizations', view: 'list', filters: {}, labels: [] })).toBe('/organizations/list');
+    expect(organizationsPath({ surface: 'organizations', view: 'list', filters: { owner: '2', lifecycle: 'live,renewal' }, labels: [] })).toBe(
       '/organizations/list?owner=2&lifecycle=live%2Crenewal',
     );
-    expect(organizationsPath({ surface: 'organizations', view: 'list', filters: { ...NONE, group: '' } })).toBe('/organizations/list?group=none');
-    expect(organizationsPath({ surface: 'organizations', view: 'board', filters: { ...NONE, group: 'lifecycle' } })).toBe('/organizations/board');
-    expect(organizationsPath({ surface: 'organizations', view: 'board', filters: { ...NONE, sort: 'name', group: 'owner' } })).toBe(
+    // An explicit "None" round-trips as the stored empty value, not the URL's 'none' sentinel.
+    expect(organizationsPath({ surface: 'organizations', view: 'list', filters: { group: '' }, labels: [] })).toBe('/organizations/list?group=');
+    expect(organizationsPath({ surface: 'organizations', view: 'board', filters: {}, labels: [] })).toBe('/organizations/board');
+    expect(organizationsPath({ surface: 'organizations', view: 'board', filters: { sort: 'name', group: 'owner' }, labels: [] })).toBe(
       '/organizations/board?sort=name&group=owner',
     );
   });
 
   it('names the chip from the filter options, then the focus', () => {
-    const base = { surface: 'organizations' as const, view: 'list' as const };
-    expect(organizationsLabel({ ...base, filters: NONE })).toBe('Organizations');
-    expect(organizationsLabel({ ...base, filters: { ...NONE, owner: '2', lifecycle: 'live' } }, FILTER_OPTIONS)).toBe(
+    const base = { surface: 'organizations' as const, view: 'list' as const, labels: [] };
+    expect(organizationsLabel({ ...base, filters: {} })).toBe('Organizations');
+    expect(organizationsLabel({ ...base, filters: { owner: '2', lifecycle: 'live' } }, FILTER_OPTIONS)).toBe(
       'Organizations · Owner: Carl CSM · Lifecycle: Live',
     );
     // No options yet: the value shows as the page's own chip would show it.
-    expect(organizationsLabel({ ...base, filters: { ...NONE, owner: '2' } })).toBe('Organizations · Owner: User 2');
-    expect(organizationsLabel({ ...base, filters: { ...NONE, ids: '3,7' }, focus: { kind: 'companies', ids: [7] } })).toBe(
+    expect(organizationsLabel({ ...base, filters: { owner: '2' } })).toBe('Organizations · Owner: User 2');
+    expect(organizationsLabel({ ...base, filters: { ids: '3,7' }, focus: { kind: 'companies', ids: [7] } })).toBe(
       'Organizations · Opened from the dashboard (2) · 1 account',
     );
   });
@@ -267,37 +298,46 @@ Expected: FAIL with "Failed to resolve import "./askContext"".
 `src/features/organizations/askContext.ts`:
 ```ts
 import { focusLabel } from '../../components/copilot/dashboardLabels';
-import type { DashboardFocus, OrganizationsFilters, OrganizationsOrigin, OrganizationsView } from '../../pages/copilot/types';
+import type { OrganizationsFilters, OrganizationsFocus, OrganizationsOrigin, OrganizationsView } from '../../pages/copilot/types';
 import { filterChips } from './filterChips';
-import { BOARD_GROUP, DEFAULT_GROUP, parseParams, toUrlSearch, type PortfolioParams } from './portfolioParams';
+import { BOARD_GROUP, DEFAULT_GROUP, DEFAULT_SORT, parseParams, type PortfolioParams } from './portfolioParams';
 import type { GroupKey, PortfolioResponse } from './portfolioTypes';
 
-/** Each view's own default grouping (an absent `group` in its URL). */
+/** Each view's own default grouping (an absent `group` in a stored context
+ *  means this). */
 export function defaultGroupOf(view: OrganizationsView): GroupKey {
   return view === 'board' ? BOARD_GROUP : DEFAULT_GROUP;
 }
 
 /** The params as a question carries them (spec §3: every portfolio param
- *  except the cursor), in the API's own string form. */
-export function toContextFilters(p: PortfolioParams): OrganizationsFilters {
-  return {
-    search: p.search,
-    owner: p.owner,
-    lifecycle: p.lifecycle.join(','),
-    health: p.health.join(','),
-    product: p.product.join(','),
-    renews_within: p.renews_within,
-    nps: p.nps,
-    ids: p.ids.join(','),
-    include_churned: p.include_churned ? '1' : '',
-    sort: p.sort,
-    group: p.group,
-  };
+ *  except the cursor), in the API's own string form — **only the set keys**.
+ *  Backend ruling: an unset key is never sent as `''` (the backend reads a
+ *  literal `ids: ''` as "names nothing"). `group` is sent only when it
+ *  differs from `defaultGroupOf(view)`, and `group: ''` only for an explicit
+ *  "None" (the Board never reaches that branch: `boardParams` keeps its
+ *  group non-empty). */
+export function toContextFilters(p: PortfolioParams, view: OrganizationsView): OrganizationsFilters {
+  const filters: OrganizationsFilters = {};
+  if (p.search) filters.search = p.search;
+  if (p.owner) filters.owner = p.owner;
+  if (p.lifecycle.length) filters.lifecycle = p.lifecycle.join(',');
+  if (p.health.length) filters.health = p.health.join(',');
+  if (p.product.length) filters.product = p.product.join(',');
+  if (p.renews_within) filters.renews_within = p.renews_within;
+  if (p.nps) filters.nps = p.nps;
+  if (p.ids.length) filters.ids = p.ids.join(',');
+  if (p.include_churned) filters.include_churned = '1';
+  if (p.sort !== DEFAULT_SORT) filters.sort = p.sort;
+  const defaultGroup = defaultGroupOf(view);
+  if (p.group === '') filters.group = '';
+  else if (p.group !== defaultGroup) filters.group = p.group;
+  return filters;
 }
 
 /** A context's filters back to params, through the URL parser, so a value
- *  the page would not accept is dropped the same way. `group: ''` is "no
- *  grouping" (the URL's `group=none`). */
+ *  the page would not accept is dropped the same way. A key left out behaves
+ *  as it would off the URL; `group: ''` is "no grouping" (the URL's
+ *  `group=none`), and a missing `group` is the view's own default. */
 export function fromContextFilters(filters: OrganizationsFilters, view: OrganizationsView): PortfolioParams {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) if (value) search.set(key, value);
@@ -305,18 +345,20 @@ export function fromContextFilters(filters: OrganizationsFilters, view: Organiza
   return parseParams(search, defaultGroupOf(view));
 }
 
-/** The page a conversation started on, with its filters (History restore). */
+/** The page a conversation started on, with its filters (History restore).
+ *  `origin.filters` is already the page's own URL parameters, only the set
+ *  keys present (backend ruling), so it is used as-is rather than round-
+ *  tripped through the params parser. */
 export function organizationsPath(origin: OrganizationsOrigin): string {
-  const view: OrganizationsView = origin.view === 'board' ? 'board' : 'list';
-  const query = toUrlSearch(fromContextFilters(origin.filters, view), defaultGroupOf(view)).toString();
-  return query ? `/organizations/${view}?${query}` : `/organizations/${view}`;
+  const query = new URLSearchParams(origin.filters as Record<string, string>).toString();
+  return query ? `/organizations/${origin.view}?${query}` : `/organizations/${origin.view}`;
 }
 
 /** The chip: "Organizations · Owner: Carl CSM · 1 account". The filter parts
  *  are the page's own filter chips, named from the portfolio's options; an
  *  unknown value shows as those chips show it ("User 9"). */
 export function organizationsLabel(
-  context: OrganizationsOrigin & { focus?: DashboardFocus | null },
+  context: OrganizationsOrigin & { focus?: OrganizationsFocus | null },
   options: PortfolioResponse['filters'] | null = null,
 ): string {
   const params = fromContextFilters(context.filters, context.view);
@@ -358,17 +400,17 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Test: `src/components/copilot/surfaceLabels.test.ts` (new), `CopilotRail.test.tsx`, `HistoryPopover.test.tsx`, `src/pages/copilot/CopilotSidebar.origin.test.tsx`, `src/pages/dashboard/ask/originPath.test.ts`
 
 **Interfaces:**
-- Consumes: Task 1's `SurfaceContext`, `SurfaceOrigin`, `OrganizationsContext`, `organizationsLabel`, `organizationsPath`; `contextLabel`, `viewLabel`, `FilterNames` (`dashboardLabels.ts`).
+- Consumes: Task 1's `SurfaceContext`, `SurfaceOrigin`, `OrganizationsContext`, `OrganizationsFocus`, `organizationsLabel`, `organizationsPath`; `contextLabel`, `viewLabel`, `FilterNames` (`dashboardLabels.ts`).
 - Produces:
   - `CopilotMessage.context?: SurfaceContext | null`
-  - `ConversationSummary.origin?: SurfaceOrigin | null` and `ConversationSummary.origin_label?: string | null`
+  - `ConversationSummary.origin?: SurfaceOrigin | null`. There is no `origin_label` field.
   - `sendMessage({conversationId?, content, context?: SurfaceContext})`
   - `Turn.context?: SurfaceContext`
   - `RailContext = {kind: 'label'; label; icon?} | {kind: 'surface'; context: SurfaceContext; label: string}`
   - `CopilotRailProps.chipLabel?: (context: SurfaceContext) => string` (replaces `names`)
   - `SurfaceNames {dashboard?: FilterNames; organizations?: PortfolioResponse['filters'] | null}`
   - `surfaceLabel(context: SurfaceContext, names?: SurfaceNames): string`
-  - `originTag(summary: Pick<ConversationSummary, 'origin' | 'origin_label'>): string | null`
+  - `originTag(summary: Pick<ConversationSummary, 'origin'>): string | null` — for Organizations, `["Organizations", ...origin.labels].join(' · ')`
   - `originPath(origin: SurfaceOrigin): string`
 
 - [ ] **Step 1: Write the failing tests**
@@ -381,8 +423,7 @@ import type { DashboardContext, OrganizationsContext } from '../../pages/copilot
 import { originTag, surfaceLabel } from './surfaceLabels';
 
 const DASH: DashboardContext = { surface: 'dashboard', area: 'revenue', view: 'forecast', filters: { owner: '2', lifecycle: '', customer: '' }, focus: null };
-const ORG_FILTERS = { search: '', owner: '2', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'health' };
-const ORG: OrganizationsContext = { surface: 'organizations', view: 'list', filters: ORG_FILTERS, focus: null };
+const ORG: OrganizationsContext = { surface: 'organizations', view: 'list', filters: { owner: '2' }, focus: null };
 
 describe('surface labels', () => {
   it("names a question on either surface with that surface's names", () => {
@@ -395,21 +436,17 @@ describe('surface labels', () => {
   it('tags a conversation with where it started', () => {
     expect(originTag({ origin: { surface: 'dashboard', area: 'health', view: 'triage', filters: DASH.filters } })).toBe('Health › Triage');
     expect(
-      originTag({ origin: { surface: 'organizations', view: 'list', filters: ORG_FILTERS }, origin_label: 'Organizations · Owner: Carl CSM' }),
+      originTag({ origin: { surface: 'organizations', view: 'list', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] } }),
     ).toBe('Organizations · Owner: Carl CSM');
-    expect(originTag({ origin: { surface: 'organizations', view: 'board', filters: ORG_FILTERS }, origin_label: null })).toBe('Organizations');
+    expect(originTag({ origin: { surface: 'organizations', view: 'board', filters: {}, labels: [] } })).toBe('Organizations');
     expect(originTag({ origin: null })).toBeNull();
-    // A dashboard tag stays its area and view, whatever the server sends.
-    expect(
-      originTag({ origin: { surface: 'dashboard', area: 'health', view: 'triage', filters: DASH.filters }, origin_label: 'Dashboard · Health' }),
-    ).toBe('Health › Triage');
   });
 });
 ```
 
 In `src/components/copilot/HistoryPopover.test.tsx`, add inside the `describe`, after the existing test:
 ```tsx
-  it("tags an Organizations conversation with the server's tag", async () => {
+  it("tags an Organizations conversation with the server's labels", async () => {
     stubCopilot({
       conversations: [
         {
@@ -417,12 +454,7 @@ In `src/components/copilot/HistoryPopover.test.tsx`, add inside the `describe`, 
           title: 'Who renews first?',
           created_at: '',
           updated_at: '',
-          origin: {
-            surface: 'organizations',
-            view: 'list',
-            filters: { search: '', owner: '2', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'health' },
-          },
-          origin_label: 'Organizations · Owner: Carl CSM',
+          origin: { surface: 'organizations', view: 'list', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] },
         },
       ],
     });
@@ -443,12 +475,7 @@ In `src/pages/copilot/CopilotSidebar.origin.test.tsx`, add inside the `describe`
         title: 'Who renews first?',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-        origin: {
-          surface: 'organizations' as const,
-          view: 'list' as const,
-          filters: { search: '', owner: '2', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'health' },
-        },
-        origin_label: 'Organizations · Owner: Carl CSM',
+        origin: { surface: 'organizations' as const, view: 'list' as const, filters: { owner: '2' }, labels: ['Owner: Carl CSM'] },
       },
     ];
     render(
@@ -464,11 +491,7 @@ In `src/pages/dashboard/ask/originPath.test.ts`, add inside the `describe`, afte
 ```ts
   it('goes back to an Organizations view with its filters', () => {
     expect(
-      originPath({
-        surface: 'organizations',
-        view: 'board',
-        filters: { search: '', owner: '2', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'lifecycle' },
-      }),
+      originPath({ surface: 'organizations', view: 'board', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] }),
     ).toBe('/organizations/board?owner=2');
   });
 ```
@@ -500,7 +523,7 @@ and replace `    rerenderRail({ names, context: { kind: 'surface', context: move
     const ORG: OrganizationsContext = {
       surface: 'organizations',
       view: 'board',
-      filters: { search: '', owner: '2', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'lifecycle' },
+      filters: { owner: '2' },
       focus: null,
     };
     renderRail({
@@ -543,11 +566,10 @@ and replace:
 with:
 ```ts
   /** Where a Dashboard or Organizations conversation started; null for every
-   *  other one. */
+   *  other one. There is no separate `origin_label`: an Organizations
+   *  origin carries its own `labels`, server-built, that the History tag
+   *  joins as `["Organizations", ...labels].join(' · ')`. */
   origin?: SurfaceOrigin | null;
-  /** The server's own tag for that origin ("Organizations · Owner: Carl
-   *  CSM"); null without one. Shown for Organizations origins only. */
-  origin_label?: string | null;
 ```
 
 In `src/pages/copilot/copilotApi.ts`, replace `import type { DraftReply, Conversation, ConversationSummary, DashboardContext } from './types';` with `import type { DraftReply, Conversation, ConversationSummary, SurfaceContext } from './types';`. Then replace `export function sendMessage(params: { conversationId?: number; content: string; context?: DashboardContext }): Promise<Conversation> {` with `export function sendMessage(params: { conversationId?: number; content: string; context?: SurfaceContext }): Promise<Conversation> {`. Finally, replace the comment above it:
@@ -627,12 +649,13 @@ export function surfaceLabel(context: SurfaceContext, names: SurfaceNames = {}):
 }
 
 /** History's tag for a conversation: a dashboard one's area and view; an
- *  Organizations one's is the server's (it knows the owner's name), or just
- *  "Organizations". Null for a conversation started anywhere else. */
-export function originTag(summary: Pick<ConversationSummary, 'origin' | 'origin_label'>): string | null {
+ *  Organizations one's is "Organizations" followed by the server's own
+ *  `labels` (it knows the owner's name), joined with " · ". Null for a
+ *  conversation started anywhere else. */
+export function originTag(summary: Pick<ConversationSummary, 'origin'>): string | null {
   const { origin } = summary;
   if (!origin) return null;
-  if (origin.surface === 'organizations') return summary.origin_label || 'Organizations';
+  if (origin.surface === 'organizations') return ['Organizations', ...origin.labels].join(' · ');
   return viewLabel(origin.area, origin.view);
 }
 ```
@@ -828,7 +851,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Consumes: `SurfaceContext`, `SurfaceName`, `DashboardFocus`, `Conversation` (types); `originPath` (Task 2); `surfaceLabel` (Task 2); `fetchConversation` (`pages/copilot/copilotApi.ts`); `useDashboardContext`, `useFilterNames` (existing).
 - Produces:
   - `AskSurface {name: SurfaceName; context: SurfaceContext | null; chipLabel: (context: SurfaceContext) => string}`
-  - `AskState` gains `surface: AskSurface` and `focusOn: (focus: DashboardFocus) => void`. Every existing field is unchanged.
+  - `AskState` gains `surface: AskSurface` and `focusOn: (focus: DashboardFocus) => void`. Every existing field is unchanged. `focus`/`focusOn`/`draft`/`ask` keep the shared, surface-agnostic `DashboardFocus` shape (the Dashboard's own `attention` focus included); on Organizations only `useAskFocusOnOpen` (Task 4) ever writes here, and only ever with `{kind: 'companies'}`, so `ask()`'s cast to `SurfaceContext` when building an Organizations send is safe in practice even though `OrganizationsContext.focus` is typed narrower (`OrganizationsFocus | null`).
   - `AskProvider({surface, preferenceKey = ASK_PREFERENCE_KEY, children})`
   - `AskHandover {askConversationId?: number}`: the navigation state a cross-surface History pick sends.
   - `ORGANIZATIONS_ASK_KEY = 'revenact_organizations_ask'`
@@ -851,14 +874,12 @@ import { AskProvider } from './AskProvider';
 import type { AskSurface } from './context';
 import { useAsk } from './useAsk';
 
-const FILTERS = { search: '', owner: '2', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'health' };
 const orgConversation: Conversation = {
   id: 9,
   title: 'Who renews first?',
   created_at: '',
   updated_at: '',
-  origin: { surface: 'organizations', view: 'list', filters: FILTERS },
-  origin_label: 'Organizations · Owner: Carl CSM',
+  origin: { surface: 'organizations', view: 'list', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] },
   messages: [],
 };
 const dashConversation: Conversation = {
@@ -1074,7 +1095,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useCopilotThread } from '../../../components/copilot/useCopilotThread';
 import { SM, XL, useMediaQuery } from '../../../lib/useMediaQuery';
 import { fetchConversation } from '../../copilot/copilotApi';
-import type { Conversation, DashboardFocus } from '../../copilot/types';
+import type { Conversation, DashboardFocus, SurfaceContext } from '../../copilot/types';
 import { ASK_PREFERENCE_KEY, readAskPreference, writeAskPreference } from './askPreference';
 import { AskContext, type AskState, type AskSurface } from './context';
 import { originPath } from './originPath';
@@ -1199,7 +1220,13 @@ export function AskProvider({
         const context = surface.context;
         if (!context || thread.pending) return;
         reveal();
-        void thread.send({ text: question, content: question, context: { ...context, focus: nextFocus } });
+        // `focus` is the shared, surface-agnostic slot (the Dashboard also
+        // offers an `attention` focus); on Organizations only
+        // `useAskFocusOnOpen` ever writes here, and it only ever builds a
+        // `{kind: 'companies'}` value, so this cast is safe in practice even
+        // though `OrganizationsContext.focus` is typed narrower than
+        // `DashboardFocus`.
+        void thread.send({ text: question, content: question, context: { ...context, focus: nextFocus } as SurfaceContext });
         // The send above carries its own focus; an earlier draft's focus and
         // text are spent, or the chip would name accounts nobody asked about.
         setFocus(null);
@@ -1279,7 +1306,10 @@ with nothing (delete those three lines).
 with:
 ```ts
   const { context, chipLabel } = ask.surface;
-  const asked = context ? { ...context, focus: ask.focus } : null;
+  // ask.focus is the shared DashboardFocus | null slot (Task 3); on
+  // Organizations it is only ever a companies focus, narrower than
+  // OrganizationsContext.focus's own static type, hence the cast.
+  const asked = context ? ({ ...context, focus: ask.focus } as NonNullable<typeof context>) : null;
   const railContext: RailContext | null = asked ? { kind: 'surface', context: asked, label: chipLabel(asked) } : null;
 ```
 - In `railProps`, replace `    chipLabel: (context: SurfaceContext) => surfaceLabel(context, { dashboard: names }),` with `    chipLabel,`.
@@ -1347,19 +1377,21 @@ const at = (url: string) =>
   function Wrapper({ children }: { children: ReactNode }) {
     return <MemoryRouter initialEntries={[url]}>{children}</MemoryRouter>;
   };
-const NONE = { search: '', owner: '', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'health' };
 
 describe('useOrganizationsContext', () => {
   it.each([
-    ['/organizations/list', { view: 'list', filters: NONE }],
+    ['/organizations/list', { view: 'list', filters: {} }],
     [
       '/organizations/list?owner=2&lifecycle=live,renewal&sort=name&include_churned=1',
-      { view: 'list', filters: { ...NONE, owner: '2', lifecycle: 'live,renewal', include_churned: '1', sort: 'name' } },
+      { view: 'list', filters: { owner: '2', lifecycle: 'live,renewal', include_churned: '1', sort: 'name' } },
     ],
-    ['/organizations/list?group=none&ids=3,7', { view: 'list', filters: { ...NONE, ids: '3,7', group: '' } }],
-    ['/organizations/board', { view: 'board', filters: { ...NONE, group: 'lifecycle' } }],
-    ['/organizations/board?group=none&owner=unassigned', { view: 'board', filters: { ...NONE, owner: 'unassigned', group: 'lifecycle' } }],
-    ['/organizations/board?group=owner&search=pizza', { view: 'board', filters: { ...NONE, search: 'pizza', group: 'owner' } }],
+    // An explicit "None" is sent as '', never omitted.
+    ['/organizations/list?group=none&ids=3,7', { view: 'list', filters: { ids: '3,7', group: '' } }],
+    // The List's own default (health) and the Board's (lifecycle) are omitted, never sent as themselves.
+    ['/organizations/board', { view: 'board', filters: {} }],
+    // The Board never asks ungrouped: group=none there reads back as lifecycle, its own default, so it too is omitted.
+    ['/organizations/board?group=none&owner=unassigned', { view: 'board', filters: { owner: 'unassigned' } }],
+    ['/organizations/board?group=owner&search=pizza', { view: 'board', filters: { search: 'pizza', group: 'owner' } }],
   ])('%s', (url, expected) => {
     const { result } = renderHook(() => useOrganizationsContext(), { wrapper: at(url) });
     expect(result.current).toEqual({ surface: 'organizations', focus: null, ...expected });
@@ -1381,6 +1413,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom';
 import { FILTER_OPTIONS } from '../../../features/organizations/testPortfolio';
+import type { SurfaceContext } from '../../copilot/types';
 import { useAsk } from '../../dashboard/ask/useAsk';
 import { OrganizationsAskLayout } from './OrganizationsAskLayout';
 import { useReportPortfolioOptions } from './portfolioOptions';
@@ -1397,7 +1430,10 @@ function Page({ name }: { name: string }) {
       <p data-testid="page">{name}</p>
       <p data-testid="surface">{ask.surface.name}</p>
       <p data-testid="view">{context?.surface === 'organizations' ? context.view : 'none'}</p>
-      <p data-testid="chip">{context ? chipLabel({ ...context, focus: ask.focus }) : 'none'}</p>
+      {/* ask.focus is the shared DashboardFocus | null slot; on Organizations
+          it is only ever a companies focus (useAskFocusOnOpen), narrower
+          than OrganizationsContext.focus's own type expects statically. */}
+      <p data-testid="chip">{context ? chipLabel({ ...context, focus: ask.focus } as SurfaceContext) : 'none'}</p>
       <p data-testid="conversation">{ask.conversation?.title ?? 'none'}</p>
       <button type="button" onClick={() => ask.setConversation({ id: 3, title: 'Kept', created_at: '', updated_at: '', messages: [] })}>
         Start
@@ -1483,7 +1519,7 @@ export function useOrganizationsContext(): OrganizationsContext | null {
   return useMemo(() => {
     if (!view) return null;
     const shown = view === 'board' ? boardParams(params) : params;
-    return { surface: 'organizations', view, filters: toContextFilters(shown), focus: null };
+    return { surface: 'organizations', view, filters: toContextFilters(shown, view), focus: null };
   }, [view, params]);
 }
 ```
@@ -1800,8 +1836,8 @@ import { stubOrganizationsAsk } from './testOrganizationsAsk';
 
 // Integration tier: the real List and Board under OrganizationsAskLayout, the
 // real rail and pill, store and router; fetch answers the portfolio and the
-// Copilot with contract-shaped bodies.
-const NONE = { search: '', owner: '', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'health' };
+// Copilot with contract-shaped bodies. `filters` below carry only the set
+// keys (backend ruling): a view's own default group is never sent.
 const rail = () => screen.queryByRole('complementary', { name: 'Ask Revenact' });
 const composer = () => screen.getByPlaceholderText('Ask Revenact');
 const views = () => screen.getByRole('navigation', { name: 'Organizations views' });
@@ -1836,7 +1872,7 @@ describe('Ask Revenact on Organizations', () => {
     await screen.findByText('Answer to: Who renews first?');
     expect(postedBodies(copilot)[0]).toEqual({
       content: 'Who renews first?',
-      context: { surface: 'organizations', view: 'list', filters: { ...NONE, owner: '2', lifecycle: 'live' }, focus: null },
+      context: { surface: 'organizations', view: 'list', filters: { owner: '2', lifecycle: 'live' }, focus: null },
     });
     const log = screen.getByRole('log', { name: 'Ask Revenact messages' });
     expect(within(log).getByText('Organizations · Owner: Carl CSM · Lifecycle: Live')).toBeInTheDocument();
@@ -1866,7 +1902,8 @@ describe('Ask Revenact on Organizations', () => {
     expect(postedBodies(copilot)[0].context).toEqual({
       surface: 'organizations',
       view: 'board',
-      filters: { ...NONE, owner: '2', group: 'lifecycle' },
+      // group is omitted: lifecycle is the Board's own default.
+      filters: { owner: '2' },
       focus: { kind: 'companies', ids: [7] },
     });
 
@@ -1875,7 +1912,8 @@ describe('Ask Revenact on Organizations', () => {
     expect(screen.getByText('Answer to: Why this one?')).toBeInTheDocument();
     await userEvent.type(composer(), 'And here?{enter}');
     await screen.findByText('Answer to: And here?');
-    expect(postedBodies(copilot)[1].context).toMatchObject({ view: 'list', filters: { owner: '2', group: 'health' }, focus: null });
+    // group is omitted here too: health is the List's own default.
+    expect(postedBodies(copilot)[1].context).toMatchObject({ view: 'list', filters: { owner: '2' }, focus: null });
   });
 
   it('is a full-screen sheet from the switch on a phone, never a rail', async () => {
@@ -2371,16 +2409,17 @@ import { resetViewport } from '../../../test/viewport';
 import { renderOrganizations } from '../testList';
 import { stubOrganizationsAsk } from './testOrganizationsAsk';
 
-const NONE = { search: '', owner: '', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'health' };
 const where = () => screen.getByTestId('where').textContent;
 const log = () => screen.getByRole('log', { name: 'Ask Revenact messages' });
 
-const listOrigin = { surface: 'organizations', view: 'list', filters: { ...NONE, owner: '2' } };
-const boardOrigin = { surface: 'organizations', view: 'board', filters: { ...NONE, owner: '2', group: 'owner' } };
+// filters carry only the set keys; group is sent only when it differs from
+// the view's own default (backend ruling), and labels are server-built.
+const listOrigin = { surface: 'organizations', view: 'list', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] };
+const boardOrigin = { surface: 'organizations', view: 'board', filters: { owner: '2', group: 'owner' }, labels: ['Owner: Carl CSM'] };
 const dashOrigin = { surface: 'dashboard', area: 'revenue', view: 'forecast', filters: { owner: '2', lifecycle: '', customer: '' } };
 
-function chat(id: number, title: string, origin: unknown, originLabel: string | null, answer: string) {
-  const summary = { id, title, created_at: '', updated_at: '', origin, origin_label: originLabel };
+function chat(id: number, title: string, origin: unknown, answer: string) {
+  const summary = { id, title, created_at: '', updated_at: '', origin };
   const full = {
     ...summary,
     messages: [
@@ -2391,10 +2430,10 @@ function chat(id: number, title: string, origin: unknown, originLabel: string | 
   return { summary, full };
 }
 
-const renews = chat(9, 'Who renews first?', listOrigin, 'Organizations · Owner: Carl CSM', 'Pizza Hut, and it is overdue.');
-const byOwner = chat(10, 'Whose book is riskiest?', boardOrigin, 'Organizations · Owner: Carl CSM', 'Carl CSM, by ARR at risk.');
-const atRisk = chat(4, 'Why is at-risk ARR up?', dashOrigin, null, 'Two renewals slipped.');
-const elsewhere = chat(5, 'Pizza Hut mail', null, null, 'They replied.');
+const renews = chat(9, 'Who renews first?', listOrigin, 'Pizza Hut, and it is overdue.');
+const byOwner = chat(10, 'Whose book is riskiest?', boardOrigin, 'Carl CSM, by ARR at risk.');
+const atRisk = chat(4, 'Why is at-risk ARR up?', dashOrigin, 'Two renewals slipped.');
+const elsewhere = chat(5, 'Pizza Hut mail', null, 'They replied.');
 
 function stubHistory() {
   return stubOrganizationsAsk({
@@ -2509,14 +2548,16 @@ import { resetViewport } from '../test/viewport';
 // End-to-end tier (jsdom, no browser): the real Navbar, both Organizations
 // pages under OrganizationsAskLayout, the rail and pill, the store and the
 // router. Only fetch is stubbed: the portfolio's endpoints and the Copilot's.
-const NONE = { search: '', owner: '', lifecycle: '', health: '', product: '', renews_within: '', nps: '', ids: '', include_churned: '', sort: '-arr', group: 'health' };
+// filters below carry only the set keys, and group only when it differs from
+// the view's own default (backend ruling).
 const where = () => new URL(`http://x${screen.getByTestId('where').textContent}`);
 const views = () => screen.getByRole('navigation', { name: 'Organizations views' });
 const rail = () => screen.getByRole('complementary', { name: 'Ask Revenact' });
 const composer = () => screen.getByPlaceholderText('Ask Revenact');
 
-const origin = { surface: 'organizations', view: 'board', filters: { ...NONE, owner: '2', group: 'lifecycle' } };
-const earlier = { id: 9, title: 'Which renewals slipped?', created_at: '', updated_at: '', origin, origin_label: 'Organizations · Owner: Carl CSM' };
+// lifecycle is the Board's own default group, so it is left out here.
+const origin = { surface: 'organizations', view: 'board', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] };
+const earlier = { id: 9, title: 'Which renewals slipped?', created_at: '', updated_at: '', origin };
 
 describe('Ask Revenact on Organizations', () => {
   afterEach(() => {
@@ -2552,7 +2593,7 @@ describe('Ask Revenact on Organizations', () => {
     expect(await within(rail()).findByText('Organizations · Owner: Carl CSM')).toBeInTheDocument();
     await userEvent.type(composer(), 'Who renews first?{enter}');
     await screen.findByText('Answer to: Who renews first?');
-    expect(postedBodies(copilot)[0].context).toEqual({ surface: 'organizations', view: 'list', filters: { ...NONE, owner: '2' }, focus: null });
+    expect(postedBodies(copilot)[0].context).toEqual({ surface: 'organizations', view: 'list', filters: { owner: '2' }, focus: null });
 
     // 3. Open Pizza Hut's row: the next question is about it alone, once.
     await userEvent.click(screen.getByRole('button', { name: 'Open Pizza Hut' }));
@@ -2567,10 +2608,11 @@ describe('Ask Revenact on Organizations', () => {
     expect(screen.getByText('Answer to: Why is it at risk?')).toBeInTheDocument();
     await userEvent.type(composer(), 'And by stage?{enter}');
     await screen.findByText('Answer to: And by stage?');
+    // group is omitted: lifecycle is the Board's own default.
     expect(postedBodies(copilot)[2].context).toEqual({
       surface: 'organizations',
       view: 'board',
-      filters: { ...NONE, owner: '2', group: 'lifecycle' },
+      filters: { owner: '2' },
       focus: null,
     });
 
@@ -2638,8 +2680,10 @@ History, the Sparkles switch) into the Navbar's actions slot. Each question
 posts `context: {surface:'organizations', view:'list'|'board',
 filters:{search, owner, lifecycle, health, product, renews_within, nps, ids,
 include_churned, sort, group}, focus}`: the portfolio params as the API reads
-them, every key present, never a cursor, and the board's `group` never empty.
-The chip reads "Organizations · Owner: Carl CSM", with names from the
+them, only the set keys present (never `ids: ''` or another unset key as
+`''`), never a cursor, `group` only when it differs from the view's own
+default, and the board's `group` never empty. The chip reads "Organizations ·
+Owner: Carl CSM", with names from the
 portfolio's filter options, which each page reports to the layout. Opening a
 row on the list, or a card's side panel or sheet on the board, sets
 `focus: {kind:'companies', ids:[id]}` for one question without opening the
@@ -2651,8 +2695,9 @@ columns narrow to `w-64`. From `xl` the side panel sits between the columns
 and the rail. Below `xl`, with the rail open, a card opens in the bottom
 sheet, and opening the rail closes a side panel that was open. List rows and
 the summary tiles wrap to their content column (container queries), not the
-window. History tags an Organizations conversation with the server's
-`origin_label` ("Organizations · Owner: Carl CSM"), and reopening one goes to
+window. History tags an Organizations conversation with "Organizations"
+followed by the server's own `labels`, joined with " · " ("Organizations ·
+Owner: Carl CSM"; there is no `origin_label` field), and reopening one goes to
 its view with its filters, then shows the thread. A conversation that started
 on the Dashboard, picked here, goes to its dashboard view with
 `askConversationId` in the navigation state, and the Dashboard's rail fetches
@@ -2683,8 +2728,8 @@ with:
     view and filters, then shows the thread. A conversation that started on
     Organizations reopens there instead, with its view and filters (§4.2).
     From Communications or `/copilot` it opens where you are, as plain text,
-    with the tag shown (an Organizations one's is the server's
-    `origin_label`).
+    with the tag shown (an Organizations one's is "Organizations" followed by
+    the server's own `labels`; there is no `origin_label` field).
 ```
 
 - [ ] **Step 2: `docs/03-ui-ux-design.md`**
@@ -2749,8 +2794,9 @@ with:
 - **History.** An 11px origin tag (LayoutDashboard icon + "Revenue › Forecast")
   on dashboard conversations — the area and view only, never the filters it
   was asked with; a question's own chip is what carries those. Organizations
-  conversations carry the Network icon and the server's `origin_label`
-  ("Organizations · Owner: Carl CSM"), capped at 60% of the row and truncated.
+  conversations carry the Network icon and "Organizations" followed by the
+  server's own `labels` ("Organizations · Owner: Carl CSM"; there is no
+  `origin_label` field), capped at 60% of the row and truncated.
 ```
 Replace:
 ```markdown
@@ -2816,7 +2862,7 @@ with:
 - Replace ``or `{kind:'dashboard'}` (structured `context` field). Props for `variant`, `top`, `thread`, `names`, `suggestions`, `draft`, `onSent`.`` with ``or `{kind:'surface'}` (the Dashboard's or Organizations' structured `context` field). Props for `variant`, `top`, `thread`, `chipLabel` (per-question chips; absent in Communications), `draft`, `onSent`. `HistoryPopover` tags a conversation with `originTag`.``
 - Replace the row `| \`components/copilot/dashboardLabels.ts\`, \`suggestions.ts\` | Chip text (\`viewLabel\` for the history tag, \`contextLabel\` for a message's own chip), three questions per area |` with:
 ```markdown
-| `components/copilot/dashboardLabels.ts`, `surfaceLabels.ts` | Chip text: `viewLabel`/`contextLabel` (dashboard), `surfaceLabel` (a question's chip on either surface), `originTag` (History's tag: the dashboard's area › view, or the server's `origin_label` for Organizations) |
+| `components/copilot/dashboardLabels.ts`, `surfaceLabels.ts` | Chip text: `viewLabel`/`contextLabel` (dashboard), `surfaceLabel` (a question's chip on either surface), `originTag` (History's tag: the dashboard's area › view, or "Organizations" followed by the server's own `origin.labels`; there is no `origin_label` field) |
 ```
 - Replace `| \`ask/context.ts\`, \`useAsk.ts\`, \`AskProvider.tsx\` | The dashboard's one conversation and thread,` with `| \`ask/context.ts\`, \`useAsk.ts\`, \`AskProvider.tsx\`, \`DashboardAskProvider.tsx\` | One surface's conversation and thread (\`AskProvider({surface, preferenceKey})\`; the Dashboard's surface via \`DashboardAskProvider\`, Organizations' via \`OrganizationsAskLayout\`), \`focusOn\` (an opened Organizations account), a conversation from the other surface handed over by \`askConversationId\` in the navigation state,`.
 - After the row that starts `| \`ask/testAsk.tsx\`, \`components/copilot/testCopilot.ts\` |`, add:
@@ -2898,7 +2944,7 @@ Expected: hits only in `src/components/layout/Navbar.tsx` (its existing `text-[1
 
 - [ ] **Step 1: Run both apps**
 
-- Backend: `../revenact-backend` on its `feat/organizations-ask` branch (the companion plan's surface, grounding and `origin_label`), on `http://localhost:8000`. Seed it with at least two owners, accounts in three stages, and one account with an overdue renewal.
+- Backend: `../revenact-backend` on its `feat/organizations-ask` branch (the companion plan's surface, grounding and `origin.labels`), on `http://localhost:8000`. Seed it with at least two owners, accounts in three stages, and one account with an overdue renewal.
 - Frontend: `npm run dev` (Vite on `http://localhost:5173`), signed in as a CSM with `view_all_accounts`.
 
 - [ ] **Step 2: Desktop, 1440×900, light theme**
@@ -2940,7 +2986,7 @@ Save screenshots at 1440, 1100 and 375 in both themes for the PR description. Th
 | §3 Frontend reuse: rail and pill from `components/copilot` and `pages/dashboard/ask`; the provider takes a context builder per surface | 2, 3, 5 |
 | §3 Context `{surface: "organizations", filters: {portfolio params except cursor}, focus}` (+ owner: `view ∈ {list, board}`) | 1, 4, 5 (pre-flight 2–3) |
 | §3 Focus: an opened row (owner: or a Board card's side panel or sheet) sets `{kind: "companies", ids: [id]}` for one question | 3 (`focusOn`), 4 (`useAskFocusOnOpen`), 5, 6, 8 |
-| §3 History: tag "Organizations · Owner: Carl CSM" (backend supplies it); reopening restores the filters (owner: and the view) | 2 (`origin_label`, `originTag`, `originPath`), 3 (handover), 7, 8 |
+| §3 History: tag "Organizations · Owner: Carl CSM" (backend supplies `origin.labels`, no `origin_label` field); reopening restores the filters (owner: and the view) | 2 (`originTag`, `originPath`), 3 (handover), 7, 8 |
 | §3 Shared sessions unchanged; grounding, validation, metering | Backend (companion plan); pre-flight 3, 17 |
 | §1 decisions table: rail and pill as on Dashboard and Communications, grounded in the filtered list, opening a row focuses it | 5, 8 |
 | §1 page anatomy: pill in the transparent top bar, full-height 320px glass rail that ✦ hides completely | 5 (pill, rail), 6 (the content narrows) |
@@ -2958,8 +3004,8 @@ Save screenshots at 1440, 1100 and 375 in both themes for the PR description. Th
 **Placeholder scan:** no step says "TBD", "handle edge cases" or "similar to Task N". Every code step has its code, every test step has its test, and every edit names the exact text it replaces. Task 2's interim `AskRail` edit is replaced in full in Task 3 step 6, with both texts given.
 
 **Type consistency, checked across tasks:**
-- `OrganizationsFilters`, `OrganizationsContext`, `OrganizationsOrigin`, `OrganizationsView`, `SurfaceContext`, `SurfaceOrigin` and `SurfaceName` (Task 1) are used in Tasks 2, 3 and 4.
-- `ConversationSummary.origin_label` (Task 2) is used by `originTag` (Task 2) and in the fixtures of Tasks 3, 7 and 8.
+- `OrganizationsFilters`, `OrganizationsContext`, `OrganizationsFocus`, `OrganizationsOrigin`, `OrganizationsView`, `SurfaceContext`, `SurfaceOrigin` and `SurfaceName` (Task 1) are used in Tasks 2, 3 and 4.
+- `ConversationSummary.origin` (Task 2), whose `OrganizationsOrigin` branch carries `labels: string[]` (there is no `origin_label` field), is used by `originTag` (Task 2) and in the fixtures of Tasks 3, 7 and 8.
 - `toContextFilters`, `fromContextFilters`, `organizationsPath`, `organizationsLabel` and `defaultGroupOf` (Task 1) are used by `originPath` and `surfaceLabel` (Task 2) and by `useOrganizationsContext` (Task 4).
 - `RailContext {kind: 'surface'}` and `CopilotRailProps.chipLabel` (Task 2) are used by `AskRail` (Tasks 2 and 3).
 - `surfaceLabel(context, {dashboard?, organizations?})` (Task 2) is used by `DashboardAskProvider` (Task 3) and `OrganizationsAskLayout` (Task 4).
