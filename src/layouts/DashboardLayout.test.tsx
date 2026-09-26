@@ -30,7 +30,7 @@ function renderAt(url: string) {
 describe('DashboardLayout', () => {
   // The dashboard's frame pads itself as Communications' body does (px-4
   // pb-4 under a transparent top bar), so <main> adds nothing around it.
-  it.each(['/dashboard/overview', '/communications', '/organizations/list', '/organizations/board'])('adds no padding around %s', (url) => {
+  it.each(['/dashboard/overview', '/communications', '/organizations/list', '/organizations/board', '/organizations/7'])('adds no padding around %s', (url) => {
     const main = renderAt(url);
     expect(main).toHaveClass('p-0');
     expect(main).not.toHaveClass('p-2');
