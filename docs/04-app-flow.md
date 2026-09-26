@@ -290,8 +290,10 @@ end scrolls into view, with "Show more" as the fallback. A card (ring, name,
 owner, ARR, signal, trend) opens its six panels in a side panel beside the
 board — a non-modal aside — or the bottom sheet on phones, with **Edit
 details**. Grouped by lifecycle, a card moves by drag (from `sm`) or its
-**Move to…** menu (a button that opens a menu of stages; nothing moves until
-one is chosen, and an outside click closes the menu without moving focus):
+**Move to…** menu (a compact icon button in the card header, "Move <name>
+to…", that opens a menu of stages; nothing moves until one is chosen, an
+outside click closes the menu without moving focus, and after a move focus
+lands on the moved card in its new column):
 the card and the counts move at once, `PATCH /customers/<id>/` saves
 `lifecycle_stage`, one move at a time, and only once it saves do the frame and
 the two columns reload; a failure rolls back the card and shows a dismissable

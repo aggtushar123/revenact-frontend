@@ -409,12 +409,18 @@ ARR. Rules specific to it, enforced by
   column shows `bg-accent-dim` with an accent ring. The drop-only Churn column
   is a dashed box. Each lifecycle column but Churn carries a header "+" that
   opens Add organization preset to that column's stage; the toolbar's own Add
-  has no preset. A card's **Move to…** is a button, not a native `<select>`
-  acting on change: it opens a real menu of the other stages and nothing moves
-  until one is chosen; Escape or choosing an item returns focus to the button,
-  an outside click just closes the menu and leaves focus where it already was,
-  and the menu opens upward instead of down when the column's remaining
-  scroll room is too short for it. The opened card is `AccountSidePanel`, a
+  has no preset. A card's **Move to…** is a compact icon button in the card
+  header (`ArrowRightLeft`, labelled "Move <name> to…", 44px on phones and
+  `min-h-9` from `sm`), not a native `<select>` acting on change: it opens a
+  real menu of the other stages and nothing moves until one is chosen. Arrow
+  keys, Home and End move within it; Escape or choosing an item returns focus
+  to the button; Tab or an outside press just closes it and leaves focus
+  where it went; opening another card's menu closes this one. The menu opens
+  on the side with more room inside the visible box (the window intersected
+  with every clipping ancestor) and caps its height to that room, scrolling.
+  After a move, focus lands on the moved card's Open button in its new
+  column. From `sm` the page fills the frame: the page does not scroll, each
+  column does (the board keeps 360px on short windows, which then scroll). The opened card is `AccountSidePanel`, a
   non-modal `bg-surface` column beside the board, not over it — the board
   stays usable while it is open. Skeletons are card-shaped; a column with
   nothing says so in words.

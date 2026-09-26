@@ -330,9 +330,13 @@ a "Show churned" button). Each `BoardColumn` is one `usePagedPortfolio` read
 with `group_value`, paged by `useEndSentinel` or Show more, and (Churn
 excepted) carries a header "+" that opens `OrganizationFormModal` preset to
 its stage; the toolbar's own Add has no preset. A card's **Move to…** is a
-button that opens a menu of the other stages — nothing moves until one is
-chosen, an outside click closes it without moving focus, and it opens upward
-near the bottom of a scrolling column. `useBoardMove` moves a card
+compact icon button in the card header ("Move <name> to…") that opens a menu
+of the other stages — nothing moves until one is chosen, an outside press
+(the shared `useDismiss` hook) closes it without moving focus, and it opens
+on the side with more visible room, capped to fit. While a new frame loads,
+the columns keep the old frame's inputs, so no column reads a new group with
+an old key. A saved move stays on screen until the frame and both columns
+have reloaded, and only then can the next move start. `useBoardMove` moves a card
 optimistically, one move at a time, through `updateCustomer` (the single
 PATCH); on success it announces "Moved X to Y." and only then reloads the
 frame and the two columns touched; on failure it rolls back and surfaces a
