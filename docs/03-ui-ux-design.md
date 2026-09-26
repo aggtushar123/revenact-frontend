@@ -447,12 +447,49 @@ ARR. Rules specific to it, enforced by
   stays usable while it is open. Skeletons are card-shaped; a column with
   nothing says so in words.
 
+### Organization page (`/organizations/:id`)
+
+The organization's story, framed like the list (transparent top bar with
+"‹ Organizations", `OrganizationsFrame`, no rail until Ask arrives in delivery 3).
+Rules specific to it, enforced by `components/organizations/detail/houseRules.test.ts`
+(which also scans `pages/organizations/Details.tsx`):
+
+- Name row: initials in a `bg-subtle` circle (never a third-party logo), the
+  name at 22px, "owner · lifecycle · Touched Nd ago" at 13px, the signal tag,
+  then Edit and a ⋯ menu (Archive, Churn while they apply).
+- Tiles: Health (ring and trend; opens the five-part breakdown below the
+  tiles), ARR (in the customer's own currency), Renewal (runway) and Pulse
+  ("AI n · CSM n", dots, "pulses disagree"). Each is a button; the last three
+  jump to their Details panel. A grid of four from `sm`, a snapping strip below.
+- Account chips (All, each account, Organization) carry only a name and the
+  story's count; the chosen one is `bg-accent text-on-accent`.
+- Details opens with Accounts: one `bg-surface` list, an item per connected
+  account (name linking to its page, owner · domain, "AI n", the AI label,
+  the pulse dots, the AI reason, Edit), with Add account in its heading.
+  Under the six panels, in the same surface, "Contact and CSAT": email and
+  phone as links, industry, and the CSAT bands as bars at their true share.
+- The one primary on the Story is "+ Add" (`PRIMARY` in `portfolio/styles.ts`:
+  `bg-accent text-on-accent`, never layered on the surface button).
+- Tabs are a real tablist (`role="tab"`, roving tab index, arrows, Home, End),
+  underlined like the Navbar's views.
+- Story: Needs attention (each row says what it is in words and goes to it),
+  the filters with counts, Sources, search and "+ Add", then the stream: days
+  as small uppercase headings, each day one `bg-surface` list with dividers,
+  in the Communications inbox's manner. An item is a Lucide icon in a circle,
+  its title, the time in DM Mono, a one-line summary, then the account tag and
+  "kind · who · via source". No card in a card.
+- Every one of the 34 table fields renders once across the name row, the
+  tiles and Details (`detail/fieldCoverage.test.tsx`).
+
 ### Overlays
 
-`HealthPopover` (five real rubric components with weights), `CsatPopover`
-(response bands at true scale), the Organizations
-`FiltersPanel` and `PinFieldsMenu`, `ContactRowActionsPopover`, and the Navbar's notification
-and account menus. All close on an outside `mousedown`.
+The Organizations `FiltersPanel` and `PinFieldsMenu`, `ContactRowActionsPopover`,
+the organization page's `Menu` (⋯ and + Add) and `SourcesPicker`, and the Navbar's
+notification and account menus. All close on an outside `mousedown`; the
+organization page's also close on Escape and hand focus back to their button.
+The organization page's `Sheet` (+ Add, an email's thread) is modal: a
+right-hand panel from `sm`, a bottom sheet below it, with a focus trap, the
+page's scroll locked, and focus returned to what opened it.
 
 ### Forms
 
@@ -475,8 +512,9 @@ button.
 
 ### Composite
 
-`ActivityFeed` is the largest shared component: five top tabs (Activity Feed,
-Headlines, Overview, Files, CallSense) and thirteen filter chips. `MentionTextarea`
+`ActivityFeed` (the account page only, since the organization page's Story
+replaced it there) is the largest shared component: five top tabs (Activity
+Feed, Headlines, Overview, Files, CallSense) and thirteen filter chips. `MentionTextarea`
 is a textarea with an `@` completion listbox supporting people and function
 mentions.
 
@@ -662,6 +700,11 @@ that snaps sideways, with a strip of column tabs ("Live 1") that jumps to one
 and follows a swipe. Cards do not drag there; each card's Move to… menu moves
 it, and a tapped card opens in the bottom sheet. Every control is 44px.
 
+The organization page below `sm`: the name row, the tiles as a strip that
+snaps sideways, the account chips and the tabs each scroll sideways in their
+own row, and the content is full width. "+ Add" and an email's thread open as
+bottom sheets. Every control is 44px.
+
 ---
 
 ## 11. Review checklist
@@ -715,7 +758,7 @@ Ranked by leverage. Each is a task in the
 | 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass`, also used by the Ask rail on the Dashboard and Organizations, is the one sanctioned exception) |
 | 9 | `Login.css` requests Inter, which is never loaded | Falls through to the system stack |
 | 10 | Dead files: `App.css` is never imported, the `counter` slice and the seeded `tasks` slice are unused | Template leftovers |
-| 11 | Navbar and ActivityFeed have controls with no handlers | Search, Plus, Help, Message, feed search, "Add Action", title chevrons |
+| 11 | Navbar and the account page's ActivityFeed have controls with no handlers | Search, Plus, Help, Message, feed search, "Add Action", title chevrons |
 
 ---
 

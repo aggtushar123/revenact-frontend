@@ -102,7 +102,7 @@ react-ts-app/
 │   ├── (index)                → Redirects to /organizations/list
 │   ├── list                   → Portfolio (List.tsx on GET /organizations/portfolio/)
 │   ├── board                  → Board (Board.tsx: PortfolioBoard on GET /organizations/portfolio/)
-│   └── :id                    → Organization Details page (full detail)
+│   └── :id                    → Organization page (Details.tsx: the story, on GET /organizations/{id}/story/)
 ├── accounts/:id               → Account Details page
 ├── copilot                    → Copilot AI module (Home / Chat / Cockpit)
 ├── scenarios/create           → Visual scenario flow builder
@@ -351,39 +351,28 @@ over snapping panels. `KanbanBoard` is no longer used here (Pipelines and the
 Accounts board keep it).
 
 #### Details View (`pages/organizations/Details.tsx`)
-Full organization detail page. Contains:
-- **Header**: Org name, avatar, health badge, action buttons
-- **Metrics Banner**: KPI cards (ARR, health, renewal, NPS, CSAT, MRR)
-- **Tabs**: Overview | Activity | Contacts | Accounts | NPS | CSAT | Custom Attributes
-- **Pinned Attributes**: Localized attribute editing panel (via `shared/PinnedAttributes`)
-- **Activity Feed**: Tabbed feed engine (via `shared/ActivityFeed`)
+The organization's story (spec `docs/superpowers/specs/2026-09-26-organization-detail-design.md`,
+delivery 1). It draws itself in `OrganizationsFrame` (no rail until delivery 3).
 
-**Activity Feed sub-tabs:**
-
-| Tab | Component | What it shows |
-|---|---|---|
-| Emails | `EmailsTab` + `EmailThreadPanel` | Threaded email list with collapsible messages + Reply composer |
-| Tasks | `TasksTab` | Task cards with priority and status badges |
-| Notes | `NotesTab` | Timeline-style note cards |
-| Tickets | `TicketsTab` | Ticket timeline with brand avatars |
-| Calendar | `CalendarEventsTab` | Upcoming calendar events |
-| Activities | `ActivitiesTab` | General activity log |
-| Call Sense | `CallSenseTab` | AI call transcript feed with slide-in panel |
-| Headlines | `HeadlinesTab` | AI-generated summary cards and reports |
-| Slack | `SlackTab` | Slack thread cards with AI items panel |
-
-**CallSense panel AI items accordions:**
-- **Summary** — AI-generated TLDR of the call
-- **Actions** — checkbox items, can create Tasks via Redux dispatch
-- **Follow Up Message** — full AI-drafted email with Copy/Send Email buttons
-- **Signals** — opportunities and risks identified in the call
-- **Topics** — categorized discussion topics with badges and summaries
-
-Data sources:
-- `activityData.ts` (12 KB) — activity + email + notes mock data
-- `contactsData.ts` (2 KB) — contacts per org
-- `accountsData.ts` (10 KB) — linked accounts data
-- `accountActivityData.ts` (6 KB) — activity data scoped to accounts
+- **Reads:** `useOrganization` (the portfolio row by `ids` plus `GET /customers/{id}/`),
+  `fetchAccountsForCustomer` (the chips) and `useStory` (`GET /organizations/{id}/story/`,
+  cursor-paged). Four requests on landing; the other tabs read when first opened.
+- **URL state:** `useDetailParams` (`features/organizations/detailParams.ts`):
+  `tab`, `account`, `group`, `source`, `q`.
+- **Header:** `OrganizationHeader` (initials, name, owner · lifecycle · last touch,
+  signal, Edit, ⋯ Archive/Churn) and `HeaderTiles` (Health with `HealthBreakdown`,
+  ARR, Renewal, Pulse; each of the last three jumps to its Details panel).
+- **Story:** `StoryTab` → `AttentionBlock`, `StoryToolbar` (filters, `SourcesPicker`,
+  search, + Add via `Menu`), `StoryStream` → `StoryItemRow`; `EmailThread` and
+  `AddFlow` open in a `Sheet`. `AddFlow` reuses `TaskForm`, `NoteForm`, `CallForm`
+  and `LogSurveyForm` from `components/organizations/activity/`.
+- **Other tabs:** `DetailsTab` (`AccountsSection`, portfolio `AccountDetails`, `CustomerFacts` + `AIAttributesPanel`),
+  `PeopleTab` (`ContactsTab`), `DealsTab` (`PipelinesTab`), `KnowledgeTab`
+  (`CompanyViewTab` + `HeadlinesTab`), `FilesCallsTab` (`FilesTab` + `CallSenseTab`).
+- **Tests:** unit tests beside each part in `components/organizations/detail/`, the
+  house-rules scan and field coverage there, `Details.test.tsx` (integration with
+  `testDetail.tsx`'s `renderOrganizationPage` and `testStory.ts`'s
+  `stubOrganizationPage`), and `src/e2e/organizationDetail.test.tsx`.
 
 ---
 
@@ -557,7 +546,14 @@ App.tsx
   │     ├── ask/ — AskProvider/useAsk (shared by both surfaces), DashboardAskProvider, AskRail, useDashboardContext, filterNames
   │     └── redirects.tsx — Keep / LegacyRedirect for old /dashboard/advance/* links
   │
-  ├── pages/organizations/Details.tsx & pages/accounts/Details.tsx
+  ├── pages/organizations/Details.tsx  (portfolio row, /customers/{id}/, accounts, /organizations/{id}/story/)
+  │     ├── OrganizationsFrame; components/organizations/detail/* (OrganizationHeader, HeaderTiles,
+  │     │     AccountChips, DetailTabs, StoryTab → AttentionBlock, StoryToolbar, StoryStream, EmailThread, AddFlow, Sheet)
+  │     ├── Details: detail/AccountsSection + portfolio/AccountDetails + detail/CustomerFacts + shared/AIAttributesPanel
+  │     └── People, Deals & risks, Knowledge, Files: shared/ContactsTab, shared/PipelinesTab,
+  │           CompanyViewTab + activity/HeadlinesTab, activity/FilesTab + activity/CallSenseTab
+  │
+  ├── pages/accounts/Details.tsx
   │     ├── components/shared/PinnedAttributes
   │     ├── components/shared/ActivityFeed
   │     │     └── components/organizations/activity/*Tab (x9)
