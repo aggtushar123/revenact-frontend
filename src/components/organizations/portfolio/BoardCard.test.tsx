@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { globex, pizzaHut } from '../../../features/organizations/testPortfolio';
@@ -67,7 +67,11 @@ describe('BoardCard', () => {
   // without opening, and nothing moves until a stage is chosen.
   it('moves from the Move to… menu (every other stage, Churn included) without opening', async () => {
     const { onMove, onOpen } = renderCard();
-    const button = screen.getByRole('button', { name: 'Move to…' });
+    const button = screen.getByRole('button', { name: 'Move Pizza Hut to…' });
+    // B1: a compact icon button in the card header, 44px on phones.
+    expect(button).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-9', 'sm:min-w-9');
+    expect(button.textContent).toBe('');
+    expect(button.closest('[data-part="card-header"]')).not.toBeNull();
     expect(button).toHaveAttribute('aria-haspopup', 'menu');
     expect(button).toHaveAttribute('aria-expanded', 'false');
     await userEvent.click(button);
@@ -86,7 +90,7 @@ describe('BoardCard', () => {
   it('moves the menu selection with Arrow Down / Arrow Up', async () => {
     const user = userEvent.setup();
     renderCard();
-    await user.click(screen.getByRole('button', { name: 'Move to…' }));
+    await user.click(screen.getByRole('button', { name: 'Move Pizza Hut to…' }));
     const menu = within(card()).getByRole('menu');
     const items = within(menu).getAllByRole('menuitem');
     expect(items[0]).toHaveFocus();
@@ -96,10 +100,31 @@ describe('BoardCard', () => {
     expect(items[0]).toHaveFocus();
   });
 
+  it('jumps to the first and last item with Home and End', async () => {
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(screen.getByRole('button', { name: 'Move Pizza Hut to…' }));
+    const items = within(within(card()).getByRole('menu')).getAllByRole('menuitem');
+    await user.keyboard('{End}');
+    expect(items[items.length - 1]).toHaveFocus();
+    await user.keyboard('{Home}');
+    expect(items[0]).toHaveFocus();
+  });
+
+  it('closes the menu when Tab moves focus out of it, without pulling focus back', async () => {
+    const user = userEvent.setup();
+    renderCard();
+    await user.click(screen.getByRole('button', { name: 'Move Pizza Hut to…' }));
+    expect(within(card()).getByRole('menu')).toBeInTheDocument();
+    await user.tab();
+    await waitFor(() => expect(within(card()).queryByRole('menu')).not.toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Open Pizza Hut' })).toHaveFocus();
+  });
+
   it('closes the menu on Escape and returns focus to the button', async () => {
     const user = userEvent.setup();
     renderCard();
-    const button = screen.getByRole('button', { name: 'Move to…' });
+    const button = screen.getByRole('button', { name: 'Move Pizza Hut to…' });
     await user.click(button);
     expect(within(card()).getByRole('menu')).toBeInTheDocument();
     await user.keyboard('{Escape}');
@@ -110,7 +135,7 @@ describe('BoardCard', () => {
   it('closes the menu on a click outside, without moving focus', async () => {
     const user = userEvent.setup();
     renderCard();
-    const button = screen.getByRole('button', { name: 'Move to…' });
+    const button = screen.getByRole('button', { name: 'Move Pizza Hut to…' });
     await user.click(button);
     expect(within(card()).getByRole('menu')).toBeInTheDocument();
     await user.click(document.body);
@@ -120,12 +145,40 @@ describe('BoardCard', () => {
   it('leaves focus on the element an outside click landed on', async () => {
     const user = userEvent.setup();
     renderCard();
-    await user.click(screen.getByRole('button', { name: 'Move to…' }));
+    await user.click(screen.getByRole('button', { name: 'Move Pizza Hut to…' }));
     expect(within(card()).getByRole('menu')).toBeInTheDocument();
     const elsewhere = screen.getByRole('button', { name: 'Elsewhere' });
     await user.click(elsewhere);
     expect(within(card()).queryByRole('menu')).not.toBeInTheDocument();
     expect(elsewhere).toHaveFocus();
+  });
+
+  it("closes another card's open menu when its own opens", async () => {
+    const user = userEvent.setup();
+    const props = { currency: 'USD' as const, isSm: true, open: false, canMove: true, moveDisabled: false, onOpen: vi.fn(), onMove: vi.fn(), onDragStart: vi.fn(), onDragEnd: vi.fn() };
+    render(
+      <MemoryRouter>
+        <ul>
+          <BoardCard row={pizzaHut} {...props} />
+          <BoardCard row={globex} {...props} />
+        </ul>
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Move Pizza Hut to…' }));
+    await user.click(screen.getByRole('button', { name: 'Move Globex to…' }));
+    expect(screen.getAllByRole('menu')).toHaveLength(1);
+    expect(screen.getByRole('menu', { name: 'Move Globex to' })).toBeInTheDocument();
+  });
+
+  it('takes focus on its Open button when asked (a card that just moved here), once', () => {
+    const onFocused = vi.fn();
+    renderCard({ takeFocus: true, onFocused });
+    expect(screen.getByRole('button', { name: 'Open Pizza Hut' })).toHaveFocus();
+    expect(onFocused).toHaveBeenCalledExactlyOnceWith(7);
+  });
+
+  it('is memoised, so a board re-render does not re-render every card', () => {
+    expect((BoardCard as unknown as { $$typeof: symbol }).$$typeof).toBe(Symbol.for('react.memo'));
   });
 
   it('drags from sm, handing over its id', () => {
@@ -143,7 +196,7 @@ describe('BoardCard', () => {
   it('does not drag on phones, where Move to… is the way', () => {
     renderCard({ isSm: false });
     expect(card()).toHaveAttribute('draggable', 'false');
-    expect(screen.getByRole('button', { name: 'Move to…' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Move Pizza Hut to…' })).toBeEnabled();
   });
 
   it('neither drags nor moves while a move is saving', () => {
@@ -151,12 +204,12 @@ describe('BoardCard', () => {
     expect(card()).toHaveAttribute('draggable', 'false');
     fireEvent.dragStart(card(), { dataTransfer: { setData: vi.fn() } });
     expect(onDragStart).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Move to…' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Move Pizza Hut to…' })).toBeDisabled();
   });
 
   it('has no Move to… and does not drag for other groupings', () => {
     renderCard({ canMove: false });
-    expect(screen.queryByRole('button', { name: 'Move to…' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Move Pizza Hut to…' })).not.toBeInTheDocument();
     expect(card()).toHaveAttribute('draggable', 'false');
   });
 
@@ -166,26 +219,39 @@ describe('BoardCard', () => {
     expect(within(card(1)).queryByText('Renewal overdue')).not.toBeInTheDocument();
   });
 
-  describe('Move to… menu placement', () => {
+  describe('Move to… menu placement (B3: the visible box)', () => {
     const rect = (top: number, bottom: number) => ({ top, bottom, left: 0, right: 200, width: 200, height: bottom - top, x: 0, y: top, toJSON: () => ({}) }) as DOMRect;
+    const menu = () => screen.getByRole('menu');
+    const button = () => screen.getByRole('button', { name: 'Move Pizza Hut to…' });
 
     afterEach(() => vi.restoreAllMocks());
 
-    it('opens below the button when there is room', async () => {
+    it('opens below the button when there is room, at full height', async () => {
       renderCard();
-      const button = screen.getByRole('button', { name: 'Move to…' });
-      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(rect(100, 132));
-      await userEvent.click(button);
-      expect(screen.getByRole('menu')).toHaveClass('top-full');
+      vi.spyOn(button(), 'getBoundingClientRect').mockReturnValue(rect(100, 132));
+      await userEvent.click(button());
+      expect(menu()).toHaveClass('top-full');
+      expect(menu().style.maxHeight).toBe('224px');
+      expect(menu()).toHaveClass('overflow-y-auto');
     });
 
     it('opens upward near the bottom of the window, so it is not cut off', async () => {
       renderCard();
-      const button = screen.getByRole('button', { name: 'Move to…' });
-      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(rect(window.innerHeight - 60, window.innerHeight - 28));
-      await userEvent.click(button);
-      expect(screen.getByRole('menu')).toHaveClass('bottom-full');
-      expect(screen.getByRole('menu')).not.toHaveClass('top-full');
+      vi.spyOn(button(), 'getBoundingClientRect').mockReturnValue(rect(window.innerHeight - 60, window.innerHeight - 28));
+      await userEvent.click(button());
+      expect(menu()).toHaveClass('bottom-full');
+      expect(menu()).not.toHaveClass('top-full');
+    });
+
+    it('measures a scrolling column that runs past the window by its visible part only', async () => {
+      renderCard();
+      const list = card().parentElement as HTMLElement;
+      list.style.overflowY = 'auto';
+      // The column extends far below the window: only the window's bottom counts.
+      vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(0, window.innerHeight + 2000));
+      vi.spyOn(button(), 'getBoundingClientRect').mockReturnValue(rect(window.innerHeight - 100, window.innerHeight - 64));
+      await userEvent.click(button());
+      expect(menu()).toHaveClass('bottom-full');
     });
 
     it('opens upward near the bottom of a scrolling column that would clip it', async () => {
@@ -193,10 +259,22 @@ describe('BoardCard', () => {
       const list = card().parentElement as HTMLElement;
       list.style.overflowY = 'auto';
       vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(0, 400));
-      const button = screen.getByRole('button', { name: 'Move to…' });
-      vi.spyOn(button, 'getBoundingClientRect').mockReturnValue(rect(340, 372));
-      await userEvent.click(button);
-      expect(screen.getByRole('menu')).toHaveClass('bottom-full');
+      vi.spyOn(button(), 'getBoundingClientRect').mockReturnValue(rect(340, 372));
+      await userEvent.click(button());
+      expect(menu()).toHaveClass('bottom-full');
+    });
+
+    it('caps its height to the larger side when neither side has room, and scrolls', async () => {
+      renderCard();
+      const list = card().parentElement as HTMLElement;
+      list.style.overflowY = 'auto';
+      vi.spyOn(list, 'getBoundingClientRect').mockReturnValue(rect(200, 500));
+      vi.spyOn(button(), 'getBoundingClientRect').mockReturnValue(rect(320, 356));
+      await userEvent.click(button());
+      // 140px below (500 - 356 - 4 gap) beats 116px above (320 - 200 - 4).
+      expect(menu()).toHaveClass('top-full');
+      expect(menu().style.maxHeight).toBe('140px');
+      expect(menu()).toHaveClass('overflow-y-auto');
     });
   });
 });
