@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { FileText, MoreHorizontal, Sparkles } from 'lucide-react';
 import type { Note } from '../../../features/customers/customersSlice';
 import { formatDateUS } from '../../../features/customers/formatters';
+import { ApiError } from '../../../lib/apiClient';
 
 
 export interface NotesTabProps {
@@ -24,17 +25,26 @@ export function NoteForm({
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!title.trim() || !body.trim()) return;
+    setError(null);
     setSaving(true);
-    const ok = await onCreate({ title: title.trim(), body: body.trim() });
-    setSaving(false);
-    if (ok) {
-      setTitle('');
-      setBody('');
-      onDone?.();
+    try {
+      const ok = await onCreate({ title: title.trim(), body: body.trim() });
+      setSaving(false);
+      if (ok) {
+        setTitle('');
+        setBody('');
+        onDone?.();
+      } else {
+        setError('Could not save that note.');
+      }
+    } catch (err) {
+      setSaving(false);
+      setError(err instanceof ApiError ? err.message : 'Could not save that note.');
     }
   }
 
@@ -47,6 +57,7 @@ export function NoteForm({
           {saving ? 'Saving…' : 'Save note'}
         </button>
       </div>
+      {error && <div className="text-[12px] text-danger font-semibold" role="alert">{error}</div>}
     </form>
   );
 }

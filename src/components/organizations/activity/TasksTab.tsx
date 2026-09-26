@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { CheckCircle, Clock, AlertCircle, MoreHorizontal, Flag } from 'lucide-react';
 import type { Task } from '../../../features/customers/customersSlice';
 import { useMembers } from '../../../features/knowledge/useMembers';
+import { ApiError } from '../../../lib/apiClient';
 
 const priorityConfig: Record<Task['priority'], { color: string; bg: string; border: string; label: string }> = {
   high: { color: 'text-danger', bg: 'bg-danger-dim', border: 'border-danger/30', label: 'High' },
@@ -80,18 +81,27 @@ export function TaskForm({ onCreate, onDone }: { onCreate: (task: NewTask) => Pr
   const [priority, setPriority] = useState<Task['priority']>('medium');
   const [assignee, setAssignee] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!title.trim() || !dueDate) return;
+    setError(null);
     setSaving(true);
-    const ok = await onCreate({ title: title.trim(), due_date: dueDate, priority, assignee_id: assignee ? Number(assignee) : null });
-    setSaving(false);
-    if (ok) {
-      setTitle('');
-      setDueDate('');
-      setAssignee('');
-      onDone?.();
+    try {
+      const ok = await onCreate({ title: title.trim(), due_date: dueDate, priority, assignee_id: assignee ? Number(assignee) : null });
+      setSaving(false);
+      if (ok) {
+        setTitle('');
+        setDueDate('');
+        setAssignee('');
+        onDone?.();
+      } else {
+        setError('Could not save that task.');
+      }
+    } catch (err) {
+      setSaving(false);
+      setError(err instanceof ApiError ? err.message : 'Could not save that task.');
     }
   }
 
@@ -113,6 +123,7 @@ export function TaskForm({ onCreate, onDone }: { onCreate: (task: NewTask) => Pr
       <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
         {saving ? 'Saving…' : 'Save task'}
       </button>
+      {error && <div className="md:col-span-4 text-[12px] text-danger font-semibold" role="alert">{error}</div>}
     </form>
   );
 }

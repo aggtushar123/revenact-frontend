@@ -8,6 +8,15 @@ import { postBodies, stubOrganizationPage } from '../../../features/organization
 import { makeDetailStore } from '../../../pages/organizations/testDetail';
 import { AddFlow } from './AddFlow';
 
+function fail500(detail = 'Try later.') {
+  return {
+    ok: false,
+    status: 500,
+    json: async () => ({ detail }),
+    blob: async () => new Blob([JSON.stringify({ detail })]),
+  };
+}
+
 function renderAdd(what: AddKind, accountId?: number) {
   const onAdded = vi.fn();
   const onClose = vi.fn();
@@ -83,6 +92,46 @@ describe('AddFlow (spec §1.6 "+ Add")', () => {
     expect(postBodies(spy, '/customers/7/surveys/')[0]).toMatchObject({ survey_type: 'nps' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('shows an inline error and keeps the sheet open when a task save fails', async () => {
+    const spy = stubOrganizationPage();
+    const { onAdded } = renderAdd('task');
+    const dialog = screen.getByRole('dialog', { name: 'New task' });
+    const title = within(dialog).getByRole('textbox', { name: 'Task title' });
+    await userEvent.type(title, 'Book the retraining');
+    fireEvent.change(within(dialog).getByLabelText('Due date'), { target: { value: '2026-10-01' } });
+    spy.mockImplementationOnce(async () => fail500());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save task' }));
+    await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent('Could not save that task.'));
+    expect(onAdded).not.toHaveBeenCalled();
+    expect(title).toHaveValue('Book the retraining');
+  });
+
+  it('shows an inline error and keeps the sheet open when a note save fails', async () => {
+    const spy = stubOrganizationPage();
+    const { onAdded } = renderAdd('note', 31);
+    const dialog = screen.getByRole('dialog', { name: 'New note' });
+    const title = within(dialog).getByRole('textbox', { name: 'Note title' });
+    await userEvent.type(title, 'Kickoff');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Note body' }), 'Met the new admin.');
+    spy.mockImplementationOnce(async () => fail500());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save note' }));
+    await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent('Could not save that note.'));
+    expect(onAdded).not.toHaveBeenCalled();
+    expect(title).toHaveValue('Kickoff');
+  });
+
+  it('shows the call log error from the calls slice', async () => {
+    const spy = stubOrganizationPage();
+    const { onAdded } = renderAdd('call');
+    const dialog = screen.getByRole('dialog', { name: 'Log a call' });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Call title' }), 'Renewal check-in');
+    fireEvent.change(within(dialog).getByLabelText('When'), { target: { value: '2026-09-25T10:00' } });
+    spy.mockImplementationOnce(async () => fail500());
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Log call' }));
+    await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent('Try later.'));
+    expect(onAdded).not.toHaveBeenCalled();
   });
 
   it('closes from Close without saving', async () => {
