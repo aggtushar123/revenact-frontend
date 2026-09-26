@@ -302,9 +302,10 @@ for the whole dashboard, not one per view.
 
 ### Ask rail
 
-`src/components/copilot/CopilotRail.tsx`, shared by Communications and the
-Dashboard, both variant `glass` at `w-[320px]` (the Dashboard's glass is the
-owner's decision of 2026-09-24; `plain`, a bordered `bg-surface` column, is
+`src/components/copilot/CopilotRail.tsx`, shared by Communications, the
+Dashboard and Organizations (list and board), all variant `glass` at
+`w-[320px]` (the Dashboard's glass is the owner's decision of 2026-09-24,
+Organizations' of 2026-09-26; `plain`, a bordered `bg-surface` column, is
 left for the phone sheet).
 
 - **Dashboard shape.** The frame is Communications', class for class (owner's
@@ -333,13 +334,28 @@ left for the phone sheet).
   - From `lg` the drill panel takes the rail's box: over the rail when it
     shows (covering it exactly, 320px), in its place when it is hidden or
     collapsed, so the figures narrow rather than being covered.
+- **Organizations shape.** The same pill in the same transparent top bar, and
+  the same rail in `OrganizationsFrame`'s `rail` slot, on `/organizations/list`
+  and `/organizations/board`. `OrganizationsAskLayout` draws the frame and the
+  rail once, above both views; each page's own `OrganizationsFrame` inside it
+  passes its content straight through rather than drawing a second frame.
+  Only the rail is glass: rows, cards, tiles, the side panel and the sheets
+  stay solid `bg-surface`. The rail wins its room: from `xl` the side panel
+  sits between the columns and the rail, both showing together; below `xl`,
+  with the rail open, a card opens in the bottom sheet, and opening the rail
+  closes an open side panel. Board columns are `w-64` beside it (`w-72`
+  otherwise). List rows (`@min-[60rem]:flex-nowrap`) and the tiles
+  (`@min-[50rem]:grid-cols-5`) respond to their `@container`, the content
+  column, so they wrap beside the rail instead of scrolling sideways.
 - **Chips.**
   - The composer's chip says what the next question is about ("Revenue ›
     Forecast · Owner: Priya · 2 accounts"). Its × removes only a focus, never
     the screen.
   - Each user question carries its own 11px `bg-subtle` chip above its bubble,
-    on the dashboard only (a dashboard conversation reopened in Communications
-    or `/copilot` shows no chip, since only the dashboard passes `names`).
+    on the Dashboard and Organizations (a conversation reopened in
+    Communications or `/copilot` shows no chip, since only those two pass
+    `chipLabel`). Organizations' chip is "Organizations", then the page's own
+    filter-chip labels, then the focus ("1 account").
 - **Empty.** Communications' empty state on both surfaces: one centred 13px
   `ink-faint` line, "Ask about what is in front of you. Answers use your
   accounts, mail and tickets." The dashboard's suggested questions were
@@ -378,7 +394,12 @@ left for the phone sheet).
     pending.
 - **History.** An 11px origin tag (LayoutDashboard icon + "Revenue › Forecast")
   on dashboard conversations — the area and view only, never the filters it
-  was asked with; a question's own chip is what carries those.
+  was asked with; a question's own chip is what carries those. Organizations
+  conversations carry the Network icon and "Organizations" followed by the
+  server's own `labels` ("Organizations · Owner: Carl CSM"; there is no
+  `origin_label` field), capped at 60% of the row and truncated. Picking a
+  conversation from History always navigates to the surface it started on
+  (Dashboard or Organizations), whichever page is currently showing.
 
 ### Portfolio rows and board (Organizations)
 
@@ -393,7 +414,8 @@ ARR. Rules specific to it, enforced by
   "Renewal overdue"), never colour alone. `renewal_overdue` and `risk` signals are
   danger-toned, `tickets` warning-toned.
 - No card in a card: the opened row's panels are separated by whitespace; the
-  summary tiles sit on the canvas. No glass anywhere on the list.
+  summary tiles sit on the canvas. No glass on the list or the board
+  themselves; only the Ask rail beside them is glass.
 - Skeletons are row- and tile-shaped; the empty state is "No organizations match
   these filters" with Clear filters (or "No organizations yet" with Add).
 - Every field of the old 34-column table renders exactly once in the row header
@@ -401,8 +423,8 @@ ARR. Rules specific to it, enforced by
 - Frame: the Navbar on `/organizations/list` and `/organizations/board` is the
   dashboard's transparent top bar ("Organizations", List/Board carrying the
   query, the actions slot, the bell, no avatar); `OrganizationsFrame` is
-  `DashboardFrame`'s body with an empty `rail` slot that Ask Revenact on
-  Organizations fills later.
+  `DashboardFrame`'s body, with the Ask rail in its `rail` slot (see "Ask
+  rail", Organizations shape).
 - Board: columns sit on the canvas with no surface of their own, and cards
   (`bg-surface`, ring, name, owner, ARR, signal, trend) are the items, so there
   is no card in a card. A column header reads "Live · 1 · $69.6K". A dragged-over
@@ -624,6 +646,11 @@ The dashboard's Ask rail changes shape at `sm` (sheet below it) and `xl` (open
 by default from it); from `lg` the drill panel takes the rail's box (over the
 rail when it shows, in its place when it does not).
 
+Organizations' Ask rail changes shape at the same `sm` and `xl`. Below `xl`
+it and the board's side panel never share the row: with the rail open a card
+opens in the bottom sheet. Below `sm` it is the full-screen sheet from ✦,
+which cannot open at the same time as an account's bottom sheet.
+
 The Organizations list below `sm`: rows become two-line cards, the toolbar is
 Search plus a Filters bottom sheet (group, sort, Export and Add inside), the
 summary tiles swipe sideways in their own strip, an opened row is a bottom
@@ -648,8 +675,9 @@ the design skill, reproduced so a reviewer can work through it.
    Reading line length 65 to 75 characters.
 4. No card inside a card. No gradient buttons, no purple, no glow, no
    glassmorphism on product surfaces. Exception, by the owner's decision on
-   2026-09-21: Communications (and, by the owner's decision on 2026-09-24,
-   the Dashboard's Ask rail), whose cards are `.rv-card-glass` /
+   2026-09-21: Communications (and, by the owner's decisions on 2026-09-24
+   and 2026-09-26, the Ask rail on the Dashboard and on the Organizations
+   list and board, the rail only), whose cards are `.rv-card-glass` /
    `.rv-glass-inner` so the canvas glow shows through, as in the reference
    mail client. The canvas gradients (`--rv-canvas-gradient-1/2`) were
    strengthened in both themes at the same time; that is the intended look
@@ -684,7 +712,7 @@ Ranked by leverage. Each is a task in the
 | 5 | Loading states are text lines, not skeletons | Only `HeadlinesTab` shows a text-line affordance; `ChatView` uses a layout-matching skeleton since 2026-09-22 |
 | 6 | `h-screen` in `DashboardLayout` | Rule says `min-h-[100dvh]` |
 | 7 | `rounded-2xl` and `rounded-3xl` outside the scale | Contact detail, Account placeholder |
-| 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass`, also used by the Dashboard's Ask rail, is the one sanctioned exception) |
+| 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass`, also used by the Ask rail on the Dashboard and Organizations, is the one sanctioned exception) |
 | 9 | `Login.css` requests Inter, which is never loaded | Falls through to the system stack |
 | 10 | Dead files: `App.css` is never imported, the `counter` slice and the seeded `tasks` slice are unused | Template leftovers |
 | 11 | Navbar and ActivityFeed have controls with no handlers | Search, Plus, Help, Message, feed search, "Add Action", title chevrons |

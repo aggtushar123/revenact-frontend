@@ -272,19 +272,21 @@ Organisations' own list (`pages/organizations/List.tsx`) reads a drill's
 "Open as a list" as `?ids=3,7`, passes it to the portfolio endpoint, and shows
 it as the removable chip "Opened from the dashboard (N)".
 
-#### Ask Revenact (`pages/dashboard/ask/`, `components/copilot/`)
+#### Ask Revenact (`pages/dashboard/ask/`, `pages/organizations/ask/`, `components/copilot/`)
 
 | File | What it does |
 |---|---|
-| `components/copilot/CopilotRail.tsx` | The shared rail (`CopilotRail`) and `HistoryPopover`. `context: RailContext` (`railContext.ts`) is `{kind:'label'}` (Communications: `[About: …]` text prefix) or `{kind:'dashboard'}` (structured `context` field). Props for `variant`, `top`, `thread`, `names`, `suggestions`, `draft`, `onSent`. Assistant replies always render as plain text, never the Markdown `AnswerText` formatting `/copilot` uses — including a reply withheld from a reader with narrower visibility in a shared session |
+| `components/copilot/CopilotRail.tsx` | The shared rail (`CopilotRail`) and `HistoryPopover`. `context: RailContext` (`railContext.ts`) is `{kind:'label'}` (Communications: `[About: …]` text prefix) or `{kind:'surface'}` (the Dashboard's or Organizations' structured `context` field). Props for `variant`, `top`, `thread`, `chipLabel` (per-question chips; absent in Communications), `draft`, `onSent`. `HistoryPopover` tags a conversation with `originTag`. Assistant replies always render as plain text, never the Markdown `AnswerText` formatting `/copilot` uses — including a reply withheld from a reader with narrower visibility in a shared session |
 | `components/copilot/useCopilotThread.ts` | Sending on one conversation: pending, failed (`budget` on 429, any other status including 400 shown the same way with Retry), `retry` (resends the question's own context and focus, not the current screen) |
-| `components/copilot/dashboardLabels.ts`, `suggestions.ts` | Chip text (`viewLabel` for the history tag, `contextLabel` for a message's own chip), three questions per area |
+| `components/copilot/dashboardLabels.ts`, `surfaceLabels.ts` | Chip text: `viewLabel`/`contextLabel` (dashboard), `surfaceLabel` (a question's chip on either surface), `originTag` (History's tag: the dashboard's area › view, or "Organizations" followed by the server's own `origin.labels`; there is no `origin_label` field) |
 | `ask/useDashboardContext.ts` | Route + `SHARED_KEYS` → `DashboardContext` and its chip, read at send time |
 | `ask/filterNames.ts`, `FilterNamesProvider.tsx` | `DashboardToolbar` reports the shared filters' option names for chips |
-| `ask/context.ts`, `useAsk.ts`, `AskProvider.tsx` | The dashboard's one conversation and thread, open state (`askPreference.ts`, written only by the Sparkles switch — an entry point opens the rail for that visit without touching it), focus, prefilled draft (`draft()`; a later `ask()` replaces it and its focus), history restore (`originPath.ts`); `useAsk()` is null outside the frame, so entry points hide in isolated view tests |
+| `ask/context.ts`, `useAsk.ts`, `AskProvider.tsx`, `DashboardAskProvider.tsx` | One surface's conversation and thread (`AskProvider({surface, preferenceKey})`; the Dashboard's surface via `DashboardAskProvider`, Organizations' via `OrganizationsAskLayout`), `focusOn` (an opened Organizations account), a conversation from the other surface handed over by `askConversationId` in the navigation state, open state (`askPreference.ts`, written only by the Sparkles switch — an entry point opens the rail for that visit without touching it), focus, prefilled draft (`draft()`; a later `ask()` replaces it and its focus), history restore (`originPath.ts`); `useAsk()` is null outside the frame, so entry points hide in isolated view tests |
 | `ask/AskRail.tsx` | The 320px glass rail (no header; hidden = not rendered) and the phone sheet (focus trap, Close, Escape/Close return focus to the Sparkles switch) |
 | `ask/AskControls.tsx` | Communications' pill (New chat, History + popover, Sparkles switch), portaled into the Navbar's actions slot (`layouts/navActionsSlot.ts`, owned by `DashboardLayout`) |
 | `ask/testAsk.tsx`, `components/copilot/testCopilot.ts` | `renderDashboard(url, view, width)`, `stubCopilot`, `postedBodies` |
+| `pages/organizations/ask/` | `OrganizationsAskLayout` (the layout route above List and Board: `AskProvider` with the `organizations` surface and `revenact_organizations_ask`), `useOrganizationsContext` (view + `toContextFilters`), `portfolioOptions` (pages report the portfolio's filter options for chips), `useAskFocusOnOpen`, `testOrganizationsAsk` (`stubOrganizationsAsk`) |
+| `features/organizations/askContext.ts` | `toContextFilters`/`fromContextFilters` (params ↔ the context's string form), `organizationsPath` (History restore), `organizationsLabel` (the chip) |
 
 #### Ticket Overview (`tabs/ticket-overview/`)
 Charts: `StatusDonut`, `PriorityDonut`, `AssigneesStackedBar`, `OriginBar`, `SentimentLineChart`, `KPIGrid`. The four countable KPIs (Total, On Hold, Positive/Negative sentiment) and every donut/bar's segments drill into `/tickets/stats/`; average lifetime and resolution rate stay plain — a rate isn't a set of tickets.
@@ -308,7 +310,7 @@ The richest domain in the app. Three views:
 
 #### List View (`pages/organizations/List.tsx`)
 The portfolio (spec `docs/superpowers/specs/2026-09-25-organizations-portfolio-design.md`),
-inside `OrganizationsFrame` (the dashboard's body, with an empty Ask rail slot).
+inside `OrganizationsFrame` (the dashboard's body, with the Ask rail in its `rail` slot), under `OrganizationsAskLayout`.
 
 | Where | What |
 |---|---|
@@ -318,7 +320,7 @@ inside `OrganizationsFrame` (the dashboard's body, with an empty Ask rail slot).
 | `features/organizations/pinnedFields.ts`, `filterChips.ts` | Pins per user (localStorage, try/catch); chip labels and N-of-M text |
 | `components/organizations/portfolio/usePortfolio.ts` | `usePagedPortfolio` (one cursor-paged read: the frame, each section, each board column) and `usePortfolio` (frame + M probe) |
 | `components/organizations/portfolio/*` | `AccountRow`, `rowParts`, `AccountDetails`, `AccountSheet`, `SummaryTiles`, `PortfolioToolbar`, `FiltersPanel`, `PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `useSelection`, `usePins`, `usePortfolioParams`; for the board `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`, `useBoardMove`, `boardMove`, `useEndSentinel` |
-| `features/organizations/testPortfolio.ts`, `pages/organizations/testList.tsx` | Fixtures, `buildPortfolio`, `stubPortfolio`; `renderOrganizations(url, {width, nav})`, `renderList`, `renderBoard`; `src/test/intersection.ts` (fake IntersectionObserver) |
+| `features/organizations/testPortfolio.ts`, `pages/organizations/testList.tsx` | Fixtures, `buildPortfolio`, `stubPortfolio`; `renderOrganizations(url, {width, nav, ask})`, `renderList`, `renderBoard`; `src/test/intersection.ts` (fake IntersectionObserver) |
 
 #### Board View (`pages/organizations/Board.tsx`)
 The portfolio as columns (spec §1 "Board", owner decisions 2026-09-26), in
@@ -547,12 +549,12 @@ App.tsx
   │     └── Navbar
   │
   ├── pages/dashboard/routes.tsx (dashboardRoutes) — areas.ts lists areas + sub-views
-  │     ├── DashboardFrame → FilterNamesProvider + AskProvider + DrillProvider, then [scroll area → AreaLayout …][AskRail][DrillPanel over the rail]
+  │     ├── DashboardFrame → FilterNamesProvider + DashboardAskProvider (AskProvider) + DrillProvider, then [scroll area → AreaLayout …][AskRail][DrillPanel over the rail]
   │     ├── <Area>Container → shared/DashboardToolbar (sub-view switch + URL filters, useDashboardFilters)
   │     │     └── the view (tabs/<section>/ControlsView or a health-overview view) → charts/*, each reading useDrill() to open DrillPanel
   │     ├── shared/ — DashboardToolbar, useDashboardFilters (SHARED_KEYS), Kpi (button when given onDrill), Panel, DataState, chartPalette (ROLE)
   │     ├── drill/ — DrillContext/useDrill, DrillPanel (panel/sheet), DrillTargets, drillApi, rows.ts
-  │     ├── ask/ — AskProvider/useAsk, AskRail, useDashboardContext, filterNames
+  │     ├── ask/ — AskProvider/useAsk (shared by both surfaces), DashboardAskProvider, AskRail, useDashboardContext, filterNames
   │     └── redirects.tsx — Keep / LegacyRedirect for old /dashboard/advance/* links
   │
   ├── pages/organizations/Details.tsx & pages/accounts/Details.tsx
@@ -563,7 +565,7 @@ App.tsx
   │     └── (activityData, accountsData, accountActivityData)
   │
   ├── pages/organizations/List.tsx  (GET /organizations/portfolio/)
-  │     ├── OrganizationsFrame (rail slot, empty until Ask on Organizations)
+  │     ├── OrganizationsAskLayout (AskProvider, organizations surface) → OrganizationsFrame (rail slot: AskRail)
   │     └── components/organizations/portfolio/*
   │           ├── SummaryTiles, PortfolioToolbar (FiltersPanel, PinFieldsMenu), FilterChips
   │           ├── PortfolioSections → AccountRow (rowParts) + AccountDetails / AccountSheet
