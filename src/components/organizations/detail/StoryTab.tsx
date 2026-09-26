@@ -1,9 +1,11 @@
 import { useCallback, useState } from 'react';
+import { Link } from 'react-router-dom';
 import type { Account } from '../../../features/customers/customersSlice';
 import { hasStoryFilters, type DetailParams, type DetailTab } from '../../../features/organizations/detailParams';
 import type { PanelKey } from '../../../features/organizations/portfolioFields';
 import type { AddKind } from '../../../features/organizations/storyKinds';
 import type { StoryItem } from '../../../features/organizations/storyTypes';
+import { QUIET } from '../portfolio/styles';
 import { AddFlow } from './AddFlow';
 import { AttentionBlock } from './AttentionBlock';
 import { EmailThread } from './EmailThread';
@@ -67,6 +69,16 @@ export function StoryTab({
           setAdding(what);
         }}
       />
+      {params.group === 'feedback' ? (
+        // Surveys are edited, expired and deleted on the Surveys page, which
+        // has no per-organization filter yet, so this links to all of them.
+        <p className="flex flex-wrap items-center gap-2 text-[13px] text-ink-muted">
+          <span>Edit, expire or delete a survey on the Surveys page.</span>
+          <Link to="/surveys" className={`${QUIET} border border-line`}>
+            Manage surveys
+          </Link>
+        </p>
+      ) : null}
       <p role="status" className="sr-only">
         {notice}
       </p>

@@ -1,7 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import type { Account } from '../../features/customers/customersSlice';
+import { pizzaHut } from '../../features/organizations/testPortfolio';
 import {
+  ACCOUNTS,
   manyItems,
   portfolioRequests,
   postBodies,
@@ -17,6 +20,43 @@ import { renderOrganizationPage } from './testDetail';
 const where = () => new URL(`http://x${screen.getByTestId('where').textContent}`);
 const itemKeys = () => [...document.querySelectorAll('[data-story-item]')].map((el) => el.getAttribute('data-story-item'));
 const landed = () => screen.findByRole('heading', { level: 1, name: 'Pizza Hut' });
+/** stubOrganizationPage plus the account saves it does not serve: POST adds
+ *  an account, PATCH replaces one, and GET /customers/7/accounts/ reads the
+ *  saved list. Each read is a fresh array: the store freezes what it keeps. */
+function stubAccountSaves() {
+  let accounts: Account[] = [...ACCOUNTS];
+  const spy = stubOrganizationPage();
+  const saves: { method: string; path: string; body: Record<string, unknown> }[] = [];
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = new URL(String(input)).pathname.replace(/^\/api\/v1/, '');
+      const method = init?.method ?? 'GET';
+      const body = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
+      if (path === '/customers/7/accounts/' && method === 'GET') {
+        spy(input, init); // counted with the page's other reads
+        return { ok: true, status: 200, json: async () => accounts.map((account) => ({ ...account })) };
+      }
+      if (method === 'POST' && path === '/customers/7/accounts/') {
+        saves.push({ method, path, body });
+        const created = { ...ACCOUNTS[1], id: 33, name: String(body.name), domain: String(body.domain ?? '') };
+        accounts = [...accounts, created];
+        return { ok: true, status: 201, json: async () => created };
+      }
+      const edit = /^\/customers\/7\/accounts\/(\d+)\/$/.exec(path);
+      if (method === 'PATCH' && edit) {
+        saves.push({ method, path, body });
+        const id = Number(edit[1]);
+        accounts = accounts.map((account) => (account.id === id ? ({ ...account, ...body } as Account) : account));
+        const saved = accounts.find((account) => account.id === id);
+        return { ok: true, status: 200, json: async () => ({ ...saved }) };
+      }
+      return spy(input, init);
+    }),
+  );
+  return { spy, saves };
+}
+
 const lastStory = (spy: Parameters<typeof storyQueries>[0]) => {
   const all = storyQueries(spy);
   return all[all.length - 1];
@@ -410,5 +450,109 @@ describe('the organization page (/organizations/:id)', () => {
     expect(contactReads).toHaveLength(1);
     // Story stayed mounted too: going back to it did not read it again.
     expect(storyQueries(spy)).toHaveLength(1);
+  });
+
+  it('shows the header skeleton until the organization lands', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage();
+    expect(screen.getByRole('status', { name: 'Loading organization' })).toBeInTheDocument();
+    await landed();
+    expect(screen.queryByRole('status', { name: 'Loading organization' })).not.toBeInTheDocument();
+  });
+
+  it('saves a new account, which then shows in the chips and in Details, read again from the server', async () => {
+    const { spy, saves } = stubAccountSaves();
+    renderOrganizationPage();
+    await userEvent.click(await screen.findByRole('button', { name: 'Add account' }));
+    await userEvent.type(screen.getByLabelText(/^Name/), 'APAC');
+    await userEvent.type(screen.getByLabelText(/^Domain/), 'apac.pizzahut.example');
+    await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Add Account' })).not.toBeInTheDocument());
+    expect(saves).toEqual([
+      expect.objectContaining({ method: 'POST', path: '/customers/7/accounts/', body: expect.objectContaining({ name: 'APAC' }) }),
+    ]);
+    const chips = screen.getByRole('group', { name: 'Filter by account' });
+    expect(await within(chips).findByRole('button', { name: /^APAC/ })).toBeInTheDocument();
+    // The accounts were read again (onSaved), not patched in by the create.
+    expect(requestPaths(spy).filter((path) => path === 'GET /customers/7/accounts/')).toHaveLength(2);
+    await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+    const section = await screen.findByRole('region', { name: 'Accounts' });
+    await waitFor(() => expect(within(section).getAllByRole('listitem')).toHaveLength(3));
+    expect(within(section).getByRole('link', { name: 'APAC' })).toHaveAttribute('href', '/accounts/33');
+  });
+
+  it('saves an edited account and shows the new name in the chips and in Details', async () => {
+    const { saves } = stubAccountSaves();
+    renderOrganizationPage('/organizations/7?account=31');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit EMEA' }));
+    const name = screen.getByLabelText(/^Name/);
+    await userEvent.clear(name);
+    await userEvent.type(name, 'EMEA North');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Edit EMEA' })).not.toBeInTheDocument());
+    expect(saves).toEqual([
+      expect.objectContaining({ method: 'PATCH', path: '/customers/7/accounts/31/', body: expect.objectContaining({ name: 'EMEA North' }) }),
+    ]);
+    expect(await screen.findByRole('button', { name: 'EMEA North 1' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Edit EMEA North' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+    const section = await screen.findByRole('region', { name: 'Accounts' });
+    expect(within(section).getByRole('link', { name: 'EMEA North' })).toHaveAttribute('href', '/accounts/31');
+  });
+
+  it('churns from the name row: the change goes out, then the header reads it back', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    const reads = portfolioRequests(spy).length;
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza Hut' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Churn' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Confirm Churn' }));
+    await waitFor(() => expect(screen.queryByText('Churn Pizza Hut?')).not.toBeInTheDocument());
+    const patches = spy.mock.calls.filter(
+      ([input, init]) => new URL(String(input)).pathname === '/api/v1/customers/7/' && init?.method === 'PATCH',
+    );
+    expect(patches).toHaveLength(1);
+    expect(JSON.parse(String(patches[0][1]?.body))).toEqual(expect.objectContaining({ lifecycle_stage: 'churn' }));
+    expect(await screen.findByText('Churned')).toBeInTheDocument();
+    expect(portfolioRequests(spy).length).toBeGreaterThan(reads);
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza Hut' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Archive']);
+  });
+
+  it('lands on an archived organization, offering only Churn', async () => {
+    stubOrganizationPage({ row: { ...pizzaHut, is_archived: true } });
+    renderOrganizationPage();
+    await landed();
+    expect(screen.getByText('Archived')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza Hut' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Churn']);
+  });
+
+  it('lands on a churned organization, offering only Archive, and none when it is archived too', async () => {
+    const churned = { ...pizzaHut, churned: true, lifecycle: { value: 'churn' as const, label: 'Churn' }, signal: null };
+    stubOrganizationPage({ row: churned });
+    renderOrganizationPage();
+    await landed();
+    expect(screen.getByText('Churned')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza Hut' }));
+    expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Archive']);
+  });
+
+  it('hides the actions menu for an organization both churned and archived', async () => {
+    const both = { ...pizzaHut, is_archived: true, churned: true, lifecycle: { value: 'churn' as const, label: 'Churn' }, signal: null };
+    stubOrganizationPage({ row: both });
+    renderOrganizationPage();
+    await landed();
+    expect(screen.queryByRole('button', { name: 'More actions for Pizza Hut' })).not.toBeInTheDocument();
+  });
+
+  it('links Feedback to the Surveys page, where surveys are edited, expired and deleted', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    expect(screen.queryByRole('link', { name: 'Manage surveys' })).not.toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole('group', { name: 'Show' })).getByRole('button', { name: /^Feedback/ }));
+    expect(await screen.findByRole('link', { name: 'Manage surveys' })).toHaveAttribute('href', '/surveys');
   });
 });
