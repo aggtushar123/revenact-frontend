@@ -28,6 +28,7 @@ describe('the organization page URL state', () => {
     });
     expect(parse('tab=deals&account=31&q=renewal').tab).toBe('deals');
     expect(parse('account=none').account).toBe('none');
+    expect(parse('account=0').account).toBe('');
   });
 
   it('keeps only the sources inside the chosen group', () => {

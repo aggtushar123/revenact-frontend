@@ -27,7 +27,7 @@ export interface DetailParams {
 
 const TAB_KEYS: string[] = DETAIL_TABS.map((tab) => tab.key);
 
-const accountValue = (raw: string | null) => (raw && (/^\d+$/.test(raw) || raw === 'none') ? raw : '');
+const accountValue = (raw: string | null) => (raw && (/^[1-9]\d*$/.test(raw) || raw === 'none') ? raw : '');
 
 /** Sources are unique and inside the chosen group. */
 function normalise(p: DetailParams): DetailParams {
