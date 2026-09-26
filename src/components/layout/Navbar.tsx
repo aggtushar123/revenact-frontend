@@ -441,8 +441,9 @@ export function Navbar() {
         {/* Right side actions. The Copilot is the home page now, first in
             the sidebar; it no longer needs a button on every other page. */}
         <div className={isFramed ? 'flex items-center gap-3 text-ink-faint' : 'flex items-center gap-1.5 text-ink-faint ml-1'}>
-          {/* The dashboard puts its Ask controls here (portaled from
-              DashboardFrame) in place of the decorative icons. */}
+          {/* The dashboard and the Organizations list and board put their
+              Ask controls here (portaled by AskRail) in place of the
+              decorative icons. */}
           {isFramed ? (
             <div ref={setSlot} data-nav-actions-slot="" className="flex items-center" />
           ) : (

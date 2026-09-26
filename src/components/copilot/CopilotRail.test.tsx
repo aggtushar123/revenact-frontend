@@ -6,7 +6,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { CopilotRail, type CopilotRailProps } from './CopilotRail';
 import { postedBodies, stubCopilot } from './testCopilot';
 import { useCopilotThread } from './useCopilotThread';
-import type { Conversation, DashboardContext } from '../../pages/copilot/types';
+import type { Conversation, DashboardContext, OrganizationsContext, SurfaceContext } from '../../pages/copilot/types';
+import { surfaceLabel } from './surfaceLabels';
 
 const DASH: DashboardContext = {
   surface: 'dashboard',
@@ -46,7 +47,7 @@ describe('CopilotRail', () => {
 
   it('sends a dashboard context as the structured field, with no text prefix', async () => {
     const { spy } = stubCopilot();
-    renderRail({ label: 'Ask Revenact', variant: 'plain', context: { kind: 'dashboard', context: DASH, label: 'Revenue › Forecast · Owner: Priya' } });
+    renderRail({ label: 'Ask Revenact', variant: 'plain', context: { kind: 'surface', context: DASH, label: 'Revenue › Forecast · Owner: Priya' } });
     expect(screen.getByRole('complementary', { name: 'Ask Revenact' })).toBeInTheDocument();
     expect(screen.getByText('Revenue › Forecast · Owner: Priya')).toBeInTheDocument();
     // The screen itself cannot be removed from a question, only a focus can.
@@ -56,10 +57,28 @@ describe('CopilotRail', () => {
     expect(postedBodies(spy)).toEqual([{ content: 'Why is at-risk ARR up?', context: DASH }]);
   });
 
+  it('sends an organizations context as the structured field, and chips each question with the label given', async () => {
+    const { spy } = stubCopilot();
+    const ORG: OrganizationsContext = {
+      surface: 'organizations',
+      view: 'board',
+      filters: { owner: '2' },
+      focus: null,
+    };
+    renderRail({
+      chipLabel: (asked) => (asked.surface === 'organizations' ? 'Organizations · Owner: Carl CSM' : 'elsewhere'),
+      context: { kind: 'surface', context: ORG, label: 'Organizations · Owner: Carl CSM' },
+    });
+    await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'Who renews first?{enter}');
+    await screen.findByText('Answer to: Who renews first?');
+    expect(postedBodies(spy)).toEqual([{ content: 'Who renews first?', context: ORG }]);
+    expect(within(screen.getByRole('log', { name: 'Copilot messages' })).getByText('Organizations · Owner: Carl CSM')).toBeInTheDocument();
+  });
+
   it('offers to remove a focus, and only a focus', async () => {
     const onClearContext = vi.fn();
     const focused = { ...DASH, focus: { kind: 'companies' as const, ids: [3, 7] } };
-    renderRail({ onClearContext, context: { kind: 'dashboard', context: focused, label: 'Revenue › Forecast · 2 accounts' } });
+    renderRail({ onClearContext, context: { kind: 'surface', context: focused, label: 'Revenue › Forecast · 2 accounts' } });
     await userEvent.click(screen.getByRole('button', { name: 'Remove focus' }));
     expect(onClearContext).toHaveBeenCalledOnce();
   });
@@ -90,7 +109,7 @@ describe('CopilotRail', () => {
 
   it('keeps the question after any other failure and sends the same body again on Retry', async () => {
     const { spy } = stubCopilot({ statuses: [500] });
-    renderRail({ context: { kind: 'dashboard', context: DASH, label: 'Revenue › Forecast' } });
+    renderRail({ context: { kind: 'surface', context: DASH, label: 'Revenue › Forecast' } });
     await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'Why is at-risk ARR up?{enter}');
     await userEvent.click(await screen.findByRole('button', { name: 'Retry' }));
     expect(await screen.findByText('Answer to: Why is at-risk ARR up?')).toBeInTheDocument();
@@ -136,12 +155,13 @@ describe('CopilotRail', () => {
   it('each question shows the screen it was asked on, and a follow-up carries the new screen', async () => {
     const { spy } = stubCopilot();
     const names = { owner: { '2': 'Priya', '5': 'Omar' } };
-    const { rerenderRail } = renderRail({ names, context: { kind: 'dashboard', context: DASH, label: 'Revenue › Forecast · Owner: Priya' } });
+    const chipLabel = (asked: SurfaceContext) => surfaceLabel(asked, { dashboard: names });
+    const { rerenderRail } = renderRail({ chipLabel, context: { kind: 'surface', context: DASH, label: 'Revenue › Forecast · Owner: Priya' } });
     await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'Why is at-risk ARR up?{enter}');
     await screen.findByText('Answer to: Why is at-risk ARR up?');
 
     const moved = { ...DASH, filters: { ...DASH.filters, owner: '5' } };
-    rerenderRail({ names, context: { kind: 'dashboard', context: moved, label: 'Revenue › Forecast · Owner: Omar' } });
+    rerenderRail({ chipLabel, context: { kind: 'surface', context: moved, label: 'Revenue › Forecast · Owner: Omar' } });
     await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'And now?{enter}');
     await screen.findByText('Answer to: And now?');
 
@@ -151,9 +171,9 @@ describe('CopilotRail', () => {
     expect(within(log).getByText('Revenue › Forecast · Owner: Omar')).toBeInTheDocument();
   });
 
-  it('shows no per-message chip where no names are given (a dashboard thread reopened elsewhere is plain text)', async () => {
+  it('shows no per-message chip where no chip label is given (a dashboard thread reopened elsewhere is plain text)', async () => {
     stubCopilot();
-    renderRail({ context: { kind: 'dashboard', context: DASH, label: 'Revenue › Forecast' } });
+    renderRail({ context: { kind: 'surface', context: DASH, label: 'Revenue › Forecast' } });
     await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'Why?{enter}');
     await screen.findByText('Answer to: Why?');
     expect(within(screen.getByRole('log', { name: 'Copilot messages' })).queryByText('Revenue › Forecast')).not.toBeInTheDocument();
@@ -161,7 +181,7 @@ describe('CopilotRail', () => {
 
   it('shows Communications\' empty line on a dashboard rail too, and no suggestions', async () => {
     stubCopilot();
-    renderRail({ context: { kind: 'dashboard', context: { ...DASH, area: 'overview', view: null }, label: 'Overview' } });
+    renderRail({ context: { kind: 'surface', context: { ...DASH, area: 'overview', view: null }, label: 'Overview' } });
     const log = screen.getByRole('log', { name: 'Copilot messages' });
     expect(within(log).getByText('Ask about what is in front of you. Answers use your accounts, mail and tickets.')).toHaveClass('m-auto', 'text-center');
     expect(screen.queryByRole('list', { name: 'Suggested questions' })).not.toBeInTheDocument();
@@ -186,7 +206,7 @@ describe('CopilotRail', () => {
 
   it('shows a 400 as the generic error with Retry, not the budget message', async () => {
     stubCopilot({ statuses: [400] });
-    renderRail({ context: { kind: 'dashboard', context: DASH, label: 'Revenue › Forecast' } });
+    renderRail({ context: { kind: 'surface', context: DASH, label: 'Revenue › Forecast' } });
     await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'Why is at-risk ARR up?{enter}');
     const alert = await screen.findByRole('alert');
     expect(alert).not.toHaveTextContent("This month's AI budget is used up.");

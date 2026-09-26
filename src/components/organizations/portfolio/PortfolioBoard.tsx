@@ -27,6 +27,9 @@ export interface PortfolioBoardProps {
   columnBumps: Record<string, number>;
   currency: CurrencyCode;
   isSm: boolean;
+  /** The Ask rail is open beside the board (from `sm`): columns are w-64
+   *  rather than w-72, so more of them fit beside it. */
+  narrow?: boolean;
   filtered: boolean;
   move: BoardMove | null;
   /** A move is saving or settling: moving is off (one at a time). */
@@ -45,11 +48,11 @@ export interface PortfolioBoardProps {
   onMoveSettled: (token: number) => void;
 }
 
-function BoardSkeleton({ isSm }: { isSm: boolean }) {
+function BoardSkeleton({ isSm, narrow }: { isSm: boolean; narrow: boolean }) {
   return (
     <div role="status" aria-label="Loading the board" className="flex gap-3 overflow-hidden">
       {Array.from({ length: isSm ? 4 : 1 }, (_, i) => (
-        <div key={i} aria-hidden="true" className={`flex shrink-0 flex-col gap-2 p-1 ${isSm ? 'w-72' : 'w-full'}`}>
+        <div key={i} aria-hidden="true" className={`flex shrink-0 flex-col gap-2 p-1 ${isSm ? (narrow ? 'w-64' : 'w-72') : 'w-full'}`}>
           <span className="block h-3 w-24 animate-pulse rounded bg-subtle" />
           {[0, 1, 2].map((j) => (
             <span key={j} className="block h-24 animate-pulse rounded-xl bg-surface" />
@@ -72,6 +75,7 @@ export function PortfolioBoard({
   columnBumps,
   currency,
   isSm,
+  narrow = false,
   filtered,
   move,
   saving,
@@ -177,7 +181,7 @@ export function PortfolioBoard({
   }, [dragging, endDrag]);
 
   if (!data && error) return <ErrorBlock message={error} onRetry={portfolio.retry} />;
-  if (!data) return <BoardSkeleton isSm={isSm} />;
+  if (!data) return <BoardSkeleton isSm={isSm} narrow={narrow} />;
   if (data.count === 0) {
     return filtered ? (
       <EmptyState
@@ -249,6 +253,7 @@ export function PortfolioBoard({
       version={inputs.version + (inputs.columnBumps[spec.key] ?? 0)}
       currency={currency}
       isSm={isSm}
+      narrow={narrow}
       canMove={canMove}
       saving={saving}
       pausedNote={paused ? PAUSED : null}

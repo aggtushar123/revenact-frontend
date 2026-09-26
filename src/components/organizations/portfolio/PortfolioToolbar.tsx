@@ -73,7 +73,7 @@ export function PortfolioToolbar({
 
   return (
     <div className="relative flex flex-wrap items-center gap-2">
-      <label className="relative min-w-0 flex-1 sm:max-w-sm">
+      <label className="relative min-w-0 flex-1 sm:min-w-[12rem] sm:max-w-sm">
         <span className="sr-only">{LABEL}</span>
         <Search className="pointer-events-none absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
         <input

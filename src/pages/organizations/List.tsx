@@ -24,6 +24,8 @@ import type { PortfolioRowRenderer } from '../../components/organizations/portfo
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
 import { useSelection } from '../../components/organizations/portfolio/useSelection';
+import { useReportPortfolioOptions } from './ask/portfolioOptions';
+import { useAskFocusOnOpen } from './ask/useAskFocus';
 import { OrganizationsFrame } from './OrganizationsFrame';
 
 type Targets = { ids: number[]; names: string[] };
@@ -112,6 +114,10 @@ export function List() {
 
   const currency = portfolio.data?.currency ?? orgCurrency;
   const options = portfolio.data?.filters ?? null;
+  // Ask Revenact (spec §3): the chips name owners and products from this
+  // read's options, and an opened row narrows the next question to it.
+  useReportPortfolioOptions(options);
+  useAskFocusOnOpen(openRow?.id ?? null);
 
   const toggleOpen = useCallback((row: PortfolioRow) => setOpenRow((current) => (current?.id === row.id ? null : row)), []);
   const closeSheet = useCallback(() => setOpenRow(null), []);
@@ -197,13 +203,17 @@ export function List() {
   return (
     <OrganizationsFrame>
       <div className="flex flex-col gap-4 pb-6">
-        <SummaryTiles
-          summary={portfolio.data?.summary ?? null}
-          failed={!portfolio.data && portfolio.error !== null}
-          currency={currency}
-          params={params}
-          onFilter={update}
-        />
+        {/* Containers: the tiles and rows follow this column, which the Ask
+            rail narrows, not the window. */}
+        <div className="@container">
+          <SummaryTiles
+            summary={portfolio.data?.summary ?? null}
+            failed={!portfolio.data && portfolio.error !== null}
+            currency={currency}
+            params={params}
+            onFilter={update}
+          />
+        </div>
         <PortfolioToolbar
           params={params}
           update={update}
@@ -235,17 +245,19 @@ export function List() {
             {notice}
           </p>
         ) : null}
-        <PortfolioSections
-          params={params}
-          version={version}
-          portfolio={portfolio}
-          currency={currency}
-          filtered={hasFilters(params)}
-          renderRow={renderRow}
-          onRowsLoaded={onRowsLoaded}
-          onClearFilters={clearFilters}
-          onAdd={() => setAdding(true)}
-        />
+        <div className="@container">
+          <PortfolioSections
+            params={params}
+            version={version}
+            portfolio={portfolio}
+            currency={currency}
+            filtered={hasFilters(params)}
+            renderRow={renderRow}
+            onRowsLoaded={onRowsLoaded}
+            onClearFilters={clearFilters}
+            onAdd={() => setAdding(true)}
+          />
+        </div>
         <SelectionBar
           count={selection.selected.size}
           owners={ownerTargets(members)}

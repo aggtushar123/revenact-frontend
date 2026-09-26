@@ -306,6 +306,46 @@ columns are full-width panels that snap sideways, with a strip of column tabs
 that jumps to one. The board has no selection mode; bulk work stays on the
 list.
 
+**Ask Revenact** is on both routes (spec §3). `OrganizationsAskLayout`, a
+pathless layout route above the list and the board, draws `OrganizationsFrame`
+and `AskRail` once, holding one conversation (the shared `AskProvider` with
+the `organizations` surface), so both survive the tab switch and every
+filter; a page's own `OrganizationsFrame` inside it is a pass-through
+(`InFrame` context), never a second frame. `AskRail` portals the pill (New
+chat, History, the Sparkles switch) into the Navbar's actions slot. Each
+question posts `context: {surface:'organizations', view:'list'|'board',
+filters:{search, owner, lifecycle, health, product, renews_within, nps, ids,
+include_churned, sort, group}, focus}`: the portfolio params as the API reads
+them, only the set keys present (never `ids: ''` or another unset key as
+`''`), never a cursor, `group` only when it differs from the view's own
+default, and the board's `group` never empty. The chip reads "Organizations ·
+Owner: Carl CSM", with names from the
+portfolio's filter options, which each page reports to the layout. Opening a
+row on the list, or a card's side panel or sheet on the board, sets
+`focus: {kind:'companies', ids:[id]}` for one question without opening the
+rail — the send, the chip's × or a filter change drops it; closing the account
+does not. The rail is the Dashboard's: a 320px glass column, open by default
+from `xl`, a full-screen sheet below `sm`, with its own remembered choice
+(`revenact_organizations_ask`). The rail wins its room: from `xl` the side
+panel sits between the columns and the rail, both showing together; below
+`xl`, with the rail open, a card opens in the bottom sheet instead, and
+opening the rail closes a side panel that was already open. Beside the rail
+the board's columns narrow to `w-64` (`w-72` otherwise). List rows and the
+summary tiles wrap to their content column (`@container`, not the window):
+rows go `@min-[60rem]:flex-nowrap`, tiles `@min-[50rem]:grid-cols-5`. History
+tags an Organizations conversation with "Organizations" followed by the
+server's own `labels`, joined with " · " ("Organizations · Owner: Carl CSM";
+there is no `origin_label` field), and reopening one goes to its view with
+its filters, then shows the thread. A conversation that started on the
+Dashboard, picked here, navigates to its dashboard view carrying the
+conversation History already loaded (and its id) in the navigation state; the
+Dashboard's rail shows that conversation for the visit at once, and only
+fetches it by id when just the id survives (and the reverse) — a History
+pick always navigates to the surface the conversation started on, whichever
+page is showing it. Shared replies on Organizations are withheld from mentioned-only
+readers by the same write-time snapshot rule as the Dashboard's; see
+[API_CONTRACTS §"Shared sessions"](../../revenact-backend/docs/API_CONTRACTS.md).
+
 ### 4.3 Accounts
 
 Reached from the Accounts tab of an organisation or from `/accounts/list`, in
@@ -520,7 +560,8 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
   Overview and every area, since `DashboardLayout`'s `<main>` is
   `overflow-hidden`.
 - **Ask Revenact.** `DashboardFrame` mounts `FilterNamesProvider` →
-  `AskProvider` → `DrillProvider` around `[scroll area][AskRail]`
+  `DashboardAskProvider` (the shared `AskProvider` with the dashboard
+  surface) → `DrillProvider` around `[scroll area][AskRail]`
   (`src/pages/dashboard/ask/`). The conversation lives in `AskProvider`, above
   the areas, so it survives tab and filter changes.
   - **Sending.** Each question posts to `/copilot/messages/` with
@@ -593,8 +634,11 @@ and rendered by `src/pages/dashboard/routes.tsx` (`dashboardRoutes`):
     `origin` is set shows a tag with only its area and view (e.g. "Revenue ›
     Forecast"), never the filters it was asked with — those live on each
     question's own chip. Reopening one on the dashboard navigates to its area,
-    view and filters, then shows the thread. From Communications or `/copilot`
-    it opens where you are, as plain text, with the tag shown.
+    view and filters, then shows the thread. A conversation that started on
+    Organizations reopens there instead, with its view and filters (§4.2).
+    From Communications or `/copilot` it opens where you are, as plain text,
+    with the tag shown (an Organizations one's is "Organizations" followed by
+    the server's own `labels`; there is no `origin_label` field).
 - **`AreaLayout`** hands each area's sub-view list down through `Outlet`
   context (`useSubViews`); each container renders `DashboardToolbar` (the
   sub-view switch plus the filter row) and dispatches its own fetch.

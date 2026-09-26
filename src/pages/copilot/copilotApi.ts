@@ -3,7 +3,7 @@
 // conversation is scoped to one User, not a Customer/Account, so it
 // lives here rather than as thunks in features/customers/customersSlice.ts.
 import { apiFetch } from '../../lib/apiClient';
-import type { DraftReply, Conversation, ConversationSummary, DashboardContext } from './types';
+import type { DraftReply, Conversation, ConversationSummary, SurfaceContext } from './types';
 
 // Pagination is off on this endpoint (see ConversationListView's own
 // docstring) — a plain array, not fetchAllPages's {count,next,...} shape.
@@ -21,9 +21,10 @@ export function deleteConversation(id: number): Promise<null> {
 
 // Omit `conversationId` to start a new Conversation (titled from this
 // message) — see SendMessageView's own docstring. `context` is the
-// dashboard's structured "where I am"; without it the body is exactly what
-// it has always been, so Communications and the Copilot page are unchanged.
-export function sendMessage(params: { conversationId?: number; content: string; context?: DashboardContext }): Promise<Conversation> {
+// Dashboard's or Organizations' structured "where I am"; without it the body
+// is exactly what it has always been, so Communications and the Copilot page
+// are unchanged.
+export function sendMessage(params: { conversationId?: number; content: string; context?: SurfaceContext }): Promise<Conversation> {
   return apiFetch<Conversation>('/copilot/messages/', {
     method: 'POST',
     body: {

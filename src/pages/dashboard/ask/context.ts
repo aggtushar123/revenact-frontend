@@ -1,12 +1,23 @@
 import { createContext } from 'react';
 import type { CopilotThread } from '../../../components/copilot/useCopilotThread';
-import type { Conversation, DashboardFocus } from '../../copilot/types';
+import type { Conversation, DashboardFocus, SurfaceContext, SurfaceName } from '../../copilot/types';
+
+/** One page's side of Ask Revenact: which surface it is, where the person is
+ *  on it now (null off a real view, e.g. mid-redirect), and how it words a
+ *  question's context as a chip. */
+export interface AskSurface {
+  name: SurfaceName;
+  context: SurfaceContext | null;
+  chipLabel: (context: SurfaceContext) => string;
+}
 
 export interface AskState {
+  /** The surface this rail asks from. */
+  surface: AskSurface;
   /** The rail is expanded (sm and up) or the sheet is open (below sm). */
   open: boolean;
   setOpen: (open: boolean) => void;
-  /** The dashboard's one conversation; survives area and filter changes. */
+  /** The surface's one conversation; survives tab and filter changes. */
   conversation: Conversation | null;
   setConversation: (conversation: Conversation | null) => void;
   thread: CopilotThread;
@@ -14,6 +25,9 @@ export interface AskState {
   focus: DashboardFocus | null;
   /** The chip's ×: drop the focus, keep the screen. */
   clearFocus: () => void;
+  /** Narrow the next question to `focus` without opening the rail or
+   *  prefilling anything (an opened Organizations row or card). */
+  focusOn: (focus: DashboardFocus) => void;
   /** A question left: its focus and prefilled draft are spent. */
   markSent: () => void;
   pendingDraft: { text: string; nonce: number } | null;
@@ -27,4 +41,19 @@ export interface AskState {
   openFromHistory: (conversation: Conversation) => void;
 }
 
+/** The surface's context narrowed by `focus`. The shared slot is a
+ *  DashboardFocus; Organizations only takes a companies focus, so any other
+ *  kind (never written there) reads as no focus rather than a cast. */
+export function withFocus(context: SurfaceContext, focus: DashboardFocus | null): SurfaceContext {
+  if (context.surface === 'dashboard') return { ...context, focus };
+  return { ...context, focus: focus?.kind === 'companies' ? focus : null };
+}
+
 export const AskContext = createContext<AskState | null>(null);
+
+/** Just `focusOn`, in its own context. Its identity never changes across an
+ *  AskProvider render (it's a bare `useCallback` with no deps), so a
+ *  component that only narrows the next question on open (a List row, a
+ *  Board card) can read it here instead of the whole `AskState` and skip
+ *  every re-render a send causes (pending, then the answer). */
+export const AskFocusOnContext = createContext<((focus: DashboardFocus) => void) | null>(null);

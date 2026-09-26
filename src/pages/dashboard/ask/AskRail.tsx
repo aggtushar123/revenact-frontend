@@ -1,16 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { CopilotRail } from '../../../components/copilot/CopilotRail';
-import { contextLabel } from '../../../components/copilot/dashboardLabels';
 import type { RailContext } from '../../../components/copilot/railContext';
 import { trapTab } from '../../../lib/focusTrap';
 import { SM, useMediaQuery } from '../../../lib/useMediaQuery';
 import { AskControls } from './AskControls';
-import { useFilterNames } from './filterNames';
+import { withFocus } from './context';
 import { useAsk } from './useAsk';
-import { useDashboardContext } from './useDashboardContext';
 
-/** The Ask rail beside the dashboard, shaped like Communications' Copilot
+/** The Ask rail beside the Dashboard or Organizations, shaped like Communications' Copilot
  *  rail: a 320px glass column, with its controls (New chat, History, the
  *  Copilot switch) in the Navbar's pill rather than a header of its own.
  *  Hidden means not rendered. Below `sm` the switch opens a full-screen
@@ -19,8 +17,6 @@ import { useDashboardContext } from './useDashboardContext';
 export function AskRail() {
   const ask = useAsk();
   const isSm = useMediaQuery(SM);
-  const { context } = useDashboardContext();
-  const names = useFilterNames();
   const [historyOpen, setHistoryOpen] = useState(false);
   const closeHistory = useCallback(() => setHistoryOpen(false), []);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -79,8 +75,9 @@ export function AskRail() {
     }
   };
 
-  const asked = context ? { ...context, focus: ask.focus } : null;
-  const railContext: RailContext | null = asked ? { kind: 'dashboard', context: asked, label: contextLabel(asked, names) } : null;
+  const { context, chipLabel } = ask.surface;
+  const asked = context ? withFocus(context, ask.focus) : null;
+  const railContext: RailContext | null = asked ? { kind: 'surface', context: asked, label: chipLabel(asked) } : null;
 
   const railProps = {
     label: 'Ask Revenact',
@@ -89,7 +86,7 @@ export function AskRail() {
     conversation: ask.conversation,
     onConversation: ask.setConversation,
     thread: ask.thread,
-    names,
+    chipLabel,
     draft: ask.pendingDraft,
     onSent: ask.markSent,
   };

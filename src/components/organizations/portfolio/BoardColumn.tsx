@@ -21,6 +21,8 @@ export interface BoardColumnProps {
   version: number;
   currency: CurrencyCode;
   isSm: boolean;
+  /** Beside the open Ask rail: w-64 rather than w-72 (from sm). */
+  narrow?: boolean;
   canMove: boolean;
   saving: boolean;
   /** Why moving is off, when it is stuck (the frame reload failed). */
@@ -83,6 +85,7 @@ export function BoardColumn({
   version,
   currency,
   isSm,
+  narrow = false,
   canMove,
   saving,
   pausedNote = null,
@@ -213,7 +216,7 @@ export function BoardColumn({
       onDragLeave={onDragLeave}
       onDrop={onDrop}
       className={`flex min-h-0 shrink-0 flex-col gap-2 rounded-xl p-1 transition-colors duration-[var(--dur-fast)] ${
-        isSm ? 'w-72' : 'w-full snap-start'
+        isSm ? (narrow ? 'w-64' : 'w-72') : 'w-full snap-start'
       } ${over && dropEnabled ? 'bg-accent-dim ring-2 ring-accent' : ''}`}
     >
       <div className="flex items-center gap-1">

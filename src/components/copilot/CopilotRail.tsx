@@ -1,19 +1,21 @@
-// The Copilot in a rail: shared by Communications (beside the inbox) and the
-// Dashboard (beside the figures).
+// The Copilot in a rail: shared by Communications (beside the inbox), the
+// Dashboard (beside the figures) and Organizations (beside the list and the
+// board).
 //
 // A conversation is real (`sendMessage` to /copilot/messages/); the rail holds
 // one at a time. The context says what a question is about: Communications
-// sends its picked source as a text prefix, the Dashboard sends where the
-// person is as a structured `context` the server grounds the answer in.
+// sends its picked source as a text prefix, the Dashboard and Organizations
+// send where the person is as a structured `context` the server grounds the
+// answer in.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, Clock, LayoutDashboard, MessageSquare, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, Clock, LayoutDashboard, MessageSquare, Network, Plus, Search, X } from 'lucide-react';
 import { AskRevenactBox } from '../shared/AskRevenactBox';
 import { fetchConversation, fetchConversations } from '../../pages/copilot/copilotApi';
 import { MessageSources } from '../../pages/copilot/MessageSources';
-import type { Conversation, ConversationSummary, CopilotMessage, DashboardContext } from '../../pages/copilot/types';
-import { contextLabel, viewLabel, type FilterNames } from './dashboardLabels';
+import type { Conversation, ConversationSummary, CopilotMessage, SurfaceContext } from '../../pages/copilot/types';
 import type { RailContext } from './railContext';
+import { originTag } from './surfaceLabels';
 import { useCopilotThread, type CopilotThread, type Turn } from './useCopilotThread';
 
 export interface CopilotRailProps {
@@ -33,9 +35,10 @@ export interface CopilotRailProps {
   top?: ReactNode;
   /** Drive the rail from outside (the dashboard sends "Why?" without the composer). */
   thread?: CopilotThread;
-  /** Names for filter values. Per-message chips render only when given, so a
-   *  dashboard conversation reopened elsewhere reads as plain text. */
-  names?: FilterNames;
+  /** Each question's own chip, worded by the surface it was asked on.
+   *  Per-message chips render only when given, so a surface conversation
+   *  reopened elsewhere (Communications) reads as plain text. */
+  chipLabel?: (context: SurfaceContext) => string;
   /** Prefills the composer; a new nonce replaces what is typed. */
   draft?: { text: string; nonce: number } | null;
   /** Called as a question is sent. */
@@ -73,7 +76,7 @@ export function CopilotRail({
   className = 'w-[320px]',
   top,
   thread: given,
-  names,
+  chipLabel,
   draft,
   onSent,
 }: CopilotRailProps) {
@@ -85,7 +88,7 @@ export function CopilotRail({
   const railRef = useRef<HTMLElement>(null);
   const messages: CopilotMessage[] = conversation?.messages ?? [];
   const empty = messages.length === 0 && !pending && !failed;
-  const chipOf = (asked: DashboardContext | null | undefined) => (names && asked ? contextLabel(asked, names) : undefined);
+  const chipOf = (asked: SurfaceContext | null | undefined) => (chipLabel && asked ? chipLabel(asked) : undefined);
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end' });
@@ -93,7 +96,7 @@ export function CopilotRail({
 
   async function send(text: string) {
     const turn: Turn =
-      context?.kind === 'dashboard'
+      context?.kind === 'surface'
         ? { text, content: text, context: context.context }
         : { text, content: (context ? `[About: ${context.label}] ` : '') + text };
     onSent?.();
@@ -300,13 +303,20 @@ export function HistoryPopover({ onClose, onOpen }: { onClose: () => void; onOpe
                     className="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-lg text-[13px] text-ink hover:bg-surface"
                   >
                     <MessageSquare className="w-4 h-4 text-ink-faint shrink-0" aria-hidden="true" />
-                    <span className="truncate">{c.title}</span>
+                    <span className="flex-1 min-w-0 truncate">{c.title}</span>
                     {c.origin ? (
-                      <span className="ml-auto shrink-0 inline-flex items-center gap-1 rounded-md bg-surface border border-line px-1.5 py-0.5 text-[11px] text-ink-muted">
-                        <LayoutDashboard className="w-3 h-3" aria-hidden="true" />
-                        <span className="sr-only">Started on the dashboard: </span>
+                      <span
+                        title={originTag(c) ?? undefined}
+                        className="ml-auto min-w-0 max-w-[40%] shrink inline-flex items-center gap-1 rounded-md bg-surface border border-line px-1.5 py-0.5 text-[11px] text-ink-muted"
+                      >
+                        {c.origin.surface === 'organizations' ? (
+                          <Network className="w-3 h-3 shrink-0" aria-hidden="true" />
+                        ) : (
+                          <LayoutDashboard className="w-3 h-3 shrink-0" aria-hidden="true" />
+                        )}
+                        <span className="sr-only">{c.origin.surface === 'organizations' ? 'Started on ' : 'Started on the dashboard: '}</span>
                         {' '}
-                        {viewLabel(c.origin.area, c.origin.view)}
+                        <span className="truncate">{originTag(c)}</span>
                       </span>
                     ) : null}
                   </button>

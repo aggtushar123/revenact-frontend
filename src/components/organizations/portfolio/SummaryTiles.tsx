@@ -88,7 +88,7 @@ const mono = 'font-mono-brand tabular-nums';
 
 function Skeleton() {
   return (
-    <div role="status" aria-label="Loading summary" className="flex gap-3 overflow-hidden sm:grid sm:grid-cols-2 lg:grid-cols-5">
+    <div role="status" aria-label="Loading summary" className="flex gap-3 overflow-hidden sm:grid sm:grid-cols-2 @min-[50rem]:grid-cols-5">
       {Array.from({ length: 5 }, (_, i) => (
         <div key={i} aria-hidden="true" className="min-w-[15rem] shrink-0 rounded-xl bg-surface p-3 sm:min-w-0">
           <span className="block h-2.5 w-16 animate-pulse rounded bg-subtle" />
@@ -155,7 +155,7 @@ export function SummaryTiles({
   const spans = RENEWAL_WINDOWS.filter((days) => days !== '180' || span === '180');
 
   return (
-    <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-5">
+    <div className="-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-2 sm:overflow-visible sm:px-0 sm:pb-0 @min-[50rem]:grid-cols-5">
       <Tile
         title="Health"
         action={
