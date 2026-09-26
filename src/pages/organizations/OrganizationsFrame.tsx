@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 
-/** The Organizations list's frame: DashboardFrame's body, class for class
+/** The Organizations list's and board's frame: DashboardFrame's body, class for class
  *  (px-4 pb-4, gap-3, no top padding because the transparent top bar above
  *  gives it), with a content column that owns its scroll and a slot for the
  *  Ask rail beside it. Delivery 3 passes the rail and portals the pill into
