@@ -123,12 +123,12 @@ export function Navbar() {
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
   const isDashboard = location.pathname.startsWith('/dashboard');
-  // The Organizations list wears the dashboard's frame (portfolio spec §1):
-  // the transparent top bar, the actions slot (empty until Ask Revenact
-  // lands on Organizations), and no avatar. The board keeps today's header
-  // until it moves onto the portfolio (delivery 2).
-  const isOrgList = location.pathname === '/organizations/list';
-  const isFramed = isDashboard || isOrgList;
+  // The Organizations list and board wear the dashboard's frame (portfolio
+  // spec §1, owner decisions 2026-09-26): the transparent top bar, the
+  // actions slot (empty until Ask Revenact lands on Organizations), and no
+  // avatar.
+  const isOrgView = location.pathname === '/organizations/list' || location.pathname === '/organizations/board';
+  const isFramed = isDashboard || isOrgView;
   const dashboardSharedSearch = sharedSearch(location.search);
 
 
@@ -285,7 +285,7 @@ export function Navbar() {
                  <h1 className="text-[16px] font-bold text-ink tracking-tight uppercase">{organization.org}</h1>
               </div>
           </div>
-        ) : isOrgList ? (
+        ) : isOrgView ? (
           <div className="flex items-center gap-4 h-full">
             <h1 className="text-[17px] font-bold text-ink tracking-tight">Organizations</h1>
             <nav aria-label="Organizations views" className="flex items-center gap-4 h-full">
@@ -295,7 +295,9 @@ export function Navbar() {
               ].map((view) => (
                 <NavLink
                   key={view.to}
-                  to={view.to}
+                  // The two views share their URL state (filters, sort,
+                  // group), so switching tabs keeps it.
+                  to={{ pathname: view.to, search: location.search }}
                   className={({ isActive }) =>
                     `h-full inline-flex items-center text-[13px] font-semibold border-b-2 transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                       isActive ? 'border-accent text-ink' : 'border-transparent text-ink-muted hover:text-ink'
