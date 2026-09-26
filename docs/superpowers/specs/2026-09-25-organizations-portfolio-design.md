@@ -91,6 +91,16 @@ Fields from the old table that sit in the row header rather than a panel: Organi
 - **Drag**: dragging between lifecycle columns changes the stage, as today. Dropping into Churn opens the existing churn modal.
 - **Other groupings**: when grouped by anything other than lifecycle, drag is disabled.
 
+Decided with the owner on 2026-09-26 (delivery 2):
+
+- **Shared top of the page**: the Board uses the List's frame, tiles, toolbar, filters, chips and "N of M" count. Filters live in the URL, so switching tabs keeps them. Group defaults to **lifecycle** on the Board (health on the List).
+- **Columns**: each column is one `usePagedPortfolio` read (`group_value=<key>`) that loads its next page when its end scrolls into view. Grouped by lifecycle, every stage gets a column, empty ones included, so there is always a drop target.
+- **Card click**: opens the six detail panels in a side panel on the right (a bottom sheet on phones), so the board stays in place. The account name still links to `/organizations/:id`.
+- **Moving an account**: drag between lifecycle columns, or use the card's **Move to…** menu (the keyboard and touch path). The card moves optimistically, saves through the single-customer update, and returns to its column with a message if the save fails. Moving into Churn opens `ChurnOrganizationModal` instead. Moving is off for other groupings.
+- **Phones**: columns become full-width panels you swipe between, with a strip of stage tabs to jump to one.
+- **Chrome**: the Board gets the transparent top bar and the frame's (empty) rail slot, like the List. `MetricsPanel` and `RenewalPopover` retire with this delivery. `KanbanBoard` stays for Pipelines.
+- **Backend**: none. The portfolio endpoint's `group_value` and cursor already page each column.
+
 ### Selection mode (`SelectionBar`)
 
 - **Entry**: tick a checkbox, or long-press a row on phones.
