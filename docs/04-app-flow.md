@@ -265,12 +265,21 @@ in instead.
    panels; then the email, phone, industry and CSAT response bands from
    `GET /customers/{id}/`; then `AIAttributesPanel`), People (contacts), Deals & risks (opportunities and
    risks), Knowledge (Company View, then headlines) and Files (files, then
-   CallSense calls); the last four read their data when first opened. The
-   account chips (`?account=`, an id or `none`) filter the Story, whose filters
-   (`group`, `source`, `q`) live in the URL too. "+ Add" logs a call or a
-   survey, or creates a task or a note, with the existing forms, on the chosen
-   account when there is one; an email opens its thread; any other item opens
-   in place, with its link when it has one. Edit opens `OrganizationFormModal`;
+   CallSense calls); the last four read their data when first opened. Opening a
+   tab reads its data the first time only: visited tabs stay mounted, with
+   inactive panels hidden, so returning doesn't reload or blank them, and the
+   Story is read only once Story has been opened. The account chips
+   (`?account=`, an id or `none`) filter the Story, whose filters (`group`,
+   `source`, `q`) live in the URL too. "+ Add" offers Log a call, New task, New
+   note and Log survey — there is no "Log activity", since there's no create
+   endpoint for it — with the existing forms, on the chosen account when there
+   is one or at organisation level otherwise; an email opens its thread; any
+   other item opens in place, with its link when it has one. A failed task or
+   note save keeps the sheet open, keeps what was typed, and shows "Could not
+   save that task." or "Could not save that note.", or the server's message.
+   The Feedback filter group shows "Manage surveys", a link to `/surveys`
+   (that page has no per-organization filter yet, a follow-up). Edit opens
+   `OrganizationFormModal`;
    ⋯ archives (`POST /organizations/bulk/`) or churns
    (`ChurnOrganizationModal`). A tile jumps to its Details panel; Health opens
    its breakdown. An id that is not a number, or one the viewer cannot see,

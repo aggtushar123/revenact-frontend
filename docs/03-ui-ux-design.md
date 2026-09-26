@@ -463,11 +463,19 @@ Rules specific to it, enforced by `components/organizations/detail/houseRules.te
   jump to their Details panel. A grid of four from `sm`, a snapping strip below.
 - Account chips (All, each account, Organization) carry only a name and the
   story's count; the chosen one is `bg-accent text-on-accent`.
-- Details opens with Accounts: one `bg-surface` list, an item per connected
-  account (name linking to its page, owner · domain, "AI n", the AI label,
-  the pulse dots, the AI reason, Edit), with Add account in its heading.
-  Under the six panels, in the same surface, "Contact and CSAT": email and
-  phone as links, industry, and the CSAT bands as bars at their true share.
+- Details opens with Accounts (`detail/AccountsSection.tsx`): a summary line
+  above the list shows counts, the health mix, total ARR, NPS with its
+  promoter, passive and detractor split, average CSAT and average CSM (both
+  averaged over scored accounts only, "—" when none are scored), and the
+  lifecycle breakdown. Then one `bg-surface` list, an item per connected
+  account: the name links to `/accounts/:id`, owner · domain, then a second
+  line with health (score and category), lifecycle, ARR, renewal, NPS, CSAT,
+  "AI n · CSM n" with the pulse dots and the AI reason, and the Revenact ID,
+  with "—" for blanks. Add account is in the heading; each item has its own
+  Edit. Under the six panels, in the same surface, "Contact and CSAT"
+  (`CustomerFacts`): email as a `mailto:` link with the part before the `@`
+  encoded, phone as a `tel:` link, industry, and the CSAT bands as bars at
+  their true share.
 - The one primary on the Story is "+ Add" (`PRIMARY` in `portfolio/styles.ts`:
   `bg-accent text-on-accent`, never layered on the surface button).
 - Tabs are a real tablist (`role="tab"`, roving tab index, arrows, Home, End),
