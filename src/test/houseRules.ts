@@ -20,6 +20,19 @@ const PX_SIZE = /text-\[(\d+(?:\.\d+)?)px\]/g;
 const NON_PX_SIZE = /text-\[[\d.]+(?:rem|em|%)\]/g;
 const NAMED_SIZE = /\btext-(?:xs|sm|base|lg|xl|2xl|3xl)\b/;
 
+// Icons are lucide-react only, never emoji. `\p{Extended_Pictographic}`
+// covers real emoji (🚀, ✨, ...) but leaves the house glyphs alone: ✦ (the
+// Ask mark), ·, —, › and ‹ all test false against it, so no allow-list is
+// needed today; if a future glyph does trip it, add it here rather than
+// weakening the rule.
+export const EMOJI = /\p{Extended_Pictographic}/u;
+
+// `h-screen` (and any variant of it, e.g. `md:h-screen`) ignores mobile
+// browser chrome; `min-h-[100dvh]` is the house rule. The lookbehind rejects
+// a `-` or word character right before the `h` so `min-h-screen` (a
+// different utility) is not a false positive.
+export const H_SCREEN = /(?<![\w-])h-screen\b/;
+
 export function sizeOffenders(source: string): string[] {
   const offenders: string[] = [];
   for (const match of source.matchAll(PX_SIZE)) {
@@ -59,6 +72,14 @@ export function houseRuleSuite(title: string, files: Record<string, string>): vo
 
     it('loads no third-party image (no Clearbit logo, no pravatar avatar)', () => {
       expect(sources.filter(([, s]) => /clearbit|pravatar/i.test(s)).map(([f]) => f)).toEqual([]);
+    });
+
+    it('uses no emoji as icons', () => {
+      expect(sources.filter(([, s]) => EMOJI.test(s)).map(([f]) => f)).toEqual([]);
+    });
+
+    it('never fills the viewport with h-screen (use min-h-[100dvh])', () => {
+      expect(sources.filter(([, s]) => H_SCREEN.test(s)).map(([f]) => f)).toEqual([]);
     });
   });
 }

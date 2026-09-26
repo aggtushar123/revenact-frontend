@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RAW, sizeOffenders } from './houseRules';
+import { EMOJI, H_SCREEN, RAW, sizeOffenders } from './houseRules';
 
 describe('house-rules scanners', () => {
   it('flag real offenders and leave tokens alone', () => {
@@ -20,5 +20,15 @@ describe('house-rules scanners', () => {
     expect(sizeOffenders('text-[13px]')).toEqual([]);
     expect(sizeOffenders('text-sm')).toEqual(['named text size']);
     expect(sizeOffenders('text-[11px] text-ink')).toEqual([]);
+
+    expect(EMOJI.test('<span>🚀</span>')).toBe(true);
+    expect(EMOJI.test('<span>✨</span>')).toBe(true);
+    expect(EMOJI.test('✦')).toBe(false);
+    expect(EMOJI.test('· — › ‹')).toBe(false);
+
+    expect(H_SCREEN.test('<div className="h-screen">')).toBe(true);
+    expect(H_SCREEN.test('<div className="md:h-screen">')).toBe(true);
+    expect(H_SCREEN.test('<div className="min-h-screen">')).toBe(false);
+    expect(H_SCREEN.test('<div className="min-h-[100dvh]">')).toBe(false);
   });
 });
