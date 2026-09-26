@@ -65,13 +65,15 @@ export function AskProvider({
   const [pendingDraft, setPendingDraft] = useState<{ text: string; nonce: number } | null>(null);
 
   // The handover is spent once read: clear it from the history entry, so a
-  // reload or Back and Forward neither refetches it nor forces the rail open.
+  // reload or Back and Forward neither refetches it nor forces the rail
+  // open. Only a real handover (an id or a conversation) is ours to clear:
+  // navigation state from anywhere else is not this provider's to erase.
   const cleared = useRef(false);
   useEffect(() => {
-    if (!handover || cleared.current) return;
+    if (!handover || cleared.current || handedId === null) return;
     cleared.current = true;
     navigate(arrivedAt, { replace: true, state: null });
-  }, [handover, arrivedAt, navigate]);
+  }, [handover, handedId, arrivedAt, navigate]);
 
   useEffect(() => {
     // Only an id came (History's copy was lost): fetch it.

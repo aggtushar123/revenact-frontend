@@ -189,6 +189,14 @@ describe('AskProvider', () => {
     expect(screen.getByTestId('title')).toHaveTextContent('Who renews first?');
   });
 
+  it("leaves navigation state alone when it isn't an Ask handover: only a real handover (an id or a conversation) is cleared", async () => {
+    renderAt({ pathname: '/organizations/list', state: { somethingElse: true } }, 1100);
+    expect(screen.getByTestId('state')).toHaveTextContent('{"somethingElse":true}');
+    // Give the clearing effect a turn to (not) run.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(screen.getByTestId('state')).toHaveTextContent('{"somethingElse":true}');
+  });
+
   it('never lets a late handover overwrite a question sent meanwhile', async () => {
     orgContext = boardContext;
     const { release, answer } = slowHandover();
