@@ -21,7 +21,6 @@ import { useBoardMove } from '../../components/organizations/portfolio/useBoardM
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
 import { FOCUS } from '../../components/organizations/portfolio/styles';
-import { AskRail } from '../dashboard/ask/AskRail';
 import { useAsk } from '../dashboard/ask/useAsk';
 import { useReportPortfolioOptions } from './ask/portfolioOptions';
 import { useAskFocusOnOpen } from './ask/useAskFocus';
@@ -170,7 +169,7 @@ export function Board() {
   };
 
   return (
-    <OrganizationsFrame rail={<AskRail />}>
+    <OrganizationsFrame>
       {/* From sm the page fills the frame (a flex column chain with min-h-0
           down to each column's own scroller), so the page doesn't scroll
           and the columns do. A short window keeps a 360px board and lets the

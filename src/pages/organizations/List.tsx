@@ -24,7 +24,6 @@ import type { PortfolioRowRenderer } from '../../components/organizations/portfo
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
 import { useSelection } from '../../components/organizations/portfolio/useSelection';
-import { AskRail } from '../dashboard/ask/AskRail';
 import { useReportPortfolioOptions } from './ask/portfolioOptions';
 import { useAskFocusOnOpen } from './ask/useAskFocus';
 import { OrganizationsFrame } from './OrganizationsFrame';
@@ -202,7 +201,7 @@ export function List() {
   };
 
   return (
-    <OrganizationsFrame rail={<AskRail />}>
+    <OrganizationsFrame>
       <div className="flex flex-col gap-4 pb-6">
         {/* Containers: the tiles and rows follow this column, which the Ask
             rail narrows, not the window. */}
