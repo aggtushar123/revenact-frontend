@@ -11,7 +11,17 @@ const BAND_TONE: Record<string, string> = {
   very_dissatisfied: 'bg-danger',
 };
 
-const LINK = `inline-flex min-h-11 max-w-full items-center truncate rounded-sm text-ink underline sm:min-h-0 ${FOCUS}`;
+const LINK = `flex min-h-11 min-w-0 max-w-full items-center truncate rounded-sm text-ink underline sm:min-h-0 ${FOCUS}`;
+
+/** Encodes only the local part (before the last `@`) so a stray `?`/`&`/`=`
+ *  in it can't be read as the mailto URL's own query string (round-1 fix,
+ *  2026-09-27) — the domain is never percent-encoded, and the visible link
+ *  text stays the raw address. */
+function mailtoHref(email: string): string {
+  const at = email.lastIndexOf('@');
+  if (at === -1) return `mailto:${encodeURIComponent(email)}`;
+  return `mailto:${encodeURIComponent(email.slice(0, at))}@${email.slice(at + 1)}`;
+}
 
 function Fact({ term, children }: { term: string; children: ReactNode }) {
   return (
@@ -91,7 +101,7 @@ export function CustomerFacts({
           <dl className="grid grid-cols-[6rem_minmax(0,1fr)] content-start gap-x-3 gap-y-1.5 text-[13px]">
             <Fact term="Email">
               {customer.email ? (
-                <a href={`mailto:${customer.email}`} className={LINK}>
+                <a href={mailtoHref(customer.email)} className={LINK}>
                   {customer.email}
                 </a>
               ) : (

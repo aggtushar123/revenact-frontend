@@ -1,9 +1,13 @@
+import type { ReactNode } from 'react';
 import { useId } from 'react';
 import { Link } from 'react-router-dom';
 import { Pencil, Plus } from 'lucide-react';
 import type { Account } from '../../../features/customers/customersSlice';
-import { AI_PULSE_LABELS } from '../../../features/customers/formatters';
-import { PulseDots } from '../portfolio/rowParts';
+import type { CurrencyCode } from '../../../features/auth/authSlice';
+import { AI_PULSE_LABELS, LIFECYCLE_LABELS, formatCompactMoney } from '../../../features/customers/formatters';
+import { HEALTH_LABEL } from '../../../features/organizations/portfolioLabels';
+import { signed } from '../../../features/organizations/portfolioFields';
+import { PulseDots, renewalText } from '../portfolio/rowParts';
 import { FOCUS, QUIET } from '../portfolio/styles';
 
 export interface AccountsSectionProps {
@@ -16,18 +20,124 @@ export interface AccountsSectionProps {
   onEdit: (account: Account) => void;
 }
 
-function AccountItem({ account, onEdit }: { account: Account; onEdit: (account: Account) => void }) {
+const DASH = '—';
+
+const utcDay = (iso: string) => {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  return Date.UTC(y, m - 1, d);
+};
+
+/** "in Nd" / "Nd overdue" (reusing `renewalText`'s own wording), or "—" with
+ *  no renewal date on file — its "No renewal date" phrase is for the
+ *  organisation's own tile, not this compact per-account line (round-1 fix,
+ *  2026-09-27: every blank value here reads as "—"). */
+function renewalInfo(renewalDate: string | null, today: string): { text: string; overdue: boolean } {
+  if (!renewalDate) return { text: DASH, overdue: false };
+  const days = Math.round((utcDay(renewalDate) - utcDay(today)) / 86400000);
+  return { text: renewalText(days), overdue: days < 0 };
+}
+
+function pctOrDash(raw: string | null): string {
+  return raw == null ? DASH : `${parseFloat(raw)}%`;
+}
+
+function plural(n: number, word: string): string {
+  return `${n} ${word}${n === 1 ? '' : 's'}`;
+}
+
+/** A number in the house style — tabular DM Mono, so figures line up. */
+function Num({ children }: { children: ReactNode }) {
+  return <span className="font-mono-brand tabular-nums text-ink">{children}</span>;
+}
+
+/** Every figure the old AccountsMetricsBanner showed (health/ARR by
+ *  category, NPS and its promoter/passive/detractor split, average CSAT,
+ *  the lifecycle-stage breakdown), computed the same way it was, so nothing
+ *  is lost when the banner and its donuts go (round-1 fix, 2026-09-27). */
+function summarize(items: Account[]) {
+  const total = items.length;
+  const health = { good: 0, average: 0, poor: 0 };
+  const lifecycle = new Map<Account['lifecycle_stage'], number>();
+  let arr = 0;
+  let promoters = 0;
+  let passives = 0;
+  let detractors = 0;
+  let csatTotal = 0;
+  for (const a of items) {
+    health[a.health_category]++;
+    lifecycle.set(a.lifecycle_stage, (lifecycle.get(a.lifecycle_stage) ?? 0) + 1);
+    arr += Number(a.arr) || 0;
+    const nps = a.nps_score ?? 0;
+    if (nps > 0) promoters++;
+    else if (nps === 0) passives++;
+    else detractors++;
+    csatTotal += a.csat_score != null ? parseFloat(a.csat_score) : 0;
+  }
+  const npsScore = total > 0 ? Math.round(((promoters - detractors) / total) * 100) : 0;
+  const avgCsat = total > 0 ? Math.round(csatTotal / total) : 0;
+  const lifecycleLine = (Object.keys(LIFECYCLE_LABELS) as Account['lifecycle_stage'][])
+    .filter((key) => lifecycle.get(key))
+    .map((key) => `${LIFECYCLE_LABELS[key]} ${lifecycle.get(key)}`)
+    .join(' · ');
+  return { total, health, arr, npsScore, promoters, passives, detractors, avgCsat, lifecycleLine };
+}
+
+/** Replaces the old AccountsMetricsBanner's donuts with the same figures as
+ *  compact text (owner decision 2026-09-26; round-1 fix, 2026-09-27: "don't
+ *  lose information" — everything the banner showed is still here). */
+function AccountsSummary({ items, currency }: { items: Account[]; currency: CurrencyCode }) {
+  const { total, health, arr, npsScore, promoters, passives, detractors, avgCsat, lifecycleLine } = summarize(items);
+  return (
+    <div className="flex flex-col gap-0.5 px-3 pb-2 text-[11px] text-ink-muted">
+      <p>
+        <Num>{total}</Num> {total === 1 ? 'account' : 'accounts'} · <Num>{health.good}</Num> healthy · <Num>{health.average}</Num> average ·{' '}
+        <Num>{health.poor}</Num> at risk · ARR <Num>{formatCompactMoney(arr, currency)}</Num> · NPS <Num>{signed(npsScore)}</Num> (
+        {plural(promoters, 'promoter')}, {plural(passives, 'passive')}, {plural(detractors, 'detractor')}) · CSAT <Num>{avgCsat}%</Num>
+      </p>
+      {lifecycleLine ? <p>{lifecycleLine}</p> : null}
+    </div>
+  );
+}
+
+function AccountItem({
+  account,
+  onEdit,
+  currency,
+  today,
+}: {
+  account: Account;
+  onEdit: (account: Account) => void;
+  currency: CurrencyCode;
+  today: string;
+}) {
   const ai = account.ai_pulse_value;
+  const healthScore = Number(account.health_score);
+  const healthText = Number.isNaN(healthScore) ? DASH : `${healthScore.toFixed(1)} ${HEALTH_LABEL[account.health_category]}`;
+  const lifecycleText = LIFECYCLE_LABELS[account.lifecycle_stage] ?? 'Other';
+  const renewal = renewalInfo(account.renewal_date, today);
   return (
     <li data-account={account.id} className="flex flex-col gap-1 px-3 py-2.5 sm:flex-row sm:items-start sm:gap-3">
       <div className="min-w-0 flex-1">
         <Link
           to={`/accounts/${account.id}`}
-          className={`inline-flex min-h-11 max-w-full items-center truncate rounded-sm text-[13px] font-semibold text-ink hover:underline sm:min-h-0 ${FOCUS}`}
+          className={`flex min-h-11 min-w-0 max-w-full items-center truncate rounded-sm text-[13px] font-semibold text-ink hover:underline sm:min-h-0 ${FOCUS}`}
         >
           {account.name}
         </Link>
-        <p className="truncate text-[11px] text-ink-muted">{[account.owner?.name ?? 'No owner', account.domain || null].filter(Boolean).join(' · ')}</p>
+        <p className="truncate text-[11px] text-ink-muted">{[account.owner?.name || 'No owner', account.domain || null].filter(Boolean).join(' · ')}</p>
+        {/* Everything AccountSerializer adds beyond the chip's own fields
+           (health, lifecycle, ARR, renewal, NPS, CSAT, the Revenact ID) —
+           round-1 fix, 2026-09-27: these used to live only in the old
+           Accounts tab's table/banner and would otherwise be lost. */}
+        <p className="mt-1 flex flex-wrap items-baseline gap-x-1 gap-y-0.5 text-[11px] text-ink-muted">
+          <span>Health <Num>{healthText}</Num></span>
+          <span>· {lifecycleText}</span>
+          <span>· <Num>{formatCompactMoney(account.arr, currency)}</Num> ARR</span>
+          <span className={renewal.overdue ? 'font-semibold text-danger' : undefined}>· {renewal.text}</span>
+          <span>· NPS <Num>{signed(account.nps_score)}</Num></span>
+          <span>· CSAT <Num>{pctOrDash(account.csat_score)}</Num></span>
+          <span>· ID <Num>{account.id}</Num></span>
+        </p>
         <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-muted">
           <span className="font-mono-brand tabular-nums text-ink">AI {ai == null ? '—' : ai}</span>
           {account.ai_pulse_score ? <span>{AI_PULSE_LABELS[account.ai_pulse_score]}</span> : null}
@@ -45,10 +155,32 @@ function AccountItem({ account, onEdit }: { account: Account; onEdit: (account: 
 
 /** Accounts on the Details tab (the owner's decision, 2026-09-26: an
  *  account's details are not lost with the old Accounts tab). One list item
- *  per connected account with only what the accounts endpoint serves; the
- *  name opens `/accounts/:id`. Add and Edit are also on the Story tab's chip
- *  row. On phones the item's Edit wraps under its details. */
-export function AccountsSection({ items, loading, error, onRetry, onAdd, onEdit }: AccountsSectionProps) {
+ *  per connected account with what the accounts endpoint serves — including
+ *  its health, lifecycle, ARR, renewal, NPS, CSAT and Revenact ID (round-1
+ *  fix, 2026-09-27: "don't lose information" — these were on the old table/
+ *  banner and are not columns here, just a second meta line); the name opens
+ *  `/accounts/:id`. A compact summary above the list replaces the old
+ *  AccountsMetricsBanner's donuts with the same figures as text. Add and
+ *  Edit are also on the Story tab's chip row. On phones the item's Edit
+ *  wraps under its details. */
+export function AccountsSection({
+  items,
+  loading,
+  error,
+  onRetry,
+  onAdd,
+  onEdit,
+  currency,
+  today = new Date().toISOString().slice(0, 10),
+}: AccountsSectionProps & {
+  /** The organisation's own contract currency (`details.commercial.currency`)
+   *  — an Account never carries its own, so its ARR always renders in this
+   *  one, matching what the old AccountsMetricsBanner did. */
+  currency: CurrencyCode;
+  /** For deterministic renewal-runway text in tests; real callers take the
+   *  default. */
+  today?: string;
+}) {
   const headingId = useId();
   return (
     <section aria-labelledby={headingId} className="rounded-xl bg-surface">
@@ -81,11 +213,14 @@ export function AccountsSection({ items, loading, error, onRetry, onAdd, onEdit 
           </button>
         </div>
       ) : items.length ? (
-        <ul className="divide-y divide-line-subtle">
-          {items.map((account) => (
-            <AccountItem key={account.id} account={account} onEdit={onEdit} />
-          ))}
-        </ul>
+        <>
+          <AccountsSummary items={items} currency={currency} />
+          <ul className="divide-y divide-line-subtle">
+            {items.map((account) => (
+              <AccountItem key={account.id} account={account} onEdit={onEdit} currency={currency} today={today} />
+            ))}
+          </ul>
+        </>
       ) : (
         <div className="px-3 pb-3">
           <p className="text-[13px] font-semibold text-ink">No accounts yet</p>

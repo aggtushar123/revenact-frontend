@@ -42,6 +42,15 @@ describe('CustomerFacts (spec §2: what GET /customers/{id}/ adds)', () => {
     expect(value('Industry')).toHaveTextContent('Restaurants');
   });
 
+  // Round-1 fix, 2026-09-27: a stray "?"/"&"/"=" in the local part must not
+  // be read as the mailto URL's own query string.
+  it("encodes the email's local part before building its mailto: link", () => {
+    renderFacts({ customer: { ...FULL, email: 'a?bcc=x@y.z' } });
+    const section = screen.getByRole('region', { name: 'Contact and CSAT' });
+    const link = within(section).getByRole('link', { name: 'a?bcc=x@y.z' });
+    expect(link).toHaveAttribute('href', 'mailto:a%3Fbcc%3Dx@y.z');
+  });
+
   it('shows a blank field as "—" with no link', () => {
     renderFacts({ customer: pizzaHutCustomer });
     for (const term of ['Email', 'Phone', 'Industry']) expect(value(term)).toHaveTextContent('—');

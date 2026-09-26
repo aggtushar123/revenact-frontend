@@ -33,7 +33,7 @@ export function DetailsTab({
 }) {
   return (
     <div className="flex flex-col gap-3">
-      <AccountsSection {...accounts} />
+      <AccountsSection {...accounts} currency={row.details.commercial.currency} />
       <div className="rounded-xl bg-surface">
         <AccountDetails row={row} stacked={!isSm} onEdit={onEdit ? () => onEdit() : undefined} />
         <CustomerFacts customer={customer} error={customerError} stacked={!isSm} onRetry={onRetryCustomer} />

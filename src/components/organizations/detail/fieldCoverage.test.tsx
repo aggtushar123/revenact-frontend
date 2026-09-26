@@ -6,7 +6,7 @@ import { ALL_COLUMNS } from '../tableData';
 import { PANEL_ORDER, PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
 import { initech, pizzaHut } from '../../../features/organizations/testPortfolio';
-import { stubOrganizationPage } from '../../../features/organizations/testStory';
+import { ACCOUNTS, stubOrganizationPage } from '../../../features/organizations/testStory';
 import { makeDetailStore } from '../../../pages/organizations/testDetail';
 import { DetailsTab } from './DetailsTab';
 import { HeaderTiles } from './HeaderTiles';
@@ -15,6 +15,9 @@ import { OrganizationHeader } from './OrganizationHeader';
 // Spec §0: the page used to show fewer fields than the List. With the name
 // row, the tiles and the Details tab it shows every one of the 34, once.
 // The churned fixture is used because the churn fields show only when churned.
+// Accounts render with real items (round-1 fix, 2026-09-27) so an
+// AccountsSection regression — like its PulseDots picking up the org row's
+// own `data-field="pulse"` — would fail the "renders exactly once" case below.
 function renderPage(row: PortfolioRow) {
   stubOrganizationPage({ row });
   return render(
@@ -28,7 +31,7 @@ function renderPage(row: PortfolioRow) {
           row={row}
           customerId={row.id}
           isSm
-          accounts={{ items: [], loading: false, error: null, onRetry: () => {}, onAdd: () => {}, onEdit: () => {} }}
+          accounts={{ items: ACCOUNTS, loading: false, error: null, onRetry: () => {}, onAdd: () => {}, onEdit: () => {} }}
           customer={null}
           customerError={null}
           onRetryCustomer={() => {}}
