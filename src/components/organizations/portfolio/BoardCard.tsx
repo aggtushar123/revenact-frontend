@@ -24,14 +24,14 @@ export interface BoardCardProps {
   canMove: boolean;
   /** A move is saving or settling (one at a time). */
   moveDisabled: boolean;
-  /** This card just moved here from a Move to… choice: take focus once. */
-  takeFocus?: boolean;
+  /** Why moving is off, shown on the Move to… button when it is stuck. */
+  moveNote?: string | null;
   onOpen: (row: PortfolioRow) => void;
-  onMove: (row: PortfolioRow, to: LifecycleValue) => void;
+  /** `fromMenu` is true for a Move to… choice (keyboard or touch), whose
+   *  card should keep focus in its new column; a drag leaves focus alone. */
+  onMove: (row: PortfolioRow, to: LifecycleValue, fromMenu?: boolean) => void;
   onDragStart: (row: PortfolioRow) => void;
   onDragEnd: () => void;
-  /** Called once focus has been taken, with the card's id. */
-  onFocused?: (id: number) => void;
 }
 
 /** The menu's tallest height (seven 32px items plus `py-1`) and its gap. */
@@ -82,13 +82,15 @@ function placeMenu(button: HTMLElement): { upward: boolean; maxHeight: number } 
 function MoveToMenu({
   row,
   disabled,
+  note,
   targets,
   onMove,
 }: {
   row: PortfolioRow;
   disabled: boolean;
+  note: string | null;
   targets: LifecycleValue[];
-  onMove: (row: PortfolioRow, to: LifecycleValue) => void;
+  onMove: (row: PortfolioRow, to: LifecycleValue, fromMenu?: boolean) => void;
 }) {
   const [openMenu, setOpenMenu] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -135,6 +137,7 @@ function MoveToMenu({
         aria-haspopup="menu"
         aria-expanded={openMenu}
         aria-label={`Move ${row.name} to…`}
+        title={disabled && note ? note : undefined}
         onClick={(event) => {
           event.stopPropagation();
           setActiveIndex(0);
@@ -165,7 +168,7 @@ function MoveToMenu({
               role="menuitem"
               tabIndex={-1}
               onClick={() => {
-                onMove(row, value);
+                onMove(row, value, true);
                 closeMenu();
               }}
               className={`flex min-h-11 sm:min-h-8 shrink-0 items-center px-3 text-left text-[13px] text-ink hover:bg-subtle focus-visible:bg-subtle ${FOCUS}`}
@@ -183,7 +186,8 @@ function MoveToMenu({
  *  content (ring, name, owner, then ARR, signal and trend) as a compact
  *  card. A click opens its details beside the board. The name links to the
  *  organization page. The header's Move to… icon button is the keyboard and
- *  touch path for a move. Memoised: dragging re-renders the board, and only
+ *  touch path for a move; after one, the board keeps focus on this card's
+ *  Open button (`data-part="open"`) in its new column. Memoised: dragging re-renders the board, and only
  *  the cards whose props change should follow. */
 export const BoardCard = memo(function BoardCard({
   row,
@@ -192,26 +196,15 @@ export const BoardCard = memo(function BoardCard({
   open,
   canMove,
   moveDisabled,
-  takeFocus = false,
+  moveNote = null,
   onOpen,
   onMove,
   onDragStart,
   onDragEnd,
-  onFocused,
 }: BoardCardProps) {
-  const openRef = useRef<HTMLButtonElement>(null);
   const draggable = isSm && canMove && !moveDisabled;
   const arr = row.arr == null ? '—' : formatCompactMoney(row.arr, currency);
   const targets = LIFECYCLE_VALUES.filter((value) => value !== row.lifecycle.value);
-
-  // A card that just moved here from its Move to… menu mounts fresh in its
-  // new column, so focus would fall to <body>: it takes focus instead. Open,
-  // not Move to…, because moving stays disabled until the move settles.
-  useEffect(() => {
-    if (!takeFocus) return;
-    openRef.current?.focus();
-    onFocused?.(row.id);
-  }, [takeFocus, onFocused, row.id]);
 
   const startDrag = (event: DragEvent<HTMLLIElement>) => {
     // jsdom has no DataTransfer. Browsers get the id so Firefox starts the drag.
@@ -244,9 +237,9 @@ export const BoardCard = memo(function BoardCard({
           </Link>
           <p className="truncate text-[11px] text-ink-muted">{PORTFOLIO_FIELDS.owner.value(row)}</p>
         </div>
-        {canMove ? <MoveToMenu row={row} disabled={moveDisabled} targets={targets} onMove={onMove} /> : null}
+        {canMove ? <MoveToMenu row={row} disabled={moveDisabled} note={moveNote} targets={targets} onMove={onMove} /> : null}
         <button
-          ref={openRef}
+          data-part="open"
           type="button"
           onClick={(event) => {
             event.stopPropagation();

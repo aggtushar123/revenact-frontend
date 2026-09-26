@@ -283,6 +283,16 @@ describe('PortfolioBoard', () => {
     await waitFor(() => expect(onMoveSettled).toHaveBeenCalledWith(1));
   });
 
+  it('says moving is paused when a saved move cannot settle because the frame reload failed', async () => {
+    stubPortfolio();
+    const move = { token: 1, row: pizzaHut, from: 'live' as const, to: 'renewal' as const, saved: true };
+    renderBoard('', { move, saving: true, frame: { error: 'Could not load organizations.' } });
+    expect(screen.getByRole('alert')).toHaveTextContent('Moving is paused until the board reloads.');
+    const button = await within(column('renewal')).findByRole('button', { name: 'Move Pizza Hut to…' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAccessibleDescription('Moving is paused until the board reloads.');
+  });
+
   it('moves a card from its Move to… menu without dragging', async () => {
     stubPortfolio();
     const { onMove } = renderBoard();

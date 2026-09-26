@@ -14,6 +14,7 @@ const PANEL_GAP = 12;
 /** How long a tab's smooth scroll may take before swipes are followed again
  *  even if it never arrived (the user swiped mid-way). */
 const JUMP_MS = 1000;
+const PAUSED = 'Moving is paused until the board reloads.';
 
 export interface PortfolioBoardProps {
   /** The Board's params (boardParams): `group` is never '' here. */
@@ -131,17 +132,37 @@ export function PortfolioBoard({
 
   // Stable, so the memoised cards don't all re-render on every board render.
   const moveCard = useCallback(
-    (row: PortfolioRow, to: LifecycleValue) => {
+    (row: PortfolioRow, to: LifecycleValue, fromMenu = false) => {
       setDragging(null);
-      // The card remounts in its new column: it takes focus there (Churn
-      // opens a modal instead, which takes focus itself).
-      if (to !== 'churn') setFocusId(row.id);
+      // A Move to… choice (keyboard or touch): the card remounts in its new
+      // column and focus follows it there. A mouse drag leaves focus alone,
+      // and Churn opens a modal that takes focus itself.
+      if (fromMenu && to !== 'churn') setFocusId(row.id);
       onMove(row, to);
     },
     [onMove],
   );
   const endDrag = useCallback(() => setDragging(null), []);
-  const onFocused = useCallback((id: number) => setFocusId((was) => (was === id ? null : was)), []);
+
+  // Focus is held on the moved card until its move settles (or fails, or is
+  // reset): the move is then gone. Adjusted during render.
+  const [focusFor, setFocusFor] = useState<number | null>(null);
+  if (focusId !== null && move !== null && focusFor !== move.token) setFocusFor(move.token);
+  if (focusId !== null && move === null && focusFor !== null) {
+    setFocusId(null);
+    setFocusFor(null);
+  }
+
+  // The user moving focus somewhere else themselves releases it.
+  useEffect(() => {
+    if (focusId === null) return;
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target as Element | null;
+      if (!target?.closest(`[data-card-id="${focusId}"]`)) setFocusId(null);
+    };
+    document.addEventListener('focusin', onFocusIn);
+    return () => document.removeEventListener('focusin', onFocusIn);
+  }, [focusId]);
 
   // A drag the card never hears the end of (dropped outside the window, or
   // its card unmounted mid-drag by a reload) must not leave `dragging` set.
@@ -207,9 +228,12 @@ export function PortfolioBoard({
     if (key && key !== activeKey) setActive(key);
   };
 
+  // A saved move settles only once the frame reloads, so while that reload
+  // is failing, moving stays off: say why, on the alert and on each control.
+  const paused = error !== null && move !== null;
   const staleError = error ? (
     <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
-      {error} Showing the last result.
+      {error} Showing the last result.{paused ? ` ${PAUSED}` : ''}
       <button type="button" onClick={portfolio.retry} className={QUIET}>
         Try again
       </button>
@@ -227,6 +251,7 @@ export function PortfolioBoard({
       isSm={isSm}
       canMove={canMove}
       saving={saving}
+      pausedNote={paused ? PAUSED : null}
       move={move}
       filtered={filtered}
       openId={openId}
@@ -236,7 +261,6 @@ export function PortfolioBoard({
       onMove={moveCard}
       onDragStart={setDragging}
       onDragEnd={endDrag}
-      onFocused={onFocused}
       onHandedOver={onHandedOver}
       onRowsLoaded={onRowsLoaded}
       onShowChurned={onShowChurned}

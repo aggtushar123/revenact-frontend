@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type DragEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type DragEvent, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
@@ -23,18 +23,21 @@ export interface BoardColumnProps {
   isSm: boolean;
   canMove: boolean;
   saving: boolean;
+  /** Why moving is off, when it is stuck (the frame reload failed). */
+  pausedNote?: string | null;
   move: BoardMove | null;
   filtered: boolean;
   openId: number | null;
-  /** The card that just moved here and should take focus. */
+  /** The card moved here from its Move to… menu: until the move settles,
+   *  focus is put back on its Open button whenever it falls to <body>
+   *  (its mount here, and every re-sort that moves its node). */
   focusId: number | null;
   /** The card being dragged, if any (held by the board, not read back from dataTransfer). */
   dragging: PortfolioRow | null;
   onOpen: (row: PortfolioRow) => void;
-  onMove: (row: PortfolioRow, to: LifecycleValue) => void;
+  onMove: (row: PortfolioRow, to: LifecycleValue, fromMenu?: boolean) => void;
   onDragStart: (row: PortfolioRow) => void;
   onDragEnd: () => void;
-  onFocused: (id: number) => void;
   /** This column has swapped a saved move's guess for its own fresh page
    *  (or its read failed, so it never will). */
   onHandedOver: (key: string, token: number) => void;
@@ -82,6 +85,7 @@ export function BoardColumn({
   isSm,
   canMove,
   saving,
+  pausedNote = null,
   move,
   filtered,
   openId,
@@ -91,7 +95,6 @@ export function BoardColumn({
   onMove,
   onDragStart,
   onDragEnd,
-  onFocused,
   onHandedOver,
   onRowsLoaded,
   onShowChurned,
@@ -99,6 +102,7 @@ export function BoardColumn({
   panelRef,
 }: BoardColumnProps) {
   const headingId = useId();
+  const sectionRef = useRef<HTMLElement | null>(null);
   const [over, setOver] = useState(false);
   const page = usePagedPortfolio(query, enabled, version, onRowsLoaded);
   // The move shows here until this column's own fresh page one lands.
@@ -111,6 +115,15 @@ export function BoardColumn({
   useEffect(() => {
     if (handedOver && move) onHandedOver(spec.key, move.token);
   }, [handedOver, move, spec.key, onHandedOver]);
+  // After every render: a browser drops focus to <body> when the focused
+  // card's node is moved (a fresh page re-sorts it under a higher-ARR card)
+  // or remounted. Put it back while the board still wants it here.
+  useEffect(() => {
+    if (focusId === null) return;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    sectionRef.current?.querySelector<HTMLElement>(`[data-card-id="${focusId}"] [data-part="open"]`)?.focus();
+  });
   const sentinelRef = useEndSentinel(
     () => void page.loadMore(),
     enabled && page.next !== null && !page.loadingMore && page.moreError === null,
@@ -176,12 +189,11 @@ export function BoardColumn({
             open={openId === row.id}
             canMove={canMove}
             moveDisabled={saving}
+            moveNote={pausedNote}
             onOpen={onOpen}
             onMove={onMove}
             onDragStart={onDragStart}
             onDragEnd={onDragEnd}
-            takeFocus={focusId === row.id}
-            onFocused={onFocused}
           />
         ))}
         <li ref={sentinelRef} data-sentinel="" aria-hidden="true" className="h-px" />
@@ -191,7 +203,10 @@ export function BoardColumn({
 
   return (
     <section
-      ref={panelRef}
+      ref={(element) => {
+        sectionRef.current = element;
+        panelRef?.(element);
+      }}
       data-column={spec.key}
       aria-labelledby={headingId}
       onDragOver={onDragOver}

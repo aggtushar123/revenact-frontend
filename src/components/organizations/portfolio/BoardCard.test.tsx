@@ -82,7 +82,7 @@ describe('BoardCard', () => {
     ]);
     expect(onMove).not.toHaveBeenCalled();
     await userEvent.click(within(menu).getByRole('menuitem', { name: 'Adoption' }));
-    expect(onMove).toHaveBeenCalledWith(pizzaHut, 'adoption');
+    expect(onMove).toHaveBeenCalledWith(pizzaHut, 'adoption', true);
     expect(onOpen).not.toHaveBeenCalled();
     expect(within(card()).queryByRole('menu')).not.toBeInTheDocument();
   });
@@ -170,11 +170,11 @@ describe('BoardCard', () => {
     expect(screen.getByRole('menu', { name: 'Move Globex to' })).toBeInTheDocument();
   });
 
-  it('takes focus on its Open button when asked (a card that just moved here), once', () => {
-    const onFocused = vi.fn();
-    renderCard({ takeFocus: true, onFocused });
-    expect(screen.getByRole('button', { name: 'Open Pizza Hut' })).toHaveFocus();
-    expect(onFocused).toHaveBeenCalledExactlyOnceWith(7);
+  it('tells the board a move came from the menu, so focus can follow the card', async () => {
+    const { onMove } = renderCard();
+    await userEvent.click(screen.getByRole('button', { name: 'Move Pizza Hut to…' }));
+    await userEvent.click(within(within(card()).getByRole('menu')).getByRole('menuitem', { name: 'Renewal' }));
+    expect(onMove).toHaveBeenCalledWith(pizzaHut, 'renewal', true);
   });
 
   it('is memoised, so a board re-render does not re-render every card', () => {

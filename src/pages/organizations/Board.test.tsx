@@ -6,7 +6,10 @@ import { resetViewport } from '../../test/viewport';
 import {
   buildPortfolio,
   customerFixture,
+  globex,
+  initech,
   patchBodies,
+  pizzaHut,
   portfolioQueries,
   stubPortfolio,
 } from '../../features/organizations/testPortfolio';
@@ -29,6 +32,23 @@ const ready = async () => {
   await screen.findByRole('link', { name: 'Pizza Hut' });
   await screen.findByRole('link', { name: 'Globex' });
 };
+
+/** Browsers drop focus to <body> when a focused node is moved in the DOM
+ *  (React reordering keyed children); jsdom keeps it. This plays the
+ *  browser's part. Undone by vi.restoreAllMocks(). */
+function emulateFocusLossOnMove() {
+  for (const name of ['insertBefore', 'appendChild'] as const) {
+    const original = Node.prototype[name] as (this: Node, ...args: unknown[]) => Node;
+    vi.spyOn(Node.prototype, name).mockImplementation(function (this: Node, ...args: unknown[]) {
+      const node = args[0] as Node;
+      const active = document.activeElement;
+      const loses = node.isConnected && active instanceof HTMLElement && node.contains(active);
+      const out = original.apply(this, args);
+      if (loses) active.blur();
+      return out;
+    } as never);
+  }
+}
 
 /** Holds every request `matches` picks until release(); everything else
  *  goes straight to the stub. */
@@ -54,6 +74,7 @@ const holdPatches = (spy: ReturnType<typeof stubPortfolio>) => holdRequests(spy,
 
 describe('Organizations board (portfolio)', () => {
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
     resetViewport();
     delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
@@ -147,6 +168,41 @@ describe('Organizations board (portfolio)', () => {
     await waitFor(() => expect(moveButton(1)).toBeEnabled());
     expect(within(column('renewal')).getByRole('button', { name: 'Open Pizza Hut' })).toHaveFocus();
     expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it('keeps focus on the moved card when its new column re-sorts under a higher-ARR card', async () => {
+    const user = userEvent.setup();
+    // Globex (ARR 120K) already sits in Renewal and comes back above Pizza Hut.
+    const globexRenewal = { ...globex, lifecycle: { value: 'renewal' as const, label: 'Renewal' } };
+    stubPortfolio({ rows: [globexRenewal, pizzaHut, initech] });
+    renderBoard();
+    await ready();
+    emulateFocusLossOnMove();
+    (moveButton(7) as HTMLElement).focus();
+    await user.keyboard('{Enter}');
+    await user.click(within(screen.getByRole('menu', { name: 'Move Pizza Hut to' })).getByRole('menuitem', { name: 'Renewal' }));
+    // The guess puts Pizza Hut on top; the fresh page puts Globex above it.
+    await waitFor(() => {
+      const ids = [...column('renewal').querySelectorAll('[data-card-id]')].map((el) => el.getAttribute('data-card-id'));
+      expect(ids).toEqual(['1', '7']);
+    });
+    await waitFor(() => expect(moveButton(1)).toBeEnabled());
+    expect(within(card(7)).getByRole('button', { name: 'Open Pizza Hut' })).toHaveFocus();
+  });
+
+  it('leaves focus alone after a mouse drag-drop', async () => {
+    stubPortfolio();
+    renderBoard();
+    await ready();
+    const search = screen.getByRole('searchbox', { name: 'Search by name or Revenact ID' });
+    search.focus();
+    const dt = dataTransfer();
+    fireEvent.dragStart(card(1), { dataTransfer: dt });
+    fireEvent.dragOver(column('live'), { dataTransfer: dt });
+    fireEvent.drop(column('live'), { dataTransfer: dt });
+    await waitFor(() => expect(within(column('live')).getByRole('link', { name: 'Globex' })).toBeInTheDocument());
+    await waitFor(() => expect(moveButton(1)).toBeEnabled());
+    expect(search).toHaveFocus();
   });
 
   it("allows one move at a time until its reloads land, so the first card never reverts", async () => {
