@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { CopilotRail } from '../../../components/copilot/CopilotRail';
 import { contextLabel } from '../../../components/copilot/dashboardLabels';
+import { surfaceLabel } from '../../../components/copilot/surfaceLabels';
+import type { SurfaceContext } from '../../copilot/types';
 import type { RailContext } from '../../../components/copilot/railContext';
 import { trapTab } from '../../../lib/focusTrap';
 import { SM, useMediaQuery } from '../../../lib/useMediaQuery';
@@ -80,7 +82,7 @@ export function AskRail() {
   };
 
   const asked = context ? { ...context, focus: ask.focus } : null;
-  const railContext: RailContext | null = asked ? { kind: 'dashboard', context: asked, label: contextLabel(asked, names) } : null;
+  const railContext: RailContext | null = asked ? { kind: 'surface', context: asked, label: contextLabel(asked, names) } : null;
 
   const railProps = {
     label: 'Ask Revenact',
@@ -89,7 +91,7 @@ export function AskRail() {
     conversation: ask.conversation,
     onConversation: ask.setConversation,
     thread: ask.thread,
-    names,
+    chipLabel: (context: SurfaceContext) => surfaceLabel(context, { dashboard: names }),
     draft: ask.pendingDraft,
     onSent: ask.markSent,
   };

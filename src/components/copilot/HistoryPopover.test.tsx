@@ -21,4 +21,22 @@ describe('HistoryPopover', () => {
     expect(tagged).toHaveAccessibleName(/Why is at-risk ARR up\?\s*Started on the dashboard: Revenue › Forecast/);
     expect(screen.getByRole('button', { name: 'What is going on with Pizza Hut?' })).toBeInTheDocument();
   });
+
+  it("tags an Organizations conversation with the server's labels", async () => {
+    stubCopilot({
+      conversations: [
+        {
+          id: 3,
+          title: 'Who renews first?',
+          created_at: '',
+          updated_at: '',
+          origin: { surface: 'organizations', view: 'list', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] },
+        },
+      ],
+    });
+    render(<HistoryPopover onClose={() => {}} onOpen={() => {}} />);
+    const tagged = await screen.findByRole('button', { name: /Who renews first\?/ });
+    expect(within(tagged).getByText('Organizations · Owner: Carl CSM')).toBeInTheDocument();
+    expect(tagged).toHaveAccessibleName(/Who renews first\?\s*Started on Organizations · Owner: Carl CSM/);
+  });
 });

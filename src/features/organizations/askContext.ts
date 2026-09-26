@@ -57,9 +57,11 @@ export function organizationsPath(origin: OrganizationsOrigin): string {
 
 /** The chip: "Organizations · Owner: Carl CSM · 1 account". The filter parts
  *  are the page's own filter chips, named from the portfolio's options; an
- *  unknown value shows as those chips show it ("User 9"). */
+ *  unknown value shows as those chips show it ("User 9"). `labels` is never
+ *  read here (it is the server's own tag, not this chip's), so both an
+ *  origin (`labels` required) and a live context (`labels` absent) fit. */
 export function organizationsLabel(
-  context: OrganizationsOrigin & { focus?: OrganizationsFocus | null },
+  context: Omit<OrganizationsOrigin, 'labels'> & { labels?: string[]; focus?: OrganizationsFocus | null },
   options: PortfolioResponse['filters'] | null = null,
 ): string {
   const params = fromContextFilters(context.filters, context.view);

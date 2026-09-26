@@ -129,10 +129,10 @@ export interface CopilotMessage {
   ask_suggestions?: AskSuggestion[];
   /** Who wrote a user turn; null on assistant turns. */
   author?: { id: number; name: string; function: string } | null;
-  /** User turns asked on the dashboard: the context as the server validated
-   *  it (focus ids already intersected with the viewer's book). Null or
-   *  absent everywhere else. */
-  context?: DashboardContext | null;
+  /** User turns asked on the Dashboard or Organizations: the context as the
+   *  server validated it (focus ids already intersected with the viewer's
+   *  book). Null or absent everywhere else. */
+  context?: SurfaceContext | null;
   created_at: string;
 }
 
@@ -152,8 +152,11 @@ export interface ConversationSummary {
   title: string;
   created_at: string;
   updated_at: string;
-  /** Where a dashboard conversation started; null for every other one. */
-  origin?: DashboardOrigin | null;
+  /** Where a Dashboard or Organizations conversation started; null for every
+   *  other one. There is no separate `origin_label`: an Organizations
+   *  origin carries its own `labels`, server-built, that the History tag
+   *  joins as `["Organizations", ...labels].join(' · ')`. */
+  origin?: SurfaceOrigin | null;
 }
 
 // Adds `messages` — the shape `fetchConversation`/`sendMessage` return.

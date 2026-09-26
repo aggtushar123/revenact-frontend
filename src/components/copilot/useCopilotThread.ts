@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../lib/apiClient';
 import { sendMessage } from '../../pages/copilot/copilotApi';
-import type { Conversation, DashboardContext } from '../../pages/copilot/types';
+import type { Conversation, SurfaceContext } from '../../pages/copilot/types';
 
 /** One question: what the bubble shows (`text`), what is sent (`content`,
- *  which carries Communications' prefix), and the dashboard context. */
+ *  which carries Communications' prefix), and the Dashboard's or
+ *  Organizations' structured context. */
 export interface Turn {
   text: string;
   content: string;
-  context?: DashboardContext;
+  context?: SurfaceContext;
 }
 
 export interface FailedTurn extends Turn {

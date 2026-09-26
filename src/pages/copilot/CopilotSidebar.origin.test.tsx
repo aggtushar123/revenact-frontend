@@ -18,4 +18,23 @@ describe('CopilotSidebar chat history', () => {
     );
     expect(screen.getByText(/^Health › Triage · /)).toBeInTheDocument();
   });
+
+  it("shows the server's tag for an Organizations conversation", () => {
+    const store = configureStore({ reducer: { knowledge: knowledgeReducer } });
+    const conversations = [
+      {
+        id: 2,
+        title: 'Who renews first?',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        origin: { surface: 'organizations' as const, view: 'list' as const, filters: { owner: '2' }, labels: ['Owner: Carl CSM'] },
+      },
+    ];
+    render(
+      <Provider store={store}>
+        <CopilotSidebar isExpanded setIsExpanded={() => {}} conversations={conversations} activeConversationId={null} sessions={{}} myInvites={[]} />
+      </Provider>,
+    );
+    expect(screen.getByText(/^Organizations · Owner: Carl CSM · /)).toBeInTheDocument();
+  });
 });
