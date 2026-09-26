@@ -21,7 +21,7 @@ Decisions, in the order they were made:
 | Topic | Decision |
 |---|---|
 | Purpose | The organisation's story, led by the timeline. |
-| Accounts | **One story for the whole organisation, filtered by account.** An account chip narrows Story, People and Deals & risks. |
+| Accounts | **One story for the whole organisation, filtered by account.** An account chip narrows Story, People and Deals & risks. **No account's details are lost** (the owner's decision, 2026-09-26): the chips stay on the Story tab as the filter, and Details lists every connected account (item 7). |
 | Layout | Six tabs under the header: **Story** (default) · **Details** · **People** · **Deals & risks** · **Knowledge** · **Files**. |
 | Not-yet-real parts | Removed now, with room kept for them. Success Plans, Custom Objects and Canvases become tabs when built. Slack, in-app Conversations and Revenact Support become story sources when real. See §6, Planned. |
 | Pulse | The List's form everywhere: "AI n · CSM n", the history dots, and "pulses disagree", with the AI reason in Details. The blended "Account Pulse" is dropped. |
@@ -59,7 +59,9 @@ Top to bottom:
      - Items are grouped by day, newest first. Each item has an icon (Lucide), title, account tag ("Organisation" when an item has no account), a one-line summary, who, and time.
      - Calls carry their CallSense summary. Opening an email shows its thread; other items open their existing detail.
      - The next page loads at the end of the list.
-7. **Details.** The List's six panels (`AccountDetails`, stacked on phones), with all 34 fields and Edit details.
+7. **Details.**
+   - **Accounts** first (the owner's decision, 2026-09-26, so that no account's details are lost with the old Accounts tab): one list item per connected account, not a table. Each item shows the name (a link to `/accounts/:id`), owner, domain, the pulse dots, the AI score with its label, and the AI reason: only what `GET /customers/{id}/accounts/` serves (`AccountSerializer`: `name`, `owner`, `domain`, `pulse`, `ai_pulse_value`, `ai_pulse_score`, `ai_pulse_reason`), so nothing is invented. Each item has Edit; the section has Add account (both also stay on the Story tab's chip row). Designed loading, error and empty states; at 375px each item wraps with no sideways scroll.
+   - Then the List's six panels (`AccountDetails`, stacked on phones), with all 34 fields and Edit details.
 8. **People, Deals & risks, Files.** Delivery 1 keeps their current content inside the new frame. Delivery 2 turns them into list items, filtered by account.
 9. **Knowledge.** Today's Company View: the brief, who answers, and questions. Delivery 1 frames it; delivery 2 restyles it.
 10. **Removed.**
