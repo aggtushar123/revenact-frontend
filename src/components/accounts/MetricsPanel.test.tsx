@@ -11,7 +11,7 @@ import { ALL_CAPABILITIES } from '../../test/capabilities';
 // fetch boundary — responses shaped exactly like revenact-backend's
 // real AccountStatsView payload (see docs/API_CONTRACTS.md ->
 // GET /api/v1/accounts/stats/), same shape as CustomerStatsView's own
-// (see organizations/MetricsPanel.test.tsx, which this mirrors).
+// (it mirrored the organizations MetricsPanel test, retired with the old board).
 
 function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };

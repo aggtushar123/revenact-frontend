@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createRef } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { PortfolioToolbar } from './PortfolioToolbar';
-import { parseParams } from '../../../features/organizations/portfolioParams';
+import { BOARD_GROUP, boardParams, parseParams } from '../../../features/organizations/portfolioParams';
+import { BOARD_GROUP_OPTIONS } from './FiltersPanel';
 import { FILTER_OPTIONS } from '../../../features/organizations/testPortfolio';
 
 function renderToolbar(search = '', isSm = true) {
@@ -122,5 +123,53 @@ describe('PortfolioToolbar', () => {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument();
     }
     expect(screen.queryByRole('combobox', { name: 'Group' })).not.toBeInTheDocument();
+  });
+});
+
+describe('PortfolioToolbar on the Board', () => {
+  function renderBoardToolbar(search = '', isSm = true) {
+    const props = {
+      params: boardParams(parseParams(new URLSearchParams(search), BOARD_GROUP)),
+      update: vi.fn(),
+      options: FILTER_OPTIONS,
+      isSm,
+      onExport: vi.fn(),
+      exporting: false,
+      onAdd: vi.fn(),
+      searchRef: createRef<HTMLInputElement>(),
+      groupOptions: BOARD_GROUP_OPTIONS,
+    };
+    render(<PortfolioToolbar {...props} />);
+    return props;
+  }
+
+  it('offers every grouping but None, starts on lifecycle, and has no Pin fields or Select', async () => {
+    const { update } = renderBoardToolbar();
+    const group = screen.getByRole('combobox', { name: 'Group' });
+    expect(group).toHaveValue('lifecycle');
+    expect(within(group).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'Health',
+      'Owner',
+      'Lifecycle',
+      'Product',
+      'Renewal window',
+    ]);
+    expect(screen.queryByRole('button', { name: 'Pin fields' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
+    await userEvent.selectOptions(group, 'owner');
+    expect(update).toHaveBeenLastCalledWith({ group: 'owner' });
+  });
+
+  it('shows lifecycle, not None, when the URL says group=none', () => {
+    renderBoardToolbar('group=none');
+    expect(screen.getByRole('combobox', { name: 'Group' })).toHaveValue('lifecycle');
+  });
+
+  it('keeps None out of the phone Filters sheet too', async () => {
+    renderBoardToolbar('', false);
+    await userEvent.click(screen.getByRole('button', { name: /^Filters/ }));
+    const group = screen.getByRole('combobox', { name: 'Group' });
+    expect(within(group).queryByRole('option', { name: 'None' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
   });
 });

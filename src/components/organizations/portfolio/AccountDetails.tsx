@@ -197,15 +197,22 @@ export function AccountDetails({
   id,
   today = new Date().toISOString().slice(0, 10),
   onEdit,
+  stacked = false,
 }: {
   row: PortfolioRow;
   id?: string;
   today?: string;
   onEdit?: (id: number) => void;
+  /** One column at every width: the Board's side panel is narrow even on
+   *  a wide screen, where the viewport-based grid would give three. */
+  stacked?: boolean;
 }) {
   const churned = row.churned;
   return (
-    <div id={id} className="grid gap-x-8 gap-y-5 border-t border-line-subtle px-3 pt-3 pb-4 md:grid-cols-2 xl:grid-cols-3">
+    <div
+      id={id}
+      className={`grid gap-x-8 gap-y-5 border-t border-line-subtle px-3 pt-3 pb-4 ${stacked ? '' : 'md:grid-cols-2 xl:grid-cols-3'}`}
+    >
       <Panel panel="commercial">
         <Pairs row={row} ids={PANEL_ORDER.commercial} />
       </Panel>
@@ -219,7 +226,7 @@ export function AccountDetails({
         <Pairs row={row} ids={churned ? PANEL_ORDER.history : ['createdBy', 'modifiedBy']} mono={false} />
       </Panel>
       {onEdit ? (
-        <div className="flex justify-end md:col-span-2 xl:col-span-3">
+        <div className={`flex justify-end ${stacked ? '' : 'md:col-span-2 xl:col-span-3'}`}>
           <button
             type="button"
             onClick={() => onEdit(row.id)}

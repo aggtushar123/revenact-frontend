@@ -20,7 +20,11 @@ export interface PortfolioParams {
 }
 
 export const DEFAULT_SORT = '-arr';
+/** The List's default grouping (an absent `group` on /organizations/list). */
 export const DEFAULT_GROUP: GroupKey = 'health';
+/** The Board's default grouping (owner decision 2026-09-26): an absent
+ *  `group` on /organizations/board. The two routes share every other param. */
+export const BOARD_GROUP: GroupKey = 'lifecycle';
 export const MAX_IDS = 500;
 
 export const LIFECYCLE_VALUES: LifecycleValue[] = [
@@ -54,7 +58,7 @@ function parseSort(raw: string | null): string {
   return SORT_KEYS.includes(raw.replace(/^-/, '')) ? raw : DEFAULT_SORT;
 }
 
-export function parseParams(search: URLSearchParams): PortfolioParams {
+export function parseParams(search: URLSearchParams, defaultGroup: GroupKey = DEFAULT_GROUP): PortfolioParams {
   const owner = search.get('owner') ?? '';
   const renews = search.get('renews_within') ?? '';
   const nps = search.get('nps') ?? '';
@@ -70,7 +74,7 @@ export function parseParams(search: URLSearchParams): PortfolioParams {
     ids: list(search.get('ids')).filter((value) => /^\d+$/.test(value)).map(Number).slice(0, MAX_IDS),
     include_churned: search.get('include_churned') === '1',
     sort: parseSort(search.get('sort')),
-    group: group === 'none' ? '' : (only([group ?? ''], GROUP_KEYS)[0] ?? DEFAULT_GROUP),
+    group: group === 'none' ? '' : (only([group ?? ''], GROUP_KEYS)[0] ?? defaultGroup),
   };
 }
 
@@ -86,13 +90,21 @@ function setFilters(query: URLSearchParams, p: PortfolioParams) {
   if (p.include_churned) query.set('include_churned', '1');
 }
 
-/** The page URL's query: defaults left out, "no grouping" written as none. */
-export function toUrlSearch(p: PortfolioParams): URLSearchParams {
+/** The page URL's query: defaults left out, "no grouping" written as none.
+ *  The route's own default group is left out too, unless `prev` (the URL
+ *  being replaced) already named it: then it was picked on the other route,
+ *  where it is not the default, and it must survive the way back (plan
+ *  pre-flight 1). */
+export function toUrlSearch(
+  p: PortfolioParams,
+  defaultGroup: GroupKey = DEFAULT_GROUP,
+  prev?: URLSearchParams,
+): URLSearchParams {
   const query = new URLSearchParams();
   setFilters(query, p);
   if (p.sort !== DEFAULT_SORT) query.set('sort', p.sort);
   if (p.group === '') query.set('group', 'none');
-  else if (p.group !== DEFAULT_GROUP) query.set('group', p.group);
+  else if (p.group !== defaultGroup || prev?.get('group') === p.group) query.set('group', p.group);
   return query;
 }
 
@@ -120,4 +132,17 @@ export function hasFilters(p: PortfolioParams): boolean {
 
 export function toggleIn<T>(values: T[], value: T): T[] {
   return values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
+}
+
+/** What the Board reads: a board always has columns, so the List's
+ *  "no grouping" (group=none, kept in the URL for the List) reads as
+ *  lifecycle here. Grouped params come back unchanged (same object). */
+export function boardParams(p: PortfolioParams): PortfolioParams {
+  return p.group === '' ? { ...p, group: BOARD_GROUP } : p;
+}
+
+/** Whether this view lists churned accounts: the backend includes them only
+ *  for include_churned=1, a `churn` lifecycle, or explicitly named ids. */
+export function includesChurned(p: PortfolioParams): boolean {
+  return p.include_churned || p.lifecycle.includes('churn') || p.ids.length > 0;
 }

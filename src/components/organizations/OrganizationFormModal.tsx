@@ -17,6 +17,9 @@ interface OrganizationFormModalProps {
    * docstring on why that isn't a selectable option here. */
   defaultLifecycleStage?: Customer['lifecycle_stage'];
   onClose: () => void;
+  /** Called after a successful save, before `onClose`, so a caller can
+   *  reload only when something changed (a cancel calls `onClose` alone). */
+  onSaved?: () => void;
 }
 
 // Deliberately not the full ~30-field schema: only what's editable while
@@ -41,7 +44,7 @@ const LIFECYCLE_OPTIONS: { value: Customer['lifecycle_stage']; label: string }[]
   { value: 'other', label: 'Other' },
 ];
 
-export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose }: OrganizationFormModalProps) {
+export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose, onSaved }: OrganizationFormModalProps) {
   const dispatch = useAppDispatch();
   const orgCurrency = useOrgCurrency();
   const isEdit = !!customer;
@@ -102,6 +105,7 @@ export function OrganizationFormModal({ customer, defaultLifecycleStage, onClose
       } else {
         await dispatch(createCustomer(data)).unwrap();
       }
+      onSaved?.();
       onClose();
     } catch (err) {
       setError(

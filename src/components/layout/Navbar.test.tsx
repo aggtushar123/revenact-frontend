@@ -236,6 +236,7 @@ function renderNavbar(
           <Route path="/dashboard" element={<div>Dashboard Marker</div>} />
           <Route path="/organizations/list" element={<div>Organizations Marker</div>} />
           <Route path="/organizations/board" element={<div>Organizations Marker</div>} />
+          <Route path="/pipelines/board" element={<div>Pipelines Marker</div>} />
           <Route path="/profile" element={<div>Profile Marker</div>} />
           <Route path="/login" element={<div>Login Marker</div>} />
           <Route path="/organizations/:id" element={<div>Details Marker</div>} />
@@ -254,14 +255,14 @@ describe('Navbar account menu', () => {
   });
 
   it('is closed by default', () => {
-    renderNavbar('/organizations/board');
+    renderNavbar('/pipelines/board');
     expect(screen.queryByText('My Profile')).not.toBeInTheDocument();
     expect(screen.queryByText('Sign out')).not.toBeInTheDocument();
   });
 
   it('opens on avatar click and shows the real logged-in user', async () => {
     const user = userEvent.setup();
-    renderNavbar('/organizations/board');
+    renderNavbar('/pipelines/board');
 
     await user.click(screen.getByAltText('Alice Admin'));
 
@@ -273,7 +274,7 @@ describe('Navbar account menu', () => {
 
   it('navigates to /profile and closes the menu', async () => {
     const user = userEvent.setup();
-    renderNavbar('/organizations/board');
+    renderNavbar('/pipelines/board');
 
     await user.click(screen.getByAltText('Alice Admin'));
     await user.click(screen.getByText('My Profile'));
@@ -288,7 +289,7 @@ describe('Navbar account menu', () => {
       vi.fn().mockResolvedValue({ ok: true, status: 205, json: async () => null })
     );
     const user = userEvent.setup();
-    renderNavbar('/organizations/board');
+    renderNavbar('/pipelines/board');
 
     await user.click(screen.getByAltText('Alice Admin'));
     await user.click(screen.getByText('Sign out'));
@@ -298,12 +299,12 @@ describe('Navbar account menu', () => {
 
   it('closes when clicking outside the menu', async () => {
     const user = userEvent.setup();
-    renderNavbar('/organizations/board');
+    renderNavbar('/pipelines/board');
 
     await user.click(screen.getByAltText('Alice Admin'));
     expect(screen.getByText('My Profile')).toBeInTheDocument();
 
-    await user.click(screen.getByText('Organizations Marker'));
+    await user.click(screen.getByText('Pipelines Marker'));
 
     await waitFor(() => expect(screen.queryByText('My Profile')).not.toBeInTheDocument());
   });
@@ -587,7 +588,7 @@ describe('Navbar actions on the dashboard', () => {
 
   it('keeps the other pages as they were, with no slot', () => {
     const setSlot = vi.fn();
-    renderNavbar('/organizations/board', null, null, [], setSlot);
+    renderNavbar('/pipelines/board', null, null, [], setSlot);
     expect(document.querySelectorAll(DECORATIVE)).toHaveLength(4);
     expect(setSlot).not.toHaveBeenCalledWith(expect.any(HTMLElement));
     expect(document.querySelector('header')).toHaveClass('h-[64px]', 'border-b', 'bg-surface', 'shadow-sm', 'px-6');
@@ -611,10 +612,19 @@ describe('Navbar on the Organizations list', () => {
     expect(screen.queryByAltText('Alice Admin')).not.toBeInTheDocument();
   });
 
-  it('leaves the board header as it was', () => {
-    renderNavbar('/organizations/board');
-    expect(document.querySelector('header')).toHaveClass('h-[64px]', 'border-b', 'bg-surface');
-    expect(screen.queryByRole('navigation', { name: 'Organizations views' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Board' })).toHaveAttribute('href', '/organizations/board');
+  it('wears the same frame on /organizations/board, and both tabs carry the query', () => {
+    const setSlot = vi.fn();
+    renderNavbar('/organizations/board?owner=2&health=poor', null, null, [], setSlot);
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('h-16', 'shrink-0', 'flex', 'items-center', 'gap-3', 'px-4');
+    for (const cls of ['bg-surface', 'border-b', 'shadow-sm']) expect(header).not.toHaveClass(cls);
+    expect(setSlot).toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(header!.querySelector('[data-nav-actions-slot]')).not.toBeNull();
+    expect(screen.queryByAltText('Alice Admin')).not.toBeInTheDocument();
+    const views = screen.getByRole('navigation', { name: 'Organizations views' });
+    expect(within(views).getByRole('link', { name: 'List' })).toHaveAttribute('href', '/organizations/list?owner=2&health=poor');
+    const board = within(views).getByRole('link', { name: 'Board' });
+    expect(board).toHaveAttribute('href', '/organizations/board?owner=2&health=poor');
+    expect(board).toHaveAttribute('aria-current', 'page');
   });
 });

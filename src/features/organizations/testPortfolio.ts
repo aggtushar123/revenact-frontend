@@ -1,5 +1,6 @@
 import { vi } from 'vitest';
 import { LIFECYCLE_VALUES } from './portfolioParams';
+import { LIFECYCLE_LABELS } from '../customers/formatters';
 import type {
   BulkRequest,
   BulkResult,
@@ -173,6 +174,9 @@ function summarise(rows: PortfolioRow[]): PortfolioSummary {
 /** What the backend answers for `query`, over `rows`: filters, health groups
  *  (Poor, Average, Good), whole-set summary, `group_value` scoping, and a
  *  cursor (opaque to the page; an offset here). */
+/** The `owner` group key: the owner's id, or 'unassigned'. */
+const ownerKey = (row: PortfolioRow) => (row.owner ? String(row.owner.id) : 'unassigned');
+
 export function buildPortfolio(query: URLSearchParams, rows: PortfolioRow[] = ALL_ROWS): PortfolioResponse {
   const list = (key: string) => (query.get(key) ?? '').split(',').filter(Boolean);
   const ids = list('ids').map(Number);
@@ -208,14 +212,21 @@ export function buildPortfolio(query: URLSearchParams, rows: PortfolioRow[] = AL
               count: groupRows.length,
               arr: sumArr(groupRows),
             }))
-        : [];
+        : group === 'owner'
+          ? [...new Set(set.map(ownerKey))].map((key) => {
+              const groupRows = set.filter((row) => ownerKey(row) === key);
+              return { key, label: groupRows[0].owner?.name ?? 'Unassigned', count: groupRows.length, arr: sumArr(groupRows) };
+            })
+          : [];
   const groupValue = query.get('group_value');
   const scoped =
     groupValue && group === 'health'
       ? set.filter((row) => row.health.category === groupValue)
       : groupValue && group === 'lifecycle'
         ? set.filter((row) => row.lifecycle.value === groupValue)
-        : set;
+        : groupValue && group === 'owner'
+          ? set.filter((row) => ownerKey(row) === groupValue)
+          : set;
   const limit = Number(query.get('limit') ?? 50);
   const start = Number(query.get('cursor') ?? 0);
   return {
@@ -259,6 +270,33 @@ export interface PortfolioStub {
   customer?: unknown;
   /** GET /auth/members/ (the bulk owner targets). */
   members?: unknown[];
+  /** The book the default portfolio answer reads (default ALL_ROWS). It is
+   *  copied, and a PATCH to /customers/<id>/ writes into the copy, so a
+   *  reload after a move sees the move. */
+  rows?: PortfolioRow[];
+  /** Answer PATCH /customers/<id>/ yourself (for a failure, say). */
+  patch?: (id: number, body: Record<string, unknown>) => { status: number; body: unknown };
+}
+
+/** What PATCH /customers/<id>/ does to the stub's book: a new stage. Churn
+ *  marks the row churned, and a churned row carries no signal (backend rule). */
+function applyPatch(book: PortfolioRow[], id: number, body: Record<string, unknown>) {
+  const index = book.findIndex((row) => row.id === id);
+  if (index < 0) return { status: 404, body: { detail: 'Not found.' } };
+  const stage = body.lifecycle_stage as LifecycleValue | undefined;
+  if (stage) {
+    const churned = book[index].churned || stage === 'churn';
+    book[index] = {
+      ...book[index],
+      lifecycle: { value: stage, label: LIFECYCLE_LABELS[stage] },
+      churned,
+      signal: churned ? null : book[index].signal,
+    };
+  }
+  return {
+    status: 200,
+    body: { ...customerFixture, id, name: book[index].name, lifecycle_stage: book[index].lifecycle.value },
+  };
 }
 
 function json(status: number, body: unknown) {
@@ -271,11 +309,12 @@ function json(status: number, body: unknown) {
 }
 
 export function stubPortfolio(stub: PortfolioStub = {}) {
+  const book = [...(stub.rows ?? ALL_ROWS)];
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
     const path = url.pathname.replace(/^\/api\/v1/, '');
     if (path === '/organizations/portfolio/') {
-      const out = (stub.portfolio ?? ((q: URLSearchParams) => buildPortfolio(q)))(url.searchParams);
+      const out = (stub.portfolio ?? ((q: URLSearchParams) => buildPortfolio(q, book)))(url.searchParams);
       return 'results' in out ? json(200, out) : json(out.status, out.body);
     }
     if (path === '/organizations/portfolio/export.csv') {
@@ -290,7 +329,14 @@ export function stubPortfolio(stub: PortfolioStub = {}) {
       const body = JSON.parse(String(init.body)) as BulkRequest;
       return json(200, (stub.bulk ?? ((b: BulkRequest) => ({ updated: b.ids, failed: [] })))(body));
     }
-    if (/^\/customers\/\d+\/$/.test(path) && stub.customer) return json(200, stub.customer);
+    const customer = /^\/customers\/(\d+)\/$/.exec(path);
+    if (customer && init?.method === 'PATCH') {
+      const id = Number(customer[1]);
+      const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+      const out = stub.patch ? stub.patch(id, body) : applyPatch(book, id, body);
+      return json(out.status, out.body);
+    }
+    if (customer && stub.customer) return json(200, stub.customer);
     if (path === '/auth/members/') return json(200, stub.members ?? []);
     return json(404, { detail: `Not stubbed: ${path}` });
   });
@@ -312,4 +358,15 @@ export function bulkBodies(spy: FetchSpy): BulkRequest[] {
   return spy.mock.calls
     .filter(([input, init]) => String(input).endsWith('/organizations/bulk/') && init?.method === 'POST')
     .map(([, init]) => JSON.parse(String(init?.body)) as BulkRequest);
+}
+
+/** Every PATCH /customers/<id>/ so far, oldest first. */
+export function patchBodies(spy: FetchSpy): { id: number; body: Record<string, unknown> }[] {
+  return spy.mock.calls
+    .map(([input, init]) => ({ path: new URL(String(input)).pathname, init }))
+    .filter(({ path, init }) => init?.method === 'PATCH' && /\/customers\/\d+\/$/.test(path))
+    .map(({ path, init }) => ({
+      id: Number(/\/customers\/(\d+)\/$/.exec(path)![1]),
+      body: JSON.parse(String(init?.body)) as Record<string, unknown>,
+    }));
 }

@@ -14,7 +14,12 @@ import { FOCUS } from './styles';
 
 const SELECT = `min-h-11 sm:min-h-9 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink hover:border-line-strong disabled:opacity-50 ${FOCUS}`;
 
-export const GROUP_OPTIONS: { value: GroupKey | 'none'; label: string }[] = [
+export interface GroupOption {
+  value: GroupKey | 'none';
+  label: string;
+}
+
+export const GROUP_OPTIONS: GroupOption[] = [
   { value: 'none', label: 'None' },
   { value: 'health', label: 'Health' },
   { value: 'owner', label: 'Owner' },
@@ -23,13 +28,19 @@ export const GROUP_OPTIONS: { value: GroupKey | 'none'; label: string }[] = [
   { value: 'renewal', label: 'Renewal window' },
 ];
 
+/** The Board always has columns, so it offers no "None". */
+export const BOARD_GROUP_OPTIONS: GroupOption[] = GROUP_OPTIONS.filter((option) => option.value !== 'none');
+
 /** Group and sort: in the toolbar from `sm`, inside the Filters sheet below. */
 export function GroupSortControls({
   params,
   update,
+  groupOptions = GROUP_OPTIONS,
 }: {
   params: PortfolioParams;
   update: (patch: Partial<PortfolioParams>) => void;
+  /** The Board passes BOARD_GROUP_OPTIONS. */
+  groupOptions?: GroupOption[];
 }) {
   const descending = params.sort.startsWith('-');
   const field = params.sort.replace(/^-/, '');
@@ -49,7 +60,7 @@ export function GroupSortControls({
           value={params.group || 'none'}
           onChange={(event) => update({ group: event.target.value === 'none' ? '' : (event.target.value as GroupKey) })}
         >
-          {GROUP_OPTIONS.map((option) => (
+          {groupOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -137,6 +148,7 @@ export function FiltersPanel({
   exporting,
   onAdd,
   triggerRef,
+  groupOptions,
 }: {
   params: PortfolioParams;
   update: (patch: Partial<PortfolioParams>) => void;
@@ -152,6 +164,8 @@ export function FiltersPanel({
    *  mousedown that would otherwise close it first. Also where focus goes
    *  back to on close. */
   triggerRef?: RefObject<HTMLElement | null>;
+  /** The phone sheet's Group choices (the Board passes BOARD_GROUP_OPTIONS). */
+  groupOptions?: GroupOption[];
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const ownerRef = useRef<HTMLSelectElement>(null);
@@ -204,7 +218,7 @@ export function FiltersPanel({
 
       {!isSm ? (
         <div className="flex flex-wrap items-center gap-3">
-          <GroupSortControls params={params} update={update} />
+          <GroupSortControls params={params} update={update} groupOptions={groupOptions} />
         </div>
       ) : null}
 

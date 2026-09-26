@@ -3,7 +3,7 @@ import { CheckSquare, Download, Pin, Plus, Search, SlidersHorizontal } from 'luc
 import type { ColumnId } from '../tableData';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { PortfolioResponse } from '../../../features/organizations/portfolioTypes';
-import { FiltersPanel, GroupSortControls } from './FiltersPanel';
+import { FiltersPanel, GroupSortControls, type GroupOption } from './FiltersPanel';
 import { PinFieldsMenu } from './PinFieldsMenu';
 import { BUTTON, FOCUS } from './styles';
 
@@ -23,7 +23,7 @@ export function PortfolioToolbar({
   update,
   options,
   isSm,
-  pins,
+  pins = [],
   onTogglePin,
   onExport,
   exporting,
@@ -31,13 +31,15 @@ export function PortfolioToolbar({
   searchRef,
   selectMode = false,
   onToggleSelectMode,
+  groupOptions,
 }: {
   params: PortfolioParams;
   update: (patch: Partial<PortfolioParams>) => void;
   options: PortfolioResponse['filters'] | null;
   isSm: boolean;
-  pins: ColumnId[];
-  onTogglePin: (id: ColumnId) => void;
+  /** Omitted on the Board, whose cards show no pinned chips: no Pin fields then. */
+  pins?: ColumnId[];
+  onTogglePin?: (id: ColumnId) => void;
   onExport: () => void;
   exporting: boolean;
   onAdd: () => void;
@@ -45,6 +47,8 @@ export function PortfolioToolbar({
   /** Phones: selection mode is on (checkboxes show without a long press). */
   selectMode?: boolean;
   onToggleSelectMode?: () => void;
+  /** The Group choices; the Board passes BOARD_GROUP_OPTIONS (no "None"). */
+  groupOptions?: GroupOption[];
 }) {
   // The box shows what is typed; the URL gets it 300ms after typing stops.
   // A chip or "Clear all" changing the URL resets the box (adjusted during
@@ -82,7 +86,7 @@ export function PortfolioToolbar({
         />
       </label>
 
-      {isSm ? <GroupSortControls params={params} update={update} /> : null}
+      {isSm ? <GroupSortControls params={params} update={update} groupOptions={groupOptions} /> : null}
 
       <button
         ref={filtersTriggerRef}
@@ -113,10 +117,12 @@ export function PortfolioToolbar({
 
       {isSm ? (
         <>
-          <button ref={pinsTriggerRef} type="button" aria-expanded={open === 'pins'} aria-haspopup="dialog" onClick={() => setOpen(open === 'pins' ? null : 'pins')} className={BUTTON}>
-            <Pin className="w-4 h-4" aria-hidden="true" />
-            Pin fields
-          </button>
+          {onTogglePin ? (
+            <button ref={pinsTriggerRef} type="button" aria-expanded={open === 'pins'} aria-haspopup="dialog" onClick={() => setOpen(open === 'pins' ? null : 'pins')} className={BUTTON}>
+              <Pin className="w-4 h-4" aria-hidden="true" />
+              Pin fields
+            </button>
+          ) : null}
           <button type="button" onClick={onExport} disabled={exporting} className={BUTTON}>
             <Download className="w-4 h-4" aria-hidden="true" />
             {exporting ? 'Exporting…' : 'Export'}
@@ -149,9 +155,12 @@ export function PortfolioToolbar({
             onAdd();
           }}
           triggerRef={filtersTriggerRef}
+          groupOptions={groupOptions}
         />
       ) : null}
-      {open === 'pins' ? <PinFieldsMenu pins={pins} onToggle={onTogglePin} onClose={close} triggerRef={pinsTriggerRef} /> : null}
+      {open === 'pins' && onTogglePin ? (
+        <PinFieldsMenu pins={pins} onToggle={onTogglePin} onClose={close} triggerRef={pinsTriggerRef} />
+      ) : null}
     </div>
   );
 }

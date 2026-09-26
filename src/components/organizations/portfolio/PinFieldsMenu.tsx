@@ -3,6 +3,7 @@ import type { ColumnId } from '../tableData';
 import { MAX_PINS } from '../../../features/organizations/pinnedFields';
 import { PANELS, PANEL_ORDER, PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
 import { FOCUS } from './styles';
+import { useDismiss } from './useDismiss';
 
 /** Replaces the old "Edit columns" popover: pick up to three fields to show
  *  as chips on every row (spec §1 "Pin a field"). */
@@ -21,34 +22,24 @@ export function PinFieldsMenu({
   triggerRef?: RefObject<HTMLElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  // Escape and the close button (there isn't one here, but the pattern
-  // matches FiltersPanel) hand focus back to the trigger. An outside click
-  // doesn't: the user moved focus somewhere on purpose, so the browser's own
-  // focus change is left alone instead of being fought right after.
+  // Escape hands focus back to the trigger. An outside press doesn't: the
+  // user moved focus somewhere on purpose, so the browser's own focus change
+  // is left alone instead of being fought right after.
   const restoreFocus = useRef(true);
+  const fallbackRef = useRef<HTMLElement | null>(null);
+  useDismiss(triggerRef ? [ref, triggerRef] : ref, (reason) => {
+    restoreFocus.current = reason === 'escape';
+    onClose();
+  });
   useEffect(() => {
     restoreFocus.current = true;
-    const previouslyFocused = document.activeElement as HTMLElement | null;
+    fallbackRef.current = document.activeElement as HTMLElement | null;
     const trigger = triggerRef?.current ?? null;
     ref.current?.querySelector<HTMLElement>('input')?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    const onPointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (ref.current?.contains(target)) return;
-      if (trigger?.contains(target)) return;
-      restoreFocus.current = false;
-      onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    document.addEventListener('mousedown', onPointerDown);
     return () => {
-      window.removeEventListener('keydown', onKey);
-      document.removeEventListener('mousedown', onPointerDown);
-      if (restoreFocus.current) (trigger ?? previouslyFocused)?.focus();
+      if (restoreFocus.current) (trigger ?? fallbackRef.current)?.focus();
     };
-  }, [onClose, triggerRef]);
+  }, [triggerRef]);
 
   const full = pins.length >= MAX_PINS;
   return (

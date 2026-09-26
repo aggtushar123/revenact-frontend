@@ -11,9 +11,7 @@ import { toApiQuery, type PortfolioParams } from '../../../features/organization
 import type { PortfolioGroup, PortfolioRow } from '../../../features/organizations/portfolioTypes';
 import { ErrorState } from '../../../pages/dashboard/shared/DataState';
 import { SECTION_PAGE_SIZE, usePagedPortfolio, type PortfolioState } from './usePortfolio';
-import { FOCUS } from './styles';
-
-const QUIET = `inline-flex min-h-11 sm:min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-[13px] font-semibold text-ink hover:bg-subtle active:bg-line-subtle disabled:opacity-50 ${FOCUS}`;
+import { FOCUS, QUIET } from './styles';
 
 export function sectionStartsOpen(index: number, total: number): boolean {
   return total <= 4 || index === 0;
@@ -44,7 +42,7 @@ export function RowSkeleton({ count }: { count: number }) {
   );
 }
 
-function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void }) {
+export function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div className="rounded-xl bg-surface">
       <ErrorState message={message} detail="Nothing is shown rather than a partial list." />
@@ -57,7 +55,7 @@ function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
-function EmptyState({ title, detail, action }: { title: string; detail: string; action: ReactNode }) {
+export function EmptyState({ title, detail, action }: { title: string; detail: string; action: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-xl bg-surface px-4 py-12 text-center">
       <p className="text-[15px] font-semibold text-ink">{title}</p>
@@ -67,7 +65,7 @@ function EmptyState({ title, detail, action }: { title: string; detail: string; 
   );
 }
 
-function MoreButton({
+export function MoreButton({
   next,
   loading,
   error,

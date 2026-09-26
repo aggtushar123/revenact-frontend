@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../../lib/apiClient';
 import { fetchPortfolio } from '../../../features/organizations/portfolioApi';
-import { hasFilters, toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
+import { hasFilters, includesChurned, toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { PortfolioResponse, PortfolioRow } from '../../../features/organizations/portfolioTypes';
 
 export const PAGE_SIZE = 50;
@@ -160,10 +160,13 @@ export interface PortfolioState extends PagedState {
   total: number | null;
 }
 
+/** `totalVersion` reloads the M probe (default: `version`). The Board passes
+ *  a smaller one that skips its lifecycle moves, which can't change M. */
 export function usePortfolio(
   params: PortfolioParams,
   version: number,
   onLoaded?: (rows: PortfolioRow[]) => void,
+  totalVersion: number = version,
 ): PortfolioState {
   const grouped = params.group !== '';
   // Grouped, the frame only needs summary, groups, filters, count and
@@ -179,9 +182,9 @@ export function usePortfolio(
   );
   const noopLoadMore = useCallback(async () => {}, []);
 
-  const withChurn = params.include_churned || params.lifecycle.includes('churn') || params.ids.length > 0;
+  const withChurn = includesChurned(params);
   const probeQuery = hasFilters(params) ? (withChurn ? 'include_churned=1&limit=1' : 'limit=1') : null;
-  const probeKey = probeQuery ? `${probeQuery}#${version}` : null;
+  const probeKey = probeQuery ? `${probeQuery}#${totalVersion}` : null;
   const [probe, setProbe] = useState<{ key: string; count: number } | null>(null);
 
   useEffect(() => {
