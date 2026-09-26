@@ -39,4 +39,27 @@ describe('HistoryPopover', () => {
     expect(within(tagged).getByText('Organizations · Owner: Carl CSM')).toBeInTheDocument();
     expect(tagged).toHaveAccessibleName(/Who renews first\?\s*Started on Organizations · Owner: Carl CSM/);
   });
+
+  it('lets the title win over its origin tag, and keeps the full tag text available', async () => {
+    stubCopilot({
+      conversations: [
+        {
+          id: 4,
+          title: 'Which of these accounts should I prioritise this week?',
+          created_at: '',
+          updated_at: '',
+          origin: { surface: 'organizations', view: 'list', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] },
+        },
+      ],
+    });
+    render(<HistoryPopover onClose={() => {}} onOpen={() => {}} />);
+    const tagged = await screen.findByRole('button', { name: /Which of these accounts/ });
+    const title = within(tagged).getByText('Which of these accounts should I prioritise this week?');
+    expect(title).toHaveClass('flex-1', 'min-w-0', 'truncate');
+    const tagText = within(tagged).getByText('Organizations · Owner: Carl CSM');
+    const tag = tagText.parentElement as HTMLElement;
+    expect(tag).toHaveClass('max-w-[40%]', 'shrink');
+    expect(tag).not.toHaveClass('max-w-[60%]', 'shrink-0');
+    expect(tag).toHaveAttribute('title', 'Organizations · Owner: Carl CSM');
+  });
 });

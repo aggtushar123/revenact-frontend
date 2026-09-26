@@ -34,6 +34,15 @@ describe('PortfolioToolbar', () => {
     expect(update).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the search a usable width and lets the row wrap when the column narrows', () => {
+    renderToolbar();
+    const input = screen.getByRole('searchbox', { name: 'Search by name or Revenact ID' });
+    const label = input.closest('label');
+    expect(label).toHaveClass('min-w-0', 'flex-1', 'sm:min-w-[12rem]');
+    const row = label?.parentElement;
+    expect(row).toHaveClass('flex-wrap');
+  });
+
   it('groups and sorts', async () => {
     const { update } = renderToolbar();
     const group = screen.getByRole('combobox', { name: 'Group' });

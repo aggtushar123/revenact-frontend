@@ -303,9 +303,12 @@ export function HistoryPopover({ onClose, onOpen }: { onClose: () => void; onOpe
                     className="w-full text-left flex items-center gap-2.5 px-2 py-2 rounded-lg text-[13px] text-ink hover:bg-surface"
                   >
                     <MessageSquare className="w-4 h-4 text-ink-faint shrink-0" aria-hidden="true" />
-                    <span className="truncate">{c.title}</span>
+                    <span className="flex-1 min-w-0 truncate">{c.title}</span>
                     {c.origin ? (
-                      <span className="ml-auto min-w-0 max-w-[60%] shrink-0 inline-flex items-center gap-1 rounded-md bg-surface border border-line px-1.5 py-0.5 text-[11px] text-ink-muted">
+                      <span
+                        title={originTag(c) ?? undefined}
+                        className="ml-auto min-w-0 max-w-[40%] shrink inline-flex items-center gap-1 rounded-md bg-surface border border-line px-1.5 py-0.5 text-[11px] text-ink-muted"
+                      >
                         {c.origin.surface === 'organizations' ? (
                           <Network className="w-3 h-3 shrink-0" aria-hidden="true" />
                         ) : (
