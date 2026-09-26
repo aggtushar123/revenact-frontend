@@ -49,11 +49,12 @@ function accountFixture(ref: StoryRef, extra: Partial<Account> = {}): Account {
 }
 
 /** EMEA carries what the Details tab's Accounts section shows (owner, domain,
- *  pulse dots, AI score and reason, health, lifecycle, ARR, renewal, NPS and
- *  CSAT); North America carries only what every account always has (a
- *  default health/lifecycle/ARR), leaving its renewal, NPS and CSAT blank —
- *  accounts do store health, ARR and renewal (round-1 fix, 2026-09-27), so
- *  this fixture exercises both a fully-populated and a mostly-blank row. */
+ *  pulse dots, AI score and reason, health, lifecycle, ARR, renewal, NPS,
+ *  CSAT and CSM pulse); North America carries only what every account always
+ *  has (a default health/lifecycle/ARR), leaving its renewal, NPS, CSAT and
+ *  CSM pulse blank — accounts do store health, ARR, renewal and CSM pulse
+ *  (round-1/round-2 fixes, 2026-09-27), so this fixture exercises both a
+ *  fully-populated and a mostly-blank row. */
 export const ACCOUNTS: Account[] = [
   accountFixture(EMEA, {
     domain: 'emea.pizzahut.example',
@@ -68,6 +69,7 @@ export const ACCOUNTS: Account[] = [
     arr: '150000.00',
     renewal_date: '2026-10-15',
     nps_score: 42,
+    csm_pulse_score: 5,
     csat_score: '88.5',
   }),
   accountFixture(NORTH_AMERICA),

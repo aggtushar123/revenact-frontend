@@ -32,7 +32,7 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
     const emea = item(31);
     expect(within(emea).getByRole('link', { name: 'EMEA' })).toHaveAttribute('href', '/accounts/31');
     expect(within(emea).getByText('Carl CSM · emea.pizzahut.example')).toBeInTheDocument();
-    expect(within(emea).getByText('AI 4')).toBeInTheDocument();
+    expect(within(emea).getByText('AI 4 · CSM 5')).toBeInTheDocument();
     expect(within(emea).getByText('Satisfied')).toBeInTheDocument();
     expect(within(emea).getByRole('img', { name: 'Pulse history: good, good, mixed' })).toBeInTheDocument();
     expect(within(emea).getByText('Usage is steady and the renewal talks are friendly.')).toBeInTheDocument();
@@ -40,7 +40,7 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
     const na = item(32);
     expect(within(na).getByRole('link', { name: 'North America' })).toHaveAttribute('href', '/accounts/32');
     expect(within(na).getByText('No owner')).toBeInTheDocument();
-    expect(within(na).getByText('AI —')).toBeInTheDocument();
+    expect(within(na).getByText('AI — · CSM —')).toBeInTheDocument();
     expect(within(na).queryByRole('img')).not.toBeInTheDocument();
   });
 
@@ -57,6 +57,15 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
     expect(emea.textContent).toContain('NPS +42');
     expect(emea.textContent).toContain('CSAT 88.5%');
     expect(emea.textContent).toContain('ID 31');
+  });
+
+  // Round-2 fix, 2026-09-27: csm_pulse_score was missing from the frontend
+  // Account type entirely, so it was dropped too — the List shows "AI n ·
+  // CSM n" and this item should match that form exactly.
+  it("shows the CSM pulse beside the AI pulse, in the List's own \"AI n · CSM n\" form", () => {
+    renderSection();
+    expect(within(item(31)).getByText('AI 4 · CSM 5')).toBeInTheDocument();
+    expect(within(item(32)).getByText('AI — · CSM —')).toBeInTheDocument();
   });
 
   it('shows "—" for any blank health, lifecycle, renewal, NPS or CSAT value, never an invented one', () => {
@@ -102,6 +111,9 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
     expect(text).toContain('0 detractors');
     // CSAT: (88.5 + 0) / 2 = 44.25, rounded to 44.
     expect(text).toContain('CSAT 44%');
+    // avg CSM (round-2 fix, 2026-09-27): EMEA scores 5, North America has
+    // none (counts as 0, same treatment as CSAT/NPS above) -> (5 + 0) / 2 = 2.5.
+    expect(text).toContain('avg CSM 2.5');
     // Lifecycle breakdown: Live (North America) before Expansion (EMEA) —
     // LIFECYCLE_LABELS' own declared order.
     expect(text).toContain('Live 1 · Expansion 1');

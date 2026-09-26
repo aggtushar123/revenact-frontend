@@ -63,6 +63,7 @@ function summarize(items: Account[]) {
   let passives = 0;
   let detractors = 0;
   let csatTotal = 0;
+  let csmTotal = 0;
   for (const a of items) {
     health[a.health_category]++;
     lifecycle.set(a.lifecycle_stage, (lifecycle.get(a.lifecycle_stage) ?? 0) + 1);
@@ -72,27 +73,34 @@ function summarize(items: Account[]) {
     else if (nps === 0) passives++;
     else detractors++;
     csatTotal += a.csat_score != null ? parseFloat(a.csat_score) : 0;
+    // Same treatment as CSAT above (an unscored account counts as 0, not
+    // excluded) — cheap to compute now that csm_pulse_score is on the type
+    // (round-2 fix, 2026-09-27), so it replaces the old banner's own CSM
+    // gauge (which blended pulse-dot history instead of this real field).
+    csmTotal += a.csm_pulse_score ?? 0;
   }
   const npsScore = total > 0 ? Math.round(((promoters - detractors) / total) * 100) : 0;
   const avgCsat = total > 0 ? Math.round(csatTotal / total) : 0;
+  const avgCsm = total > 0 ? (csmTotal / total).toFixed(1) : DASH;
   const lifecycleLine = (Object.keys(LIFECYCLE_LABELS) as Account['lifecycle_stage'][])
     .filter((key) => lifecycle.get(key))
     .map((key) => `${LIFECYCLE_LABELS[key]} ${lifecycle.get(key)}`)
     .join(' · ');
-  return { total, health, arr, npsScore, promoters, passives, detractors, avgCsat, lifecycleLine };
+  return { total, health, arr, npsScore, promoters, passives, detractors, avgCsat, avgCsm, lifecycleLine };
 }
 
 /** Replaces the old AccountsMetricsBanner's donuts with the same figures as
  *  compact text (owner decision 2026-09-26; round-1 fix, 2026-09-27: "don't
  *  lose information" — everything the banner showed is still here). */
 function AccountsSummary({ items, currency }: { items: Account[]; currency: CurrencyCode }) {
-  const { total, health, arr, npsScore, promoters, passives, detractors, avgCsat, lifecycleLine } = summarize(items);
+  const { total, health, arr, npsScore, promoters, passives, detractors, avgCsat, avgCsm, lifecycleLine } = summarize(items);
   return (
     <div className="flex flex-col gap-0.5 px-3 pb-2 text-[11px] text-ink-muted">
       <p>
         <Num>{total}</Num> {total === 1 ? 'account' : 'accounts'} · <Num>{health.good}</Num> healthy · <Num>{health.average}</Num> average ·{' '}
         <Num>{health.poor}</Num> at risk · ARR <Num>{formatCompactMoney(arr, currency)}</Num> · NPS <Num>{signed(npsScore)}</Num> (
-        {plural(promoters, 'promoter')}, {plural(passives, 'passive')}, {plural(detractors, 'detractor')}) · CSAT <Num>{avgCsat}%</Num>
+        {plural(promoters, 'promoter')}, {plural(passives, 'passive')}, {plural(detractors, 'detractor')}) · CSAT <Num>{avgCsat}%</Num> · avg CSM{' '}
+        <Num>{avgCsm}</Num>
       </p>
       {lifecycleLine ? <p>{lifecycleLine}</p> : null}
     </div>
@@ -111,6 +119,7 @@ function AccountItem({
   today: string;
 }) {
   const ai = account.ai_pulse_value;
+  const csm = account.csm_pulse_score;
   const healthScore = Number(account.health_score);
   const healthText = Number.isNaN(healthScore) ? DASH : `${healthScore.toFixed(1)} ${HEALTH_LABEL[account.health_category]}`;
   const lifecycleText = LIFECYCLE_LABELS[account.lifecycle_stage] ?? 'Other';
@@ -139,7 +148,11 @@ function AccountItem({
           <span>· ID <Num>{account.id}</Num></span>
         </p>
         <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-muted">
-          <span className="font-mono-brand tabular-nums text-ink">AI {ai == null ? '—' : ai}</span>
+          {/* The List's own "AI n · CSM n" form (round-2 fix, 2026-09-27:
+             csm_pulse_score was being dropped too). */}
+          <span className="font-mono-brand tabular-nums text-ink">
+            AI {ai == null ? '—' : ai} · CSM {csm == null ? '—' : csm}
+          </span>
           {account.ai_pulse_score ? <span>{AI_PULSE_LABELS[account.ai_pulse_score]}</span> : null}
           {account.pulse.length ? <PulseDots history={account.pulse} /> : null}
         </p>

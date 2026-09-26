@@ -4,10 +4,12 @@ import { QUIET } from '../portfolio/styles';
 import { CountChip } from './CountChip';
 
 /** The account chips (spec §1.4): All, each account and the organization
- *  itself, numbered by the story's `counts.by_account`. Accounts store no
- *  health, ARR or renewal, so a chip carries only its name and count. The
- *  row also adds an account and edits the chosen one (the old Accounts tab's
- *  two real actions). */
+ *  itself, numbered by the story's `counts.by_account`. Accounts do carry
+ *  health, ARR, renewal, NPS, CSAT and CSM pulse (round-1/round-2 fixes,
+ *  2026-09-27 corrected this comment, which previously claimed otherwise) —
+ *  the chips stay name plus count by design, and those figures live on the
+ *  Details tab's Accounts section instead. The row also adds an account and
+ *  edits the chosen one (the old Accounts tab's two real actions). */
 export function AccountChips({
   accounts,
   loading,
