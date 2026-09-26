@@ -101,7 +101,7 @@ react-ts-app/
 ├── organizations/
 │   ├── (index)                → Redirects to /organizations/list
 │   ├── list                   → Portfolio (List.tsx on GET /organizations/portfolio/)
-│   ├── board                  → Board (KanbanBoard on /customers/, unchanged)
+│   ├── board                  → Board (Board.tsx: PortfolioBoard on GET /organizations/portfolio/)
 │   └── :id                    → Organization Details page (full detail)
 ├── accounts/:id               → Account Details page
 ├── copilot                    → Copilot AI module (Home / Chat / Cockpit)
@@ -316,13 +316,33 @@ inside `OrganizationsFrame` (the dashboard's body, with an empty Ask rail slot).
 | `features/organizations/portfolioParams.ts` | URL state ↔ API query (`parseParams`, `toUrlSearch`, `toApiQuery`, `filterQuery`) |
 | `features/organizations/portfolioFields.ts` | The 34-field registry: label, place (header or one of six panels), formatter, sort key |
 | `features/organizations/pinnedFields.ts`, `filterChips.ts` | Pins per user (localStorage, try/catch); chip labels and N-of-M text |
-| `components/organizations/portfolio/usePortfolio.ts` | `usePagedPortfolio` (one cursor-paged read: the frame, each section, later each board column) and `usePortfolio` (frame + M probe) |
-| `components/organizations/portfolio/*` | `AccountRow`, `rowParts`, `AccountDetails`, `AccountSheet`, `SummaryTiles`, `PortfolioToolbar`, `FiltersPanel`, `PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `useSelection`, `usePins`, `usePortfolioParams` |
-| `features/organizations/testPortfolio.ts`, `pages/organizations/testList.tsx` | Fixtures, `buildPortfolio`, `stubPortfolio`; `renderList(url, {width})` |
+| `components/organizations/portfolio/usePortfolio.ts` | `usePagedPortfolio` (one cursor-paged read: the frame, each section, each board column) and `usePortfolio` (frame + M probe) |
+| `components/organizations/portfolio/*` | `AccountRow`, `rowParts`, `AccountDetails`, `AccountSheet`, `SummaryTiles`, `PortfolioToolbar`, `FiltersPanel`, `PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `useSelection`, `usePins`, `usePortfolioParams`; for the board `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`, `useBoardMove`, `boardMove`, `useEndSentinel` |
+| `features/organizations/testPortfolio.ts`, `pages/organizations/testList.tsx` | Fixtures, `buildPortfolio`, `stubPortfolio`; `renderOrganizations(url, {width, nav})`, `renderList`, `renderBoard`; `src/test/intersection.ts` (fake IntersectionObserver) |
 
 #### Board View (`pages/organizations/Board.tsx`)
-`KanbanBoard` grouped by lifecycle on `/customers/`, with `MetricsPanel`.
-Unchanged until delivery 2 moves it onto `usePagedPortfolio` per column.
+The portfolio as columns (spec §1 "Board", owner decisions 2026-09-26), in
+`OrganizationsFrame` with the list's tiles, toolbar and chips on the same URL
+state (`usePortfolioParams(BOARD_GROUP)`: an absent `group` is lifecycle here).
+`PortfolioBoard` builds the columns from the frame's `groups` (`boardColumns`:
+every lifecycle stage, Churn drop-only while churned accounts are hidden, with
+a "Show churned" button). Each `BoardColumn` is one `usePagedPortfolio` read
+with `group_value`, paged by `useEndSentinel` or Show more, and (Churn
+excepted) carries a header "+" that opens `OrganizationFormModal` preset to
+its stage; the toolbar's own Add has no preset. A card's **Move to…** is a
+button that opens a menu of the other stages — nothing moves until one is
+chosen, an outside click closes it without moving focus, and it opens upward
+near the bottom of a scrolling column. `useBoardMove` moves a card
+optimistically, one move at a time, through `updateCustomer` (the single
+PATCH); on success it announces "Moved X to Y." and only then reloads the
+frame and the two columns touched; on failure it rolls back and surfaces a
+dismissable alert with the server's reason. It hands Churn to
+`ChurnOrganizationModal` instead of PATCHing (cancelling changes nothing).
+`useOverlayActive` keeps the optimistic guess on screen until each read's
+fresh page lands. From `sm` an opened card is `AccountSidePanel`, a non-modal
+aside beside the board; below it, the modal `AccountSheet`, with column tabs
+over snapping panels. `KanbanBoard` is no longer used here (Pipelines and the
+Accounts board keep it).
 
 #### Details View (`pages/organizations/Details.tsx`)
 Full organization detail page. Contains:
@@ -532,7 +552,6 @@ App.tsx
   │     └── redirects.tsx — Keep / LegacyRedirect for old /dashboard/advance/* links
   │
   ├── pages/organizations/Details.tsx & pages/accounts/Details.tsx
-  │     ├── components/organizations/MetricsPanel (or AccountMetricsPanel)
   │     ├── components/shared/PinnedAttributes
   │     ├── components/shared/ActivityFeed
   │     │     └── components/organizations/activity/*Tab (x9)
@@ -546,8 +565,10 @@ App.tsx
   │           ├── PortfolioSections → AccountRow (rowParts) + AccountDetails / AccountSheet
   │           └── SelectionBar (bulk via POST /organizations/bulk/)
   │
-  ├── pages/organizations/Board.tsx
-  │     └── components/organizations/MetricsPanel (until the board moves to the portfolio)
+  ├── pages/organizations/Board.tsx  (GET /organizations/portfolio/, PATCH /customers/<id>/)
+  │     ├── OrganizationsFrame; SummaryTiles, PortfolioToolbar, FilterChips (shared with the list)
+  │     └── components/organizations/portfolio/PortfolioBoard → BoardColumn → BoardCard
+  │           + AccountSidePanel / AccountSheet, useBoardMove (optimistic move), boardMove, useEndSentinel
   │
   ├── pages/copilot/Index.tsx
   │     ├── HomeView, ChatView, CockpitView

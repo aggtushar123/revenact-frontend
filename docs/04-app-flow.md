@@ -267,7 +267,8 @@ in instead.
 
 Add and edit run through `OrganizationFormModal`; churn through
 `ChurnOrganizationModal`, one account at a time; archive, owner and lifecycle
-changes through `POST /organizations/bulk/`.
+changes through `POST /organizations/bulk/` on the list, and a board move
+through `PATCH /customers/<id>/`, one account at a time.
 
 A dashboard drill's "Open as a list" (§4.7) lands here as `?ids=3,7`: the
 portfolio call carries `ids` (archived and churned accounts named there are
@@ -275,8 +276,33 @@ included), the chip "Opened from the dashboard (2)" shows, and removing it
 drops the param and returns focus to the search box. The count reads "N of M"
 against the whole book.
 
-`/organizations/board` is unchanged in this release: it still reads
-`/customers/` and `MetricsPanel`, and keeps its old header.
+`/organizations/board` shares the list's top half (the transparent top bar,
+tiles, toolbar, chips and "N of M") and its URL state; the List/Board tabs
+carry the query across. `group` defaults to lifecycle here (health on the
+list); `group=none` from the list reads as lifecycle, and the board's Group
+menu offers no None. The frame call (`limit=1`) gives each column header its
+count and ARR from `groups`. Grouped by lifecycle, every stage is a column in
+stage order, empty ones included. Churn lists churned accounts only when the
+view includes them (`include_churned`, a `churn` lifecycle, or `ids`), and is
+otherwise a drop target with "Show churned". Each non-empty column reads its
+own cards with `group_value=<key>&limit=25` and loads the next page when its
+end scrolls into view, with "Show more" as the fallback. A card (ring, name,
+owner, ARR, signal, trend) opens its six panels in a side panel beside the
+board — a non-modal aside — or the bottom sheet on phones, with **Edit
+details**. Grouped by lifecycle, a card moves by drag (from `sm`) or its
+**Move to…** menu (a button that opens a menu of stages; nothing moves until
+one is chosen, and an outside click closes the menu without moving focus):
+the card and the counts move at once, `PATCH /customers/<id>/` saves
+`lifecycle_stage`, one move at a time, and only once it saves do the frame and
+the two columns reload; a failure rolls back the card and shows a dismissable
+alert with the server's reason, and a polite status announces "Moved X to
+Y." Moving into Churn opens `ChurnOrganizationModal` instead (confirming
+reloads the board, cancelling changes nothing). Other groupings do not move
+cards. Each lifecycle column but Churn has a "+" that opens Add organization
+preset to that stage; the toolbar's own Add has no preset. Below `sm` the
+columns are full-width panels that snap sideways, with a strip of column tabs
+that jumps to one. The board has no selection mode; bulk work stays on the
+list.
 
 ### 4.3 Accounts
 

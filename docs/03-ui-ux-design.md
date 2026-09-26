@@ -178,11 +178,11 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 
 | Component | Where |
 |---|---|
-| Portfolio rows (`components/organizations/portfolio/`) | `/organizations/list`: `AccountRow` (a rounded item, not a table row; a two-line card below `sm`), `AccountDetails` (six panels, part of the row), `SummaryTiles`, `PortfolioToolbar`/`FiltersPanel`/`PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `AccountSheet`. See "Portfolio rows" below |
+| Portfolio rows and board (`components/organizations/portfolio/`) | `/organizations/list`: `AccountRow` (a rounded item, not a table row; a two-line card below `sm`), `AccountDetails` (six panels, part of the row), `SummaryTiles`, `PortfolioToolbar`/`FiltersPanel`/`PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `AccountSheet`. `/organizations/board`: `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`. See "Portfolio rows and board" below |
 | `AccountsTable`, `ContactsTable` | Same shape, no bulk actions |
-| `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by Pipelines, Organizations Board and Accounts Board |
+| `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by Pipelines and the Accounts board |
 | Dashboard tables | `AccountHealthDetailTable`, `RenewalQueueTable`, `ActivityDetailedTable`, `GoingDarkTable`, `SwingTable` |
-| `MetricsPanel` | Organizations Board (until it moves to the portfolio), Accounts, Contacts: count, health donut with COUNT/MRR/ARR toggle, NPS, lifecycle donut, renewal window |
+| `MetricsPanel` | Accounts and Contacts (each its own): count, health donut with COUNT/MRR/ARR toggle, NPS, lifecycle donut, renewal window |
 | `PinnedAttributes` | Label and value pairs typed as text, truncated, dot, owner or pulse |
 | `EntityAvatar` | Company logo, else deterministic initials in one of five semantic hues |
 | `PresenceStrip` | Session participants, maximum five |
@@ -380,7 +380,7 @@ left for the phone sheet).
   on dashboard conversations — the area and view only, never the filters it
   was asked with; a question's own chip is what carries those.
 
-### Portfolio rows (Organizations list)
+### Portfolio rows and board (Organizations)
 
 The list is Operate mode without a spreadsheet: one rounded `bg-surface` item
 per account on the canvas, grouped into sections whose headers show count and
@@ -398,15 +398,31 @@ ARR. Rules specific to it, enforced by
   these filters" with Clear filters (or "No organizations yet" with Add).
 - Every field of the old 34-column table renders exactly once in the row header
   or a panel (`fieldCoverage.test.tsx`); any panel field can be pinned as a chip.
-- Frame: the Navbar on `/organizations/list` is the dashboard's transparent top
-  bar ("Organizations", List/Board, the actions slot, the bell, no avatar);
-  `OrganizationsFrame` is `DashboardFrame`'s body with an empty `rail` slot that
-  Ask Revenact on Organizations fills later.
+- Frame: the Navbar on `/organizations/list` and `/organizations/board` is the
+  dashboard's transparent top bar ("Organizations", List/Board carrying the
+  query, the actions slot, the bell, no avatar); `OrganizationsFrame` is
+  `DashboardFrame`'s body with an empty `rail` slot that Ask Revenact on
+  Organizations fills later.
+- Board: columns sit on the canvas with no surface of their own, and cards
+  (`bg-surface`, ring, name, owner, ARR, signal, trend) are the items, so there
+  is no card in a card. A column header reads "Live · 1 · $69.6K". A dragged-over
+  column shows `bg-accent-dim` with an accent ring. The drop-only Churn column
+  is a dashed box. Each lifecycle column but Churn carries a header "+" that
+  opens Add organization preset to that column's stage; the toolbar's own Add
+  has no preset. A card's **Move to…** is a button, not a native `<select>`
+  acting on change: it opens a real menu of the other stages and nothing moves
+  until one is chosen; Escape or choosing an item returns focus to the button,
+  an outside click just closes the menu and leaves focus where it already was,
+  and the menu opens upward instead of down when the column's remaining
+  scroll room is too short for it. The opened card is `AccountSidePanel`, a
+  non-modal `bg-surface` column beside the board, not over it — the board
+  stays usable while it is open. Skeletons are card-shaped; a column with
+  nothing says so in words.
 
 ### Overlays
 
 `HealthPopover` (five real rubric components with weights), `CsatPopover`
-(response bands at true scale), `RenewalPopover`, the Organizations
+(response bands at true scale), the Organizations
 `FiltersPanel` and `PinFieldsMenu`, `ContactRowActionsPopover`, and the Navbar's notification
 and account menus. All close on an outside `mousedown`.
 
@@ -607,6 +623,11 @@ Search plus a Filters bottom sheet (group, sort, Export and Add inside), the
 summary tiles swipe sideways in their own strip, an opened row is a bottom
 sheet with a focus trap that locks page scroll while it is open, and a long
 press starts selection. Every control is 44px.
+
+The Organizations board below `sm`: each column is a full-width panel in a row
+that snaps sideways, with a strip of column tabs ("Live 1") that jumps to one
+and follows a swipe. Cards do not drag there; each card's Move to… menu moves
+it, and a tapped card opens in the bottom sheet. Every control is 44px.
 
 ---
 
