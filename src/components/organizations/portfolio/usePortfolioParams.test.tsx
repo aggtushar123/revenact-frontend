@@ -71,3 +71,27 @@ describe('usePortfolioParams on the Board', () => {
     expect(screen.getByTestId('group')).toHaveTextContent('lifecycle');
   });
 });
+
+describe('an explicit group carries between the routes (plan pre-flight 1)', () => {
+  it("keeps a group=lifecycle picked on the List when the Board filters, though it is the Board's default", async () => {
+    render(
+      <MemoryRouter initialEntries={['/organizations/board?group=lifecycle']}>
+        <BoardProbe />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Poor' }));
+    const search = new URLSearchParams(screen.getByTestId('where').textContent!);
+    expect(search.get('group')).toBe('lifecycle');
+    expect(search.get('health')).toBe('poor');
+  });
+
+  it('keeps a group=health picked on the Board when the List filters', async () => {
+    render(
+      <MemoryRouter initialEntries={['/organizations/list?group=health']}>
+        <Probe />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Poor' }));
+    expect(new URLSearchParams(screen.getByTestId('where').textContent!).get('group')).toBe('health');
+  });
+});

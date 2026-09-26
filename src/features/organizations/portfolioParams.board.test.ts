@@ -25,6 +25,13 @@ describe('per-route default group', () => {
     // Each route writes the other's default out, so a pick survives the switch.
     expect(toUrlSearch({ ...onBoard, group: 'lifecycle' }).toString()).toBe('group=lifecycle');
   });
+
+  it("keeps the route's default in the URL when the URL already named it (an explicit pick)", () => {
+    const onBoard = parseParams(new URLSearchParams('group=lifecycle'), BOARD_GROUP);
+    expect(toUrlSearch(onBoard, BOARD_GROUP, new URLSearchParams('group=lifecycle')).get('group')).toBe('lifecycle');
+    // Changed to the default from something else: omitted as before.
+    expect(toUrlSearch(onBoard, BOARD_GROUP, new URLSearchParams('group=health')).has('group')).toBe(false);
+  });
 });
 
 describe('boardParams', () => {

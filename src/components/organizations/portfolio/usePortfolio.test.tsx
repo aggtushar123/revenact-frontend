@@ -75,6 +75,22 @@ describe('usePortfolio', () => {
     await waitFor(() => expect(churn.result.current.total).toBe(3));
   });
 
+  it('re-probes M on its own version only, so a reload that cannot change M (a lifecycle move) skips it', async () => {
+    const spy = stubPortfolio();
+    const { result, rerender } = renderHook(({ version, totalVersion }) => usePortfolio(params('health=average'), version, undefined, totalVersion), {
+      initialProps: { version: 0, totalVersion: 0 },
+    });
+    await waitFor(() => expect(result.current.total).toBe(2));
+    const probes = () => portfolioQueries(spy).filter((q) => q.toString() === 'limit=1').length;
+    expect(probes()).toBe(1);
+    rerender({ version: 1, totalVersion: 0 });
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(probes()).toBe(1);
+    expect(result.current.total).toBe(2);
+    rerender({ version: 2, totalVersion: 1 });
+    await waitFor(() => expect(probes()).toBe(2));
+  });
+
   it('clamps the M probe so it is never less than the frame count', async () => {
     stubPortfolio({
       portfolio: (q) => {

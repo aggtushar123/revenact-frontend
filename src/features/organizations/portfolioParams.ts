@@ -90,14 +90,21 @@ function setFilters(query: URLSearchParams, p: PortfolioParams) {
   if (p.include_churned) query.set('include_churned', '1');
 }
 
-/** The page URL's query: defaults left out (the route's own default group
- *  included), "no grouping" written as none. */
-export function toUrlSearch(p: PortfolioParams, defaultGroup: GroupKey = DEFAULT_GROUP): URLSearchParams {
+/** The page URL's query: defaults left out, "no grouping" written as none.
+ *  The route's own default group is left out too, unless `prev` (the URL
+ *  being replaced) already named it: then it was picked on the other route,
+ *  where it is not the default, and it must survive the way back (plan
+ *  pre-flight 1). */
+export function toUrlSearch(
+  p: PortfolioParams,
+  defaultGroup: GroupKey = DEFAULT_GROUP,
+  prev?: URLSearchParams,
+): URLSearchParams {
   const query = new URLSearchParams();
   setFilters(query, p);
   if (p.sort !== DEFAULT_SORT) query.set('sort', p.sort);
   if (p.group === '') query.set('group', 'none');
-  else if (p.group !== defaultGroup) query.set('group', p.group);
+  else if (p.group !== defaultGroup || prev?.get('group') === p.group) query.set('group', p.group);
   return query;
 }
 

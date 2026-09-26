@@ -160,10 +160,13 @@ export interface PortfolioState extends PagedState {
   total: number | null;
 }
 
+/** `totalVersion` reloads the M probe (default: `version`). The Board passes
+ *  a smaller one that skips its lifecycle moves, which can't change M. */
 export function usePortfolio(
   params: PortfolioParams,
   version: number,
   onLoaded?: (rows: PortfolioRow[]) => void,
+  totalVersion: number = version,
 ): PortfolioState {
   const grouped = params.group !== '';
   // Grouped, the frame only needs summary, groups, filters, count and
@@ -181,7 +184,7 @@ export function usePortfolio(
 
   const withChurn = includesChurned(params);
   const probeQuery = hasFilters(params) ? (withChurn ? 'include_churned=1&limit=1' : 'limit=1') : null;
-  const probeKey = probeQuery ? `${probeQuery}#${version}` : null;
+  const probeKey = probeQuery ? `${probeQuery}#${totalVersion}` : null;
   const [probe, setProbe] = useState<{ key: string; count: number } | null>(null);
 
   useEffect(() => {
