@@ -53,14 +53,25 @@ export function useStory(orgId: number, query: string, version: number, enabled:
   }, [enabled, key, orgId, query]);
 
   const current = loaded && 'data' in loaded ? loaded : null;
+  // The latest `current`, so `loadMore` reads it through a ref instead of
+  // closing over it: a fresh page one landing (or a page being appended)
+  // changes `current`'s identity on every load, and closing over it would
+  // recreate `loadMore` just as often. `key`/`orgId`/`query` are enough to
+  // define this callback's identity — they change only when the read itself
+  // changes, synced in an effect below so no render ever reads a stale value.
+  const currentRef = useRef(current);
+  useEffect(() => {
+    currentRef.current = current;
+  });
 
   const loadMore = useCallback(async () => {
-    if (!current || current.key !== key || !current.next || inFlight.current) return;
+    const latest = currentRef.current;
+    if (!latest || latest.key !== key || !latest.next || inFlight.current) return;
     const token = generation.current;
     inFlight.current = true;
     setMore({ key, loading: true, error: null });
     try {
-      const page = await fetchStory(orgId, query, current.next);
+      const page = await fetchStory(orgId, query, latest.next);
       if (generation.current !== token) return;
       setLoaded((prev) =>
         prev && 'data' in prev && prev.key === key
@@ -74,7 +85,7 @@ export function useStory(orgId: number, query: string, version: number, enabled:
     } finally {
       if (generation.current === token) inFlight.current = false;
     }
-  }, [current, key, orgId, query]);
+  }, [key, orgId, query]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
