@@ -49,8 +49,10 @@ describe('organizations ask context', () => {
     expect(organizationsPath({ surface: 'organizations', view: 'list', filters: { owner: '2', lifecycle: 'live,renewal' }, labels: [] })).toBe(
       '/organizations/list?owner=2&lifecycle=live%2Crenewal',
     );
-    // An explicit "None" round-trips as the stored empty value, not the URL's 'none' sentinel.
-    expect(organizationsPath({ surface: 'organizations', view: 'list', filters: { group: '' }, labels: [] })).toBe('/organizations/list?group=');
+    // An explicit "None" is spelled back as the URL's own sentinel: the page
+    // only reads `group=none` as ungrouped, and would treat a bare `group=`
+    // as unset (its own default group).
+    expect(organizationsPath({ surface: 'organizations', view: 'list', filters: { group: '' }, labels: [] })).toBe('/organizations/list?group=none');
     expect(organizationsPath({ surface: 'organizations', view: 'board', filters: {}, labels: [] })).toBe('/organizations/board');
     expect(organizationsPath({ surface: 'organizations', view: 'board', filters: { sort: 'name', group: 'owner' }, labels: [] })).toBe(
       '/organizations/board?sort=name&group=owner',
@@ -68,5 +70,20 @@ describe('organizations ask context', () => {
     expect(organizationsLabel({ ...base, filters: { ids: '3,7' }, focus: { kind: 'companies', ids: [7] } })).toBe(
       'Organizations · Opened from the dashboard (2) · 1 account',
     );
+  });
+
+  it("uses the server's own stored labels when present (C2), rather than recomputing chips from options it may not have", () => {
+    const base = { surface: 'organizations' as const, view: 'list' as const, filters: { owner: '2' } };
+    // No options at all: without the stored labels this would read "User 2".
+    expect(organizationsLabel({ ...base, labels: ['Owner: Carl CSM'] })).toBe('Organizations · Owner: Carl CSM');
+    // Options are present too, but the stored labels still win.
+    expect(organizationsLabel({ ...base, labels: ['Owner: Carl CSM'] }, FILTER_OPTIONS)).toBe('Organizations · Owner: Carl CSM');
+    // A focus is never stored in labels (it's spent by the send): it is
+    // still named fresh, from the live `focus`.
+    expect(organizationsLabel({ ...base, labels: ['Owner: Carl CSM'], focus: { kind: 'companies', ids: [7] } })).toBe(
+      'Organizations · Owner: Carl CSM · 1 account',
+    );
+    // Empty labels (nothing was filtered) fall back the same as absent ones.
+    expect(organizationsLabel({ ...base, filters: {}, labels: [] })).toBe('Organizations');
   });
 });

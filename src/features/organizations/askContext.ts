@@ -49,23 +49,32 @@ export function fromContextFilters(filters: OrganizationsFilters, view: Organiza
 /** The page a conversation started on, with its filters (History restore).
  *  `origin.filters` is already the page's own URL parameters, only the set
  *  keys present (backend ruling), so it is used as-is rather than round-
- *  tripped through the params parser. */
+ *  tripped through the params parser — except `group: ''` (the stored
+ *  "None"), which the URL spells `group=none`, as `fromContextFilters`
+ *  already does; the page only reads that sentinel as ungrouped, and would
+ *  otherwise fall back to its own default group for a bare `group=`. */
 export function organizationsPath(origin: OrganizationsOrigin): string {
-  const query = new URLSearchParams(origin.filters as Record<string, string>).toString();
+  const filters = origin.filters.group === '' ? { ...origin.filters, group: 'none' } : origin.filters;
+  const query = new URLSearchParams(filters as Record<string, string>).toString();
   return query ? `/organizations/${origin.view}?${query}` : `/organizations/${origin.view}`;
 }
 
-/** The chip: "Organizations · Owner: Carl CSM · 1 account". The filter parts
- *  are the page's own filter chips, named from the portfolio's options; an
- *  unknown value shows as those chips show it ("User 9"). `labels` is never
- *  read here (it is the server's own tag, not this chip's), so both an
- *  origin (`labels` required) and a live context (`labels` absent) fit. */
+/** The chip: "Organizations · Owner: Carl CSM · 1 account". When the server
+ *  already stored `labels` on this context (a past message, or an origin,
+ *  which always carries them), those are used as-is (C2) — the asker's own
+ *  filter options at the time, which may differ from (or be unavailable to)
+ *  whoever is reading the chip now. Only a live, still-being-asked context
+ *  (`labels` absent) falls back to recomputing the filter chips here, named
+ *  from the portfolio's options; an unknown value then shows as those chips
+ *  show it ("User 9"). The focus part is never stored in `labels` (it is
+ *  spent by the send), so it is always named fresh, from `focus`. */
 export function organizationsLabel(
   context: Omit<OrganizationsOrigin, 'labels'> & { labels?: string[]; focus?: OrganizationsFocus | null },
   options: PortfolioResponse['filters'] | null = null,
 ): string {
-  const params = fromContextFilters(context.filters, context.view);
-  const parts = ['Organizations', ...filterChips(params, options).map((chip) => chip.label)];
+  const parts = context.labels?.length
+    ? ['Organizations', ...context.labels]
+    : ['Organizations', ...filterChips(fromContextFilters(context.filters, context.view), options).map((chip) => chip.label)];
   const focus = focusLabel(context.focus ?? null);
   if (focus) parts.push(focus);
   return parts.join(' · ');
