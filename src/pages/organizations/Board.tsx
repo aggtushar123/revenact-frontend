@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAppSelector, useOrgCurrency } from '../../hooks';
 import { apiFetch } from '../../lib/apiClient';
-import { SM, useMediaQuery } from '../../lib/useMediaQuery';
+import { SM, XL, useMediaQuery } from '../../lib/useMediaQuery';
 import type { Customer } from '../../features/customers/customersSlice';
 import { exportPortfolio, fetchPortfolio } from '../../features/organizations/portfolioApi';
 import { BOARD_GROUP, boardParams, hasFilters, includesChurned, toApiQuery } from '../../features/organizations/portfolioParams';
@@ -22,6 +22,7 @@ import { errorMessage, usePortfolio } from '../../components/organizations/portf
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
 import { FOCUS } from '../../components/organizations/portfolio/styles';
 import { AskRail } from '../dashboard/ask/AskRail';
+import { useAsk } from '../dashboard/ask/useAsk';
 import { useReportPortfolioOptions } from './ask/portfolioOptions';
 import { useAskFocusOnOpen } from './ask/useAskFocus';
 import { OrganizationsFrame } from './OrganizationsFrame';
@@ -36,6 +37,14 @@ export function Board() {
   const { params: urlParams, update, clearFilters } = usePortfolioParams(BOARD_GROUP);
   const params = useMemo(() => boardParams(urlParams), [urlParams]);
   const isSm = useMediaQuery(SM);
+  const isXl = useMediaQuery(XL);
+  const ask = useAsk();
+  // The Ask rail (spec §3), open beside the board from sm, wins the room
+  // (plan pre-flight 12): the columns narrow, and below xl, where a 320px
+  // rail and the 26rem side panel don't both fit, an opened card is the
+  // bottom sheet instead of the side panel.
+  const railOpen = isSm && Boolean(ask?.open);
+  const sidePanel = isSm && (!railOpen || isXl);
   const orgCurrency = useOrgCurrency();
   const defaultLifecycleStage = useAppSelector(
     (state) => state.auth.user?.organisation.default_lifecycle_stage || undefined,
@@ -57,6 +66,15 @@ export function Board() {
   const onRowsLoaded = useCallback((rows: PortfolioRow[]) => {
     setOpenRow((current) => (current && rows.find((row) => row.id === current.id)) || current);
   }, []);
+
+  // Opening the rail below xl takes the side panel's room: the open card
+  // closes rather than turning into a sheet over the rail, and its focus
+  // stays for the next question. Adjusted during render, not in an effect.
+  const [railWas, setRailWas] = useState(railOpen);
+  if (railWas !== railOpen) {
+    setRailWas(railOpen);
+    if (railOpen && !isXl) setOpenRow(null);
+  }
 
   const [churning, setChurning] = useState<PortfolioRow | null>(null);
   const onSaved = useCallback((move: BoardMove) => {
@@ -159,13 +177,15 @@ export function Board() {
           frame scroll. Phones scroll the page. */}
       <div data-part="board-page" className={`flex flex-col gap-4 pb-4 ${isSm ? 'min-h-0 flex-1' : ''}`}>
         <div className="flex shrink-0 flex-col gap-4">
-          <SummaryTiles
-            summary={portfolio.data?.summary ?? null}
-            failed={failed}
-            currency={currency}
-            params={params}
-            onFilter={update}
-          />
+          <div className="@container">
+            <SummaryTiles
+              summary={portfolio.data?.summary ?? null}
+              failed={failed}
+              currency={currency}
+              params={params}
+              onFilter={update}
+            />
+          </div>
           <PortfolioToolbar
             params={params}
             update={update}
@@ -230,6 +250,7 @@ export function Board() {
             columnBumps={columnBumps}
             currency={currency}
             isSm={isSm}
+            narrow={railOpen}
             filtered={hasFilters(params)}
             move={board.move}
             saving={board.busy}
@@ -242,11 +263,11 @@ export function Board() {
             onShowChurned={() => update({ include_churned: true })}
             onMoveSettled={board.settle}
           />
-          {isSm && openRow ? <AccountSidePanel row={openRow} currency={currency} onClose={closeOpen} onEdit={openEdit} /> : null}
+          {sidePanel && openRow ? <AccountSidePanel row={openRow} currency={currency} onClose={closeOpen} onEdit={openEdit} /> : null}
         </div>
       </div>
 
-      {!isSm && openRow ? <AccountSheet row={openRow} currency={currency} onClose={closeOpen} onEdit={openEdit} /> : null}
+      {!sidePanel && openRow ? <AccountSheet row={openRow} currency={currency} onClose={closeOpen} onEdit={openEdit} /> : null}
 
       {adding ? (
         <OrganizationFormModal
