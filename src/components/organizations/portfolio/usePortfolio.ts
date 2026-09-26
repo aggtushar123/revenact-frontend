@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../../lib/apiClient';
 import { fetchPortfolio } from '../../../features/organizations/portfolioApi';
-import { hasFilters, toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
+import { hasFilters, includesChurned, toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { PortfolioResponse, PortfolioRow } from '../../../features/organizations/portfolioTypes';
 
 export const PAGE_SIZE = 50;
@@ -179,7 +179,7 @@ export function usePortfolio(
   );
   const noopLoadMore = useCallback(async () => {}, []);
 
-  const withChurn = params.include_churned || params.lifecycle.includes('churn') || params.ids.length > 0;
+  const withChurn = includesChurned(params);
   const probeQuery = hasFilters(params) ? (withChurn ? 'include_churned=1&limit=1' : 'limit=1') : null;
   const probeKey = probeQuery ? `${probeQuery}#${version}` : null;
   const [probe, setProbe] = useState<{ key: string; count: number } | null>(null);
