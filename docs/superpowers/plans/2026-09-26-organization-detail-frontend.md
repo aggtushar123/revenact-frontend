@@ -16,7 +16,7 @@
 
 - Header reads (spec §2): `GET /organizations/portfolio/?ids={id}&include_churned=1` (plus `limit=1`), which "gives one row with everything the List shows"; `ids` names archived rows too. `GET /customers/{id}/` adds `health_breakdown`, `csat_breakdown`, email, phone and industry.
 - Accounts: `GET /customers/{id}/accounts/` gives the chips. "Their counts come from the story's `counts.by_account`."
-- Story: `GET /api/v1/organizations/{id}/story/` (called as `/organizations/{id}/story/` through `apiFetch`, which prefixes `/api/v1`). **The backend is the source of truth** (`revenact-backend/docs/superpowers/plans/2026-09-26-organization-story-backend.md` and `services/organizations/story/` on `feat/organization-story`); Task 1 mirrors it. `IsAuthenticated`; an organisation outside `visible_customers` is a **404** (it does not confirm the organisation exists). Parameters: `group` ∈ {conversations, tickets, tasks, feedback, health}; `source` (comma list of exact kinds); `account` (a positive account id, or `none` for the organization's own records; an id outside this organization's accounts in scope reads nothing, not a 404); `q` (trimmed, at most 200 characters); `thread` (an email `thread_id`: that thread's emails only; it narrows `items`, never `counts` or `attention`); `cursor`; `limit` (default 30, max 100; below 1 reads as 30). "Unknown values are dropped, never a 400."
+- Story: `GET /api/v1/organizations/{id}/story/` (called as `/organizations/{id}/story/` through `apiFetch`, which prefixes `/api/v1`). **The backend is the source of truth** (`revenact-backend/docs/superpowers/plans/2026-09-26-organization-story-backend.md` and `services/organizations/story/` plus `OrganizationStoryView` in `services/organizations/views.py` on `feat/organization-story`, commits 04137dc (attention) and f2cf6b0 (the view), whose `tests/test_story_views.py` pins the response shape); Task 1 mirrors it. The view reads `today` as `timezone.localdate()` in the project's UTC time zone. `IsAuthenticated`; an organisation outside `visible_customers` is a **404** (it does not confirm the organisation exists). Parameters: `group` ∈ {conversations, tickets, tasks, feedback, health}; `source` (comma list of exact kinds); `account` (a positive account id, or `none` for the organization's own records; an id outside this organization's accounts in scope reads nothing, not a 404); `q` (trimmed, at most 200 characters); `thread` (an email `thread_id`: that thread's emails only; it narrows `items`, never `counts` or `attention`); `cursor`; `limit` (default 30, max 100; below 1 reads as 30). "Unknown values are dropped, never a 400."
 - Story response: `{items, next_cursor, counts: {by_group, by_kind, by_account}, attention}`. Each item is `{id, kind, source, occurred_at, all_day, account: {id, name} | null, title, summary, actor: {id: number | null, name} | null, link: {thread_id: string | null, url: string | null}}`. `by_group` (keys `all` and the five groups) and `by_kind` (every kind) follow `account` and `q` but not `group` or `source`; `by_account` (keys `all`, `none` and every in-scope account id as a string) follows `group`, `source` and `q` but not `account`. `attention` follows `account` only. The shapes are fixed in Task 1 (pre-flight 10).
 - Paging: one keyset cursor over `(occurred_at, kind, id)`, opaque, `null` on the last page, passed back verbatim (URL-encoded). The cursor is bound to `group`, `source`, `account`, `q` and `thread`: a cursor cut under other filters, or a malformed one, reads as page one. The page reads 30 at a time (`STORY_PAGE_SIZE`).
 - The story is what has happened: anything dated from tomorrow (UTC) on (an upcoming meeting, a future-dated ticket) is left out of items and counts. A task is in the story at its `created_at`, not its due date (overdue tasks are the attention block's job). Health items are month-end `HealthSnapshot` changes of health category, AI pulse or CSM pulse only; lifecycle changes are not stored and never appear.
@@ -31,7 +31,7 @@
   - Skeletons shaped like what they stand for. Designed empty and error states.
   - Hover, focus-visible (`FOCUS` from `portfolio/styles.ts`), active and disabled states throughout. 44px touch targets below `sm` (`min-h-11 sm:min-h-9`). Motion only through existing tokens; the global reduced-motion override covers `transition-*` and `animate-pulse`.
   - No third-party images (no Clearbit logo, no pravatar avatar): initials only.
-- Copy: sentence case, no em dashes in new UI copy, "organization"/"organizations" (US spelling) in UI text.
+- Copy: sentence case, no em dashes in new UI copy ("—" standing alone as an empty value, as the List shows it, is a glyph, not punctuation, and is allowed), "organization"/"organizations" (US spelling) in UI text.
 - Phones are `< 640px` (`SM = '(min-width: 640px)'` from `src/lib/useMediaQuery.ts`). jsdom has no `matchMedia`, so **`useMediaQuery` reads false (phone) in tests unless `setViewport(1440)` from `src/test/viewport.ts` runs first**. The page reads `isSm` once and passes it down. A layout that exists on phones only or on desktop only (the tile strip vs the grid, the bottom sheet vs the side panel) is rendered conditionally on `isSm`, never only CSS-hidden.
 - jsdom has no `IntersectionObserver` and no `Element.prototype.scrollIntoView`. The code guards both (`useEndSentinel` does nothing without an observer and Show more does the paging; every `scrollIntoView` call is `?.()`).
 - Tests follow `.claude/skills/testing/SKILL.md`: unit, integration (real store and router, network mocked at `fetch` with §2-shaped bodies through `stubOrganizationPage`), and e2e in `src/e2e/`.
@@ -51,7 +51,7 @@
 | 7 | A chip filters Story, People and Deals & risks; delivery 2 turns People and Deals into list items "filtered by account". | `ContactsTab` and `PipelinesTab` have no account filter to take. | In delivery 1 the chips show on the Story tab only and filter only the story. `?account=` stays in the URL while other tabs are open, so delivery 2 can read it. |
 | 8 | Six tabs; the Accounts tab is not among them. | The Accounts tab holds account Add/Edit (`AccountFormModal`), a banner, a spreadsheet table with dead controls and a drill to `/accounts/:id`, which falls back to mock data on refresh (spec §6). | The Accounts tab goes, but no account detail is lost (**owner's decision, 2026-09-26**). The chips stay on the Story tab as the filter; the chip row ends with **Add account** (`AccountFormModal` create, then the accounts reload) and, while an account chip is chosen, **Edit <account>** (`AccountFormModal` edit). The Details tab opens with an **Accounts** section (`AccountsSection`, Task 15): one list item per connected account, not a table, with its name linking to `/accounts/:id`, owner, domain, pulse dots, "AI n" with the AI label and the AI reason (every one a field `GET /customers/{id}/accounts/` serves; `Account` gains the served `ai_pulse_value`), Edit on each and Add account, with designed loading, error and empty states. `/accounts/:id` still falls back to mock data on refresh (spec §6); that page is its own work. |
 | 9 | "Success Plans, Custom Objects and Canvases become tabs when built." | Custom Objects and Canvas List are real tabs today; `/accounts/:id` renders the same components. | They leave this page with the rest of the old tab bar. `CustomObjectsTab` and `CanvasListTab` stay in `components/shared/` for `/accounts/:id`. |
-| 10 | §2 names the story fields but not their values. | The backend plan (`2026-09-26-organization-story-backend.md`) and its code on `feat/organization-story` (`services/organizations/story/params.py`, `cursor.py`, `items.py`, `health.py`, `scope.py`, `sources.py`, `build.py`) fix them; the code wins where the two differ. | Task 1 mirrors the backend exactly. `kind` ∈ {activity, calendar_event, call, email, health, note, survey, task, ticket} (a Call is its own kind, its `summary` is `Call.summary`); groups: conversations = activity, call, email, calendar_event; tickets = ticket; tasks = task, note; feedback = survey; health = health. `id` is the record's own pk (unique with `kind`). `source` is the provider in lower case: a connector's (`zendesk`, `jira`, `freshdesk`, `webhook`, `intercom`, `salesforce`, `hubspot`, `slack`, `gmail`, `ms_teams`, `zoom`, `github`, `figma`), a mailbox's (`google`, `microsoft`, `imap`), or `revenact` for anything logged in the app; the page names it with `sourceName`. `occurred_at` is always an ISO 8601 UTC timestamp; `all_day: true` marks a date-only record (activity, calendar event, ticket, note, survey, health), whose date is the date part of `occurred_at` (midnight UTC), not a moment. `actor` is `{id, name}` with `id` a user id when the row links a user and `null` when only a name is stored, or `null` (activity, calendar event, survey, health). `link` is `{thread_id, url}`: `thread_id` is an email's thread (null when blank); `url` is a ticket's `external_url` or a call's `recording_url`, sent only when it starts with `http://` or `https://`, else null. `attention` (backend Task 7) is exactly `{renewal: {date, days, overdue} \| null, tickets: {count, oldest_days} \| null, overdue_tasks: {count, oldest_days} \| null, questions: {count} \| null, anomaly: {id, title, first_seen_at, last_seen_at} \| null}`, each null when nothing needs attention: renewal only when overdue or due within 30 days and never for a churned organization; tickets are open High or Critical; `anomaly.title` is always a string (withheld as "Similar reports across 1 of your companies" unless the viewer sees everything). |
+| 10 | §2 names the story fields but not their values. | The backend plan (`2026-09-26-organization-story-backend.md`) and its code on `feat/organization-story` (`services/organizations/story/params.py`, `cursor.py`, `items.py`, `health.py`, `scope.py`, `sources.py`, `attention.py`, `build.py`, and `OrganizationStoryView` in `views.py`, commit f2cf6b0) fix them; the code wins where the two differ. | Task 1 mirrors the backend exactly. `kind` ∈ {activity, calendar_event, call, email, health, note, survey, task, ticket} (a Call is its own kind, its `summary` is `Call.summary`); groups: conversations = activity, call, email, calendar_event; tickets = ticket; tasks = task, note; feedback = survey; health = health. `id` is the record's own pk (unique with `kind`). `source` is the provider in lower case: a connector's (`zendesk`, `jira`, `freshdesk`, `webhook`, `intercom`, `salesforce`, `hubspot`, `slack`, `gmail`, `ms_teams`, `zoom`, `github`, `figma`), a mailbox's (`google`, `microsoft`, `imap`), or `revenact` for anything logged in the app; the page names it with `sourceName`. `occurred_at` is always an ISO 8601 UTC timestamp; `all_day: true` marks a date-only record (activity, calendar event, ticket, note, survey, health), whose date is the date part of `occurred_at` (midnight UTC), not a moment. `actor` is `{id, name}` with `id` a user id when the row links a user and `null` when only a name is stored, or `null` (activity, calendar event, survey, health). `link` is `{thread_id, url}`: `thread_id` is an email's thread (null when blank); `url` is a ticket's `external_url` or a call's `recording_url`, sent only when it starts with `http://` or `https://`, else null. `attention` (`story/attention.py`) is exactly `{renewal: {date, days, overdue} \| null, tickets: {count, oldest_days} \| null, overdue_tasks: {count, oldest_days} \| null, questions: {count} \| null, anomaly: {id, title, first_seen_at, last_seen_at} \| null}`, each null when nothing needs attention: renewal only when overdue or due within 30 days and never for a churned organization; tickets are open High or Critical; `anomaly.title` is always a string (withheld as "Similar reports across 1 of your companies" unless the viewer sees everything). |
 | 11 | Filters: All · Conversations · Tickets · Tasks & notes · Feedback · Health & usage, a Sources picker (exact types) and search. "A source with no real data never appears." | The feed's 13 chips include placeholders (Pulse, Conversations, Revenact Support), a fake Slack filter and browser-only Sessions. | `STORY_GROUPS` and `STORY_KINDS` (Task 1) list only the nine real kinds. The Sources picker offers the chosen group's kinds that have data (`counts.by_kind[kind] > 0`, the backend's answer to "a source with no real data never appears in Sources"), plus any already chosen; choosing a group drops sources outside it. `group`, `source` and `q` live in the URL too, so a filtered story survives refresh and Back; search writes `q` 300ms after typing stops (or on Enter), with `replace`. Filters with a zero count still show. |
 | 12 | "+ Add: Log activity, New task, New note, Log survey. These are the existing create flows." | Each flow is an inline form toggled inside its own tab (`TasksTab`, `NotesTab`, `SurveysTab`, `CallSenseTab`). `Activity` has no create endpoint (`CustomerActivityListView` is list-only; backend pre-flight 22). A call create endpoint does exist: `_CallListView` is a `ListCreateAPIView` behind `POST /customers/{id}/calls/` and `POST /customers/{id}/accounts/{account_id}/calls/`, which CallSense's "Log a call" uses. | Task 12 lifts each form out as an exported component (`TaskForm`, `NoteForm`, `CallForm`, `LogSurveyForm`), leaving the tabs' behaviour and labels unchanged. `AddFlow` (Task 13) shows the chosen one in a `Sheet`; the menu reads **Log a call · New task · New note · Log survey**. It creates on the organization, or on the chosen account when an account chip is active. On success the sheet closes, the story reloads and a polite status says "Added to the story." |
 | 13 | "Opening an email shows its thread." | `EmailThreadPanel` invents a kickoff message for every logged email (`buildThread`), loads pravatar avatars, and its Reply, Forward, quick-reply and emoji controls do nothing. | The backend has no thread endpoint; it adds `thread=<thread_id>` to the story (backend pre-flight 14): that thread's emails only, across the organization and its accounts, under the same rules, newest first; it narrows `items`, not `counts` or `attention`. A new `EmailThread` (Task 11) reads `GET /organizations/{id}/story/?thread=<link.thread_id>&limit=100` (every page, through `fetchThread`) and shows the messages oldest first, each with its sender (`actor`), time and summary (the backend's one-line, 240-character `summary`; the full message stays in Communications). An email whose `link.thread_id` is null (logged in Revenact) has no thread and opens in place like any other item. No reply controls on this page; replying stays in Communications. `EmailThreadPanel` stays for `/accounts/:id`. |
@@ -59,7 +59,7 @@
 | 15 | Calls carry their CallSense summary. | CallSense is a feed sub-tab listing calls with recording, participants and transcript. | The story shows a call's summary (the backend's `summary`). The full CallSense list moves to the **Files** tab under a "Calls" heading, beside the files, as "current content". |
 | 16 | Knowledge is today's Company View. | Headlines (an AI digest with Regenerate) and AI attributes are real and have no place in the six tabs. | Headlines go under Company View on the Knowledge tab. `AIAttributesPanel` goes under the six panels on the Details tab. |
 | 17 | The next page loads at the end of the list. | `useEndSentinel` and `MoreButton` exist in `portfolio/`. | `StoryStream` (Task 10) reuses both: a 1px sentinel after the last day and a visible Show more as the fallback. The observer's root is the viewport (the frame is unchanged). |
-| 18 | Details: the List's six panels, stacked on phones, with Edit details. | `AccountDetails` takes `stacked` and `onEdit`. | `DetailsTab` (Task 15) renders the Accounts section (pre-flight 8), then `AccountDetails stacked={!isSm}`, whose Edit details opens the same `OrganizationFormModal`. |
+| 18 | Details: the List's six panels, stacked on phones, with Edit details. | `AccountDetails` takes `stacked` and `onEdit`. | `DetailsTab` (Task 15) renders the Accounts section (pre-flight 8), then `AccountDetails stacked={!isSm}`, whose Edit details opens the same `OrganizationFormModal`, then `CustomerFacts`: the email, phone and industry and the CSAT response bands that `GET /customers/{id}/` adds (spec §2) and the six panels do not show (Voice shows only the CSAT score). |
 | 19 | Removals (§1.10). | The Slack tab, fake pinned Pulse, invented NPS counts, placeholders, "Enable new 360 UI", every dead control, Clearbit and pravatar, `PinnedAttributes`, the All-attributes modal and the Overview sub-tab all live in `Details.tsx` or in shared components the account page also renders (`ActivityFeed`, `PinnedAttributes`, `SlackTab`, `EmailThreadPanel`). | The rewrite drops everything from this page. Shared components `/accounts/:id` still imports stay (spec §6 plans that page). `HealthPopover` and `CsatPopover` have no importers left and are deleted after a grep (Task 18). The house-rules scan also forbids `clearbit` and `pravatar` in the new folder and the page. |
 | 20 | Tests at three levels. | `Details.test.tsx` has 40 tests, most about the old page. Its Contacts, Pipelines and Surveys tests are the only coverage of `ContactsTab`, `PipelinesTab` and `SurveysTab`, which live on. | Task 12 moves the survey tests to `SurveysTab.test.tsx` and Task 15 moves the contacts and pipelines tests to `PeopleTab.test.tsx` and `DealsTab.test.tsx`, by line range from the untouched file, rendering those components directly. Task 16 replaces `Details.test.tsx` with the new page's integration tests. |
 | 21 | The Surveys page's row-click lands on this page's Surveys filter. | `SurveysPage.tsx:86` navigates with `state.activityFilter: 'Surveys'`. | It navigates to `/organizations/{id}?group=feedback` (Task 16). `ActivityFeed`'s `initialFilter` stays for `/accounts/:id`. |
@@ -88,6 +88,7 @@ Create:
   - `AttentionBlock.tsx` (+ test), `SourcesPicker.tsx`, `StoryToolbar.tsx` (+ test, covering Sources)
   - `StoryItemRow.tsx`, `StoryStream.tsx` (+ test, covering the row)
   - `EmailThread.tsx` (+ test), `AddFlow.tsx` (+ test), `StoryTab.tsx` (+ test)
+  - `CountChip.tsx`, `CustomerFacts.tsx` (+ test)
   - `AccountsSection.tsx` (+ test), `DetailsTab.tsx`, `PeopleTab.tsx` (+ test), `DealsTab.tsx` (+ test), `KnowledgeTab.tsx`, `FilesCallsTab.tsx` (+ `otherTabs.test.tsx`)
 - `src/components/organizations/activity/SurveysTab.test.tsx` (moved tests).
 - `src/pages/organizations/testDetail.tsx`: `makeDetailStore`, `renderOrganizationPage`.
@@ -95,12 +96,14 @@ Create:
 
 Modify:
 - `src/components/organizations/portfolio/houseRules.test.ts` (uses the shared suite).
+- `src/components/organizations/portfolio/styles.ts` (`PRIMARY`, Task 9) and `rowParts.tsx` (`PulseDots`, Task 15).
+- `src/components/organizations/ConfirmDialog.tsx` (the `bg-scrim` token, Task 16).
 - `src/components/organizations/activity/TasksTab.tsx`, `NotesTab.tsx`, `CallSenseTab.tsx`, `SurveysTab.tsx` (forms exported).
 - `src/pages/organizations/Details.tsx` (rewrite), `Details.test.tsx` (rewrite), `OrganizationsFrame.tsx` (comment).
 - `src/pages/surveys/SurveysPage.tsx` and `SurveysPage.test.tsx`.
 - `src/components/layout/Navbar.tsx` and `Navbar.test.tsx`; `src/layouts/DashboardLayout.tsx` and `DashboardLayout.test.tsx`.
 - `src/components/contacts/ContactRowActionsPopover.tsx` (one comment).
-- `src/features/customers/customersSlice.ts` (`Account.ai_pulse_value`, Task 15).
+- `src/features/customers/customersSlice.ts` (`Account.ai_pulse_value`, Task 1).
 - Docs: `docs/04-app-flow.md`, `docs/03-ui-ux-design.md`, `.agents/workflows/repo-architecture.md`.
 
 Delete (Task 18): `src/components/organizations/HealthPopover.tsx`, `HealthPopover.test.tsx`, `CsatPopover.tsx`, `CsatPopover.test.tsx`.
@@ -115,6 +118,7 @@ Kept on purpose (used by `/accounts/:id` or other pages): `ActivityFeed`, `Pinne
 - Create: `src/features/organizations/storyKinds.ts`
 - Create: `src/features/organizations/storyApi.ts`
 - Create: `src/features/organizations/testStory.ts`
+- Modify: `src/features/customers/customersSlice.ts` (`Account` gains `ai_pulse_value?: number | null`, which `AccountSerializer` already serves; the fixtures below set it)
 - Test: `src/features/organizations/storyKinds.test.ts`, `src/features/organizations/storyApi.test.ts`
 
 **Interfaces:**
@@ -123,7 +127,7 @@ Kept on purpose (used by `/accounts/:id` or other pages): `ActivityFeed`, `Pinne
   - Types: `StoryGroup`, `StoryKind`, `StoryRef`, `StoryActor`, `StoryLink`, `StoryItem`, `StoryAttention`, `StoryCounts`, `StoryResponse` (exactly as below, mirroring the backend's `items.py`, `build.py` and its plan's Task 7).
   - `STORY_GROUPS: {key: StoryGroup | ''; label: string}[]`, `GROUP_KEYS: StoryGroup[]`, `STORY_KINDS: {kind; label; group}[]`, `KIND_GROUP: Record<StoryKind, StoryGroup>`, `KIND_NAME: Record<StoryKind, string>`, `isStoryKind(v: string): v is StoryKind`, `isStoryGroup(v: string): v is StoryGroup`, `kindsIn(group: StoryGroup | ''): StoryKind[]`, `offeredSources(group, byKind, selected): StoryKind[]`, `sourceName(source: string): string`, `type AddKind = 'call' | 'task' | 'note' | 'survey'`, `ADD_FLOWS: {key: AddKind; label: string}[]`.
   - `STORY_PAGE_SIZE = 30`, `THREAD_PAGE_SIZE = 100`, `storyPath(orgId: number): string`, `interface StoryFilters {group: StoryGroup | ''; sources: StoryKind[]; account: string; q: string}`, `storyQuery(f: StoryFilters, limit?: number): string`, `fetchStory(orgId: number, query: string, cursor?: string | null): Promise<StoryResponse>`, `fetchThread(orgId: number, threadId: string): Promise<StoryItem[]>`.
-  - Test-only (`testStory.ts`): `EMEA`, `NORTH_AMERICA` (`StoryRef`), `ACCOUNTS: Account[]`, `pizzaHutCustomer: Customer`, `STORY_ITEMS: StoryItem[]`, `PIZZA_ATTENTION`, `QUIET_ATTENTION: StoryAttention`, `THREAD_ITEMS: StoryItem[]`, `MEMBERS`, `manyItems(n: number): StoryItem[]`, `buildStory(query, book, attention, accountIds): StoryResponse`, `stubOrganizationPage(stub?: OrganizationPageStub)` (returns the fetch spy), `storyQueries(spy): URLSearchParams[]`, `portfolioRequests(spy): URLSearchParams[]`, `postBodies(spy, path: string): Record<string, unknown>[]`, `requestPaths(spy): string[]`.
+  - Test-only (`testStory.ts`): `EMEA`, `NORTH_AMERICA` (`StoryRef`), `ACCOUNTS: Account[]`, `pizzaHutCustomer: Customer`, `STORY_ITEMS: StoryItem[]`, `PIZZA_ATTENTION`, `QUIET_ATTENTION: StoryAttention`, `THREAD_ITEMS: StoryItem[]`, `MEMBERS`, `manyItems(n: number): StoryItem[]`, `buildStory(query, book, attention, accountIds): StoryResponse`, `stubOrganizationPage(stub?: OrganizationPageStub)` (returns the fetch spy; `failPortfolio`, `failCustomer` and `failStory` make the first reads fail), `storyQueries(spy): URLSearchParams[]`, `portfolioRequests(spy): URLSearchParams[]`, `postBodies(spy, path: string): Record<string, unknown>[]`, `requestPaths(spy): string[]`.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -273,6 +277,12 @@ Run: `npx vitest run src/features/organizations/storyKinds.test.ts src/features/
 Expected: FAIL with "Failed to resolve import './storyKinds'" (and './storyApi', './testStory').
 
 - [ ] **Step 3: Implement**
+
+The frontend `Account` type lacks the `ai_pulse_value` that `GET /customers/{id}/accounts/` serves (`AccountSerializer` in revenact-backend `services/customers/serializers.py`), and the fixtures below set it. In `src/features/customers/customersSlice.ts`, inside `export interface Account`, directly under `ai_pulse_reason: string;`, add:
+```ts
+  /** The AI pulse as a number (1-5), null when unscored; AccountSerializer's `ai_pulse_value`. Optional because older fixtures omit it. */
+  ai_pulse_value?: number | null;
+```
 
 `src/features/organizations/storyTypes.ts`:
 ```ts
@@ -826,6 +836,8 @@ export interface OrganizationPageStub {
   threads?: Record<string, StoryItem[]>;
   /** How many portfolio reads fail (500 "Try later.") before they succeed. */
   failPortfolio?: number;
+  /** How many GET /customers/{id}/ reads fail (500 "Try later.") before they succeed. */
+  failCustomer?: number;
   /** How many story reads fail (500 "Try later.") before they succeed. */
   failStory?: number;
 }
@@ -861,6 +873,7 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
   let current: PortfolioRow | null = stub.row === undefined ? pizzaHut : stub.row;
   const book = [...(stub.items ?? STORY_ITEMS)];
   let portfolioFailures = stub.failPortfolio ?? 0;
+  let customerFailures = stub.failCustomer ?? 0;
   let storyFailures = stub.failStory ?? 0;
   let created = 0;
   const accounts = stub.accounts ?? ACCOUNTS;
@@ -980,7 +993,13 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
     }
 
     if (method === 'GET') {
-      if (orgPath && path === orgPath) return json(200, stub.customer ?? pizzaHutCustomer);
+      if (orgPath && path === orgPath) {
+        if (customerFailures > 0) {
+          customerFailures -= 1;
+          return json(500, { detail: 'Try later.' });
+        }
+        return json(200, stub.customer ?? pizzaHutCustomer);
+      }
       if (orgPath && path === `${orgPath}accounts/`) return json(200, accounts);
       if (path === '/auth/members/') return json(200, MEMBERS);
       if (/^\/customers\/\d+\/brief\/$/.test(path)) return json(200, EMPTY_BRIEF);
@@ -1037,7 +1056,7 @@ Run: `npx tsc -b --noEmit`
 Expected: no output.
 
 ```bash
-git add src/features/organizations/storyTypes.ts src/features/organizations/storyKinds.ts src/features/organizations/storyKinds.test.ts src/features/organizations/storyApi.ts src/features/organizations/storyApi.test.ts src/features/organizations/testStory.ts
+git add src/features/customers/customersSlice.ts src/features/organizations/storyTypes.ts src/features/organizations/storyKinds.ts src/features/organizations/storyKinds.test.ts src/features/organizations/storyApi.ts src/features/organizations/storyApi.test.ts src/features/organizations/testStory.ts
 git commit -m "feat(organizations): the organization story contract, its kinds and a test stub
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
@@ -1058,7 +1077,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Produces:
   - `type DetailTab = 'story' | 'details' | 'people' | 'deals' | 'knowledge' | 'files'`, `DETAIL_TABS: {key: DetailTab; label: string}[]`, `interface DetailParams {tab; account: string; group: StoryGroup | ''; sources: StoryKind[]; q: string}`, `parseDetailParams(search: URLSearchParams): DetailParams`, `toDetailSearch(p: DetailParams): URLSearchParams`, `withPatch(p: DetailParams, patch: Partial<DetailParams>): DetailParams`, `storyFilters(p: DetailParams): StoryFilters`, `hasStoryFilters(p: DetailParams): boolean`, `detailTabId(base: string, tab: DetailTab): string`, `detailPanelId(base: string): string`.
   - `type Timed = {occurred_at: string; all_day: boolean}`, `localDay(date: Date): string`, `dayKey(item: Timed): string`, `timeLabel(item: Timed): string`, `dayLabel(key: string, today: string): string`, `groupByDay<T extends Timed>(items: T[]): {key: string; items: T[]}[]`.
-  - `useDetailParams(): {params: DetailParams; update: (patch: Partial<DetailParams>, options?: {replace?: boolean}) => void}` (`update` is stable).
+  - `useDetailParams(): {params: DetailParams; update: (patch: Partial<DetailParams>, options?: {replace?: boolean}) => void}`. `update` merges into the URL as it is now; its identity changes with the URL (react-router's `setSearchParams` does), so a caller that must not re-run on it reads it through a ref.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1362,8 +1381,10 @@ import {
   type DetailParams,
 } from '../../../features/organizations/detailParams';
 
-/** The organization page's URL state. `update` is stable, merges a patch into
- *  what the URL holds now, and pushes a history entry unless `replace`. */
+/** The organization page's URL state. `update` merges a patch into what the
+ *  URL holds now and pushes a history entry unless `replace`. Its identity
+ *  changes whenever the URL does (react-router's `setSearchParams` does), so
+ *  a caller that must not re-run on it reads it through a ref. */
 export function useDetailParams() {
   const [search, setSearch] = useSearchParams();
   const key = search.toString();
@@ -1745,7 +1766,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `fetchPortfolio` (`portfolioApi.ts`), `apiFetch`, `errorMessage` (`portfolio/usePortfolio.ts`), `fetchStory` (Task 1), `stubOrganizationPage`, `manyItems`, `storyQueries`, `portfolioRequests` (Task 1).
 - Produces:
-  - `interface OrganizationState {row: PortfolioRow | null; customer: Customer | null; loading: boolean; notFound: boolean; error: string | null; customerError: string | null; retry: () => void}` and `useOrganization(id: number | null, version: number): OrganizationState`.
+  - `interface OrganizationState {row: PortfolioRow | null; customer: Customer | null; loading: boolean; notFound: boolean; error: string | null; customerError: string | null; retry: () => void}` and `useOrganization(id: number | null, version: number): OrganizationState`. The last row that landed stays in `row` while a new version reloads and after a reload fails (then `error` is set beside it).
   - `interface StoryState {data: StoryResponse | null; items: StoryItem[]; next: string | null; loading: boolean; error: string | null; loadingMore: boolean; moreError: string | null; loadMore: () => Promise<void>; retry: () => void}` and `useStory(orgId: number, query: string, version: number, enabled: boolean): StoryState`.
 
 - [ ] **Step 1: Write the failing tests**
@@ -1801,9 +1822,22 @@ describe('useOrganization', () => {
     stubOrganizationPage({ failPortfolio: 1 });
     const { result } = renderHook(() => useOrganization(7, 0));
     await waitFor(() => expect(result.current.error).toBe('Try later.'));
+    expect(result.current.row).toBeNull();
     act(() => result.current.retry());
     await waitFor(() => expect(result.current.row?.name).toBe('Pizza Hut'));
     expect(result.current.error).toBeNull();
+  });
+
+  it('keeps the row on screen and reports the error when a reload fails', async () => {
+    stubOrganizationPage();
+    const { result, rerender } = renderHook(({ version }) => useOrganization(7, version), { initialProps: { version: 0 } });
+    await waitFor(() => expect(result.current.row?.name).toBe('Pizza Hut'));
+    stubOrganizationPage({ failPortfolio: 1 });
+    rerender({ version: 1 });
+    await waitFor(() => expect(result.current.error).toBe('Try later.'));
+    expect(result.current.row?.name).toBe('Pizza Hut');
+    expect(result.current.loading).toBe(false);
+    expect(result.current.notFound).toBe(false);
   });
 });
 ```
@@ -1894,11 +1928,12 @@ type RowLoad = { key: string; row: PortfolioRow | null } | { key: string; error:
 type CustomerLoad = { key: string; customer: Customer } | { key: string; error: string };
 
 export interface OrganizationState {
-  /** The List's row for this organization; null until it lands, or when not found. */
+  /** The List's row for this organization; null until it lands, or when not
+   *  found. The last one that landed stays while a reload runs or fails. */
   row: PortfolioRow | null;
   /** GET /customers/{id}/: the health breakdown and the edit form's record. */
   customer: Customer | null;
-  /** The row for the current id and version has not landed yet. */
+  /** The row for the current id and version has not landed (or failed) yet. */
   loading: boolean;
   /** Not a number, or the portfolio has no such row for this viewer. */
   notFound: boolean;
@@ -1915,6 +1950,9 @@ export function useOrganization(id: number | null, version: number): Organizatio
   const [attempt, setAttempt] = useState(0);
   const key = `${id}#${version}#${attempt}`;
   const [rowLoad, setRowLoad] = useState<RowLoad | null>(null);
+  // The last row that landed: it stays on screen while a new version reloads
+  // and after a reload fails, so a failed refresh never blanks the page.
+  const [lastRow, setLastRow] = useState<PortfolioRow | null>(null);
   const [customerLoad, setCustomerLoad] = useState<CustomerLoad | null>(null);
 
   useEffect(() => {
@@ -1923,7 +1961,10 @@ export function useOrganization(id: number | null, version: number): Organizatio
     const query = new URLSearchParams({ ids: String(id), include_churned: '1', limit: '1' }).toString();
     fetchPortfolio(query).then(
       (data) => {
-        if (!cancelled) setRowLoad({ key, row: data.results.find((row) => row.id === id) ?? null });
+        if (cancelled) return;
+        const found = data.results.find((row) => row.id === id) ?? null;
+        setRowLoad({ key, row: found });
+        setLastRow(found);
       },
       (err: unknown) => {
         if (!cancelled) setRowLoad({ key, error: errorMessage(err, 'Could not load this organization.') });
@@ -1945,7 +1986,7 @@ export function useOrganization(id: number | null, version: number): Organizatio
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   const shown = rowLoad && 'row' in rowLoad ? rowLoad : null;
-  const row = shown?.row && shown.row.id === id ? shown.row : null;
+  const row = lastRow && lastRow.id === id ? lastRow : null;
   const customer = customerLoad && 'customer' in customerLoad && customerLoad.customer.id === id ? customerLoad.customer : null;
   return {
     row,
@@ -2058,7 +2099,7 @@ export function useStory(orgId: number, query: string, version: number, enabled:
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run src/components/organizations/detail/useOrganization.test.tsx src/components/organizations/detail/useStory.test.tsx`
-Expected: PASS (10 tests).
+Expected: PASS (11 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -2081,7 +2122,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Consumes: `useDismiss` (`portfolio/useDismiss.ts`), `FOCUS`, `BUTTON` (`portfolio/styles.ts`), `SignalTag`, `touchText` (`portfolio/rowParts.tsx`), `PORTFOLIO_FIELDS` (`portfolioFields.ts`).
 - Produces:
   - `interface MenuItem {key: string; label: string; onSelect: () => void; danger?: boolean}` and `Menu({label: string; trigger: ReactNode; triggerClassName: string; items: MenuItem[]; align?: 'start' | 'end'})`.
-  - `OrganizationHeader({row: PortfolioRow; canEdit: boolean; onEdit: () => void; onArchive: () => void; onChurn: () => void})`. It renders `data-field="organization"`, `"owner"` and `"lifecycleStage"` (header fields for the coverage test).
+  - `OrganizationHeader({row: PortfolioRow; canEdit: boolean; editError?: string | null; onRetryEdit?: () => void; onEdit: () => void; onArchive: () => void; onChurn: () => void})`. While Edit is disabled because the record failed to load, `editError` shows under the name row as the reason ("Edit is unavailable: …", the Edit button's description) with Try again (`onRetryEdit`). It renders `data-field="organization"`, `"owner"` and `"lifecycleStage"` (header fields for the coverage test).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -2194,6 +2235,28 @@ describe('OrganizationHeader (spec §1.2)', () => {
   it('Edit waits while the record loads', () => {
     renderHeader(pizzaHut, false);
     expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('says why Edit is off when the record could not load, and tries again', async () => {
+    const onRetryEdit = vi.fn();
+    render(
+      <OrganizationHeader
+        row={pizzaHut}
+        canEdit={false}
+        editError="Try later."
+        onRetryEdit={onRetryEdit}
+        onEdit={vi.fn()}
+        onArchive={vi.fn()}
+        onChurn={vi.fn()}
+      />,
+    );
+    const edit = screen.getByRole('button', { name: 'Edit' });
+    expect(edit).toBeDisabled();
+    expect(edit).toHaveAccessibleDescription('Edit is unavailable: Try later.');
+    expect(screen.getByRole('alert')).toHaveTextContent('Edit is unavailable: Try later.');
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetryEdit).toHaveBeenCalledOnce();
   });
 
   it('⋯ holds Archive and Churn', async () => {
@@ -2352,11 +2415,12 @@ export function Menu({
 
 `src/components/organizations/detail/OrganizationHeader.tsx`:
 ```tsx
+import { useId } from 'react';
 import { Ellipsis, Pencil } from 'lucide-react';
 import { PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
 import { SignalTag, touchText } from '../portfolio/rowParts';
-import { BUTTON, FOCUS } from '../portfolio/styles';
+import { BUTTON, FOCUS, QUIET } from '../portfolio/styles';
 import { Menu, type MenuItem } from './Menu';
 
 /** The name row (spec §1.2): initials (never a third-party logo), the name,
@@ -2366,6 +2430,8 @@ import { Menu, type MenuItem } from './Menu';
 export function OrganizationHeader({
   row,
   canEdit,
+  editError = null,
+  onRetryEdit,
   onEdit,
   onArchive,
   onChurn,
@@ -2373,10 +2439,15 @@ export function OrganizationHeader({
   row: PortfolioRow;
   /** The customer record has landed, so the edit form can open. */
   canEdit: boolean;
+  /** Why the record did not land; shown as Edit's reason while it is off. */
+  editError?: string | null;
+  onRetryEdit?: () => void;
   onEdit: () => void;
   onArchive: () => void;
   onChurn: () => void;
 }) {
+  const reasonId = useId();
+  const blocked = !canEdit && editError ? editError : null;
   const status = row.is_archived ? 'Archived' : row.churned ? 'Churned' : null;
   const actions: MenuItem[] = [
     ...(row.is_archived ? [] : [{ key: 'archive', label: 'Archive', onSelect: onArchive }]),
@@ -2404,9 +2475,25 @@ export function OrganizationHeader({
           <span data-field="owner">{PORTFOLIO_FIELDS.owner.value(row)}</span> ·{' '}
           <span data-field="lifecycleStage">{row.lifecycle.label}</span> · {touchText(row.last_touch_days)}
         </p>
+        {blocked ? (
+          <p role="alert" className="mt-1 flex flex-wrap items-center gap-x-2 text-[11px] text-danger">
+            <span id={reasonId}>Edit is unavailable: {blocked}</span>
+            {onRetryEdit ? (
+              <button type="button" onClick={onRetryEdit} className={QUIET}>
+                Try again
+              </button>
+            ) : null}
+          </p>
+        ) : null}
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
-        <button type="button" onClick={onEdit} disabled={!canEdit} className={BUTTON}>
+        <button
+          type="button"
+          onClick={onEdit}
+          disabled={!canEdit}
+          aria-describedby={blocked ? reasonId : undefined}
+          className={BUTTON}
+        >
           <Pencil className="h-4 w-4" aria-hidden="true" />
           Edit
         </button>
@@ -2427,7 +2514,7 @@ export function OrganizationHeader({
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run src/components/organizations/detail/Menu.test.tsx src/components/organizations/detail/OrganizationHeader.test.tsx src/components/organizations/detail/houseRules.test.ts`
-Expected: PASS (4 + 6 tests, and the house rules over the new files).
+Expected: PASS (4 + 7 tests, and the house rules over the new files).
 
 - [ ] **Step 5: Commit**
 
@@ -2524,7 +2611,7 @@ describe('HeaderTiles (spec §1.3)', () => {
     expect(screen.queryByRole('region', { name: 'Health breakdown' })).not.toBeInTheDocument();
   });
 
-  it('says so while the breakdown loads, and when it cannot', async () => {
+  it('says so while the breakdown loads', async () => {
     renderTiles({ customer: null });
     await userEvent.click(screen.getByRole('button', { name: /^Health/ }));
     expect(screen.getByRole('status', { name: 'Loading the health breakdown' })).toBeInTheDocument();
@@ -2536,7 +2623,7 @@ describe('HeaderTiles (spec §1.3)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Could not load the health breakdown.');
   });
 
-  it('is a grid from sm and a snapping strip on phones', () => {
+  it('is a four-column grid from sm', () => {
     renderTiles({ isSm: true });
     expect(screen.getByRole('button', { name: /^ARR/ }).parentElement).toHaveClass('grid', 'grid-cols-4');
   });
@@ -2755,6 +2842,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ### Task 7: Account chips and the tablist
 
 **Files:**
+- Create: `src/components/organizations/detail/CountChip.tsx`
 - Create: `src/components/organizations/detail/AccountChips.tsx`
 - Create: `src/components/organizations/detail/DetailTabs.tsx`
 - Test: `src/components/organizations/detail/AccountChips.test.tsx`, `src/components/organizations/detail/DetailTabs.test.tsx`
@@ -2762,6 +2850,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 **Interfaces:**
 - Consumes: `Account` (`customersSlice.ts`); `DETAIL_TABS`, `DetailTab`, `detailTabId`, `detailPanelId` (Task 2); `FOCUS`, `QUIET` (`styles.ts`); `ACCOUNTS` (Task 1).
 - Produces:
+  - `CountChip({label: string; count: number | null; pressed: boolean; onClick: () => void})`: the rounded, `aria-pressed` chip with an optional mono count, shared by the account chips and the story's filters (Task 9). The caller sets `key`.
   - `AccountChips({accounts: Account[]; loading: boolean; error: string | null; counts: Record<string, number> | null; selected: string; onSelect: (value: string) => void; onRetry: () => void; onAdd: () => void; onEdit: (account: Account) => void})`. Chips: All (`counts.all`), each account (`counts[id] ?? 0`), and Organization (`counts.none`) when it has items or is chosen. `counts` is the backend's `by_account`: `all`, `none` and every in-scope account id. Pressing the chosen account chip again returns to All (`onSelect('')`).
   - `DetailTabs({idBase: string; active: DetailTab; onChange: (tab: DetailTab) => void})`: `role="tablist"`, roving tab index, arrows/Home/End with automatic activation, the active tab scrolled into view.
 
@@ -2801,7 +2890,7 @@ describe('AccountChips (spec §1.4)', () => {
     expect(screen.getByRole('button', { name: 'All 5' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('shows no numbers until the story has counted, and 0 for an account with nothing', () => {
+  it('shows no numbers until the story has counted', () => {
     renderChips({ counts: null });
     expect(chips().map((chip) => chip.textContent)).toEqual(['All', 'EMEA', 'North America']);
   });
@@ -2835,7 +2924,7 @@ describe('AccountChips (spec §1.4)', () => {
     expect(screen.getByRole('button', { name: 'Add account' })).toBeInTheDocument();
   });
 
-  it('shows a skeleton while the accounts load, and the error with Try again', async () => {
+  it('shows a skeleton while the accounts load', () => {
     renderChips({ accounts: [], loading: true });
     expect(screen.getByRole('status', { name: 'Loading accounts' })).toBeInTheDocument();
   });
@@ -2908,9 +2997,12 @@ describe('DetailTabs (spec §1.5)', () => {
 
   it('selects on click and scrolls the chosen tab into view', async () => {
     render(<Host />);
-    await userEvent.click(screen.getByRole('tab', { name: 'Knowledge' }));
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    scroll.mockClear();
+    const knowledge = screen.getByRole('tab', { name: 'Knowledge' });
+    await userEvent.click(knowledge);
     expect(screen.getByRole('tabpanel', { name: 'Knowledge' })).toHaveTextContent('knowledge');
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    expect(scroll.mock.contexts).toContain(knowledge);
   });
 });
 ```
@@ -2922,13 +3014,51 @@ Expected: FAIL with "Failed to resolve import './AccountChips'" and "'./DetailTa
 
 - [ ] **Step 3: Implement**
 
+`src/components/organizations/detail/CountChip.tsx`:
+```tsx
+import { FOCUS } from '../portfolio/styles';
+
+const CHIP = `inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] sm:min-h-8 ${FOCUS}`;
+
+/** A pressable chip with an optional count: the account chips and the
+ *  story's filters. The chosen one is the monochrome primary. */
+export function CountChip({
+  label,
+  count,
+  pressed,
+  onClick,
+}: {
+  label: string;
+  /** Null until the story has counted: the chip shows no number. */
+  count: number | null;
+  pressed: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      onClick={onClick}
+      className={`${CHIP} ${pressed ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink hover:bg-subtle active:bg-line-subtle'}`}
+    >
+      <span className="max-w-[12rem] truncate">{label}</span>
+      {count == null ? null : (
+        <>
+          {' '}
+          <span className={`font-mono-brand text-[11px] tabular-nums ${pressed ? '' : 'text-ink-muted'}`}>{count}</span>
+        </>
+      )}
+    </button>
+  );
+}
+```
+
 `src/components/organizations/detail/AccountChips.tsx`:
 ```tsx
 import { Pencil, Plus } from 'lucide-react';
 import type { Account } from '../../../features/customers/customersSlice';
-import { FOCUS, QUIET } from '../portfolio/styles';
-
-const CHIP = `inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] sm:min-h-8 ${FOCUS}`;
+import { QUIET } from '../portfolio/styles';
+import { CountChip } from './CountChip';
 
 /** The account chips (spec §1.4): All, each account and the organization
  *  itself, numbered by the story's `counts.by_account`. Accounts store no
@@ -2966,21 +3096,7 @@ export function AccountChips({
   const chip = (value: string, label: string, n: number | null) => {
     const pressed = selected === value;
     return (
-      <button
-        key={value || 'all'}
-        type="button"
-        aria-pressed={pressed}
-        onClick={() => onSelect(pressed && value ? '' : value)}
-        className={`${CHIP} ${pressed ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink hover:bg-subtle active:bg-line-subtle'}`}
-      >
-        <span className="max-w-[12rem] truncate">{label}</span>
-        {n == null ? null : (
-          <>
-            {' '}
-            <span className={`font-mono-brand text-[11px] tabular-nums ${pressed ? '' : 'text-ink-muted'}`}>{n}</span>
-          </>
-        )}
-      </button>
+      <CountChip key={value || 'all'} label={label} count={n} pressed={pressed} onClick={() => onSelect(pressed && value ? '' : value)} />
     );
   };
 
@@ -3114,7 +3230,7 @@ Expected: PASS (8 + 3 tests, and the house rules).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/organizations/detail/AccountChips.tsx src/components/organizations/detail/AccountChips.test.tsx src/components/organizations/detail/DetailTabs.tsx src/components/organizations/detail/DetailTabs.test.tsx
+git add src/components/organizations/detail/CountChip.tsx src/components/organizations/detail/AccountChips.tsx src/components/organizations/detail/AccountChips.test.tsx src/components/organizations/detail/DetailTabs.tsx src/components/organizations/detail/DetailTabs.test.tsx
 git commit -m "feat(organizations): account chips and a real tablist for the organization page
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
@@ -3341,12 +3457,14 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ### Task 9: The story toolbar: filters, Sources, search and + Add
 
 **Files:**
+- Modify: `src/components/organizations/portfolio/styles.ts` (add `PRIMARY`)
 - Create: `src/components/organizations/detail/SourcesPicker.tsx`
 - Create: `src/components/organizations/detail/StoryToolbar.tsx`
 - Test: `src/components/organizations/detail/StoryToolbar.test.tsx`
 
 **Interfaces:**
-- Consumes: `STORY_GROUPS`, `STORY_KINDS`, `offeredSources`, `ADD_FLOWS`, `AddKind`, `StoryCounts` (Task 1); `Menu` (Task 5); `useDismiss`; `BUTTON`, `FOCUS`, `QUIET`.
+- Consumes: `STORY_GROUPS`, `STORY_KINDS`, `offeredSources`, `ADD_FLOWS`, `AddKind`, `StoryCounts` (Task 1); `Menu` (Task 5); `CountChip` (Task 7); `useDismiss`; `BUTTON`, `FOCUS`, `QUIET`.
+- Produces (styles): `PRIMARY` in `portfolio/styles.ts`, the monochrome primary button (`bg-accent text-on-accent`, no surface colours to fight it).
 - Produces:
   - `SourcesPicker({offered: StoryKind[]; selected: StoryKind[]; onChange: (next: StoryKind[]) => void})`: a button "Sources" (with "· n" when some are chosen) opening a checkbox panel and an "Every source" reset.
   - `StoryToolbar({group; sources; q; byGroup: StoryCounts['by_group'] | null; byKind: StoryCounts['by_kind'] | null; isSm: boolean; onGroup: (group: StoryGroup | '') => void; onSources: (sources: StoryKind[]) => void; onSearch: (q: string) => void; onAdd: (what: AddKind) => void})`. All's count is `byGroup.all`. Search calls `onSearch(trimmed)` 300ms after typing stops, or at once on Enter; the draft follows `q` when it changes from outside. The Add button's name is "Add to the story".
@@ -3439,7 +3557,12 @@ describe('StoryToolbar (spec §1.6)', () => {
 
   it('+ Add offers the four existing create flows', async () => {
     const { onAdd } = renderToolbar();
-    await userEvent.click(screen.getByRole('button', { name: 'Add to the story' }));
+    const add = screen.getByRole('button', { name: 'Add to the story' });
+    // The primary: accent fill and its own text colour, with no surface fill to fight it.
+    expect(add).toHaveClass('bg-accent', 'text-on-accent');
+    expect(add).not.toHaveClass('bg-surface');
+    expect(add).not.toHaveClass('text-ink');
+    await userEvent.click(add);
     expect(screen.getAllByRole('menuitem').map((item) => item.textContent)).toEqual(['Log a call', 'New task', 'New note', 'Log survey']);
     await userEvent.click(screen.getByRole('menuitem', { name: 'New task' }));
     expect(onAdd).toHaveBeenCalledWith('task');
@@ -3458,6 +3581,15 @@ Run: `npx vitest run src/components/organizations/detail/StoryToolbar.test.tsx`
 Expected: FAIL with "Failed to resolve import './StoryToolbar'".
 
 - [ ] **Step 3: Implement**
+
+In `src/components/organizations/portfolio/styles.ts`, append:
+```ts
+
+/** The monochrome primary button (one per surface): accent fill, its own
+ *  text colour. Written out rather than layered on BUTTON, whose surface
+ *  fill and ink text would win in the stylesheet's order. */
+export const PRIMARY = `inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-lg border border-accent bg-accent px-3 text-[13px] font-semibold text-on-accent hover:bg-accent-hover active:bg-accent-hover disabled:opacity-50 ${FOCUS}`;
+```
 
 `src/components/organizations/detail/SourcesPicker.tsx`:
 ```tsx
@@ -3549,7 +3681,8 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Plus, Search } from 'lucide-react';
 import { ADD_FLOWS, STORY_GROUPS, offeredSources, type AddKind } from '../../../features/organizations/storyKinds';
 import type { StoryCounts, StoryGroup, StoryKind } from '../../../features/organizations/storyTypes';
-import { BUTTON, FOCUS } from '../portfolio/styles';
+import { FOCUS, PRIMARY } from '../portfolio/styles';
+import { CountChip } from './CountChip';
 import { Menu } from './Menu';
 import { SourcesPicker } from './SourcesPicker';
 
@@ -3607,29 +3740,15 @@ export function StoryToolbar({
   return (
     <div className="flex flex-col gap-2">
       <div role="group" aria-label="Show" className={isSm ? 'flex flex-wrap gap-1.5' : '-mx-4 flex gap-1.5 overflow-x-auto px-4'}>
-        {STORY_GROUPS.map((option) => {
-          const pressed = group === option.key;
-          const n = option.key ? (byGroup?.[option.key] ?? null) : total;
-          return (
-            <button
-              key={option.key || 'all'}
-              type="button"
-              aria-pressed={pressed}
-              onClick={() => onGroup(option.key)}
-              className={`inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] sm:min-h-8 ${FOCUS} ${
-                pressed ? 'bg-accent text-on-accent' : 'bg-surface text-ink hover:bg-subtle active:bg-line-subtle'
-              }`}
-            >
-              {option.label}
-              {n == null ? null : (
-                <>
-                  {' '}
-                  <span className={`font-mono-brand text-[11px] tabular-nums ${pressed ? '' : 'text-ink-muted'}`}>{n}</span>
-                </>
-              )}
-            </button>
-          );
-        })}
+        {STORY_GROUPS.map((option) => (
+          <CountChip
+            key={option.key || 'all'}
+            label={option.label}
+            count={option.key ? (byGroup?.[option.key] ?? null) : total}
+            pressed={group === option.key}
+            onClick={() => onGroup(option.key)}
+          />
+        ))}
       </div>
       <div className="flex items-center gap-2">
         <form
@@ -3662,7 +3781,7 @@ export function StoryToolbar({
               Add
             </>
           }
-          triggerClassName={`${BUTTON} border-accent bg-accent text-on-accent hover:bg-accent-hover`}
+          triggerClassName={PRIMARY}
           items={ADD_FLOWS.map((flow) => ({ key: flow.key, label: flow.label, onSelect: () => onAdd(flow.key) }))}
         />
       </div>
@@ -3679,7 +3798,7 @@ Expected: PASS (8 tests, and the house rules).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/organizations/detail/SourcesPicker.tsx src/components/organizations/detail/StoryToolbar.tsx src/components/organizations/detail/StoryToolbar.test.tsx
+git add src/components/organizations/portfolio/styles.ts src/components/organizations/detail/SourcesPicker.tsx src/components/organizations/detail/StoryToolbar.tsx src/components/organizations/detail/StoryToolbar.test.tsx
 git commit -m "feat(organizations): the story toolbar with filters, Sources, search and Add
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
@@ -3787,6 +3906,8 @@ describe('StoryStream (spec §1.6 "Stream")', () => {
     const { onOpenEmail } = renderStream(state());
     const title = within(row('email:41')).getByRole('button', { name: 'Re: Renewal pricing' });
     expect(title).toHaveAttribute('aria-haspopup', 'dialog');
+    // A 44px target below sm, like every control.
+    expect(title).toHaveClass('min-h-11', 'sm:min-h-0');
     await userEvent.click(title);
     expect(onOpenEmail).toHaveBeenCalledWith(STORY_ITEMS[0]);
   });
@@ -3859,12 +3980,22 @@ describe('StoryStream (spec §1.6 "Stream")', () => {
     expect(story.loadMore).toHaveBeenCalledTimes(2);
   });
 
-  it('does not ask again while a page is loading, and shows a failed page', () => {
+  it('does not ask again while a page is loading', () => {
     const io = installIntersectionObserver();
     const story = state({ next: '30', loadingMore: true });
     renderStream(story);
     expect(io.watching(document.querySelector('[data-sentinel]') as Element)).toBe(false);
     expect(screen.getByRole('button', { name: 'Loading…' })).toBeDisabled();
+  });
+
+  it('shows a failed page under Show more and stops asking until Show more is pressed', async () => {
+    const io = installIntersectionObserver();
+    const story = state({ next: '30', moreError: 'Could not load more of the story.' });
+    renderStream(story);
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load more of the story.');
+    expect(io.watching(document.querySelector('[data-sentinel]') as Element)).toBe(false);
+    await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
+    expect(story.loadMore).toHaveBeenCalledTimes(1);
   });
 });
 ```
@@ -3940,7 +4071,8 @@ export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEma
   const meta = [KIND_NAME[item.kind] ?? 'Record', item.actor?.name, source ? `via ${source}` : null]
     .filter(Boolean)
     .join(' · ');
-  const titleButton = `max-w-full truncate rounded-sm text-left hover:underline ${FOCUS}`;
+  // A 44px target below sm (the line height centres the title in it).
+  const titleButton = `inline-block min-h-11 max-w-full truncate rounded-sm text-left leading-[2.75rem] hover:underline active:opacity-70 sm:min-h-0 sm:leading-normal ${FOCUS}`;
 
   return (
     <li data-story-item={`${item.kind}:${item.id}`} className="flex gap-3 px-3 py-2.5">
@@ -4091,7 +4223,7 @@ export function StoryStream({
 - [ ] **Step 4: Run the tests to verify they pass**
 
 Run: `npx vitest run src/components/organizations/detail/StoryStream.test.tsx src/components/organizations/detail/houseRules.test.ts`
-Expected: PASS (11 tests, and the house rules).
+Expected: PASS (12 tests, and the house rules).
 
 - [ ] **Step 5: Commit**
 
@@ -5408,21 +5540,24 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 ### Task 15: Details, People, Deals & risks, Knowledge and Files (and the moved contacts and pipelines tests)
 
 **Files:**
+- Modify: `src/components/organizations/portfolio/rowParts.tsx` (`PulseDots`, shared with `PulsePair`)
 - Create: `src/components/organizations/detail/AccountsSection.tsx`
+- Create: `src/components/organizations/detail/CustomerFacts.tsx`
 - Create: `src/components/organizations/detail/DetailsTab.tsx`
 - Create: `src/components/organizations/detail/PeopleTab.tsx`
 - Create: `src/components/organizations/detail/DealsTab.tsx`
 - Create: `src/components/organizations/detail/KnowledgeTab.tsx`
 - Create: `src/components/organizations/detail/FilesCallsTab.tsx`
-- Modify: `src/features/customers/customersSlice.ts` (`Account` gains `ai_pulse_value?: number | null`, which `AccountSerializer` already serves)
-- Test: `src/components/organizations/detail/AccountsSection.test.tsx`, `src/components/organizations/detail/otherTabs.test.tsx`, `src/components/organizations/detail/fieldCoverage.test.tsx`
+- Test: `src/components/organizations/detail/AccountsSection.test.tsx`, `src/components/organizations/detail/CustomerFacts.test.tsx`, `src/components/organizations/detail/otherTabs.test.tsx`, `src/components/organizations/detail/fieldCoverage.test.tsx`
 - Create (moved tests): `src/components/organizations/detail/PeopleTab.test.tsx`, `src/components/organizations/detail/DealsTab.test.tsx`
 
 **Interfaces:**
-- Consumes: `Account` (`customersSlice.ts`), `AI_PULSE_LABELS` (`formatters.ts`), `pulseWords` (`portfolioFields.ts`), `QUIET`, `FOCUS`, `ACCOUNTS` (Task 1); `AccountDetails` (`portfolio/AccountDetails.tsx`, `stacked`, `onEdit`); `AIAttributesPanel`, `ContactsTab`, `PipelinesTab` (`components/shared`); `CompanyViewTab`; `HeadlinesTab`, `FilesTab`, `CallSenseTab` (`components/organizations/activity`); thunks `fetchContactsForCustomer`, `fetchOpportunitiesForCustomer`, `fetchRisksForCustomer`, `fetchHeadlinesForCustomer`, `regenerateHeadlines`; `OrganizationHeader` (Task 5), `HeaderTiles` (Task 6); `makeDetailStore` (Task 12).
+- Consumes: `Account` (with `ai_pulse_value`, Task 1), `Customer`, `CsatBreakdown` (`customersSlice.ts`), `AI_PULSE_LABELS` (`formatters.ts`), `pulseWords` (`portfolioFields.ts`), `QUIET`, `FOCUS`, `ACCOUNTS`, `pizzaHutCustomer` (Task 1); `AccountDetails` (`portfolio/AccountDetails.tsx`, `stacked`, `onEdit`); `AIAttributesPanel`, `ContactsTab`, `PipelinesTab` (`components/shared`); `CompanyViewTab`; `HeadlinesTab`, `FilesTab`, `CallSenseTab` (`components/organizations/activity`); thunks `fetchContactsForCustomer`, `fetchOpportunitiesForCustomer`, `fetchRisksForCustomer`, `fetchHeadlinesForCustomer`, `regenerateHeadlines`; `OrganizationHeader` (Task 5), `HeaderTiles` (Task 6); `makeDetailStore` (Task 12).
 - Produces:
   - `interface AccountsSectionProps {items: Account[]; loading: boolean; error: string | null; onRetry: () => void; onAdd: () => void; onEdit: (account: Account) => void}` and `AccountsSection(props)`: the owner's Accounts section (2026-09-26): a heading with Add account, then one list item per connected account (not a table) with its name linking to `/accounts/:id`, owner, domain, "AI n" with the AI label, the pulse dots, the AI reason, and Edit; designed loading, error and empty states.
-  - `DetailsTab({row: PortfolioRow; customerId: number; isSm: boolean; accounts: AccountsSectionProps; onEdit?: () => void})`: the Accounts section, then the six panels (`stacked` below `sm`) with Edit details, then AI attributes.
+  - `PulseDots({history: number[]; field?: string})` (`rowParts.tsx`): the stored pulse dots as one `role="img"` with "Pulse history: …"; `PulsePair` renders it with `field="pulse"`, `AccountsSection` without a field.
+  - `CustomerFacts({customer: Customer | null; error: string | null; stacked: boolean; onRetry: () => void})`: `<section aria-label "Contact and CSAT">` with the email (a `mailto:` link), phone (a `tel:` link) and industry ("—" when blank), and the CSAT response bands from `csat_breakdown` (count and share per band, a bar at the share's width, "No CSAT survey has been answered yet." at zero); a skeleton while the record loads and the read error with Try again. None of these four is among the 34 table fields; Voice shows only the CSAT score.
+  - `DetailsTab({row: PortfolioRow; customerId: number; isSm: boolean; accounts: AccountsSectionProps; customer: Customer | null; customerError: string | null; onRetryCustomer: () => void; onEdit?: () => void})`: the Accounts section, then the six panels (`stacked` below `sm`) with Edit details, then `CustomerFacts`, then AI attributes.
   - `PeopleTab({customerId: number})`, `DealsTab({customerId: number})`, `KnowledgeTab({customerId: number; customerName: string})`, `FilesCallsTab({customerId: number})`: today's content, each reading its data when first opened.
 
 - [ ] **Step 1: Check the source of the moved tests**
@@ -5545,10 +5680,99 @@ with:
 
 - [ ] **Step 3: Write the new failing tests**
 
-The Accounts section reads only what `GET /customers/{id}/accounts/` serves (`AccountSerializer` in revenact-backend `services/customers/serializers.py`): `name`, `owner` (nested user), `domain`, `pulse` (the stored dots), `ai_pulse_score` (the category), `ai_pulse_value` (the number) and `ai_pulse_reason`. All seven exist, so nothing is dropped. The frontend `Account` type lacks `ai_pulse_value`; add it in `src/features/customers/customersSlice.ts`, directly under `ai_pulse_reason: string;`:
-```ts
-  /** The AI pulse as a number (1-5), null when unscored; AccountSerializer's `ai_pulse_value`. Optional because older fixtures omit it. */
-  ai_pulse_value?: number | null;
+The Accounts section reads only what `GET /customers/{id}/accounts/` serves (`AccountSerializer` in revenact-backend `services/customers/serializers.py`): `name`, `owner` (nested user), `domain`, `pulse` (the stored dots), `ai_pulse_score` (the category), `ai_pulse_value` (the number) and `ai_pulse_reason`. All seven exist, so nothing is dropped (Task 1 gave `Account` its `ai_pulse_value`).
+
+`CustomerFacts` shows what `GET /customers/{id}/` adds to the List's row (spec §2) that no panel shows: email, phone, industry and the CSAT spread (`csat_breakdown`; the Voice panel has only the score). It sits under the six panels, in the same surface, divided like them.
+
+`src/components/organizations/detail/CustomerFacts.test.tsx`:
+```tsx
+import { describe, expect, it, vi } from 'vitest';
+import type { ComponentProps } from 'react';
+import { render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import type { Customer } from '../../../features/customers/customersSlice';
+import { pizzaHutCustomer } from '../../../features/organizations/testStory';
+import { CustomerFacts } from './CustomerFacts';
+
+const band = (key: string, label: string, count: number, share: number) => ({ key, label, count, share });
+
+const FULL = {
+  ...pizzaHutCustomer,
+  email: 'ap@pizzahut.example',
+  phone: '+1 972 555 0100',
+  industry: 'Restaurants',
+  csat_breakdown: {
+    responses: 8,
+    bands: [
+      band('very_satisfied', 'Very Satisfied', 3, 37.5),
+      band('satisfied', 'Satisfied', 3, 37.5),
+      band('neutral', 'Neutral', 2, 25),
+      band('dissatisfied', 'Dissatisfied', 0, 0),
+      band('very_dissatisfied', 'Very Dissatisfied', 0, 0),
+    ],
+  },
+} as Customer;
+
+function renderFacts(props: Partial<ComponentProps<typeof CustomerFacts>> = {}) {
+  const onRetry = vi.fn();
+  render(<CustomerFacts customer={FULL} error={null} stacked={false} onRetry={onRetry} {...props} />);
+  return onRetry;
+}
+
+const value = (term: string) => screen.getByText(term).nextElementSibling as HTMLElement;
+
+describe('CustomerFacts (spec §2: what GET /customers/{id}/ adds)', () => {
+  it('shows the email and phone as links, and the industry', () => {
+    renderFacts();
+    const section = screen.getByRole('region', { name: 'Contact and CSAT' });
+    expect(within(section).getByRole('link', { name: 'ap@pizzahut.example' })).toHaveAttribute('href', 'mailto:ap@pizzahut.example');
+    expect(within(section).getByRole('link', { name: '+1 972 555 0100' })).toHaveAttribute('href', 'tel:+19725550100');
+    expect(value('Industry')).toHaveTextContent('Restaurants');
+  });
+
+  it('shows a blank field as "—" with no link', () => {
+    renderFacts({ customer: pizzaHutCustomer });
+    for (const term of ['Email', 'Phone', 'Industry']) expect(value(term)).toHaveTextContent('—');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  });
+
+  it('spreads the CSAT responses across their bands at their true share', () => {
+    renderFacts();
+    expect(screen.getByText('CSAT responses').closest('p')).toHaveTextContent('8 CSAT responses');
+    const rows = within(screen.getByRole('list', { name: 'CSAT responses by band' })).getAllByRole('listitem');
+    expect(rows.map((row) => row.textContent)).toEqual([
+      'Very Satisfied3 · 37.5%',
+      'Satisfied3 · 37.5%',
+      'Neutral2 · 25%',
+      'Dissatisfied0 · 0%',
+      'Very Dissatisfied0 · 0%',
+    ]);
+    expect(rows[2].querySelector('[data-share]')).toHaveStyle({ width: '25%' });
+  });
+
+  it('says when no CSAT survey has been answered', () => {
+    renderFacts({ customer: pizzaHutCustomer });
+    expect(screen.getByText('No CSAT survey has been answered yet.')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'CSAT responses by band' })).not.toBeInTheDocument();
+  });
+
+  it('shows a skeleton while the record loads', () => {
+    renderFacts({ customer: null });
+    expect(screen.getByRole('status', { name: 'Loading contact details and CSAT' })).toBeInTheDocument();
+  });
+
+  it('shows the read error with Try again', async () => {
+    const onRetry = renderFacts({ customer: null, error: 'Try later.' });
+    expect(screen.getByRole('alert')).toHaveTextContent('Try later.');
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(onRetry).toHaveBeenCalledOnce();
+  });
+
+  it('puts the two halves side by side from md unless stacked', () => {
+    renderFacts({ stacked: true });
+    expect(screen.getByText('Email').closest('[data-facts]')).not.toHaveClass('md:grid-cols-2');
+  });
+});
 ```
 
 `src/components/organizations/detail/AccountsSection.test.tsx`:
@@ -5638,13 +5862,14 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import { pizzaHut } from '../../../features/organizations/testPortfolio';
-import { ACCOUNTS, requestPaths, stubOrganizationPage } from '../../../features/organizations/testStory';
+import { ACCOUNTS, pizzaHutCustomer, requestPaths, stubOrganizationPage } from '../../../features/organizations/testStory';
 import { makeDetailStore } from '../../../pages/organizations/testDetail';
 import { DetailsTab } from './DetailsTab';
 import { FilesCallsTab } from './FilesCallsTab';
 import { KnowledgeTab } from './KnowledgeTab';
 
 const NO_ACCOUNTS = { items: [], loading: false, error: null, onRetry: () => {}, onAdd: () => {}, onEdit: () => {} };
+const CUSTOMER = { customer: pizzaHutCustomer, customerError: null, onRetryCustomer: () => {} };
 
 function renderWithStore(ui: ReactNode) {
   render(
@@ -5657,11 +5882,13 @@ function renderWithStore(ui: ReactNode) {
 describe('the other tabs in delivery 1', () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("Details shows the Accounts section, then the List's six panels with Edit details, then the AI attributes", async () => {
+  it("Details shows the Accounts section, the List's six panels with Edit details, contact and CSAT, then the AI attributes", async () => {
     stubOrganizationPage();
     const onEdit = vi.fn();
     const onEditAccount = vi.fn();
-    renderWithStore(<DetailsTab row={pizzaHut} customerId={7} isSm accounts={{ ...NO_ACCOUNTS, items: ACCOUNTS, onEdit: onEditAccount }} onEdit={onEdit} />);
+    renderWithStore(
+      <DetailsTab row={pizzaHut} customerId={7} isSm accounts={{ ...NO_ACCOUNTS, items: ACCOUNTS, onEdit: onEditAccount }} {...CUSTOMER} onEdit={onEdit} />,
+    );
     expect(screen.getByRole('region', { name: 'Accounts' }).compareDocumentPosition(document.querySelector('[data-panel="commercial"]')!)).toBe(
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
@@ -5673,12 +5900,14 @@ describe('the other tabs in delivery 1', () => {
     expect(document.querySelector('[data-panel="commercial"]')!.parentElement).toHaveClass('md:grid-cols-2');
     await userEvent.click(screen.getByRole('button', { name: 'Edit details' }));
     expect(onEdit).toHaveBeenCalledOnce();
-    expect(screen.getByRole('region', { name: 'AI attributes' })).toBeInTheDocument();
+    const facts = screen.getByRole('region', { name: 'Contact and CSAT' });
+    expect(document.querySelector('[data-panel="history"]')!.compareDocumentPosition(facts)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(facts.compareDocumentPosition(screen.getByRole('region', { name: 'AI attributes' }))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it('Details stacks the panels on phones', () => {
     stubOrganizationPage();
-    renderWithStore(<DetailsTab row={pizzaHut} customerId={7} isSm={false} accounts={NO_ACCOUNTS} />);
+    renderWithStore(<DetailsTab row={pizzaHut} customerId={7} isSm={false} accounts={NO_ACCOUNTS} {...CUSTOMER} />);
     expect(document.querySelector('[data-panel="commercial"]')!.parentElement).not.toHaveClass('md:grid-cols-2');
     expect(screen.queryByRole('button', { name: 'Edit details' })).not.toBeInTheDocument();
   });
@@ -5734,6 +5963,9 @@ function renderPage(row: PortfolioRow) {
           customerId={row.id}
           isSm
           accounts={{ items: [], loading: false, error: null, onRetry: () => {}, onAdd: () => {}, onEdit: () => {} }}
+          customer={null}
+          customerError={null}
+          onRetryCustomer={() => {}}
           onEdit={() => {}}
         />
       </MemoryRouter>
@@ -5781,10 +6013,39 @@ describe('the organization page shows the 34 table fields', () => {
 
 - [ ] **Step 4: Run the tests to verify they fail**
 
-Run: `npx vitest run src/components/organizations/detail/AccountsSection.test.tsx src/components/organizations/detail/otherTabs.test.tsx src/components/organizations/detail/fieldCoverage.test.tsx src/components/organizations/detail/PeopleTab.test.tsx src/components/organizations/detail/DealsTab.test.tsx`
-Expected: FAIL with "Failed to resolve import './AccountsSection'" (and DetailsTab, PeopleTab, DealsTab, KnowledgeTab, FilesCallsTab).
+Run: `npx vitest run src/components/organizations/detail/AccountsSection.test.tsx src/components/organizations/detail/CustomerFacts.test.tsx src/components/organizations/detail/otherTabs.test.tsx src/components/organizations/detail/fieldCoverage.test.tsx src/components/organizations/detail/PeopleTab.test.tsx src/components/organizations/detail/DealsTab.test.tsx`
+Expected: FAIL with "Failed to resolve import './AccountsSection'" (and CustomerFacts, DetailsTab, PeopleTab, DealsTab, KnowledgeTab, FilesCallsTab).
 
 - [ ] **Step 5: Implement the tabs**
+
+In `src/components/organizations/portfolio/rowParts.tsx`, replace the dots inside `PulsePair`:
+```tsx
+        <span data-field="pulse" role="img" aria-label={`Pulse history: ${pulseWords(pulse.history)}`} className="flex gap-[3px]">
+          {pulse.history.map((n, i) => (
+            <span key={i} className={`h-1.5 w-1.5 rounded-full ${DOT[n] ?? DOT[0]}`} />
+          ))}
+        </span>
+```
+with:
+```tsx
+        <PulseDots history={pulse.history} field="pulse" />
+```
+and add, directly above `/** "AI n · CSM n", the stored pulse dots`:
+```tsx
+/** The stored pulse dots, oldest first, as one image described in words.
+ *  `field` marks it for the field-coverage test where it is the row's Pulse
+ *  column (the organization's), and is left off an account's dots. */
+export function PulseDots({ history, field }: { history: number[]; field?: string }) {
+  return (
+    <span data-field={field} role="img" aria-label={`Pulse history: ${pulseWords(history)}`} className="flex gap-[3px]">
+      {history.map((n, i) => (
+        <span key={i} className={`h-1.5 w-1.5 rounded-full ${DOT[n] ?? DOT[0]}`} />
+      ))}
+    </span>
+  );
+}
+
+```
 
 `src/components/organizations/detail/AccountsSection.tsx`:
 ```tsx
@@ -5793,7 +6054,7 @@ import { Link } from 'react-router-dom';
 import { Pencil, Plus } from 'lucide-react';
 import type { Account } from '../../../features/customers/customersSlice';
 import { AI_PULSE_LABELS } from '../../../features/customers/formatters';
-import { pulseWords } from '../../../features/organizations/portfolioFields';
+import { PulseDots } from '../portfolio/rowParts';
 import { FOCUS, QUIET } from '../portfolio/styles';
 
 export interface AccountsSectionProps {
@@ -5805,9 +6066,6 @@ export interface AccountsSectionProps {
   onAdd: () => void;
   onEdit: (account: Account) => void;
 }
-
-/** The pulse dots' tones, as in the List's `PulsePair`. */
-const DOT: Record<number, string> = { 1: 'bg-success', 2: 'bg-danger', 3: 'bg-warning', 0: 'bg-line-strong' };
 
 function AccountItem({ account, onEdit }: { account: Account; onEdit: (account: Account) => void }) {
   const ai = account.ai_pulse_value;
@@ -5824,13 +6082,7 @@ function AccountItem({ account, onEdit }: { account: Account; onEdit: (account: 
         <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-muted">
           <span className="font-mono-brand tabular-nums text-ink">AI {ai == null ? '—' : ai}</span>
           {account.ai_pulse_score ? <span>{AI_PULSE_LABELS[account.ai_pulse_score]}</span> : null}
-          {account.pulse.length ? (
-            <span role="img" aria-label={`Pulse history: ${pulseWords(account.pulse)}`} className="flex gap-[3px]">
-              {account.pulse.map((n, i) => (
-                <span key={i} className={`h-1.5 w-1.5 rounded-full ${DOT[n] ?? DOT[0]}`} />
-              ))}
-            </span>
-          ) : null}
+          {account.pulse.length ? <PulseDots history={account.pulse} /> : null}
         </p>
         {account.ai_pulse_reason ? <p className="mt-1 line-clamp-2 text-[13px] text-ink-muted">{account.ai_pulse_reason}</p> : null}
       </div>
@@ -5896,28 +6148,159 @@ export function AccountsSection({ items, loading, error, onRetry, onAdd, onEdit 
 }
 ```
 
+`src/components/organizations/detail/CustomerFacts.tsx`:
+```tsx
+import { useId, type ReactNode } from 'react';
+import type { CsatBreakdown, Customer } from '../../../features/customers/customersSlice';
+import { FOCUS, QUIET } from '../portfolio/styles';
+
+/** Bands run best to worst; the tone follows the band, not the customer. */
+const BAND_TONE: Record<string, string> = {
+  very_satisfied: 'bg-success',
+  satisfied: 'bg-success',
+  neutral: 'bg-warning',
+  dissatisfied: 'bg-danger',
+  very_dissatisfied: 'bg-danger',
+};
+
+const LINK = `inline-flex min-h-11 max-w-full items-center truncate rounded-sm text-ink underline sm:min-h-0 ${FOCUS}`;
+
+function Fact({ term, children }: { term: string; children: ReactNode }) {
+  return (
+    <>
+      <dt className="text-ink-muted">{term}</dt>
+      <dd className="min-w-0 break-words text-ink">{children}</dd>
+    </>
+  );
+}
+
+function CsatSpread({ breakdown }: { breakdown: CsatBreakdown }) {
+  const { responses, bands } = breakdown;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-[13px] text-ink">
+        <span className="font-mono-brand tabular-nums">{responses}</span> <span>CSAT responses</span>
+      </p>
+      {responses === 0 ? (
+        <p className="text-[13px] text-ink-muted">No CSAT survey has been answered yet.</p>
+      ) : (
+        <ul aria-label="CSAT responses by band" className="flex flex-col gap-1.5">
+          {bands.map((band) => (
+            <li key={band.key} className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] items-center gap-3 text-[13px]">
+              <span className="truncate text-ink-muted">{band.label}</span>
+              <span aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-line">
+                <span data-share="" className={`block h-full ${BAND_TONE[band.key] ?? 'bg-line-strong'}`} style={{ width: `${band.share}%` }} />
+              </span>
+              <span className="font-mono-brand tabular-nums text-ink">
+                {band.count} · {band.share}%
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** What GET /customers/{id}/ adds to the List's row (spec §2) that none of
+ *  the six panels shows: how to reach the organization, its industry, and
+ *  how its answered CSAT surveys spread (the Voice panel has the score
+ *  only). Under the panels, divided like them, in the same surface. */
+export function CustomerFacts({
+  customer,
+  error,
+  stacked,
+  onRetry,
+}: {
+  customer: Customer | null;
+  error: string | null;
+  /** One column at every width (phones). */
+  stacked: boolean;
+  onRetry: () => void;
+}) {
+  const headingId = useId();
+  const phoneHref = customer?.phone ? `tel:${customer.phone.replace(/[^\d+]/g, '')}` : '';
+  return (
+    <section aria-labelledby={headingId} className="flex flex-col gap-3 border-t border-line-subtle px-3 pt-3 pb-4">
+      <h3 id={headingId} className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
+        Contact and CSAT
+      </h3>
+      {error ? (
+        <div role="alert" className="flex flex-col items-start gap-2">
+          <p className="text-[13px] text-danger">{error}</p>
+          <button type="button" onClick={onRetry} className={`${QUIET} border border-line`}>
+            Try again
+          </button>
+        </div>
+      ) : !customer ? (
+        <div role="status" aria-label="Loading contact details and CSAT" className="flex flex-col gap-2">
+          {[0, 1, 2].map((i) => (
+            <span key={i} aria-hidden="true" className="block h-3 w-full animate-pulse rounded bg-subtle" />
+          ))}
+        </div>
+      ) : (
+        <div data-facts="" className={`grid gap-x-8 gap-y-4 ${stacked ? '' : 'md:grid-cols-2'}`}>
+          <dl className="grid grid-cols-[6rem_minmax(0,1fr)] content-start gap-x-3 gap-y-1.5 text-[13px]">
+            <Fact term="Email">
+              {customer.email ? (
+                <a href={`mailto:${customer.email}`} className={LINK}>
+                  {customer.email}
+                </a>
+              ) : (
+                '—'
+              )}
+            </Fact>
+            <Fact term="Phone">
+              {customer.phone ? (
+                <a href={phoneHref} className={LINK}>
+                  {customer.phone}
+                </a>
+              ) : (
+                '—'
+              )}
+            </Fact>
+            <Fact term="Industry">{customer.industry || '—'}</Fact>
+          </dl>
+          <CsatSpread breakdown={customer.csat_breakdown} />
+        </div>
+      )}
+    </section>
+  );
+}
+```
+
 `src/components/organizations/detail/DetailsTab.tsx`:
 ```tsx
+import type { Customer } from '../../../features/customers/customersSlice';
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
 import { AIAttributesPanel } from '../../shared/AIAttributesPanel';
 import { AccountDetails } from '../portfolio/AccountDetails';
 import { AccountsSection, type AccountsSectionProps } from './AccountsSection';
+import { CustomerFacts } from './CustomerFacts';
 
 /** Details (spec §1.7): the connected accounts (the owner's decision,
  *  2026-09-26), then the List's six panels with every field and Edit
- *  details, stacked on phones, then the AI attributes that used to sit in
- *  the pinned panel. */
+ *  details, stacked on phones, then contact and CSAT from the customer
+ *  record (spec §2), then the AI attributes that used to sit in the pinned
+ *  panel. */
 export function DetailsTab({
   row,
   customerId,
   isSm,
   accounts,
+  customer,
+  customerError,
+  onRetryCustomer,
   onEdit,
 }: {
   row: PortfolioRow;
   customerId: number;
   isSm: boolean;
   accounts: AccountsSectionProps;
+  /** GET /customers/{id}/; null while it loads or when it failed. */
+  customer: Customer | null;
+  customerError: string | null;
+  onRetryCustomer: () => void;
   /** Absent until the customer record has landed. */
   onEdit?: () => void;
 }) {
@@ -5926,6 +6309,7 @@ export function DetailsTab({
       <AccountsSection {...accounts} />
       <div className="rounded-xl bg-surface">
         <AccountDetails row={row} stacked={!isSm} onEdit={onEdit ? () => onEdit() : undefined} />
+        <CustomerFacts customer={customer} error={customerError} stacked={!isSm} onRetry={onRetryCustomer} />
         <div className="px-3 pb-4">
           <AIAttributesPanel customerId={customerId} />
         </div>
@@ -6069,12 +6453,12 @@ export function FilesCallsTab({ customerId }: { customerId: number }) {
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `npx vitest run src/components/organizations/detail src/pages/organizations/Details.test.tsx`
-Expected: PASS: the six Accounts section tests, the four new tab tests, the 37 field-coverage cases, every moved contacts and pipelines test, the whole `detail/` folder (house rules included), and the old `Details.test.tsx` (still untouched).
+Expected: PASS: the six Accounts section tests, the seven CustomerFacts tests, the four new tab tests, the 37 field-coverage cases, every moved contacts and pipelines test, the whole `detail/` folder (house rules included), and the old `Details.test.tsx` (still untouched).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/features/customers/customersSlice.ts src/components/organizations/detail/AccountsSection.tsx src/components/organizations/detail/AccountsSection.test.tsx src/components/organizations/detail/DetailsTab.tsx src/components/organizations/detail/PeopleTab.tsx src/components/organizations/detail/DealsTab.tsx src/components/organizations/detail/KnowledgeTab.tsx src/components/organizations/detail/FilesCallsTab.tsx src/components/organizations/detail/otherTabs.test.tsx src/components/organizations/detail/fieldCoverage.test.tsx src/components/organizations/detail/PeopleTab.test.tsx src/components/organizations/detail/DealsTab.test.tsx
+git add src/components/organizations/portfolio/rowParts.tsx src/components/organizations/detail/AccountsSection.tsx src/components/organizations/detail/AccountsSection.test.tsx src/components/organizations/detail/CustomerFacts.tsx src/components/organizations/detail/CustomerFacts.test.tsx src/components/organizations/detail/DetailsTab.tsx src/components/organizations/detail/PeopleTab.tsx src/components/organizations/detail/DealsTab.tsx src/components/organizations/detail/KnowledgeTab.tsx src/components/organizations/detail/FilesCallsTab.tsx src/components/organizations/detail/otherTabs.test.tsx src/components/organizations/detail/fieldCoverage.test.tsx src/components/organizations/detail/PeopleTab.test.tsx src/components/organizations/detail/DealsTab.test.tsx
 git commit -m "feat(organizations): Details with the connected accounts and the List's panels, and today's other tabs in the new frame
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
@@ -6090,11 +6474,12 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 - Modify: `src/pages/organizations/OrganizationsFrame.tsx` (doc comment's first line)
 - Modify: `src/components/organizations/detail/houseRules.test.ts` (scan the page too)
 - Modify: `src/pages/surveys/SurveysPage.tsx` (`handleRowClick`), `src/pages/surveys/SurveysPage.test.tsx` (`DetailsStub`, one expectation)
+- Modify: `src/components/organizations/ConfirmDialog.tsx` (its backdrop takes the `bg-scrim` token, as Archive's confirm now opens from the name row)
 
 **Interfaces:**
 - Consumes: everything from Tasks 1-15; `OrganizationsFrame`; `OrganizationFormModal`, `ChurnOrganizationModal`, `ConfirmDialog`, `AccountFormModal`; `bulkUpdate`; `fetchAccountsForCustomer`; `EmptyState`, `ErrorBlock`, `errorMessage`, `FOCUS`, `QUIET`; `SM`, `useMediaQuery`.
 - Produces:
-  - `Details()` (the same export `App.tsx` routes to `/organizations/:id`).
+  - `Details()` (the same export `App.tsx` routes to `/organizations/:id`). Its states: "Organization not found"; the header's first read failing (`ErrorBlock` with Try again); a header skeleton, and a tab skeleton on Details ("Loading details") and Knowledge ("Loading knowledge"), until the row lands; a failed reload with the row still on screen (an inline alert, "Could not refresh this organization: …", with Try again); Edit off with its reason when the customer record failed.
   - `renderOrganizationPage(url?: string, options?: {width?: number; nav?: boolean; list?: boolean}): {store}` (`testDetail.tsx`): the real store and router with the page at `/organizations/:id` and, at `/organizations/list`, the real `List` when `list` is set (a marker otherwise), each with a `data-testid="where"` line; `nav` adds the real `Navbar`.
 
 - [ ] **Step 1: Add the page render helper**
@@ -6102,6 +6487,8 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 In `src/pages/organizations/testDetail.tsx`, replace the first line (`// Test-only helpers for the organization page. Task 16 adds renderOrganizationPage.`) and the imports below it with:
 ```tsx
 // Test-only helpers for the organization page: its store and its render.
+// Never hot-reloaded: Where sits beside the helpers so a test imports one module.
+/* eslint-disable react-refresh/only-export-components */
 import { configureStore } from '@reduxjs/toolkit';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -6213,8 +6600,10 @@ describe('the organization page (/organizations/:id)', () => {
     expect(within(header).getByText('Renewal overdue')).toBeInTheDocument();
     expect(within(header).getByRole('button', { name: 'ARR $69.6K. Show commercial details' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'EMEA 1' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'All 5' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Organization 3' })).toBeInTheDocument();
+    // The Show filters have an "All 5" too: the account chips are their own group.
+    const chips = screen.getByRole('group', { name: 'Filter by account' });
+    expect(within(chips).getByRole('button', { name: 'All 5' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(chips).getByRole('button', { name: 'Organization 3' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Needs attention' })).toBeInTheDocument();
     expect(itemKeys()).toEqual(['email:41', 'call:12', 'ticket:88', 'task:5', 'health:3']);
     expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true');
@@ -6274,6 +6663,8 @@ describe('the organization page (/organizations/:id)', () => {
     expect(screen.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
     const panel = screen.getByRole('tabpanel', { name: 'Details' });
     expect(within(panel).getByText('Total contract value')).toBeInTheDocument();
+    const facts = within(panel).getByRole('region', { name: 'Contact and CSAT' });
+    expect(await within(facts).findByText('No CSAT survey has been answered yet.')).toBeInTheDocument();
     expect(within(panel).getByRole('region', { name: 'AI attributes' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
     expect(storyQueries(spy)).toHaveLength(0);
@@ -6281,14 +6672,36 @@ describe('the organization page (/organizations/:id)', () => {
     await waitFor(() => expect(storyQueries(spy)).toHaveLength(1));
   });
 
+  it('shows a skeleton on Details and Knowledge until the organization lands', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage('/organizations/7?tab=details');
+    expect(screen.getByRole('status', { name: 'Loading details' })).toBeInTheDocument();
+    await landed();
+    expect(screen.queryByRole('status', { name: 'Loading details' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Knowledge' }));
+    expect(await screen.findByRole('region', { name: 'Headlines' })).toBeInTheDocument();
+  });
+
+  it('shows the Knowledge skeleton on a deep link until the organization lands', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage('/organizations/7?tab=knowledge');
+    expect(screen.getByRole('status', { name: 'Loading knowledge' })).toBeInTheDocument();
+    await landed();
+    expect(await screen.findByRole('region', { name: 'Headlines' })).toBeInTheDocument();
+  });
+
   it('jumps from a tile to its Details panel, and opens the health breakdown', async () => {
     stubOrganizationPage();
     renderOrganizationPage();
     await landed();
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    scroll.mockClear();
     await userEvent.click(screen.getByRole('button', { name: /^ARR/ }));
     expect(where().searchParams.get('tab')).toBe('details');
-    await waitFor(() => expect(document.querySelector('[data-panel="commercial"]')).toHaveFocus());
-    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    const commercial = document.querySelector('[data-panel="commercial"]');
+    await waitFor(() => expect(commercial).toHaveFocus());
+    // The panel itself scrolled into view, not only the tab row.
+    expect(scroll.mock.contexts).toContain(commercial);
     await userEvent.click(screen.getByRole('button', { name: /^Pulse/ }));
     await waitFor(() => expect(document.querySelector('[data-panel="voice"]')).toHaveFocus());
     await userEvent.click(screen.getByRole('button', { name: /^Health 4\.9/ }));
@@ -6386,6 +6799,8 @@ describe('the organization page (/organizations/:id)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza Hut' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
     expect(screen.getByText('Archive Pizza Hut?')).toBeInTheDocument();
+    // The confirm dims the page with the scrim token, which darkens in both themes.
+    expect(screen.getByText('Archive Pizza Hut?').closest('.fixed')).toHaveClass('bg-scrim');
     await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
     await waitFor(() => expect(postBodies(spy, '/organizations/bulk/')).toEqual([{ ids: [7], action: 'archive', value: null }]));
     expect(await screen.findByText('Archived')).toBeInTheDocument();
@@ -6419,6 +6834,35 @@ describe('the organization page (/organizations/:id)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'EMEA 1' }));
     await userEvent.click(screen.getByRole('button', { name: 'Edit EMEA' }));
     expect(screen.getByRole('heading', { name: 'Edit EMEA' })).toBeInTheDocument();
+  });
+
+  it('keeps the page and says so when a reload fails, with Try again', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    // The next header read fails: archive, then the reload after it.
+    stubOrganizationPage({ failPortfolio: 1 });
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza Hut' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Archive' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Could not refresh this organization: Try later.');
+    expect(screen.getByRole('heading', { level: 1, name: 'Pizza Hut' })).toBeInTheDocument();
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
+    expect(await screen.findByText('Archived')).toBeInTheDocument();
+  });
+
+  it('says why Edit is off when the record did not load, and Try again brings it back', async () => {
+    stubOrganizationPage({ failCustomer: 1 });
+    renderOrganizationPage();
+    await landed();
+    expect(await screen.findByText('Edit is unavailable: Try later.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
+    const header = document.querySelector('[data-part="header"]') as HTMLElement;
+    await userEvent.click(within(header).getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Edit' })).toBeEnabled());
+    expect(screen.queryByText('Edit is unavailable: Try later.')).not.toBeInTheDocument();
   });
 
   it('says an organization this viewer cannot see is not found', async () => {
@@ -6538,6 +6982,21 @@ function Centered({ children }: { children: ReactNode }) {
   );
 }
 
+/** A tab's content before the organization's row lands. */
+function TabSkeleton({ label }: { label: string }) {
+  return (
+    <div role="status" aria-label={label} className="flex flex-col gap-3">
+      {[0, 1].map((i) => (
+        <div key={i} aria-hidden="true" className="flex flex-col gap-2 rounded-xl bg-surface p-3">
+          <span className="block h-3 w-32 animate-pulse rounded bg-subtle" />
+          <span className="block h-3 w-full animate-pulse rounded bg-subtle" />
+          <span className="block h-3 w-2/3 animate-pulse rounded bg-subtle" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function HeaderSkeleton({ isSm }: { isSm: boolean }) {
   return (
     <div role="status" aria-label="Loading organization" className="flex flex-col gap-3">
@@ -6643,6 +7102,8 @@ export function Details() {
             <OrganizationHeader
               row={row}
               canEdit={org.customer !== null}
+              editError={org.customerError}
+              onRetryEdit={org.retry}
               onEdit={() => setEditing(true)}
               onArchive={() => setArchiving(true)}
               onChurn={() => setChurning(true)}
@@ -6652,6 +7113,16 @@ export function Details() {
         ) : (
           <HeaderSkeleton isSm={isSm} />
         )}
+
+        {row && org.error ? (
+          // A reload (after an edit, archive or churn) failed: the last row stays.
+          <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl bg-surface px-3 py-2 text-[13px] text-danger">
+            <span>Could not refresh this organization: {org.error}</span>
+            <button type="button" onClick={org.retry} className={QUIET}>
+              Try again
+            </button>
+          </div>
+        ) : null}
 
         {tab === 'story' ? (
           <AccountChips
@@ -6702,15 +7173,20 @@ export function Details() {
                   onAdd: () => setAddingAccount(true),
                   onEdit: setEditingAccount,
                 }}
+                customer={org.customer}
+                customerError={org.customerError}
+                onRetryCustomer={org.retry}
                 onEdit={org.customer ? () => setEditing(true) : undefined}
               />
-            ) : null
+            ) : (
+              <TabSkeleton label="Loading details" />
+            )
           ) : tab === 'people' ? (
             <PeopleTab customerId={orgId} />
           ) : tab === 'deals' ? (
             <DealsTab customerId={orgId} />
           ) : tab === 'knowledge' ? (
-            row ? <KnowledgeTab customerId={orgId} customerName={row.name} /> : null
+            row ? <KnowledgeTab customerId={orgId} customerName={row.name} /> : <TabSkeleton label="Loading knowledge" />
           ) : (
             <FilesCallsTab customerId={orgId} />
           )}
@@ -6769,6 +7245,15 @@ houseRuleSuite('organization page house rules', {
 });
 ```
 
+In `src/components/organizations/ConfirmDialog.tsx`, replace:
+```tsx
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[200] p-4" onClick={onClose}>
+```
+with:
+```tsx
+    <div className="fixed inset-0 bg-scrim flex items-center justify-center z-[200] p-4" onClick={onClose}>
+```
+
 In `src/pages/organizations/OrganizationsFrame.tsx`, replace:
 ```tsx
 /** The Organizations list's and board's frame: DashboardFrame's body, class for class
@@ -6825,15 +7310,15 @@ with:
 - [ ] **Step 6: Run the tests to verify they pass**
 
 Run: `npx vitest run src/pages/organizations src/components/organizations src/pages/surveys src/features/organizations`
-Expected: PASS: the new page tests (18), the house rules over `detail/` and `Details.tsx`, the Surveys page test, and every organizations test besides.
+Expected: PASS: the new page tests (23), the house rules over `detail/` and `Details.tsx`, the Surveys page test, and every organizations test besides.
 
 - [ ] **Step 7: Type-check, lint and commit**
 
-Run: `npx tsc -b --noEmit && npx eslint src/pages/organizations src/components/organizations/detail src/components/organizations/activity src/features/organizations src/pages/surveys src/test`
+Run: `npx tsc -b --noEmit && npx eslint src/pages/organizations src/components/organizations src/features/organizations src/pages/surveys src/test`
 Expected: no output from tsc; eslint reports 0 errors and no warnings in these paths.
 
 ```bash
-git add src/pages/organizations/Details.tsx src/pages/organizations/Details.test.tsx src/pages/organizations/testDetail.tsx src/pages/organizations/OrganizationsFrame.tsx src/components/organizations/detail/houseRules.test.ts src/pages/surveys/SurveysPage.tsx src/pages/surveys/SurveysPage.test.tsx
+git add src/pages/organizations/Details.tsx src/pages/organizations/Details.test.tsx src/pages/organizations/testDetail.tsx src/pages/organizations/OrganizationsFrame.tsx src/components/organizations/ConfirmDialog.tsx src/components/organizations/detail/houseRules.test.ts src/pages/surveys/SurveysPage.tsx src/pages/surveys/SurveysPage.test.tsx
 git commit -m "feat(organizations): the organization page as the organization's story
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
@@ -7185,7 +7670,8 @@ with:
    (the account chips) and `GET /organizations/{id}/story/` (the Story). The
    tabs, in the URL as `?tab=`, are Story, Details (the connected accounts as
    list items linking to `/accounts/:id`, with Add and Edit; then the List's six
-   panels, then `AIAttributesPanel`), People (contacts), Deals & risks (opportunities and
+   panels; then the email, phone, industry and CSAT response bands from
+   `GET /customers/{id}/`; then `AIAttributesPanel`), People (contacts), Deals & risks (opportunities and
    risks), Knowledge (Company View, then headlines) and Files (files, then
    CallSense calls); the last four read their data when first opened. The
    account chips (`?account=`, an id or `none`) filter the Story, whose filters
@@ -7257,6 +7743,10 @@ Rules specific to it, enforced by `components/organizations/detail/houseRules.te
 - Details opens with Accounts: one `bg-surface` list, an item per connected
   account (name linking to its page, owner · domain, "AI n", the AI label,
   the pulse dots, the AI reason, Edit), with Add account in its heading.
+  Under the six panels, in the same surface, "Contact and CSAT": email and
+  phone as links, industry, and the CSAT bands as bars at their true share.
+- The one primary on the Story is "+ Add" (`PRIMARY` in `portfolio/styles.ts`:
+  `bg-accent text-on-accent`, never layered on the surface button).
 - Tabs are a real tablist (`role="tab"`, roving tab index, arrows, Home, End),
   underlined like the Navbar's views.
 - Story: Needs attention (each row says what it is in words and goes to it),
@@ -7345,7 +7835,7 @@ delivery 1). It draws itself in `OrganizationsFrame` (no rail until delivery 3).
   search, + Add via `Menu`), `StoryStream` → `StoryItemRow`; `EmailThread` and
   `AddFlow` open in a `Sheet`. `AddFlow` reuses `TaskForm`, `NoteForm`, `CallForm`
   and `LogSurveyForm` from `components/organizations/activity/`.
-- **Other tabs:** `DetailsTab` (`AccountsSection`, portfolio `AccountDetails` + `AIAttributesPanel`),
+- **Other tabs:** `DetailsTab` (`AccountsSection`, portfolio `AccountDetails`, `CustomerFacts` + `AIAttributesPanel`),
   `PeopleTab` (`ContactsTab`), `DealsTab` (`PipelinesTab`), `KnowledgeTab`
   (`CompanyViewTab` + `HeadlinesTab`), `FilesCallsTab` (`FilesTab` + `CallSenseTab`).
 - **Tests:** unit tests beside each part in `components/organizations/detail/`, the
@@ -7364,7 +7854,7 @@ with:
   ├── pages/organizations/Details.tsx  (portfolio row, /customers/{id}/, accounts, /organizations/{id}/story/)
   │     ├── OrganizationsFrame; components/organizations/detail/* (OrganizationHeader, HeaderTiles,
   │     │     AccountChips, DetailTabs, StoryTab → AttentionBlock, StoryToolbar, StoryStream, EmailThread, AddFlow, Sheet)
-  │     ├── Details: detail/AccountsSection + portfolio/AccountDetails + shared/AIAttributesPanel
+  │     ├── Details: detail/AccountsSection + portfolio/AccountDetails + detail/CustomerFacts + shared/AIAttributesPanel
   │     └── People, Deals & risks, Knowledge, Files: shared/ContactsTab, shared/PipelinesTab,
   │           CompanyViewTab + activity/HeadlinesTab, activity/FilesTab + activity/CallSenseTab
   │
@@ -7406,7 +7896,7 @@ To check the warnings: `npx eslint $(git diff --name-only main -- 'src/**/*.ts' 
 ```bash
 git diff main --name-only --diff-filter=AM -- 'src/**/*.tsx' | grep -v '\.test\.' | xargs grep -nE '#[0-9a-fA-F]{3,6}\b|rgba?\(|text-white|text-(blue|rose|purple|amber|emerald|red|green)-|clearbit|pravatar' || echo "no raw colours or third-party images"
 ```
-Expected: hits only in `src/components/organizations/activity/*.tsx`, `src/components/layout/Navbar.tsx` and `src/pages/surveys/SurveysPage.tsx` from lines this plan did not write (their existing classes), or `no raw colours or third-party images`. Anything in `src/components/organizations/detail/` or `src/pages/organizations/Details.tsx` is a failure to fix; `detail/houseRules.test.ts` already enforces them.
+Expected: hits only in `src/components/organizations/activity/*.tsx`, `src/components/layout/Navbar.tsx`, `src/pages/surveys/SurveysPage.tsx` `src/components/contacts/ContactRowActionsPopover.tsx` (Task 18 edits a comment there; its `rgba` shadow is older) and `src/components/organizations/ConfirmDialog.tsx` (Task 16 gives its backdrop `bg-scrim`; its danger button's `bg-danger text-white` is the app-wide pattern, as there is no `on-danger` token yet) from lines this plan did not write (their existing classes), or `no raw colours or third-party images`. Anything in `src/components/organizations/detail/` or `src/pages/organizations/Details.tsx` is a failure to fix; `detail/houseRules.test.ts` already enforces them.
 
 - [ ] **Step 3: The removals held**
 
@@ -7432,7 +7922,7 @@ Expected: `removed` and `deleted`.
 Drive it with `npm run pw` (playwright-cli) or Claude in Chrome. From `/organizations/list`, open the seeded organization:
 1. The top bar is transparent: "‹ Organizations", then the bell, no avatar, no bordered bar. No page-level horizontal scroll. DevTools' Network tab shows four requests on landing.
 2. The name row: initials (no image), the name, "owner · lifecycle · Touched Nd ago", the signal, Edit and ⋯. The tiles agree with the List's row for the same organization (health, trend, runway, pulse); ARR is in the customer's currency.
-3. Health opens the five-part breakdown; ARR, Renewal and Pulse land on their Details panels with a focus ring on the panel. Details opens with Accounts: each connected account as an item (name, owner, domain, AI score and reason, pulse dots), its name opening `/accounts/:id`, Edit and Add account opening the account form.
+3. Health opens the five-part breakdown; ARR, Renewal and Pulse land on their Details panels with a focus ring on the panel. Details opens with Accounts: each connected account as an item (name, owner, domain, AI score and reason, pulse dots), its name opening `/accounts/:id`, Edit and Add account opening the account form. Under the six panels, "Contact and CSAT" shows the email, phone and industry and the CSAT bands.
 4. The chips read "All n · <accounts> · Organization n"; choosing one narrows the story and puts `?account=` in the URL; refresh keeps it. Add account and Edit <account> open the account form.
 5. Needs attention shows each row in words; its rows go to Tickets, Tasks & notes, Knowledge and the contract panel.
 6. Filters, Sources and search each narrow the story and survive a refresh and Back. Clear filters empties them.
@@ -7440,7 +7930,8 @@ Drive it with `npm run pw` (playwright-cli) or Claude in Chrome. From `/organiza
 8. The email opens its thread (only real messages, oldest first); Escape returns focus to the email. The ticket opens in place with "Open in Zendesk" (new tab).
 9. Scroll to the end: the next page loads before the end; Show more is still there.
 10. Tab through the page: every tile, chip, tab (arrows move), filter, menu item and story title shows a focus ring.
-11. ⋯ → Archive shows the reason if refused; on the archived organization ⋯ offers only Churn; the churned one offers only Archive.
+11. "+ Add" is the accent button (dark text on light in dark mode, light on dark in light mode), never a pale label on a pale fill.
+12. ⋯ → Archive shows the reason if refused; on the archived organization ⋯ offers only Churn; the churned one offers only Archive.
 
 - [ ] **Step 3: Phone, 375×812, light theme**
 
@@ -7472,7 +7963,7 @@ Save screenshots at 1440 and 375 in both themes for the PR description. Then the
 | §1.6 Filters, Sources, search | 1, 2, 9, 14 |
 | §1.6 + Add with the existing create flows | 12, 13, 14 |
 | §1.6 Stream: by day (`all_day` aware), Lucide icons, account tag, one-line summary, who, time; CallSense summary on calls; email thread via `?thread=`; other items' detail with `link.url`; paging | 10, 11, 14 (pre-flight 13-15, 24, 25) |
-| §1.7 Details: the connected accounts as items (owner's decision, 2026-09-26), the List's six panels, stacked on phones, Edit details | 15, 16 (pre-flight 8, 18) |
+| §1.7 Details: the connected accounts as items (owner's decision, 2026-09-26), the List's six panels, stacked on phones, Edit details; §2's email, phone, industry and `csat_breakdown` (`CustomerFacts`) | 15, 16 (pre-flight 8, 18) |
 | §1.8 People, Deals & risks, Files: current content in the new frame | 15 |
 | §1.9 Knowledge: today's Company View | 15 |
 | §1.10 Removals (Slack, fake Pulse, invented NPS, placeholders, 360 toggle, dead controls, Clearbit/pravatar, pinned panel, All-attributes modal, Overview) | 16, 18, 21 (pre-flight 19) |

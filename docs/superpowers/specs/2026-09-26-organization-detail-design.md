@@ -54,7 +54,7 @@ Top to bottom:
      - unanswered Knowledge questions
      - the latest anomaly (title withheld unless the viewer sees everything)
    - **Filters:** All · Conversations · Tickets · Tasks & notes · Feedback · Health & usage, plus a **Sources** picker (multi-select of exact types) and a **search** box.
-   - **+ Add:** Log activity, New task, New note, Log survey. These are the existing create flows.
+   - **+ Add:** Log a call, New task, New note, Log survey. These are the existing create flows. "Log a call" stands in for "Log activity" (amended 2026-09-26): an Activity has no create endpoint, while a call does (`POST /customers/{id}/calls/` and the account's, which CallSense's "Log a call" uses), and a logged call joins the story with its summary.
    - **Stream:**
      - Items are grouped by day, newest first. Each item has an icon (Lucide), title, account tag ("Organisation" when an item has no account), a one-line summary, who, and time.
      - Calls carry their CallSense summary. Opening an email shows its thread; other items open their existing detail.
@@ -62,6 +62,7 @@ Top to bottom:
 7. **Details.**
    - **Accounts** first (the owner's decision, 2026-09-26, so that no account's details are lost with the old Accounts tab): one list item per connected account, not a table. Each item shows the name (a link to `/accounts/:id`), owner, domain, the pulse dots, the AI score with its label, and the AI reason: only what `GET /customers/{id}/accounts/` serves (`AccountSerializer`: `name`, `owner`, `domain`, `pulse`, `ai_pulse_value`, `ai_pulse_score`, `ai_pulse_reason`), so nothing is invented. Each item has Edit; the section has Add account (both also stay on the Story tab's chip row). Designed loading, error and empty states; at 375px each item wraps with no sideways scroll.
    - Then the List's six panels (`AccountDetails`, stacked on phones), with all 34 fields and Edit details.
+   - Then what `GET /customers/{id}/` adds that no panel shows (§2): email, phone, industry and the CSAT response bands (`csat_breakdown`; the Voice panel has only the score).
 8. **People, Deals & risks, Files.** Delivery 1 keeps their current content inside the new frame. Delivery 2 turns them into list items, filtered by account.
 9. **Knowledge.** Today's Company View: the brief, who answers, and questions. Delivery 1 frames it; delivery 2 restyles it.
 10. **Removed.**
