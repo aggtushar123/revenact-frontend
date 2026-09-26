@@ -50,3 +50,10 @@ export function withFocus(context: SurfaceContext, focus: DashboardFocus | null)
 }
 
 export const AskContext = createContext<AskState | null>(null);
+
+/** Just `focusOn`, in its own context. Its identity never changes across an
+ *  AskProvider render (it's a bare `useCallback` with no deps), so a
+ *  component that only narrows the next question on open (a List row, a
+ *  Board card) can read it here instead of the whole `AskState` and skip
+ *  every re-render a send causes (pending, then the answer). */
+export const AskFocusOnContext = createContext<((focus: DashboardFocus) => void) | null>(null);

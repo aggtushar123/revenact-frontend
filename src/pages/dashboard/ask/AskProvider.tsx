@@ -5,7 +5,7 @@ import { SM, XL, useMediaQuery } from '../../../lib/useMediaQuery';
 import { fetchConversation } from '../../copilot/copilotApi';
 import type { Conversation, DashboardFocus } from '../../copilot/types';
 import { ASK_PREFERENCE_KEY, readAskPreference, writeAskPreference } from './askPreference';
-import { AskContext, withFocus, type AskState, type AskSurface } from './context';
+import { AskContext, AskFocusOnContext, withFocus, type AskState, type AskSurface } from './context';
 import { originPath } from './originPath';
 
 /** The navigation state another surface's History sends with a conversation
@@ -196,5 +196,9 @@ export function AskProvider({
     [surface, open, setOpen, reveal, conversation, setConversation, thread, focus, clearFocus, focusOn, markSent, pendingDraft, navigate],
   );
 
-  return <AskContext.Provider value={value}>{children}</AskContext.Provider>;
+  return (
+    <AskContext.Provider value={value}>
+      <AskFocusOnContext.Provider value={focusOn}>{children}</AskFocusOnContext.Provider>
+    </AskContext.Provider>
+  );
 }
