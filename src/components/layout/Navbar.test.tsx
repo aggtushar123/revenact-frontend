@@ -235,6 +235,7 @@ function renderNavbar(
         <Routes>
           <Route path="/dashboard" element={<div>Dashboard Marker</div>} />
           <Route path="/organizations/list" element={<div>Organizations Marker</div>} />
+          <Route path="/organizations/board" element={<div>Organizations Marker</div>} />
           <Route path="/profile" element={<div>Profile Marker</div>} />
           <Route path="/login" element={<div>Login Marker</div>} />
           <Route path="/organizations/:id" element={<div>Details Marker</div>} />
@@ -253,14 +254,14 @@ describe('Navbar account menu', () => {
   });
 
   it('is closed by default', () => {
-    renderNavbar('/organizations/list');
+    renderNavbar('/organizations/board');
     expect(screen.queryByText('My Profile')).not.toBeInTheDocument();
     expect(screen.queryByText('Sign out')).not.toBeInTheDocument();
   });
 
   it('opens on avatar click and shows the real logged-in user', async () => {
     const user = userEvent.setup();
-    renderNavbar('/organizations/list');
+    renderNavbar('/organizations/board');
 
     await user.click(screen.getByAltText('Alice Admin'));
 
@@ -272,7 +273,7 @@ describe('Navbar account menu', () => {
 
   it('navigates to /profile and closes the menu', async () => {
     const user = userEvent.setup();
-    renderNavbar('/organizations/list');
+    renderNavbar('/organizations/board');
 
     await user.click(screen.getByAltText('Alice Admin'));
     await user.click(screen.getByText('My Profile'));
@@ -287,7 +288,7 @@ describe('Navbar account menu', () => {
       vi.fn().mockResolvedValue({ ok: true, status: 205, json: async () => null })
     );
     const user = userEvent.setup();
-    renderNavbar('/organizations/list');
+    renderNavbar('/organizations/board');
 
     await user.click(screen.getByAltText('Alice Admin'));
     await user.click(screen.getByText('Sign out'));
@@ -297,7 +298,7 @@ describe('Navbar account menu', () => {
 
   it('closes when clicking outside the menu', async () => {
     const user = userEvent.setup();
-    renderNavbar('/organizations/list');
+    renderNavbar('/organizations/board');
 
     await user.click(screen.getByAltText('Alice Admin'));
     expect(screen.getByText('My Profile')).toBeInTheDocument();
@@ -586,10 +587,34 @@ describe('Navbar actions on the dashboard', () => {
 
   it('keeps the other pages as they were, with no slot', () => {
     const setSlot = vi.fn();
-    renderNavbar('/organizations/list', null, null, [], setSlot);
+    renderNavbar('/organizations/board', null, null, [], setSlot);
     expect(document.querySelectorAll(DECORATIVE)).toHaveLength(4);
     expect(setSlot).not.toHaveBeenCalledWith(expect.any(HTMLElement));
     expect(document.querySelector('header')).toHaveClass('h-[64px]', 'border-b', 'bg-surface', 'shadow-sm', 'px-6');
     expect(screen.getByAltText('Alice Admin')).toBeInTheDocument();
+  });
+});
+
+describe('Navbar on the Organizations list', () => {
+  it('wears the dashboard frame on /organizations/list: transparent bar, views nav, the actions slot, no avatar', () => {
+    const setSlot = vi.fn();
+    renderNavbar('/organizations/list', null, null, [], setSlot);
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('h-16', 'shrink-0', 'flex', 'items-center', 'gap-3', 'px-4');
+    for (const cls of ['bg-surface', 'border-b', 'shadow-sm']) expect(header).not.toHaveClass(cls);
+    expect(screen.getByRole('heading', { name: 'Organizations' })).toBeInTheDocument();
+    const views = screen.getByRole('navigation', { name: 'Organizations views' });
+    expect(within(views).getByRole('link', { name: 'List' })).toHaveAttribute('href', '/organizations/list');
+    expect(within(views).getByRole('link', { name: 'Board' })).toHaveAttribute('href', '/organizations/board');
+    expect(setSlot).toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(header!.querySelector('[data-nav-actions-slot]')).not.toBeNull();
+    expect(screen.queryByAltText('Alice Admin')).not.toBeInTheDocument();
+  });
+
+  it('leaves the board header as it was', () => {
+    renderNavbar('/organizations/board');
+    expect(document.querySelector('header')).toHaveClass('h-[64px]', 'border-b', 'bg-surface');
+    expect(screen.queryByRole('navigation', { name: 'Organizations views' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Board' })).toHaveAttribute('href', '/organizations/board');
   });
 });

@@ -20,8 +20,7 @@ interface AccountsTableProps {
 }
 
 // `accounts` is already just this one server-fetched, server-filtered
-// page — same "no local slicing" convention as ContactsTable/
-// OrganizationsTable. No checkboxes/bulk actions and no Delete column
+// page — same "no local slicing" convention as ContactsTable. No checkboxes/bulk actions and no Delete column
 // here — Account has neither today (see AccountListView's own
 // docstring on the backend), same capability as the Organization
 // Details page's own Accounts tab.

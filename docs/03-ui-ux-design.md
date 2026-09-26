@@ -178,11 +178,11 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 
 | Component | Where |
 |---|---|
-| `OrganizationsTable` | 34 selectable columns, select-all, sortable, `EditColumnsPopover`, row actions, "Showing a-b of n" footer |
+| Portfolio rows (`components/organizations/portfolio/`) | `/organizations/list`: `AccountRow` (a rounded item, not a table row; a two-line card below `sm`), `AccountDetails` (six panels, part of the row), `SummaryTiles`, `PortfolioToolbar`/`FiltersPanel`/`PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `AccountSheet`. See "Portfolio rows" below |
 | `AccountsTable`, `ContactsTable` | Same shape, no bulk actions |
 | `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by Pipelines, Organizations Board and Accounts Board |
 | Dashboard tables | `AccountHealthDetailTable`, `RenewalQueueTable`, `ActivityDetailedTable`, `GoingDarkTable`, `SwingTable` |
-| `MetricsPanel` | Per domain: count, health donut with COUNT/MRR/ARR toggle, NPS, lifecycle donut, renewal window |
+| `MetricsPanel` | Organizations Board (until it moves to the portfolio), Accounts, Contacts: count, health donut with COUNT/MRR/ARR toggle, NPS, lifecycle donut, renewal window |
 | `PinnedAttributes` | Label and value pairs typed as text, truncated, dot, owner or pulse |
 | `EntityAvatar` | Company logo, else deterministic initials in one of five semantic hues |
 | `PresenceStrip` | Session participants, maximum five |
@@ -380,11 +380,34 @@ left for the phone sheet).
   on dashboard conversations — the area and view only, never the filters it
   was asked with; a question's own chip is what carries those.
 
+### Portfolio rows (Organizations list)
+
+The list is Operate mode without a spreadsheet: one rounded `bg-surface` item
+per account on the canvas, grouped into sections whose headers show count and
+ARR. Rules specific to it, enforced by
+`components/organizations/portfolio/houseRules.test.ts`:
+
+- Type sizes 11/13/15/22 px only; numbers in `font-mono-brand tabular-nums`.
+- Health is a ring coloured by `HEALTH_COLORS` with the score as text; the trend
+  line, runway and signal all carry words (the trend's label, "47d overdue",
+  "Renewal overdue"), never colour alone. `renewal_overdue` and `risk` signals are
+  danger-toned, `tickets` warning-toned.
+- No card in a card: the opened row's panels are separated by whitespace; the
+  summary tiles sit on the canvas. No glass anywhere on the list.
+- Skeletons are row- and tile-shaped; the empty state is "No organizations match
+  these filters" with Clear filters (or "No organizations yet" with Add).
+- Every field of the old 34-column table renders exactly once in the row header
+  or a panel (`fieldCoverage.test.tsx`); any panel field can be pinned as a chip.
+- Frame: the Navbar on `/organizations/list` is the dashboard's transparent top
+  bar ("Organizations", List/Board, the actions slot, the bell, no avatar);
+  `OrganizationsFrame` is `DashboardFrame`'s body with an empty `rail` slot that
+  Ask Revenact on Organizations fills later.
+
 ### Overlays
 
 `HealthPopover` (five real rubric components with weights), `CsatPopover`
-(response bands at true scale), `RenewalPopover`, `EditColumnsPopover`,
-`RowActionsPopover`, `ContactRowActionsPopover`, and the Navbar's notification
+(response bands at true scale), `RenewalPopover`, the Organizations
+`FiltersPanel` and `PinFieldsMenu`, `ContactRowActionsPopover`, and the Navbar's notification
 and account menus. All close on an outside `mousedown`.
 
 ### Forms
@@ -578,6 +601,12 @@ viewport height.
 The dashboard's Ask rail changes shape at `sm` (sheet below it) and `xl` (open
 by default from it); from `lg` the drill panel takes the rail's box (over the
 rail when it shows, in its place when it does not).
+
+The Organizations list below `sm`: rows become two-line cards, the toolbar is
+Search plus a Filters bottom sheet (group, sort, Export and Add inside), the
+summary tiles swipe sideways in their own strip, an opened row is a bottom
+sheet with a focus trap that locks page scroll while it is open, and a long
+press starts selection. Every control is 44px.
 
 ---
 

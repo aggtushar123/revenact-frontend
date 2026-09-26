@@ -132,11 +132,3 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { id: 'modifiedBy', label: 'Modified By / Modified Date' },
   { id: 'nameAddress', label: 'Name / Address' },
 ];
-
-export const DEFAULT_VISIBLE_COLUMNS: ColumnId[] = [
-  'organization', 'revenactId', 'owner', 'lifecycleStage', 'health', 'pulse',
-  'aiPulseScore', 'aiPulseReason', 'nps', 'csatScore', 'joinedDate', 'renewalDate',
-  'arrAccount', 'arrHQ', 'implFee', 'tcv', 'tcvRenewal', 'contractStart', 'contractEnd',
-  'productsUtilized', 'topSourceChannel', 'totalContractedSeats', 'totalActiveSeats',
-  'totalSeatUtilization', 'totalHires'
-];

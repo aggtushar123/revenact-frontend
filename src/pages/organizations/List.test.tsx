@@ -1,735 +1,500 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router-dom';
-import { configureStore } from '@reduxjs/toolkit';
-import customersReducer from '../../features/customers/customersSlice';
-import authReducer from '../../features/auth/authSlice';
-import { List } from './List';
-import { ALL_CAPABILITIES } from '../../test/capabilities';
+import { renderList } from './testList';
+import { LONG_PRESS_MS } from '../../components/organizations/portfolio/AccountRow';
+import { resetMembersCache } from '../../features/knowledge/useMembers';
+import { resetViewport } from '../../test/viewport';
+import {
+  ALL_ROWS,
+  buildPortfolio,
+  bulkBodies,
+  customerFixture,
+  portfolioQueries,
+  stubPortfolio,
+} from '../../features/organizations/testPortfolio';
 
-// Integration tier (see the `testing` skill): real store + real router
-// context (OrganizationsTable navigates on row click), network mocked at
-// the fetch boundary with responses shaped exactly like revenact-backend's
-// real paginated envelope — see docs/API_CONTRACTS.md -> customers.
-const globex = {
-  id: 1,
-  name: 'Globex Corp',
-  address: 'Chicago, IL',
-  domain: 'globex.com',
-  owner: null,
-  created_by: null,
-  modified_by: null,
-  created_at: '2026-08-31T00:00:00Z',
-  updated_at: '2026-08-31T00:00:00Z',
-  lifecycle_stage: 'live' as const,
-  health_score: '8.0',
-  health_category: 'good' as const,
-  pulse: [1, 1, 1, 0, 0],
-  ai_pulse_score: 'satisfied' as const,
-  ai_pulse_reason: 'Steady usage.',
-  nps_score: 40,
-  csat_score: '80.00',
-  joined_date: '2024-01-01',
-  renewal_date: '2026-01-01',
-  contract_start_date: '2024-01-01',
-  contract_end_date: '2026-01-01',
-  currency: 'USD' as const,
-  currency_display: 'US Dollar ($)',
-  arr_billed_at_account: '60000.00',
-  arr_billed_at_hq: '60000.00',
-  implementation_fee: '10000.00',
-  total_contract_value: '70000.00',
-  total_forecasted_renewal_revenue: '73500.00',
-  primary_product: 1,
-  primary_product_name: 'Product A',
-  additional_products_count: null,
-  top_source_channel: 'Direct Sales',
-  total_contracted_seats: 100,
-  total_active_seats: 80,
-  seat_utilization_percentage: 80,
-  total_hires: 10,
-  scope_web_app: 'N/A',
-  ces_percentage: '90.00',
-  churn_date: null,
-  churn_reason: '' as const,
-  churn_reason_display: '',
-  churn_comment: '',
-  is_archived: false,
-};
+// Integration tier: the real page, store and router; fetch stubbed with
+// §2-shaped bodies (features/organizations/testPortfolio.ts).
+const where = () => new URL(`http://x${screen.getByTestId('where').textContent}`);
+const { createObjectURL, revokeObjectURL } = URL;
 
-const initech = { ...globex, id: 2, name: 'Initech' };
-
-function renderPage(
-  defaultLifecycleStage = '',
-  currency: 'USD' | 'EUR' = 'USD',
-  initialEntries: string[] = ['/organizations/list']
-) {
-  // ActionBar (rendered by List) now reads state.auth.user's own
-  // organisation for Global Presets' default lifecycle stage — needs
-  // the slice present even for tests that don't exercise that path.
-  const store = configureStore({
-    reducer: { customers: customersReducer, auth: authReducer },
-    preloadedState: {
-      auth: {
-        user: {
-          id: 1,
-          email: 'alice@acme.io',
-          name: 'Alice',
-          avatar: '',
-          role: 'admin' as const,
-          role_id: 1,
-          role_name: 'Admin',
-          permissions: ALL_CAPABILITIES,
-          function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
-          organisation: {
-            id: 1,
-            name: 'Acme Inc',
-            slug: 'acme-inc',
-            currency,
-            currency_display: currency === 'USD' ? 'US Dollar ($)' : 'Euro (€)',
-            default_lifecycle_stage: defaultLifecycleStage,
-            ai_agent_enabled: true,
-            ai_agent_tone: 'professional' as const,
-            ai_agent_tone_display: 'Professional',
-          },
-          is_active: true,
-        },
-        accessToken: 'token',
-        refreshToken: 'refresh',
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      },
+/** Wraps the stub so matching requests wait until `release()`, once `start()`ed. */
+function holdFetch(spy: ReturnType<typeof stubPortfolio>, when: (url: URL) => boolean) {
+  const waiting: (() => void)[] = [];
+  let on = false;
+  vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) => {
+    if (on && when(new URL(String(input)))) await new Promise<void>((resolve) => waiting.push(resolve));
+    return spy(input, init);
+  });
+  return {
+    start: () => {
+      on = true;
     },
-  });
-  render(
-    <Provider store={store}>
-      <MemoryRouter initialEntries={initialEntries}>
-        <List />
-      </MemoryRouter>
-    </Provider>
-  );
+    release: () => {
+      on = false;
+      waiting.splice(0).forEach((resolve) => resolve());
+    },
+  };
 }
+const isPortfolio = (url: URL) => url.pathname.endsWith('/organizations/portfolio/');
 
-function jsonResponse(status: number, body: unknown) {
-  return { ok: status >= 200 && status < 300, status, json: async () => body };
-}
-
-// MetricsPanel independently fetches upcoming renewals (?renewal_within=)
-// in parallel with the table's own customers fetch, so a plain queued
-// mockResolvedValueOnce sequence isn't reliable — dispatch on the URL
-// instead. `customers` is consumed one response per call (repeating the
-// last once exhausted); every `?renewal_within=` request gets its own
-// fixed (empty, by default) response, since these tests aren't about it.
-const ZERO_STATS = {
-  health: {
-    good: { count: 0, mrr: 0, arr: 0 },
-    average: { count: 0, mrr: 0, arr: 0 },
-    poor: { count: 0, mrr: 0, arr: 0 },
-  },
-  nps: { promoters: 0, passives: 0, detractors: 0, score: 0 },
-  lifecycle: Object.fromEntries(
-    ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'churn', 'expansion', 'other'].map((s) => [
-      s,
-      { count: 0, mrr: 0, arr: 0 },
-    ])
-  ),
-};
-
-function makeFetchMock({
-  customers,
-  renewals = { count: 0, next: null, previous: null, results: [] },
-  stats = ZERO_STATS,
-}: {
-  customers: Array<{ status: number; body: unknown }>;
-  renewals?: unknown;
-  stats?: unknown;
-}) {
-  const queue = [...customers];
-  return vi.fn((url: string) => {
-    if (typeof url === 'string' && url.includes('/customers/stats/')) {
-      return Promise.resolve(jsonResponse(200, stats));
-    }
-    if (typeof url === 'string' && url.includes('renewal_within')) {
-      return Promise.resolve(jsonResponse(200, renewals));
-    }
-    const next = queue.length > 1 ? queue.shift()! : queue[0];
-    return Promise.resolve(jsonResponse(next.status, next.body));
-  });
-}
-
-// The dashboard-drill tests below (?ids=) also trigger a THIRD kind of
-// request List.tsx makes on its own — a bare, unfiltered GET /customers/
-// used only to read MetricsPanel's book-wide total while a drill is
-// active (List.tsx's own drillTotalCount effect), fired concurrently
-// with the table's own ids=/search=-filtered fetch. Both the probe and
-// an actual unfiltered list fetch (e.g. after "Show all") hit the exact
-// same bare endpoint, so `makeFetchMock`'s single shared queue can't
-// reliably tell a probe call apart from the table's own call by order —
-// these tests key responses off the URL instead.
-function makeDrillFetchMock({
-  idsResult,
-  bareResult = { count: 0, next: null, previous: null, results: [] },
-  searchResult,
-  stats = ZERO_STATS,
-}: {
-  idsResult: { count: number; next: string | null; previous: string | null; results: unknown[] };
-  bareResult?: { count: number; next: string | null; previous: string | null; results: unknown[] };
-  searchResult?: { count: number; next: string | null; previous: string | null; results: unknown[] };
-  stats?: unknown;
-}) {
-  return vi.fn((url: string) => {
-    if (typeof url !== 'string') return Promise.resolve(jsonResponse(200, bareResult));
-    if (url.includes('/customers/stats/')) return Promise.resolve(jsonResponse(200, stats));
-    if (url.includes('renewal_within')) {
-      return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
-    }
-    if (searchResult && url.includes('search=')) return Promise.resolve(jsonResponse(200, searchResult));
-    if (url.includes('ids=')) return Promise.resolve(jsonResponse(200, idsResult));
-    return Promise.resolve(jsonResponse(200, bareResult));
-  });
-}
-
-describe('Organizations List page', () => {
-  beforeEach(() => {
+describe('Organizations list (portfolio)', () => {
+  afterEach(() => {
+    resetMembersCache();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    resetViewport();
+    URL.createObjectURL = createObjectURL;
+    URL.revokeObjectURL = revokeObjectURL;
   });
 
-  it('calls the real paginated endpoint on mount and renders the fetched organizations', async () => {
-    const fetchMock = makeFetchMock({
-      customers: [{ status: 200, body: { count: 1, next: null, previous: null, results: [globex] } }],
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderPage();
-
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/api/v1/customers/'),
-      expect.anything()
-    );
-    expect(screen.getByText('Showing 1-1 of 1 organizations')).toBeInTheDocument();
+  it('loads tiles, health sections and rows from the portfolio endpoint', async () => {
+    const spy = stubPortfolio();
+    renderList();
+    expect(await screen.findByRole('button', { name: /^Average · 1/ })).toHaveAttribute('aria-expanded', 'true');
+    expect(await screen.findByRole('link', { name: 'Pizza Hut' })).toHaveAttribute('href', '/organizations/7');
+    expect(screen.getByRole('group', { name: 'Health' })).toBeInTheDocument();
+    const [frame] = portfolioQueries(spy);
+    expect(frame.get('group')).toBe('health');
+    expect(frame.get('sort')).toBe('-arr');
+    expect(frame.get('limit')).toBe('1');
+    expect(portfolioQueries(spy).some((q) => q.get('group_value') === 'average' && q.get('limit') === '25')).toBe(true);
+    expect(screen.getByText('2 organizations')).toBeInTheDocument();
   });
 
-  it('shows the backend error message when the fetch fails', async () => {
-    const fetchMock = makeFetchMock({
-      customers: [{ status: 500, body: { detail: 'Server error.' } }],
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderPage();
-
-    expect(await screen.findByText('Server error.')).toBeInTheDocument();
+  it('lands a dashboard drill as a chip; removing it drops ids and returns focus to Search', async () => {
+    const spy = stubPortfolio();
+    renderList('/organizations/list?ids=7,2');
+    const chip = await screen.findByRole('button', { name: 'Remove Opened from the dashboard (2)' });
+    expect(portfolioQueries(spy)[0].get('ids')).toBe('7,2');
+    await userEvent.click(chip);
+    expect(where().searchParams.has('ids')).toBe(false);
+    expect(screen.getByRole('searchbox', { name: 'Search by name or Revenact ID' })).toHaveFocus();
   });
 
-  it('paging to the next page fetches the server-supplied next URL and swaps the rows', async () => {
-    const fetchMock = makeFetchMock({
-      customers: [
-        {
-          status: 200,
-          body: {
-            count: 2,
-            next: 'http://localhost:8000/api/v1/customers/?page=2',
-            previous: null,
-            results: [globex],
-          },
-        },
-        {
-          status: 200,
-          body: {
-            count: 2,
-            next: null,
-            previous: 'http://localhost:8000/api/v1/customers/',
-            results: [initech],
-          },
-        },
-      ],
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
+  it('filters from a tile, shows N of M, and clears the selection when filters change', async () => {
+    stubPortfolio();
+    renderList();
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+    expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('1 selected');
 
-    renderPage();
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Next page' }));
-
-    await waitFor(() => expect(screen.getByText('Initech')).toBeInTheDocument());
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      'http://localhost:8000/api/v1/customers/?page=2',
-      expect.anything()
-    );
-    expect(screen.getByText('Showing 2-2 of 2 organizations')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Average 1' }));
+    expect(where().searchParams.get('health')).toBe('average');
+    expect(await screen.findByText('1 of 2 organizations')).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument();
   });
 
-  it('searching debounces, hits ?search=, and resets pagination to the first page', async () => {
-    const fetchMock = makeFetchMock({
-      customers: [
-        { status: 200, body: { count: 2, next: null, previous: null, results: [globex, initech] } },
-        { status: 200, body: { count: 1, next: null, previous: null, results: [initech] } },
-      ],
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
-
-    renderPage();
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-
-    await user.type(
-      screen.getByPlaceholderText('Search by name, Revenact ID or External ID'),
-      'init'
-    );
-
-    // Typing alone shouldn't fire a request per keystroke — only after the
-    // 300ms debounce settles. (MetricsPanel's separate renewals fetch on
-    // mount is excluded — it's unrelated to the search box.)
-    const customersCalls = fetchMock.mock.calls.filter(
-      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
-    );
-    expect(customersCalls).toHaveLength(1);
-
-    await waitFor(
-      () => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument(),
-      { timeout: 2000 }
-    );
-    expect(screen.getByText('Initech')).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenLastCalledWith(
-      expect.stringContaining('/api/v1/customers/?search=init'),
-      expect.anything()
-    );
-    expect(screen.getByText('Showing 1-1 of 1 organizations')).toBeInTheDocument();
-  });
-});
-
-describe('Organizations List page — dashboard drill (?ids=)', () => {
-  beforeEach(() => {
-    vi.unstubAllGlobals();
+  it('shows the designed empty state and clears filters from it', async () => {
+    stubPortfolio();
+    renderList('/organizations/list?search=zzz');
+    expect(await screen.findByText('No organizations match these filters')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(where().searchParams.has('search')).toBe(false);
+    expect(await screen.findByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
   });
 
-  it('opening /organizations/list?ids=3,7 fetches ids= and shows the drill notice', async () => {
-    const fetchMock = makeDrillFetchMock({
-      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
-
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-
-    const idsCall = fetchMock.mock.calls.find(([url]) => String(url).includes('ids=3%2C7'));
-    expect(idsCall).toBeTruthy();
-
-    const showAllButton = screen.getByRole('button', { name: 'Show all' });
-    expect(showAllButton.closest('div')).toHaveTextContent('Showing 2 accounts from the dashboard');
+  it('says the tiles and count are unavailable after a failed first load, not loading forever', async () => {
+    stubPortfolio({ portfolio: () => ({ status: 500, body: { detail: 'Boom' } }) });
+    renderList();
+    expect(await screen.findByText('Summary unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Organizations unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading summary' })).not.toBeInTheDocument();
   });
 
-  it('"Show all" removes ids from the URL, re-fetches without it, and clears the notice', async () => {
-    const fetchMock = makeDrillFetchMock({
-      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
-      bareResult: { count: 1, next: null, previous: null, results: [globex] },
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
-
-    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Show all' }));
-
-    await waitFor(() => expect(screen.queryByRole('button', { name: 'Show all' })).not.toBeInTheDocument());
-
-    const customersCalls = fetchMock.mock.calls.filter(
-      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
-    );
-    const lastUrl = String(customersCalls[customersCalls.length - 1][0]);
-    expect(lastUrl).not.toContain('ids=');
+  it('shows an error and recovers on Try again', async () => {
+    let fail = true;
+    stubPortfolio({ portfolio: (q) => (fail ? { status: 500, body: { detail: 'Boom' } } : buildPortfolio(q)) });
+    renderList();
+    expect(await screen.findByText(/Boom/)).toBeInTheDocument();
+    expect(screen.getByText(/Boom/).closest('[role="alert"]')).not.toBeNull();
+    fail = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('link', { name: 'Pizza Hut' })).toBeInTheDocument();
   });
 
-  it('searching while ids is set sends both search and ids params', async () => {
-    const fetchMock = makeDrillFetchMock({
-      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
-      searchResult: { count: 1, next: null, previous: null, results: [initech] },
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
-
-    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-
-    await user.type(
-      screen.getByPlaceholderText('Search by name, Revenact ID or External ID'),
-      'init'
-    );
-
-    await waitFor(
-      () => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument(),
-      { timeout: 2000 }
-    );
-
-    const customersCalls = fetchMock.mock.calls.filter(
-      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
-    );
-    const lastUrl = String(customersCalls[customersCalls.length - 1][0]);
-    expect(lastUrl).toContain('search=init');
-    expect(lastUrl).toContain('ids=3%2C7');
+  it('exports the current query through the session', async () => {
+    const spy = stubPortfolio();
+    URL.createObjectURL = vi.fn(() => 'blob:x');
+    URL.revokeObjectURL = vi.fn();
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    renderList('/organizations/list?health=average');
+    await screen.findByRole('link', { name: 'Pizza Hut' });
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+    const call = spy.mock.calls.find(([input]) => String(input).includes('export.csv'));
+    expect(new URL(String(call?.[0])).searchParams.get('health')).toBe('average');
   });
 
-  it('an empty ids= param is treated as absent (no notice, no ids sent)', async () => {
-    const fetchMock = makeFetchMock({
-      customers: [{ status: 200, body: { count: 1, next: null, previous: null, results: [globex] } }],
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderPage('', 'USD', ['/organizations/list?ids=']);
-
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Show all' })).not.toBeInTheDocument();
-
-    const customersCalls = fetchMock.mock.calls.filter(
-      ([url]) => !String(url).includes('renewal_within') && !String(url).includes('/customers/stats/')
-    );
-    expect(String(customersCalls[0][0])).not.toContain('ids=');
+  it('opens a row inline and edits it with the existing form', async () => {
+    stubPortfolio({ customer: customerFixture });
+    renderList();
+    await userEvent.click(await screen.findByRole('button', { name: 'Open Pizza Hut' }));
+    expect(screen.getByRole('button', { name: 'Close Pizza Hut' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('heading', { name: 'Commercial' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit details' }));
+    expect(await screen.findByRole('heading', { name: 'Edit Pizza Hut' })).toBeInTheDocument();
   });
 
-  it('a fresh store at ?ids=3,7 shows the unfiltered list count in MetricsPanel, not the drilled count or 0', async () => {
-    // Fix round 2: round 1 summed GET /customers/stats/'s Health buckets
-    // for the total, but those are scoped to `live_customers` (excludes
-    // churned — see revenact-backend's CustomerStatsView/scoping.py),
-    // narrower than the list's own population (includes churned), so it
-    // undercounted even outside a drill. List.tsx now fetches the
-    // unfiltered list's own `count` directly (page 1, rows discarded)
-    // into local state whenever a drill is active, and passes that.
-    const fetchMock = makeDrillFetchMock({
-      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
-      bareResult: { count: 12, next: null, previous: null, results: [] },
-    });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
-
-    // The table lists the 2 drilled rows...
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-    expect(screen.getByText('Initech')).toBeInTheDocument();
-    expect(screen.getByText('Showing 1-2 of 2 organizations')).toBeInTheDocument();
-    // ...while the panel shows the real book-wide total (12), not 2 (the
-    // drilled count) and not 0 (fix round 1's regression).
-    await waitFor(() => expect(screen.getByTitle('Number of organizations')).toHaveTextContent('12'));
+  it('adds an organization with the existing form', async () => {
+    stubPortfolio();
+    renderList();
+    await userEvent.click(await screen.findByRole('button', { name: 'Add organization' }));
+    expect(screen.getByRole('heading', { name: 'Add Organization' })).toBeInTheDocument();
   });
 
-  it('a fresh drill landing shows "—", not 0, until the total probe resolves', async () => {
-    let resolveProbe: (value: unknown) => void = () => {};
-    const probe = new Promise((resolve) => {
-      resolveProbe = resolve;
-    });
-    const base = makeDrillFetchMock({
-      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
-    });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        typeof url === 'string' && /\/customers\/(\?)?$/.test(url.replace(/^.*\/api\/v1/, ''))
-          ? probe
-          : base(url),
-      ),
-    );
-
-    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
-
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-    expect(screen.getByTitle('Number of organizations')).toHaveTextContent('—');
-    expect(screen.getByTitle('Number of organizations')).not.toHaveTextContent('0');
-
-    resolveProbe(jsonResponse(200, { count: 12, next: null, previous: null, results: [] }));
-    await waitFor(() => expect(screen.getByTitle('Number of organizations')).toHaveTextContent('12'));
+  it('moves focus to Search after removing any chip, not only the dashboard one', async () => {
+    stubPortfolio();
+    renderList('/organizations/list?health=average');
+    await userEvent.click(await screen.findByRole('button', { name: 'Remove Health: Average' }));
+    expect(where().searchParams.has('health')).toBe(false);
+    expect(screen.getByRole('searchbox', { name: 'Search by name or Revenact ID' })).toHaveFocus();
   });
 
-  it('a drill landing whose total probe fails keeps "—" rather than a fabricated 0', async () => {
-    const base = makeDrillFetchMock({
-      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
-    });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        typeof url === 'string' && /\/customers\/(\?)?$/.test(url.replace(/^.*\/api\/v1/, ''))
-          ? Promise.resolve(jsonResponse(500, { detail: 'boom' }))
-          : base(url),
-      ),
-    );
-
-    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
-
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(screen.getByTitle('Number of organizations')).toHaveTextContent('—');
+  it('opens a row inline on desktop without a sheet', async () => {
+    stubPortfolio();
+    renderList();
+    await userEvent.click(await screen.findByRole('button', { name: 'Open Pizza Hut' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('[data-panel="commercial"]')).toHaveLength(1);
   });
 
-  it('the drill banner hides its number while the ids fetch is loading', async () => {
-    let resolveIds: (value: unknown) => void = () => {};
-    const idsPending = new Promise((resolve) => {
-      resolveIds = resolve;
-    });
-    const base = makeDrillFetchMock({
-      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
-      bareResult: { count: 12, next: null, previous: null, results: [] },
-    });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => (typeof url === 'string' && url.includes('ids=') ? idsPending : base(url))),
-    );
-
-    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
-
-    const banner = screen.getByRole('button', { name: 'Show all' }).parentElement as HTMLElement;
-    expect(banner).toHaveTextContent('Showing accounts from the dashboard');
-    expect(banner.textContent).not.toMatch(/\d/);
-
-    resolveIds(jsonResponse(200, { count: 2, next: null, previous: null, results: [globex, initech] }));
-    await waitFor(() => expect(banner).toHaveTextContent('Showing 2 accounts from the dashboard'));
+  it('ungrouped, keeps selected rows that are still listed after a filter change', async () => {
+    stubPortfolio();
+    renderList('/organizations/list?group=none');
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Globex' }));
+    expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('2 selected');
+    await userEvent.click(screen.getByRole('button', { name: 'Average 1' }));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Globex' })).not.toBeInTheDocument());
+    expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('1 selected');
+    expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).toBeChecked();
   });
 
-  it('a normal visit (no drill) still shows the list fetch\'s own count in MetricsPanel', async () => {
-    const fetchMock = makeFetchMock({
-      customers: [{ status: 200, body: { count: 7, next: null, previous: null, results: [globex] } }],
+  it('ungrouped, keeps failed ids selected across the reload after a bulk action, even from page 3', { timeout: 30000 }, async () => {
+    const rows = Array.from({ length: 120 }, (_, i) => ({ ...ALL_ROWS[1], id: 100 + i, name: `Account ${100 + i}` }));
+    const spy = stubPortfolio({
+      portfolio: (q) => buildPortfolio(q, rows),
+      bulk: (body) => ({ updated: body.ids.slice(2), failed: body.ids.slice(0, 2).map((id) => ({ id, reason: 'Not found.' })) }),
     });
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderPage();
-
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByTitle('Number of organizations')).toHaveTextContent('7'));
+    renderList('/organizations/list?group=none');
+    await screen.findByRole('link', { name: 'Account 100' });
+    await userEvent.click(screen.getByRole('button', { name: 'Show more organizations' }));
+    await screen.findByRole('link', { name: 'Account 150' });
+    await userEvent.click(screen.getByRole('button', { name: 'Show more organizations' }));
+    await screen.findByRole('link', { name: 'Account 219' });
+    for (let id = 200; id < 210; id += 1) await userEvent.click(screen.getByRole('checkbox', { name: `Select Account ${id}` }));
+    const bar = screen.getByRole('region', { name: 'Selection' });
+    expect(bar).toHaveTextContent('10 selected');
+    const before = portfolioQueries(spy).length;
+    await userEvent.selectOptions(within(bar).getByRole('combobox', { name: 'Set lifecycle' }), 'live');
+    await userEvent.click(within(bar).getByRole('button', { name: 'Apply to 10' }));
+    await waitFor(() => expect(bulkBodies(spy)).toHaveLength(1));
+    expect(await within(bar).findByText(/1 failed|2 failed/)).toBeInTheDocument();
+    // The reload lands page one only; the two failures are on page 3.
+    await waitFor(() => expect(portfolioQueries(spy).length).toBeGreaterThan(before));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Account 200' })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Account 100' })).not.toBeDisabled());
+    expect(bar).toHaveTextContent('2 selected');
   });
 
-  it('"Show all" moves focus to the search input, not <body>', async () => {
-    const fetchMock = makeDrillFetchMock({
-      idsResult: { count: 2, next: null, previous: null, results: [globex, initech] },
-      bareResult: { count: 1, next: null, previous: null, results: [globex] },
-    });
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
+  it('keeps the selection when the group changes to None, pruning against the flat rows, and clears it back to Health', async () => {
+    stubPortfolio();
+    renderList();
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Globex' }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Group' }), 'none');
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Average · 1/ })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Globex' })).not.toBeDisabled());
+    expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('2 selected');
 
-    renderPage('', 'USD', ['/organizations/list?ids=3,7']);
-    expect(await screen.findByText('Globex Corp')).toBeInTheDocument();
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Sort by' }), 'name');
+    await waitFor(() => expect(where().searchParams.get('sort')).toBe('-name'));
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Globex' })).not.toBeDisabled());
+    expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('2 selected');
 
-    await user.click(screen.getByRole('button', { name: 'Show all' }));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Group' }), 'health');
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument());
+  });
 
+  it('ungrouped, clears the selection when the query changed while a bulk action ran', async () => {
+    const spy = stubPortfolio();
+    const gate = holdFetch(spy, (url) => url.pathname.endsWith('/organizations/bulk/'));
+    renderList('/organizations/list?group=none');
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Globex' }));
+    gate.start();
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Set lifecycle' }), 'live');
+    await userEvent.click(screen.getByRole('button', { name: 'Apply to 2' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Average 1' }));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Globex' })).not.toBeInTheDocument());
+    gate.release();
+    const bar = await screen.findByRole('region', { name: 'Selection' });
+    expect(await within(bar).findByText(/Updated 2 organizations/)).toBeInTheDocument();
+    expect(bar).not.toHaveTextContent('selected');
+    expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).not.toBeChecked();
+  });
+
+  it('disables selection and bulk actions while the list reloads', async () => {
+    const spy = stubPortfolio();
+    const gate = holdFetch(spy, isPortfolio);
+    renderList();
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+    gate.start();
+    await userEvent.click(screen.getByRole('button', { name: 'Good 1' }));
+    const bar = screen.getByRole('region', { name: 'Selection' });
+    expect(within(bar).getByRole('combobox', { name: 'Change owner' })).toBeDisabled();
+    expect(within(bar).getByRole('button', { name: /Export/ })).toBeDisabled();
+    expect(bar).not.toHaveTextContent('Applying…');
+    gate.release();
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument());
+  });
+
+  it('grouped, keeps checkboxes disabled until the frame lands, even once a section has', async () => {
+    const spy = stubPortfolio();
+    const gate = holdFetch(spy, (url) => isPortfolio(url) && url.searchParams.has('group') && !url.searchParams.has('group_value'));
+    renderList();
+    await screen.findByRole('checkbox', { name: 'Select Pizza Hut' });
+    gate.start();
+    await userEvent.click(screen.getByRole('button', { name: 'Average 1' }));
     await waitFor(() =>
-      expect(screen.getByPlaceholderText('Search by name, Revenact ID or External ID')).toHaveFocus()
+      expect(portfolioQueries(spy).some((q) => q.get('health') === 'average' && q.get('group_value') === 'average')).toBe(true),
     );
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Pizza Hut' }).closest('ul')).toHaveAttribute('aria-busy', 'false'));
+    expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).toBeDisabled();
+    gate.release();
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).not.toBeDisabled());
   });
-});
 
-// A tiny in-memory "backend" for POST/PATCH so these tests exercise the
-// real create/update thunks end-to-end (List -> table/ActionBar -> modal
-// -> thunk -> store -> re-render), not just a canned response.
-function makeMutationFetchMock(initial: (typeof globex)[]) {
-  let customers = [...initial];
-  let nextId = 1 + Math.max(0, ...customers.map((c) => c.id));
-  return vi.fn((url: string, options?: { method?: string; body?: string }) => {
-    const method = options?.method ?? 'GET';
-    if (url.includes('/customers/stats/')) return Promise.resolve(jsonResponse(200, ZERO_STATS));
-    if (url.includes('renewal_within')) {
-      return Promise.resolve(jsonResponse(200, { count: 0, next: null, previous: null, results: [] }));
-    }
-    if (url.includes('/auth/members/')) return Promise.resolve(jsonResponse(200, []));
+  it('keeps the open sheet in step with reloaded rows', async () => {
+    let rows = ALL_ROWS;
+    stubPortfolio({ portfolio: (q) => buildPortfolio(q, rows), customer: customerFixture });
+    renderList('/organizations/list', { width: 375 });
+    await userEvent.click(await screen.findByRole('button', { name: 'Open Pizza Hut' }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Pizza Hut' })).getByRole('button', { name: 'Edit details' }));
+    await screen.findByRole('heading', { name: 'Edit Pizza Hut' });
+    rows = ALL_ROWS.map((row) => (row.id === 7 ? { ...row, name: 'Pizza Hut Ltd' } : row));
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('dialog', { name: 'Pizza Hut Ltd' })).toBeInTheDocument();
+  });
 
-    if (method === 'POST' && url.endsWith('/customers/')) {
-      const body = JSON.parse(options!.body!);
-      const created = { ...globex, ...body, id: nextId++, owner: null, created_by: null, modified_by: null };
-      customers = [created, ...customers];
-      return Promise.resolve(jsonResponse(201, created));
-    }
-    const patchMatch = /\/customers\/(\d+)\/$/.exec(url);
-    if (method === 'PATCH' && patchMatch) {
-      const id = Number(patchMatch[1]);
-      const body = JSON.parse(options!.body!);
-      customers = customers.map((c) => (c.id === id ? { ...c, ...body } : c));
-      return Promise.resolve(jsonResponse(200, customers.find((c) => c.id === id)));
-    }
-    return Promise.resolve(
-      jsonResponse(200, { count: customers.length, next: null, previous: null, results: customers })
+  describe('bulk actions', () => {
+    it('unassigns with value null, lists failures by name, keeps them selected and reloads', async () => {
+      const spy = stubPortfolio({
+        bulk: (body) => ({ updated: body.ids.filter((id) => id !== 7), failed: [{ id: 7, reason: 'Not found.' }] }),
+      });
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select Globex' }));
+      const before = portfolioQueries(spy).length;
+      const bar = screen.getByRole('region', { name: 'Selection' });
+      await userEvent.selectOptions(within(bar).getByRole('combobox', { name: 'Change owner' }), 'unassigned');
+      expect(bulkBodies(spy)).toHaveLength(0);
+      await userEvent.click(within(bar).getByRole('button', { name: 'Apply to 2' }));
+      await waitFor(() => expect(bulkBodies(spy)).toHaveLength(1));
+      expect(bulkBodies(spy)[0]).toEqual({ ids: [7, 1], action: 'set_owner', value: null });
+      expect(await within(bar).findByText(/Updated 1 organization\./)).toBeInTheDocument();
+      expect(within(bar).getByText('Pizza Hut').closest('li')).toHaveTextContent('Pizza Hut: Not found.');
+      await waitFor(() => expect(portfolioQueries(spy).length).toBeGreaterThan(before));
+      await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).not.toBeDisabled());
+      expect(bar).toHaveTextContent('1 selected');
+      expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' })).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Select Globex' })).not.toBeChecked();
+    });
+
+    it('offers every active member and every stage but churn as targets, not just the ones in use', async () => {
+      const spy = stubPortfolio({
+        members: [
+          { id: 9, name: 'Nora New', is_active: true },
+          { id: 4, name: 'Gone Away', is_active: false },
+        ],
+      });
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      const bar = screen.getByRole('region', { name: 'Selection' });
+      const owner = within(bar).getByRole('combobox', { name: 'Change owner' });
+      // Nora owns nothing, so the filter options never name her.
+      expect(await within(owner).findByRole('option', { name: 'Nora New' })).toBeInTheDocument();
+      expect(within(owner).getByRole('option', { name: 'Unassigned' })).toBeInTheDocument();
+      expect(within(owner).queryByRole('option', { name: 'Gone Away' })).not.toBeInTheDocument();
+      expect(within(owner).queryByRole('option', { name: 'Carl CSM' })).not.toBeInTheDocument();
+      const stage = within(bar).getByRole('combobox', { name: 'Set lifecycle' });
+      // No account is in Expansion.
+      expect(within(stage).getByRole('option', { name: 'Expansion' })).toBeInTheDocument();
+      expect(within(stage).queryByRole('option', { name: 'Churn' })).not.toBeInTheDocument();
+
+      await userEvent.selectOptions(owner, '9');
+      await userEvent.click(within(bar).getByRole('button', { name: 'Apply to 1' }));
+      await waitFor(() => expect(bulkBodies(spy)).toEqual([{ ids: [7], action: 'set_owner', value: 9 }]));
+    });
+
+    it('archives after a confirm and names the account the server refused', async () => {
+      const spy = stubPortfolio({
+        bulk: (body) => ({ updated: [], failed: body.ids.map((id) => ({ id, reason: "You can't archive this organization." })) }),
+      });
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      await userEvent.click(within(screen.getByRole('region', { name: 'Selection' })).getByRole('button', { name: 'Archive' }));
+      expect(screen.getByRole('heading', { name: 'Archive Pizza Hut?' })).toBeInTheDocument();
+      const buttons = screen.getAllByRole('button', { name: 'Archive' });
+      await userEvent.click(buttons[buttons.length - 1]);
+      await waitFor(() => expect(bulkBodies(spy)).toEqual([{ ids: [7], action: 'archive', value: null }]));
+      expect(await screen.findByText(/You can't archive this organization\./)).toBeInTheDocument();
+      expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('Pizza Hut: You can\'t archive this organization.');
+    });
+
+    it('does not reselect failures when the filters changed while the action ran', async () => {
+      const spy = stubPortfolio({ bulk: (body) => ({ updated: [], failed: body.ids.map((id) => ({ id, reason: 'Not found.' })) }) });
+      const gate = holdFetch(spy, (url) => url.pathname.endsWith('/organizations/bulk/'));
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      gate.start();
+      await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Change owner' }), 'unassigned');
+      await userEvent.click(screen.getByRole('button', { name: 'Apply to 1' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Good 1' }));
+      await waitFor(() => expect(screen.queryByRole('link', { name: 'Pizza Hut' })).not.toBeInTheDocument());
+      await screen.findByRole('link', { name: 'Globex' });
+      gate.release();
+      const bar = await screen.findByRole('region', { name: 'Selection' });
+      expect(await within(bar).findByText(/1 failed/)).toBeInTheDocument();
+      expect(bar).not.toHaveTextContent('selected');
+    });
+
+    it('guards Export (selected) against a double click', async () => {
+      const spy = stubPortfolio();
+      URL.createObjectURL = vi.fn(() => 'blob:x');
+      URL.revokeObjectURL = vi.fn();
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      const gate = holdFetch(spy, (url) => url.pathname.endsWith('export.csv'));
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      gate.start();
+      const bar = screen.getByRole('region', { name: 'Selection' });
+      await userEvent.click(within(bar).getByRole('button', { name: 'Export' }));
+      expect(within(bar).getByRole('button', { name: 'Export' })).toBeDisabled();
+      expect(bar).toHaveTextContent('Exporting…');
+      expect(bar).not.toHaveTextContent('Applying…');
+      await userEvent.click(within(bar).getByRole('button', { name: 'Export' }));
+      gate.release();
+      await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+      expect(spy.mock.calls.filter(([input]) => String(input).includes('export.csv'))).toHaveLength(1);
+    });
+
+    it('keeps the selection when a churn is cancelled, and clears it once churned', async () => {
+      const spy = stubPortfolio({ customer: customerFixture });
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      const bar = screen.getByRole('region', { name: 'Selection' });
+      await userEvent.click(within(bar).getByRole('button', { name: 'Churn' }));
+      const before = portfolioQueries(spy).length;
+      await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.queryByRole('heading', { name: 'Churn Pizza Hut?' })).not.toBeInTheDocument();
+      expect(bar).toHaveTextContent('1 selected');
+      expect(portfolioQueries(spy)).toHaveLength(before);
+
+      await userEvent.click(within(bar).getByRole('button', { name: 'Churn' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Confirm Churn' }));
+      await waitFor(() => expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument());
+      await waitFor(() => expect(portfolioQueries(spy).length).toBeGreaterThan(before));
+    });
+
+    it('offers churn only for exactly one account, in the existing churn modal', async () => {
+      stubPortfolio();
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select Globex' }));
+      const bar = screen.getByRole('region', { name: 'Selection' });
+      expect(within(bar).queryByRole('button', { name: 'Churn' })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('checkbox', { name: 'Select Globex' }));
+      await userEvent.click(within(bar).getByRole('button', { name: 'Churn' }));
+      expect(screen.getByRole('heading', { name: 'Churn Pizza Hut?' })).toBeInTheDocument();
+    });
+
+    it('exports the selected accounts, churned included', async () => {
+      const spy = stubPortfolio();
+      URL.createObjectURL = vi.fn(() => 'blob:x');
+      URL.revokeObjectURL = vi.fn();
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+      renderList();
+      await userEvent.click(await screen.findByRole('checkbox', { name: 'Select Pizza Hut' }));
+      await userEvent.click(within(screen.getByRole('region', { name: 'Selection' })).getByRole('button', { name: 'Export' }));
+      await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+      const call = spy.mock.calls.find(([input]) => String(input).includes('export.csv'));
+      const query = new URL(String(call?.[0])).searchParams;
+      expect(query.get('ids')).toBe('7');
+      expect(query.get('include_churned')).toBe('1');
+    });
+  });
+
+  it('shows the export failing', async () => {
+    const spy = stubPortfolio();
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).includes('export.csv')
+        ? { ok: false, status: 500, json: async () => ({ detail: 'Export broke' }) }
+        : spy(input, init),
     );
-  });
-}
-
-describe('Organizations List page — Add/Edit/Churn/Archive', () => {
-  beforeEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it('adding an organization posts to /customers/ and shows it in the table', async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([]));
-    const user = userEvent.setup();
-
-    renderPage();
-    await screen.findByText('No organizations yet.');
-
-    await user.click(screen.getByRole('button', { name: /Add Organization/ }));
-    await user.type(screen.getByLabelText('Name *'), 'New Co');
-    await user.click(screen.getByRole('button', { name: 'Create Organization' }));
-
-    expect(await screen.findByText('New Co')).toBeInTheDocument();
-    expect(screen.queryByText('Create Organization')).not.toBeInTheDocument(); // modal closed
+    renderList();
+    await screen.findByRole('link', { name: 'Pizza Hut' });
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect((await screen.findByText('Export broke')).closest('[role="alert"]')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Export' })).not.toBeDisabled();
   });
 
-  it("Add Organization pre-selects Settings > Global Presets' own tenant default stage", async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([]));
-    const user = userEvent.setup();
+  describe('on a phone (375px)', () => {
+    it('collapses the toolbar and keeps group, sort, export and add in the Filters sheet', async () => {
+      stubPortfolio();
+      renderList('/organizations/list', { width: 375 });
+      await screen.findByRole('link', { name: 'Pizza Hut' });
+      expect(screen.queryByRole('combobox', { name: 'Group' })).not.toBeInTheDocument();
+      await userEvent.click(screen.getByRole('button', { name: /^Filters/ }));
+      const sheet = screen.getByRole('dialog', { name: 'Filters' });
+      expect(sheet).toHaveAttribute('aria-modal', 'true');
+      for (const name of ['Group', 'Sort by']) expect(within(sheet).getByRole('combobox', { name })).toBeInTheDocument();
+      expect(within(sheet).getByRole('button', { name: 'Add organization' })).toBeInTheDocument();
+      expect(within(sheet).getByRole('checkbox', { name: 'Include churned' })).toBeInTheDocument();
+    });
 
-    renderPage('adoption');
-    await screen.findByText('No organizations yet.');
+    it('enters selection mode from a visible Select toggle, without a long press', async () => {
+      stubPortfolio();
+      renderList('/organizations/list', { width: 375 });
+      await screen.findByRole('link', { name: 'Pizza Hut' });
+      const toggle = screen.getByRole('button', { name: 'Select' });
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('checkbox', { name: 'Select Pizza Hut' }).closest('label')).not.toHaveClass('hidden');
+      await userEvent.click(document.querySelector('[data-row-id="7"] [data-part="header"]') as HTMLElement);
+      expect(screen.getByRole('region', { name: 'Selection' })).toHaveTextContent('1 selected');
+      expect(screen.queryByRole('dialog', { name: 'Pizza Hut' })).not.toBeInTheDocument();
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument();
+    });
 
-    await user.click(screen.getByRole('button', { name: /Add Organization/ }));
+    it('shows the Select toggle pressed after a long press, and turning it off ends selection', async () => {
+      stubPortfolio();
+      renderList('/organizations/list', { width: 375 });
+      await screen.findByRole('link', { name: 'Pizza Hut' });
+      const header = document.querySelector('[data-row-id="7"] [data-part="header"]') as HTMLElement;
+      fireEvent.pointerDown(header);
+      await new Promise((resolve) => setTimeout(resolve, LONG_PRESS_MS + 50));
+      fireEvent.pointerUp(header);
+      const toggle = screen.getByRole('button', { name: 'Select' });
+      expect(toggle).toHaveAttribute('aria-pressed', 'true');
+      await userEvent.click(toggle);
+      expect(toggle).toHaveAttribute('aria-pressed', 'false');
+      expect(screen.queryByRole('region', { name: 'Selection' })).not.toBeInTheDocument();
+    });
 
-    expect(await screen.findByLabelText('Lifecycle Stage')).toHaveValue('adoption');
-  });
-
-  it("Add Organization pre-selects the org's own currency (Tier 1)", async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([]));
-    const user = userEvent.setup();
-
-    renderPage('', 'EUR');
-    await screen.findByText('No organizations yet.');
-
-    await user.click(screen.getByRole('button', { name: /Add Organization/ }));
-
-    expect(await screen.findByLabelText('Currency')).toHaveValue('EUR');
-  });
-
-  it('adding an organization sends its own chosen currency, distinct from the org default', async () => {
-    const fetchMock = makeMutationFetchMock([]);
-    vi.stubGlobal('fetch', fetchMock);
-    const user = userEvent.setup();
-
-    renderPage('', 'USD');
-    await screen.findByText('No organizations yet.');
-
-    await user.click(screen.getByRole('button', { name: /Add Organization/ }));
-    await user.type(screen.getByLabelText('Name *'), 'Globex EU');
-    await user.selectOptions(screen.getByLabelText('Currency'), 'EUR');
-    await user.click(screen.getByRole('button', { name: 'Create Organization' }));
-
-    await screen.findByText('Globex EU');
-    const postCall = fetchMock.mock.calls.find(([, o]: [string, { method?: string }?]) => o?.method === 'POST')!;
-    const body = JSON.parse((postCall[1] as { body: string }).body);
-    expect(body.currency).toBe('EUR');
-  });
-
-  it('editing an organization prefills the form and PATCHes the change', async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
-    const user = userEvent.setup();
-
-    renderPage();
-    await screen.findByText('Globex Corp');
-
-    await user.click(screen.getByRole('button', { name: 'Actions for Globex Corp' }));
-    await user.click(await screen.findByRole('button', { name: 'Edit Organization' }));
-
-    const nameInput = await screen.findByLabelText('Name *');
-    expect(nameInput).toHaveValue('Globex Corp');
-    await user.clear(nameInput);
-    await user.type(nameInput, 'Globex Renamed');
-    await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-    expect(await screen.findByText('Globex Renamed')).toBeInTheDocument();
-  });
-
-  it('churning an organization sets lifecycle_stage=churn and stays visible', async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
-    const user = userEvent.setup();
-
-    renderPage();
-    await screen.findByText('Globex Corp');
-
-    await user.click(screen.getByRole('button', { name: 'Actions for Globex Corp' }));
-    await user.click(await screen.findByRole('button', { name: 'Churn Organization' }));
-    await user.type(screen.getByLabelText('Reason'), 'Budget Cut');
-    await user.click(screen.getByRole('button', { name: 'Confirm Churn' }));
-
-    await waitFor(() => expect(screen.getByText('Churn')).toBeInTheDocument());
-    expect(screen.getByText('Globex Corp')).toBeInTheDocument();
-  });
-
-  it('archiving an organization removes it from the list after confirming', async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
-    const user = userEvent.setup();
-
-    renderPage();
-    await screen.findByText('Globex Corp');
-
-    await user.click(screen.getByRole('button', { name: 'Actions for Globex Corp' }));
-    await user.click(await screen.findByRole('button', { name: 'Archive Organization' }));
-    await user.click(await screen.findByRole('button', { name: 'Archive' }));
-
-    await waitFor(() => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument());
-    expect(screen.getByText('No organizations yet.')).toBeInTheDocument();
-  });
-
-  it("the settings gear's Edit/Archive/Churn are disabled until something is checkbox-selected", async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
-    const user = userEvent.setup();
-
-    renderPage();
-    await screen.findByText('Globex Corp');
-
-    await user.click(screen.getByRole('button', { name: 'Settings' }));
-    expect(await screen.findByRole('button', { name: 'Edit Organization' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Archive Organization' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Churn Organization' })).toBeDisabled();
-  });
-
-  it('checking a row and using the settings gear edits that organization', async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([globex]));
-    const user = userEvent.setup();
-
-    renderPage();
-    await screen.findByText('Globex Corp');
-
-    await user.click(screen.getByRole('checkbox', { name: 'Select Globex Corp' }));
-    await user.click(screen.getByRole('button', { name: 'Actions for 1 selected organization' }));
-    await user.click(await screen.findByRole('button', { name: 'Edit Organization' }));
-
-    const nameInput = await screen.findByLabelText('Name *');
-    expect(nameInput).toHaveValue('Globex Corp');
-  });
-
-  it('selecting two rows and archiving from the settings gear removes both', async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([globex, initech]));
-    const user = userEvent.setup();
-
-    renderPage();
-    await screen.findByText('Globex Corp');
-    await screen.findByText('Initech');
-
-    await user.click(screen.getByRole('checkbox', { name: 'Select Globex Corp' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Select Initech' }));
-    await user.click(screen.getByRole('button', { name: 'Actions for 2 selected organizations' }));
-
-    // Edit doesn't make sense for a multi-selection.
-    expect(await screen.findByRole('button', { name: 'Edit Organization' })).toBeDisabled();
-
-    await user.click(screen.getByRole('button', { name: 'Archive Organization' }));
-    expect(await screen.findByText('Archive 2 organizations?')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Archive' }));
-
-    await waitFor(() => expect(screen.queryByText('Globex Corp')).not.toBeInTheDocument());
-    expect(screen.queryByText('Initech')).not.toBeInTheDocument();
-  });
-
-  it('the header checkbox selects and deselects every row on the page', async () => {
-    vi.stubGlobal('fetch', makeMutationFetchMock([globex, initech]));
-    const user = userEvent.setup();
-
-    renderPage();
-    await screen.findByText('Globex Corp');
-    await screen.findByText('Initech');
-
-    await user.click(screen.getByRole('checkbox', { name: 'Select all organizations on this page' }));
-    expect(screen.getByRole('checkbox', { name: 'Select Globex Corp' })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Select Initech' })).toBeChecked();
-
-    await user.click(screen.getByRole('checkbox', { name: 'Select all organizations on this page' }));
-    expect(screen.getByRole('checkbox', { name: 'Select Globex Corp' })).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Select Initech' })).not.toBeChecked();
+    it('opens a row as a bottom sheet, and Escape closes it', async () => {
+      stubPortfolio();
+      renderList('/organizations/list', { width: 375 });
+      await userEvent.click(await screen.findByRole('button', { name: 'Open Pizza Hut' }));
+      const sheet = screen.getByRole('dialog', { name: 'Pizza Hut' });
+      expect(within(sheet).getByRole('heading', { name: 'Commercial' })).toBeInTheDocument();
+      expect(document.querySelectorAll('[data-panel="commercial"]')).toHaveLength(1);
+      await userEvent.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog', { name: 'Pizza Hut' })).not.toBeInTheDocument();
+    });
   });
 });

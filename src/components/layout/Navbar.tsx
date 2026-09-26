@@ -123,6 +123,12 @@ export function Navbar() {
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
   const isDashboard = location.pathname.startsWith('/dashboard');
+  // The Organizations list wears the dashboard's frame (portfolio spec §1):
+  // the transparent top bar, the actions slot (empty until Ask Revenact
+  // lands on Organizations), and no avatar. The board keeps today's header
+  // until it moves onto the portfolio (delivery 2).
+  const isOrgList = location.pathname === '/organizations/list';
+  const isFramed = isDashboard || isOrgList;
   const dashboardSharedSearch = sharedSearch(location.search);
 
 
@@ -212,7 +218,7 @@ export function Navbar() {
     // no avatar (the sidebar carries the account menu).
     <header
       className={
-        isDashboard
+        isFramed
           ? 'h-16 shrink-0 flex items-center gap-3 px-4'
           : 'h-[64px] border-b border-line-subtle bg-surface flex items-center justify-between px-6 shrink-0 z-20 transition-all duration-300 shadow-sm'
       }
@@ -278,6 +284,28 @@ export function Navbar() {
                  />
                  <h1 className="text-[16px] font-bold text-ink tracking-tight uppercase">{organization.org}</h1>
               </div>
+          </div>
+        ) : isOrgList ? (
+          <div className="flex items-center gap-4 h-full">
+            <h1 className="text-[17px] font-bold text-ink tracking-tight">Organizations</h1>
+            <nav aria-label="Organizations views" className="flex items-center gap-4 h-full">
+              {[
+                { to: '/organizations/list', label: 'List' },
+                { to: '/organizations/board', label: 'Board' },
+              ].map((view) => (
+                <NavLink
+                  key={view.to}
+                  to={view.to}
+                  className={({ isActive }) =>
+                    `h-full inline-flex items-center text-[13px] font-semibold border-b-2 transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                      isActive ? 'border-accent text-ink' : 'border-transparent text-ink-muted hover:text-ink'
+                    }`
+                  }
+                >
+                  {view.label}
+                </NavLink>
+              ))}
+            </nav>
           </div>
         ) : isOrganizations ? (
           <>
@@ -407,13 +435,13 @@ export function Navbar() {
         )}
       </div>
       
-      <div className={isDashboard ? 'ml-auto flex items-center gap-3' : 'flex items-center gap-4'}>
+      <div className={isFramed ? 'ml-auto flex items-center gap-3' : 'flex items-center gap-4'}>
         {/* Right side actions. The Copilot is the home page now, first in
             the sidebar; it no longer needs a button on every other page. */}
-        <div className={isDashboard ? 'flex items-center gap-3 text-ink-faint' : 'flex items-center gap-1.5 text-ink-faint ml-1'}>
+        <div className={isFramed ? 'flex items-center gap-3 text-ink-faint' : 'flex items-center gap-1.5 text-ink-faint ml-1'}>
           {/* The dashboard puts its Ask controls here (portaled from
               DashboardFrame) in place of the decorative icons. */}
-          {isDashboard ? (
+          {isFramed ? (
             <div ref={setSlot} data-nav-actions-slot="" className="flex items-center" />
           ) : (
             <>
@@ -487,7 +515,7 @@ export function Navbar() {
         </div>
 
         {/* User avatar + account menu (not on the dashboard; see the header) */}
-        {isDashboard ? null : (
+        {isFramed ? null : (
         <div className="relative ml-1" ref={accountMenuRef}>
           <button
             onClick={() => setIsAccountMenuOpen((open) => !open)}

@@ -52,7 +52,7 @@ react-ts-app/
 │   │   ├── shared/             ← Multi-domain components (ActivityFeed, PinnedAttributes, Summary)
 │   │   ├── contacts/           ← ContactsTable, ActionBar, MetricsPanel
 │   │   ├── dashboard/charts/   ← Shared Recharts chart components (AI Trending)
-│   │   └── organizations/      ← Rich org domain components (see below)
+│   │   └── organizations/      ← Org domain components; portfolio/ holds the list page's (see below)
 │   └── pages/                  ← Route-level page components
 │       ├── auth/               ← Login page
 │       ├── organizations/      ← List, Board, Details (org detail view)
@@ -100,8 +100,8 @@ react-ts-app/
 ├── health                     → Redirects to /dashboard/health/distribution
 ├── organizations/
 │   ├── (index)                → Redirects to /organizations/list
-│   ├── list                   → OrganizationsTable (main list view)
-│   ├── board                  → Board view (stub)
+│   ├── list                   → Portfolio (List.tsx on GET /organizations/portfolio/)
+│   ├── board                  → Board (KanbanBoard on /customers/, unchanged)
 │   └── :id                    → Organization Details page (full detail)
 ├── accounts/:id               → Account Details page
 ├── copilot                    → Copilot AI module (Home / Chat / Cockpit)
@@ -269,10 +269,8 @@ Usage's three seat tiles and its band chart stay off until
 (`product-usage/ControlsView.tsx`) has no drill at all — every figure there
 is an aggregate across a product's own customers, never a set of accounts.
 Organisations' own list (`pages/organizations/List.tsx`) reads a drill's
-"Open as a list" as `?ids=3,7`, banners "Showing n accounts from the
-dashboard" with a "Show all" that clears the param, and probes the
-unfiltered `/customers/` count separately so `MetricsPanel` keeps showing
-the whole book's population rather than the filtered page's.
+"Open as a list" as `?ids=3,7`, passes it to the portfolio endpoint, and shows
+it as the removable chip "Opened from the dashboard (N)".
 
 #### Ask Revenact (`pages/dashboard/ask/`, `components/copilot/`)
 
@@ -309,18 +307,22 @@ Charts: `StatusDonut`, `PriorityDonut`, `AssigneesStackedBar`, `OriginBar`, `Sen
 The richest domain in the app. Three views:
 
 #### List View (`pages/organizations/List.tsx`)
-Renders `<OrganizationsTable />` — a feature-rich data table.
+The portfolio (spec `docs/superpowers/specs/2026-09-25-organizations-portfolio-design.md`),
+inside `OrganizationsFrame` (the dashboard's body, with an empty Ask rail slot).
 
-**`components/organizations/OrganizationsTable.tsx`** (18 KB)
-- Displays org rows with health scores, ARR, NPS, CSAT, renewal date, pulse dots, AI pulse score
-- Paginated (5 rows/page), column visibility toggleable via `EditColumnsPopover`
-- Hoverable popovers: `HealthPopover`, `CsatPopover`, reason tooltip
-- Per-row action menu via `RowActionsPopover`
-- Aggregate KPI cards via `MetricsPanel`
-- Data source: `tableData.ts` (22 KB, mock data for 10+ orgs)
+| Where | What |
+|---|---|
+| `features/organizations/portfolioTypes.ts`, `portfolioApi.ts` | The endpoint's contract; `fetchPortfolio`, `exportPortfolio` (CSV via the session), `bulkUpdate` |
+| `features/organizations/portfolioParams.ts` | URL state ↔ API query (`parseParams`, `toUrlSearch`, `toApiQuery`, `filterQuery`) |
+| `features/organizations/portfolioFields.ts` | The 34-field registry: label, place (header or one of six panels), formatter, sort key |
+| `features/organizations/pinnedFields.ts`, `filterChips.ts` | Pins per user (localStorage, try/catch); chip labels and N-of-M text |
+| `components/organizations/portfolio/usePortfolio.ts` | `usePagedPortfolio` (one cursor-paged read: the frame, each section, later each board column) and `usePortfolio` (frame + M probe) |
+| `components/organizations/portfolio/*` | `AccountRow`, `rowParts`, `AccountDetails`, `AccountSheet`, `SummaryTiles`, `PortfolioToolbar`, `FiltersPanel`, `PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `useSelection`, `usePins`, `usePortfolioParams` |
+| `features/organizations/testPortfolio.ts`, `pages/organizations/testList.tsx` | Fixtures, `buildPortfolio`, `stubPortfolio`; `renderList(url, {width})` |
 
 #### Board View (`pages/organizations/Board.tsx`)
-Currently a stub placeholder.
+`KanbanBoard` grouped by lifecycle on `/customers/`, with `MetricsPanel`.
+Unchanged until delivery 2 moves it onto `usePagedPortfolio` per column.
 
 #### Details View (`pages/organizations/Details.tsx`)
 Full organization detail page. Contains:
@@ -537,10 +539,15 @@ App.tsx
   │     │           └── CallSenseTab → features/tasks/tasksSlice (dispatch addTask)
   │     └── (activityData, accountsData, accountActivityData)
   │
-  ├── pages/organizations/List.tsx
-  │     └── components/organizations/OrganizationsTable
-  │           ├── ActionBar, EditColumnsPopover, HealthPopover, CsatPopover, RowActionsPopover
-  │           └── MetricsPanel
+  ├── pages/organizations/List.tsx  (GET /organizations/portfolio/)
+  │     ├── OrganizationsFrame (rail slot, empty until Ask on Organizations)
+  │     └── components/organizations/portfolio/*
+  │           ├── SummaryTiles, PortfolioToolbar (FiltersPanel, PinFieldsMenu), FilterChips
+  │           ├── PortfolioSections → AccountRow (rowParts) + AccountDetails / AccountSheet
+  │           └── SelectionBar (bulk via POST /organizations/bulk/)
+  │
+  ├── pages/organizations/Board.tsx
+  │     └── components/organizations/MetricsPanel (until the board moves to the portfolio)
   │
   ├── pages/copilot/Index.tsx
   │     ├── HomeView, ChatView, CockpitView
@@ -592,7 +599,6 @@ App.tsx
 
 | Route | Status |
 |---|---|
-| `/organizations/board` | Stub (`Board.tsx` is 296 bytes) |
 | `/communications` | No route defined |
 | `/accounts` (list) | No list route, only `/accounts/:id` |
 | `/sfdc`, `/feedbacks` | No route defined |

@@ -157,7 +157,7 @@ function TabPill({ label, isActive, onClick }: { label: string; isActive: boolea
 // with the embedded Pipelines tab on the Organization/Account Details
 // pages — see components/pipelines/KanbanBoard.tsx. Only each entity's
 // own flat-table List view stays here, one per entity for the same
-// reason ContactsTable/OrganizationsTable aren't merged into one
+// reason ContactsTable/AccountsTable aren't merged into one
 // generic table: the column sets genuinely differ (Stage/MRR/
 // Organization/Priority isn't reused by anything else).
 
