@@ -11,6 +11,7 @@ import { UserManagement } from './pages/users/UserManagement';
 import { List } from './pages/organizations/List';
 import { Board } from './pages/organizations/Board';
 import { Details as OrganizationDetails } from './pages/organizations/Details';
+import { OrganizationsAskLayout } from './pages/organizations/ask/OrganizationsAskLayout';
 import { AccountDetails } from './pages/accounts/Details';
 import { List as AccountsList } from './pages/accounts/List';
 import { Board as AccountsBoard } from './pages/accounts/Board';
@@ -194,8 +195,11 @@ function App() {
 
           <Route path="organizations">
             <Route index element={<Navigate to="list" replace />} />
-            <Route path="list" element={<List />} />
-            <Route path="board" element={<Board />} />
+            {/* One Ask conversation above both views (spec §3). */}
+            <Route element={<OrganizationsAskLayout />}>
+              <Route path="list" element={<List />} />
+              <Route path="board" element={<Board />} />
+            </Route>
             <Route path=":id" element={<OrganizationDetails />} />
           </Route>
 
