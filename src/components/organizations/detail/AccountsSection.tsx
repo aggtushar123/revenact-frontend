@@ -62,26 +62,38 @@ function summarize(items: Account[]) {
   let promoters = 0;
   let passives = 0;
   let detractors = 0;
+  let npsCount = 0;
   let csatTotal = 0;
+  let csatCount = 0;
   let csmTotal = 0;
+  let csmCount = 0;
   for (const a of items) {
     health[a.health_category]++;
     lifecycle.set(a.lifecycle_stage, (lifecycle.get(a.lifecycle_stage) ?? 0) + 1);
     arr += Number(a.arr) || 0;
-    const nps = a.nps_score ?? 0;
-    if (nps > 0) promoters++;
-    else if (nps === 0) passives++;
-    else detractors++;
-    csatTotal += a.csat_score != null ? parseFloat(a.csat_score) : 0;
-    // Same treatment as CSAT above (an unscored account counts as 0, not
-    // excluded) — cheap to compute now that csm_pulse_score is on the type
-    // (round-2 fix, 2026-09-27), so it replaces the old banner's own CSM
-    // gauge (which blended pulse-dot history instead of this real field).
-    csmTotal += a.csm_pulse_score ?? 0;
+    // NPS, CSAT and CSM average only the accounts that actually have a
+    // score — a blank one is left out, not counted as a passive/0 (round-3
+    // fix, 2026-09-27: confirmed bug — the old code diluted every average
+    // toward a blank account's implicit 0/passive; a deliberate break from
+    // the old banner, which did dilute this way).
+    if (a.nps_score != null) {
+      npsCount++;
+      if (a.nps_score > 0) promoters++;
+      else if (a.nps_score === 0) passives++;
+      else detractors++;
+    }
+    if (a.csat_score != null) {
+      csatCount++;
+      csatTotal += parseFloat(a.csat_score);
+    }
+    if (a.csm_pulse_score != null) {
+      csmCount++;
+      csmTotal += a.csm_pulse_score;
+    }
   }
-  const npsScore = total > 0 ? Math.round(((promoters - detractors) / total) * 100) : 0;
-  const avgCsat = total > 0 ? Math.round(csatTotal / total) : 0;
-  const avgCsm = total > 0 ? (csmTotal / total).toFixed(1) : DASH;
+  const npsScore = npsCount > 0 ? signed(Math.round(((promoters - detractors) / npsCount) * 100)) : DASH;
+  const avgCsat = csatCount > 0 ? `${Math.round(csatTotal / csatCount)}%` : DASH;
+  const avgCsm = csmCount > 0 ? (csmTotal / csmCount).toFixed(1) : DASH;
   const lifecycleLine = (Object.keys(LIFECYCLE_LABELS) as Account['lifecycle_stage'][])
     .filter((key) => lifecycle.get(key))
     .map((key) => `${LIFECYCLE_LABELS[key]} ${lifecycle.get(key)}`)
@@ -98,8 +110,8 @@ function AccountsSummary({ items, currency }: { items: Account[]; currency: Curr
     <div className="flex flex-col gap-0.5 px-3 pb-2 text-[11px] text-ink-muted">
       <p>
         <Num>{total}</Num> {total === 1 ? 'account' : 'accounts'} · <Num>{health.good}</Num> healthy · <Num>{health.average}</Num> average ·{' '}
-        <Num>{health.poor}</Num> at risk · ARR <Num>{formatCompactMoney(arr, currency)}</Num> · NPS <Num>{signed(npsScore)}</Num> (
-        {plural(promoters, 'promoter')}, {plural(passives, 'passive')}, {plural(detractors, 'detractor')}) · CSAT <Num>{avgCsat}%</Num> · avg CSM{' '}
+        <Num>{health.poor}</Num> at risk · ARR <Num>{formatCompactMoney(arr, currency)}</Num> · NPS <Num>{npsScore}</Num> (
+        {plural(promoters, 'promoter')}, {plural(passives, 'passive')}, {plural(detractors, 'detractor')}) · CSAT <Num>{avgCsat}</Num> · avg CSM{' '}
         <Num>{avgCsm}</Num>
       </p>
       {lifecycleLine ? <p>{lifecycleLine}</p> : null}

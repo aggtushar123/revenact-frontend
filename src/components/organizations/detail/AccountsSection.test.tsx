@@ -102,21 +102,56 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
     expect(text).toContain('1 average');
     expect(text).toContain('0 at risk');
     expect(text).toContain('ARR $150.0K');
-    // NPS: EMEA scores 42 (promoter), North America has none (counts as a
-    // passive, same as the old banAccountsMetricsBanner's own npsValue ?? 0)
-    // -> ((1 promoter - 0 detractors) / 2) * 100 = +50.
-    expect(text).toContain('NPS +50');
+    // NPS, CSAT and CSM average only the scored account (round-3 fix,
+    // 2026-09-27): North America's own blanks are left out, not diluted in
+    // as a passive/0 the way the old banner did. Only EMEA (nps 42, csat
+    // 88.5, csm 5) counts, so every average equals its own single value.
+    expect(text).toContain('NPS +100');
     expect(text).toContain('1 promoter');
-    expect(text).toContain('1 passive');
+    expect(text).toContain('0 passive');
     expect(text).toContain('0 detractors');
-    // CSAT: (88.5 + 0) / 2 = 44.25, rounded to 44.
-    expect(text).toContain('CSAT 44%');
-    // avg CSM (round-2 fix, 2026-09-27): EMEA scores 5, North America has
-    // none (counts as 0, same treatment as CSAT/NPS above) -> (5 + 0) / 2 = 2.5.
-    expect(text).toContain('avg CSM 2.5');
+    expect(text).toContain('CSAT 89%');
+    expect(text).toContain('avg CSM 5.0');
     // Lifecycle breakdown: Live (North America) before Expansion (EMEA) —
     // LIFECYCLE_LABELS' own declared order.
     expect(text).toContain('Live 1 · Expansion 1');
+  });
+
+  // Round-3 fix, 2026-09-27: confirmed bug — avg CSAT and avg CSM used to
+  // add 0 for an unscored account and divide by every account, so one
+  // account at 5 plus one blank read "avg CSM 2.5" instead of the scored
+  // account's own 5.0.
+  it('averages avg CSAT and avg CSM over only the accounts that have a score', () => {
+    const scored: Account = { ...ACCOUNTS[0], id: 40, csat_score: '70', csm_pulse_score: 5 };
+    const blank: Account = { ...ACCOUNTS[1], id: 41, csat_score: null, csm_pulse_score: null };
+    renderSection({ items: [scored, blank] });
+    const text = screen.getByRole('region', { name: 'Accounts' }).textContent ?? '';
+    expect(text).toContain('avg CSM 5.0');
+    expect(text).toContain('CSAT 70%');
+  });
+
+  it('shows "—" for avg CSAT, avg CSM and NPS when no account has a score', () => {
+    const a: Account = { ...ACCOUNTS[1], id: 42, nps_score: null, csat_score: null, csm_pulse_score: null };
+    const b: Account = { ...ACCOUNTS[1], id: 43, nps_score: null, csat_score: null, csm_pulse_score: null };
+    renderSection({ items: [a, b] });
+    const text = screen.getByRole('region', { name: 'Accounts' }).textContent ?? '';
+    expect(text).toContain('NPS —');
+    expect(text).toContain('CSAT —');
+    expect(text).toContain('avg CSM —');
+  });
+
+  // Round-3 fix, 2026-09-27: an account with no nps_score must not count as
+  // a passive — the promoter/passive/detractor split and the NPS score
+  // itself are computed over scored accounts only.
+  it('ignores accounts with no NPS score when computing the split and the NPS score', () => {
+    const promoter: Account = { ...ACCOUNTS[0], id: 50, nps_score: 9 };
+    const blank: Account = { ...ACCOUNTS[1], id: 51, nps_score: null };
+    renderSection({ items: [promoter, blank] });
+    const text = screen.getByRole('region', { name: 'Accounts' }).textContent ?? '';
+    expect(text).toContain('NPS +100');
+    expect(text).toContain('1 promoter');
+    expect(text).toContain('0 passive');
+    expect(text).toContain('0 detractors');
   });
 
   it('shows no summary when there are no accounts', () => {
