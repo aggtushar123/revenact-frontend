@@ -35,8 +35,9 @@ export interface HeadlinesTabProps {
   /** Shown as a banner above the cards, not in place of them — a failed
    * regenerate leaves the existing cards perfectly readable. */
   regenerateError?: string | null;
-  /** Inside a page that scrolls on its own (the organization page): a card
-   *  like its neighbours, with no scroll area of its own. Off by default. */
+  /** Inside a page that scrolls on its own and heads the section itself (the
+   *  organization page): a card like its neighbours, with no scroll area and
+   *  no "Account Headlines" title of its own. Off by default. */
   embedded?: boolean;
 }
 
@@ -149,16 +150,21 @@ export function HeadlinesTab({
           : 'flex-1 overflow-y-auto custom-scrollbar bg-surface font-sans p-6 md:p-8'
       }
     >
-      {/* Title Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div className="flex items-center gap-2">
-          <LayoutTemplate className="w-5 h-5 text-accent" />
-          <h2 className="text-[14.5px] font-extrabold text-accent tracking-wide">
-            Account Headlines
-          </h2>
+      {/* Title Header. Embedded, the page heads the section ("Headlines"),
+          so only Regenerate stays: one heading, not two. */}
+      {embedded ? (
+        regenerateButton && <div className="flex justify-end mb-4">{regenerateButton}</div>
+      ) : (
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-2">
+            <LayoutTemplate className="w-5 h-5 text-accent" />
+            <h2 className="text-[14.5px] font-extrabold text-accent tracking-wide">
+              Account Headlines
+            </h2>
+          </div>
+          {regenerateButton}
         </div>
-        {regenerateButton}
-      </div>
+      )}
 
       {regenerateError && (
         <div className="flex items-start gap-2 mb-6 rounded-lg border border-danger/30 bg-danger/10 px-3.5 py-2.5">

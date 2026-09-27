@@ -120,6 +120,18 @@ describe('alignment on the organization page', () => {
       expect(container.querySelector('[data-owners]')).toHaveClass('grid-cols-2', 'md:grid-cols-3', 'xl:grid-cols-6');
     });
 
+    it('Knowledge has one Headlines heading: the page\'s, with Regenerate kept in the card', async () => {
+      const { KnowledgeTab } = await import('./KnowledgeTab');
+      renderWithStore(<KnowledgeTab customerId={7} customerName="Pizza Hut" />);
+      expect(screen.getByRole('region', { name: 'Headlines' })).toBeInTheDocument();
+      const { unmount } = render(<HeadlinesTab headlines={[headline]} isLoading={false} error={null} onRegenerate={async () => {}} embedded />);
+      expect(screen.queryByRole('heading', { name: 'Account Headlines' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Regenerate/ })).toBeInTheDocument();
+      unmount();
+      render(<HeadlinesTab headlines={[headline]} isLoading={false} error={null} />);
+      expect(screen.getByRole('heading', { name: 'Account Headlines' })).toBeInTheDocument();
+    });
+
     it('HeadlinesTab: embedded is a card with no scroll area; the default keeps its own', () => {
       const { container, unmount } = render(<HeadlinesTab headlines={[headline]} isLoading={false} error={null} embedded />);
       expect(container.firstElementChild).toHaveClass('rounded-xl', 'px-5', 'py-4');
