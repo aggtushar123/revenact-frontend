@@ -48,7 +48,13 @@ function renderStream(story: StoryState, filtered = false) {
 const row = (key: string) => document.querySelector(`[data-story-item="${key}"]`) as HTMLElement;
 
 describe('StoryStream (spec §1.6 "Stream")', () => {
-  afterEach(() => vi.unstubAllGlobals());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  /** jsdom lays nothing out: make every one-line summary read as clipped. */
+  const clipSummaries = () => vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockReturnValue(500);
 
   it('groups the items by day, newest first', () => {
     renderStream(state());
@@ -100,6 +106,7 @@ describe('StoryStream (spec §1.6 "Stream")', () => {
   });
 
   it('opens an email with no thread in place, links only http(s), and has no toggle with nothing to show', async () => {
+    clipSummaries();
     const onDay = { occurred_at: '2026-09-20T00:00:00+00:00', all_day: true };
     const items: StoryItem[] = [
       { ...STORY_ITEMS[0], id: 59, title: 'Logged email', summary: 'Typed in Revenact.', source: 'revenact', link: { thread_id: null, url: null } },
@@ -171,5 +178,35 @@ describe('StoryStream (spec §1.6 "Stream")', () => {
     expect(io.watching(document.querySelector('[data-sentinel]') as Element)).toBe(false);
     await userEvent.click(screen.getByRole('button', { name: 'Show more' }));
     expect(story.loadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers no toggle when the summary fits its line and there is no link', () => {
+    const items: StoryItem[] = [{ ...STORY_ITEMS[3], id: 70, kind: 'note', title: 'Short note', summary: 'Fits.', link: { thread_id: null, url: null } }];
+    renderStream(state({ items }));
+    expect(within(row('note:70')).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(row('note:70')).getByText('Short note')).toBeInTheDocument();
+  });
+
+  it('offers the toggle when the summary is cut off, or runs to more lines', async () => {
+    const items: StoryItem[] = [
+      { ...STORY_ITEMS[3], id: 71, kind: 'note', title: 'Two lines', summary: 'First.\nSecond.', link: { thread_id: null, url: null } },
+    ];
+    renderStream(state({ items }));
+    await userEvent.click(within(row('note:71')).getByRole('button', { name: 'Two lines' }));
+    expect(within(row('note:71')).getByRole('button', { name: 'Two lines' })).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('offers the toggle when the one-line summary is clipped', () => {
+    clipSummaries();
+    const items: StoryItem[] = [{ ...STORY_ITEMS[3], id: 72, kind: 'note', title: 'Long note', summary: 'A long summary.', link: { thread_id: null, url: null } }];
+    renderStream(state({ items }));
+    expect(within(row('note:72')).getByRole('button', { name: 'Long note' })).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it("ellipsizes a long account tag (a block that can shrink, not a flex box)", () => {
+    renderStream(state());
+    const tag = within(row('ticket:88')).getByText(/^(EMEA|North America|Organization)$/);
+    expect(tag).toHaveClass('inline-block', 'min-w-0', 'truncate');
+    expect(tag).not.toHaveClass('inline-flex');
   });
 });

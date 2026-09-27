@@ -80,4 +80,18 @@ describe('AccountChips (spec §1.4)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
     expect(onRetry).toHaveBeenCalledOnce();
   });
+
+  it('keeps the chips, Edit and Add account in one wrapping row from sm', () => {
+    renderChips({ selected: '31' });
+    const group = screen.getByRole('group', { name: 'Filter by account' });
+    expect(group).toHaveClass('sm:contents');
+    expect(group.parentElement).toHaveClass('flex', 'flex-wrap');
+    expect(screen.getByRole('button', { name: 'Edit EMEA' }).parentElement).toBe(group.parentElement);
+    expect(screen.getByRole('button', { name: 'Add account' }).parentElement).toBe(group.parentElement);
+  });
+
+  it('gives each chip a 44px target below sm and 36px from sm', () => {
+    renderChips();
+    for (const chip of chips()) expect(chip).toHaveClass('min-h-11', 'sm:min-h-9');
+  });
 });

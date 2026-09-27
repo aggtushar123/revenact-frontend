@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type ReactNode } from 'react';
 import { CircleAlert } from 'lucide-react';
 import { formatDate } from '../../../features/customers/formatters';
 import type { DetailTab } from '../../../features/organizations/detailParams';
@@ -9,16 +9,22 @@ import { FOCUS } from '../portfolio/styles';
 interface Row {
   key: string;
   tone: string;
-  text: string;
-  /** The main text is a count in words (a renewal countdown, a number of
-   *  tickets/tasks/questions): render it in DM Mono, as the List does. The
-   *  anomaly's title is server prose, not a count, and stays plain. */
-  numeric?: boolean;
+  /** The main text. Its numbers are `<Num>` (DM Mono), its words the body
+   *  font; the anomaly's title is server prose and stays plain. */
+  text: ReactNode;
   detail?: string;
   action?: () => void;
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+function Num({ children }: { children: ReactNode }) {
+  return <span className="font-mono-brand tabular-nums">{children}</span>;
+}
+
+const plural = (n: number, one: string, many: string) => (
+  <>
+    <Num>{n}</Num> {n === 1 ? one : many}
+  </>
+);
 
 /** Needs attention (spec §1.6), shown only when something does. Each row
  *  says what it is in words and, where there is one, goes to it. */
@@ -40,8 +46,17 @@ export function AttentionBlock({
     rows.push({
       key: 'renewal',
       tone: renewal.overdue ? 'text-danger' : 'text-warning',
-      text: renewal.overdue ? `Renewal ${-renewal.days}d overdue` : renewal.days === 0 ? 'Renews today' : `Renews in ${renewal.days}d`,
-      numeric: true,
+      text: renewal.overdue ? (
+        <>
+          Renewal <Num>{-renewal.days}d</Num> overdue
+        </>
+      ) : renewal.days === 0 ? (
+        'Renews today'
+      ) : (
+        <>
+          Renews in <Num>{renewal.days}d</Num>
+        </>
+      ),
       detail: formatDate(renewal.date),
       action: () => onJump('contract'),
     });
@@ -51,7 +66,6 @@ export function AttentionBlock({
       key: 'tickets',
       tone: 'text-danger',
       text: plural(tickets.count, 'open High or Critical ticket', 'open High or Critical tickets'),
-      numeric: true,
       detail: `oldest ${tickets.oldest_days}d`,
       action: () => onFilter('tickets'),
     });
@@ -61,7 +75,6 @@ export function AttentionBlock({
       key: 'tasks',
       tone: 'text-danger',
       text: plural(overdue_tasks.count, 'overdue task', 'overdue tasks'),
-      numeric: true,
       detail: `oldest ${overdue_tasks.oldest_days}d`,
       action: () => onFilter('tasks'),
     });
@@ -71,7 +84,6 @@ export function AttentionBlock({
       key: 'questions',
       tone: 'text-warning',
       text: plural(questions.count, 'unanswered question', 'unanswered questions'),
-      numeric: true,
       action: () => onOpenTab('knowledge'),
     });
   }
@@ -97,7 +109,9 @@ export function AttentionBlock({
           const content = (
             <>
               <CircleAlert className={`h-4 w-4 shrink-0 ${row.tone}`} aria-hidden="true" />
-              <span className={`min-w-0 truncate text-ink ${row.numeric ? 'font-mono-brand tabular-nums' : ''}`}>{row.text}</span>
+              <span data-main="" className="min-w-0 truncate text-ink">
+                {row.text}
+              </span>
               {row.detail ? (
                 <>
                   {' · '}

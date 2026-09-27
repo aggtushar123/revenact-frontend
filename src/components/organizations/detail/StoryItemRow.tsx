@@ -1,4 +1,4 @@
-import { useId, useState } from 'react';
+import { useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   Activity,
   CalendarDays,
@@ -55,7 +55,24 @@ export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEma
   const Icon = ICON[item.kind] ?? Activity;
   const time = timeLabel(item);
   const threaded = item.kind === 'email' && Boolean(item.link.thread_id);
-  const expandable = !threaded && Boolean(item.summary || item.link.url);
+  // Opening in place shows the whole summary and the link, so it is offered
+  // only when there is more than the row already shows: a link, a summary of
+  // several lines, or one cut off at the row's width (measured, and again
+  // when the row resizes).
+  const summaryRef = useRef<HTMLParagraphElement>(null);
+  const [clipped, setClipped] = useState(false);
+  useLayoutEffect(() => {
+    const line = summaryRef.current;
+    if (!line) return;
+    const measure = () => setClipped(line.scrollWidth > line.clientWidth);
+    measure();
+    if (typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(line);
+    return () => observer.disconnect();
+  }, [item.summary, expanded]);
+  const linked = /^https?:\/\//i.test(item.link.url ?? '');
+  const expandable = !threaded && (linked || item.summary.includes('\n') || clipped);
   const source = sourceName(item.source);
   const meta = [KIND_NAME[item.kind] ?? 'Record', item.actor?.name, source ? `via ${source}` : null]
     .filter(Boolean)
@@ -101,10 +118,12 @@ export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEma
             <ItemLink item={item} />
           </div>
         ) : item.summary ? (
-          <p className="truncate text-[13px] text-ink-muted">{item.summary}</p>
+          <p ref={summaryRef} className="truncate text-[13px] text-ink-muted">
+            {item.summary}
+          </p>
         ) : null}
         <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-muted">
-          <span className="inline-flex max-w-[10rem] truncate rounded-full bg-subtle px-2 py-0.5 text-ink">
+          <span className="inline-block min-w-0 max-w-[10rem] truncate rounded-full bg-subtle px-2 py-0.5 text-ink">
             {item.account?.name ?? 'Organization'}
           </span>
           <span className="min-w-0 truncate">{meta}</span>

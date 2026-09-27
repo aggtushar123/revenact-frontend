@@ -11,6 +11,10 @@ function renderBlock(attention: StoryAttention = PIZZA_ATTENTION) {
   return { ...handlers, container };
 }
 
+/** A row's main text, whole, though its numbers are their own elements. */
+const main = (text: string) =>
+  screen.getByText((_, el) => el?.tagName === 'SPAN' && el.hasAttribute('data-main') && el.textContent === text);
+
 describe('AttentionBlock (spec §1.6 "Needs attention")', () => {
   it('lists each thing that needs attention, in words', () => {
     renderBlock();
@@ -30,7 +34,7 @@ describe('AttentionBlock (spec §1.6 "Needs attention")', () => {
       renewal: { date: '2026-10-10', days: 14, overdue: false },
       anomaly: { id: 9, title: 'Logins fell 60%', first_seen_at: '2026-09-20T08:00:00+00:00', last_seen_at: '2026-09-21T08:00:00+00:00' },
     });
-    expect(screen.getByText('Renews in 14d')).toBeInTheDocument();
+    expect(main('Renews in 14d')).toBeInTheDocument();
     expect(screen.getByText('Logins fell 60%')).toBeInTheDocument();
   });
 
@@ -53,22 +57,28 @@ describe('AttentionBlock (spec §1.6 "Needs attention")', () => {
 
   it('colours an overdue renewal and overdue tasks as danger, and a renewal due soon as warning', () => {
     renderBlock();
-    const overdueRenewalRow = screen.getByText('Renewal 47d overdue').closest('li');
-    const overdueTasksRow = screen.getByText('1 overdue task').closest('li');
+    const overdueRenewalRow = main('Renewal 47d overdue').closest('li');
+    const overdueTasksRow = main('1 overdue task').closest('li');
     expect(overdueRenewalRow?.querySelector('svg')).toHaveClass('text-danger');
     expect(overdueTasksRow?.querySelector('svg')).toHaveClass('text-danger');
 
     renderBlock({ ...QUIET_ATTENTION, renewal: { date: '2026-10-10', days: 14, overdue: false } });
-    const dueSoonRow = screen.getByText('Renews in 14d').closest('li');
+    const dueSoonRow = main('Renews in 14d').closest('li');
     expect(dueSoonRow?.querySelector('svg')).toHaveClass('text-warning');
   });
 
-  it('sets the numbers in each row\'s main text in DM Mono', () => {
+  it('sets only the numbers in each row\'s main text in DM Mono, the words in the body font', () => {
     renderBlock();
-    expect(screen.getByText('Renewal 47d overdue')).toHaveClass('font-mono-brand', 'tabular-nums');
-    expect(screen.getByText('2 open High or Critical tickets')).toHaveClass('font-mono-brand', 'tabular-nums');
-    expect(screen.getByText('1 overdue task')).toHaveClass('font-mono-brand', 'tabular-nums');
-    expect(screen.getByText('3 unanswered questions')).toHaveClass('font-mono-brand', 'tabular-nums');
+    for (const [text, number] of [
+      ['Renewal 47d overdue', '47d'],
+      ['2 open High or Critical tickets', '2'],
+      ['1 overdue task', '1'],
+      ['3 unanswered questions', '3'],
+    ]) {
+      const phrase = main(text);
+      expect(phrase).not.toHaveClass('font-mono-brand');
+      expect(within(phrase).getByText(number)).toHaveClass('font-mono-brand', 'tabular-nums');
+    }
     // The anomaly's title is server prose, not a count: it stays plain.
     expect(screen.getByText('Similar reports across 1 of your companies')).not.toHaveClass('font-mono-brand');
   });

@@ -1,6 +1,6 @@
 import { FOCUS } from '../portfolio/styles';
 
-const CHIP = `inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] sm:min-h-8 ${FOCUS}`;
+const CHIP = `inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[13px] sm:min-h-9 ${FOCUS}`;
 
 /** A pressable chip with an optional count: the account chips and the
  *  story's filters. The chosen one is the monochrome primary. */

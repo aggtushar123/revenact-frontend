@@ -18,13 +18,25 @@ const InFrame = createContext(false);
  *  in this frame, which inside the layout passes their content straight
  *  through, and on its own (a page rendered alone) draws the frame without
  *  a rail, the content taking the full width. */
-export function OrganizationsFrame({ rail = null, children }: { rail?: ReactNode; children: ReactNode }) {
+export function OrganizationsFrame({
+  rail = null,
+  bleed = false,
+  children,
+}: {
+  rail?: ReactNode;
+  /** Below sm, the 16px side gutter sits inside the scroll column instead of
+   *  around it, so a strip that bleeds with `-mx-4` (the organization page's
+   *  tiles, filters and tabs) reaches the screen edge exactly and never
+   *  makes the column scroll sideways. */
+  bleed?: boolean;
+  children: ReactNode;
+}) {
   const inFrame = useContext(InFrame);
   if (inFrame) return <>{children}</>;
   return (
     <InFrame.Provider value={true}>
-      <div className="relative flex-1 min-h-0 w-full flex gap-3 px-4 pb-4">
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col">{children}</div>
+      <div className={`relative flex-1 min-h-0 w-full flex gap-3 pb-4 ${bleed ? 'px-0 sm:px-4' : 'px-4'}`}>
+        <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col ${bleed ? 'px-4 sm:px-0' : ''}`}>{children}</div>
         {rail}
       </div>
     </InFrame.Provider>

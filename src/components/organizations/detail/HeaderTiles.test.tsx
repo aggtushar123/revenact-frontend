@@ -87,5 +87,7 @@ describe('HeaderTiles (spec §1.3)', () => {
     const strip = screen.getByRole('button', { name: /^ARR/ }).parentElement;
     expect(strip).toHaveClass('overflow-x-auto', 'snap-x', 'snap-mandatory');
     expect(strip).not.toHaveClass('grid');
+    // Snap points sit inside the 16px gutter, so the strip starts unscrolled.
+    expect(strip).toHaveClass('scroll-px-4');
   });
 });

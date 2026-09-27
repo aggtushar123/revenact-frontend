@@ -51,7 +51,10 @@ export function AccountChips({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <div role="group" aria-label="Filter by account" className="flex min-w-0 max-w-full gap-2 overflow-x-auto sm:flex-wrap">
+      {/* From sm the group lends its chips to the row (display: contents), so
+          chips, Edit and Add account wrap as one row; on phones the chips
+          scroll sideways and the two actions follow. */}
+      <div role="group" aria-label="Filter by account" className="flex min-w-0 max-w-full gap-2 overflow-x-auto sm:contents">
         {loading && accounts.length === 0 ? (
           <span role="status" aria-label="Loading accounts" className="flex gap-2">
             {[0, 1, 2].map((i) => (

@@ -40,7 +40,7 @@ export function HeaderTiles({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className={isSm ? 'grid grid-cols-4 gap-3' : '-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4'}>
+      <div className={isSm ? 'grid grid-cols-4 gap-3' : '-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4'}>
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}

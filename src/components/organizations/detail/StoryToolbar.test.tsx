@@ -97,4 +97,16 @@ describe('StoryToolbar (spec §1.6)', () => {
     renderToolbar({ isSm: false });
     expect(screen.getByRole('group', { name: 'Show' })).toHaveClass('overflow-x-auto');
   });
+
+  it('gives the search its own full-width line on phones, with Sources and + Add on the next', () => {
+    renderToolbar({ isSm: false });
+    const search = screen.getByRole('search');
+    expect(search).toHaveClass('w-full');
+    expect(search.parentElement).not.toContainElement(screen.getByRole('button', { name: 'Add to the story' }));
+  });
+
+  it('keeps the search, Sources and + Add on one line from sm', () => {
+    renderToolbar({ isSm: true });
+    expect(screen.getByRole('search').parentElement).toContainElement(screen.getByRole('button', { name: 'Add to the story' }));
+  });
 });

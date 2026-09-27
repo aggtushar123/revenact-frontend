@@ -133,7 +133,13 @@ function AccountItem({
   const ai = account.ai_pulse_value;
   const csm = account.csm_pulse_score;
   const healthScore = Number(account.health_score);
-  const healthText = Number.isNaN(healthScore) ? DASH : `${healthScore.toFixed(1)} ${HEALTH_LABEL[account.health_category]}`;
+  const healthText = Number.isNaN(healthScore) ? (
+    <Num>{DASH}</Num>
+  ) : (
+    <>
+      <Num>{healthScore.toFixed(1)}</Num> {HEALTH_LABEL[account.health_category]}
+    </>
+  );
   const lifecycleText = LIFECYCLE_LABELS[account.lifecycle_stage] ?? 'Other';
   const renewal = renewalInfo(account.renewal_date, today);
   return (
@@ -151,7 +157,7 @@ function AccountItem({
            round-1 fix, 2026-09-27: these used to live only in the old
            Accounts tab's table/banner and would otherwise be lost. */}
         <p className="mt-1 flex flex-wrap items-baseline gap-x-1 gap-y-0.5 text-[11px] text-ink-muted">
-          <span>Health <Num>{healthText}</Num></span>
+          <span>Health {healthText}</span>
           <span>· {lifecycleText}</span>
           <span>· <Num>{formatCompactMoney(account.arr, currency)}</Num> ARR</span>
           <span className={renewal.overdue ? 'font-semibold text-danger' : undefined}>· {renewal.text}</span>
@@ -162,8 +168,8 @@ function AccountItem({
         <p className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-muted">
           {/* The List's own "AI n · CSM n" form (round-2 fix, 2026-09-27:
              csm_pulse_score was being dropped too). */}
-          <span className="font-mono-brand tabular-nums text-ink">
-            AI {ai == null ? '—' : ai} · CSM {csm == null ? '—' : csm}
+          <span className="text-ink">
+            AI <Num>{ai == null ? DASH : ai}</Num> · CSM <Num>{csm == null ? DASH : csm}</Num>
           </span>
           {account.ai_pulse_score ? <span>{AI_PULSE_LABELS[account.ai_pulse_score]}</span> : null}
           {account.pulse.length ? <PulseDots history={account.pulse} /> : null}

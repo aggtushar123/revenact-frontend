@@ -269,7 +269,7 @@ describe('the organization page (/organizations/:id)', () => {
     expect(postBodies(spy, '/customers/7/accounts/31/tasks/')).toEqual([
       { title: 'Book the retraining', due_date: '2026-10-01', priority: 'medium', assignee_id: null },
     ]);
-    expect(await screen.findByRole('button', { name: 'Book the retraining' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 3, name: 'Book the retraining' })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: 'EMEA 2' })).toBeInTheDocument();
     expect(screen.getByText('Added to the story.')).toBeInTheDocument();
   });
@@ -400,6 +400,9 @@ describe('the organization page (/organizations/:id)', () => {
     const strip = screen.getByRole('button', { name: /^ARR/ }).parentElement;
     expect(strip).toHaveClass('overflow-x-auto', 'snap-x');
     expect(strip).not.toHaveClass('grid');
+    // The phone gutter is inside the scroll column: the strips' -mx-4 bleeds
+    // to the screen edge and never makes the column scroll sideways.
+    expect(strip?.closest('.overflow-y-auto')).toHaveClass('px-4', 'sm:px-0');
     expect(screen.getByRole('tablist')).toHaveClass('overflow-x-auto');
     await userEvent.click(await screen.findByRole('button', { name: 'Add to the story' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'New note' }));

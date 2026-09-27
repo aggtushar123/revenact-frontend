@@ -21,6 +21,10 @@ function renderSection(props: Partial<ComponentProps<typeof AccountsSection>> = 
   return handlers;
 }
 
+/** The deepest element whose whole text is `text` (its numbers may be their own elements). */
+const whole = (text: string) => (_: string, el: Element | null) =>
+  el?.textContent === text && [...el.children].every((child) => child.textContent !== text);
+
 const item = (id: number) => document.querySelector(`[data-account="${id}"]`) as HTMLElement;
 
 describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)', () => {
@@ -32,7 +36,7 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
     const emea = item(31);
     expect(within(emea).getByRole('link', { name: 'EMEA' })).toHaveAttribute('href', '/accounts/31');
     expect(within(emea).getByText('Carl CSM · emea.pizzahut.example')).toBeInTheDocument();
-    expect(within(emea).getByText('AI 4 · CSM 5')).toBeInTheDocument();
+    expect(within(emea).getByText(whole('AI 4 · CSM 5'))).toBeInTheDocument();
     expect(within(emea).getByText('Satisfied')).toBeInTheDocument();
     expect(within(emea).getByRole('img', { name: 'Pulse history: good, good, mixed' })).toBeInTheDocument();
     expect(within(emea).getByText('Usage is steady and the renewal talks are friendly.')).toBeInTheDocument();
@@ -40,7 +44,7 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
     const na = item(32);
     expect(within(na).getByRole('link', { name: 'North America' })).toHaveAttribute('href', '/accounts/32');
     expect(within(na).getByText('No owner')).toBeInTheDocument();
-    expect(within(na).getByText('AI — · CSM —')).toBeInTheDocument();
+    expect(within(na).getByText(whole('AI — · CSM —'))).toBeInTheDocument();
     expect(within(na).queryByRole('img')).not.toBeInTheDocument();
   });
 
@@ -64,8 +68,8 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
   // CSM n" and this item should match that form exactly.
   it("shows the CSM pulse beside the AI pulse, in the List's own \"AI n · CSM n\" form", () => {
     renderSection();
-    expect(within(item(31)).getByText('AI 4 · CSM 5')).toBeInTheDocument();
-    expect(within(item(32)).getByText('AI — · CSM —')).toBeInTheDocument();
+    expect(within(item(31)).getByText(whole('AI 4 · CSM 5'))).toBeInTheDocument();
+    expect(within(item(32)).getByText(whole('AI — · CSM —'))).toBeInTheDocument();
   });
 
   it('shows "—" for any blank health, lifecycle, renewal, NPS or CSAT value, never an invented one', () => {
@@ -196,5 +200,16 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
     renderSection({ items: [] });
     expect(screen.getByText('No accounts yet')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Add account' })).toBeInTheDocument();
+  });
+
+  it('sets only the numbers of the meta lines in DM Mono, the words in the body font', () => {
+    renderSection();
+    const mono = (el: Element) => el.closest('.font-mono-brand') !== null;
+    const emea = item(31);
+    expect(mono(within(emea).getByText('8.6'))).toBe(true);
+    expect(mono(within(emea).getByText(whole('Health 8.6 Good')))).toBe(false);
+    expect(mono(within(emea).getByText('4'))).toBe(true);
+    expect(mono(within(emea).getByText('5'))).toBe(true);
+    expect(mono(within(emea).getByText(whole('AI 4 · CSM 5')))).toBe(false);
   });
 });

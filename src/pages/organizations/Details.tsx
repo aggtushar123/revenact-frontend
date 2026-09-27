@@ -52,7 +52,7 @@ async function archiveOrganization(id: number): Promise<void> {
 
 function Centered({ children }: { children: ReactNode }) {
   return (
-    <OrganizationsFrame>
+    <OrganizationsFrame bleed>
       <div className="mx-auto w-full max-w-6xl py-6">{children}</div>
     </OrganizationsFrame>
   );
@@ -193,7 +193,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
   const row = org.row;
   const tab = params.tab;
   return (
-    <OrganizationsFrame>
+    <OrganizationsFrame bleed>
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 pb-6">
         {row ? (
           <section data-part="header" aria-label="Organization summary" className="flex flex-col gap-3">

@@ -64,7 +64,8 @@ describe('the organization page, end to end (spec §5)', () => {
     // 5. It is in the story, filed under EMEA, and the chip counts it.
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(postBodies(spy, '/customers/7/accounts/31/tasks/')).toHaveLength(1);
-    const added = await screen.findByRole('button', { name: 'Send the EMEA quote' });
+    // Its one-line summary fits, so its title is plain text, not a toggle.
+    const added = await screen.findByRole('heading', { level: 3, name: 'Send the EMEA quote' });
     expect(added.closest('[data-story-item]')).toHaveTextContent('EMEA');
     expect(await screen.findByRole('button', { name: 'EMEA 2' })).toHaveAttribute('aria-pressed', 'true');
 
