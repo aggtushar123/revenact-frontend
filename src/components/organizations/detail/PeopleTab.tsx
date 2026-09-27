@@ -12,5 +12,5 @@ export function PeopleTab({ customerId }: { customerId: number }) {
   useEffect(() => {
     dispatch(fetchContactsForCustomer(customerId));
   }, [dispatch, customerId]);
-  return <ContactsTab contacts={contacts} isLoading={contactsLoading} error={contactsError} customerId={customerId} />;
+  return <ContactsTab contacts={contacts} isLoading={contactsLoading} error={contactsError} customerId={customerId} embedded />;
 }

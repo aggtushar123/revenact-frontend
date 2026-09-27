@@ -11,6 +11,9 @@ const BAND_TONE: Record<string, string> = {
   very_dissatisfied: 'bg-danger',
 };
 
+/** Label, bar, then count · share in a fixed, right-aligned column. */
+const BAND_ROW = 'grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_7rem]';
+
 const LINK = `flex min-h-11 min-w-0 max-w-full items-center truncate rounded-sm text-ink underline sm:min-h-0 ${FOCUS}`;
 
 /** An address with `?`, `&` or `#` anywhere could carry its own mailto
@@ -46,12 +49,14 @@ function CsatSpread({ breakdown }: { breakdown: CsatBreakdown }) {
       ) : (
         <ul aria-label="CSAT responses by band" className="flex flex-col gap-1.5">
           {bands.map((band) => (
-            <li key={band.key} className="grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_auto] items-center gap-3 text-[13px]">
+            // One template for every row, the count column a fixed width, so
+            // every bar starts and ends at the same x whatever the counts say.
+            <li key={band.key} className={`${BAND_ROW} items-center gap-3 text-[13px]`}>
               <span className="truncate text-ink-muted">{band.label}</span>
               <span aria-hidden="true" className="h-1.5 overflow-hidden rounded-full bg-line">
                 <span data-share="" className={`block h-full ${BAND_TONE[band.key] ?? 'bg-line-strong'}`} style={{ width: `${band.share}%` }} />
               </span>
-              <span className="font-mono-brand tabular-nums text-ink">
+              <span data-count="" className="text-right font-mono-brand tabular-nums text-ink">
                 {band.count} · {band.share}%
               </span>
             </li>
@@ -99,7 +104,9 @@ export function CustomerFacts({
           ))}
         </div>
       ) : (
-        <div data-facts="" className={`grid gap-x-8 gap-y-4 ${stacked ? '' : 'md:grid-cols-2'}`}>
+        // The panels' grid above (AccountDetails): halves at md, thirds at xl,
+        // where contact takes the first third and CSAT the other two.
+        <div data-facts="" className={`grid gap-x-8 gap-y-4 ${stacked ? '' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
           <dl className="grid grid-cols-[6rem_minmax(0,1fr)] content-start gap-x-3 gap-y-1.5 text-[13px]">
             <Fact term="Email">
               {customer.email && UNSAFE_EMAIL.test(customer.email) ? (
@@ -123,7 +130,9 @@ export function CustomerFacts({
             </Fact>
             <Fact term="Industry">{customer.industry || '—'}</Fact>
           </dl>
-          <CsatSpread breakdown={customer.csat_breakdown} />
+          <div data-csat="" className={`min-w-0 ${stacked ? '' : 'xl:col-span-2'}`}>
+            <CsatSpread breakdown={customer.csat_breakdown} />
+          </div>
         </div>
       )}
     </section>

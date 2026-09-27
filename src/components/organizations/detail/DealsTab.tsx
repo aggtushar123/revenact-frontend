@@ -28,6 +28,7 @@ export function DealsTab({ customerId }: { customerId: number }) {
       risksLoading={pipelineRisksLoading}
       risksError={pipelineRisksError}
       customerId={customerId}
+      embedded
     />
   );
 }

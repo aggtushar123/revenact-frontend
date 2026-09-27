@@ -35,6 +35,9 @@ export interface HeadlinesTabProps {
   /** Shown as a banner above the cards, not in place of them — a failed
    * regenerate leaves the existing cards perfectly readable. */
   regenerateError?: string | null;
+  /** Inside a page that scrolls on its own (the organization page): a card
+   *  like its neighbours, with no scroll area of its own. Off by default. */
+  embedded?: boolean;
 }
 
 export function HeadlinesTab({
@@ -44,6 +47,7 @@ export function HeadlinesTab({
   onRegenerate,
   isRegenerating = false,
   regenerateError = null,
+  embedded = false,
 }: HeadlinesTabProps) {
   const [confirming, setConfirming] = useState(false);
   const summaryItems = headlines.filter((item) => item.kind === 'summary');
@@ -138,7 +142,13 @@ export function HeadlinesTab({
   }
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar bg-surface font-sans p-6 md:p-8">
+    <div
+      className={
+        embedded
+          ? 'bg-surface font-sans rounded-xl border border-line-subtle shadow-sm px-5 py-4'
+          : 'flex-1 overflow-y-auto custom-scrollbar bg-surface font-sans p-6 md:p-8'
+      }
+    >
       {/* Title Header */}
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-2">

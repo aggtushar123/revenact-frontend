@@ -45,6 +45,11 @@ export interface PipelinesTabProps {
    * account instead of an organization-level one. Omitted on the
    * Organization Details page's own Pipelines tab. */
   accountId?: number;
+  /** Inside a page that already sets the column (the organization page):
+   *  no scroll area, side padding or max width of its own, so the stats
+   *  strip and the table span the page's edges. Off by default, so every
+   *  other route renders as before. */
+  embedded?: boolean;
 }
 
 // Shared between the Organization Details page's own Pipelines tab and
@@ -68,6 +73,7 @@ export function PipelinesTab({
   risksError,
   customerId,
   accountId,
+  embedded = false,
 }: PipelinesTabProps) {
   const dispatch = useAppDispatch();
   const currency = useOrgCurrency();
@@ -146,10 +152,12 @@ export function PipelinesTab({
   const showAccountColumn = accountId === undefined;
   const columnCount = showAccountColumn ? 5 : 4;
 
+  const widthClass = embedded ? 'w-full' : 'max-w-7xl w-full mx-auto';
+
   return (
-    <div className="flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar p-6 pt-2">
+    <div className={embedded ? 'flex flex-col gap-6' : 'flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar p-6 pt-2'}>
       {/* Summary Banner */}
-      <div className="max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-4 gap-4 bg-surface p-4 rounded-2xl border border-line-subtle shadow-sm shrink-0">
+      <div className={`${widthClass} grid grid-cols-1 md:grid-cols-4 gap-4 bg-surface p-4 rounded-2xl border border-line-subtle shadow-sm shrink-0`}>
         {activeSubTab === 'opportunities' ? (
           <>
             <PipelineStatCard title="Total Opportunities" value={opportunityStats.total.toString()} subtext="Across every stage" icon={<Target className="w-4 h-4 text-accent" />} />
@@ -168,7 +176,7 @@ export function PipelinesTab({
       </div>
 
       {/* Action Bar & Table */}
-      <div className="max-w-7xl w-full mx-auto bg-surface rounded-2xl border border-line-subtle shadow-sm flex flex-col overflow-hidden">
+      <div className={`${widthClass} bg-surface rounded-2xl border border-line-subtle shadow-sm flex flex-col overflow-hidden`}>
         {/* Sub-tabs */}
         <div className="px-4 pt-3 flex items-center gap-4 border-b border-line-subtle">
           <button

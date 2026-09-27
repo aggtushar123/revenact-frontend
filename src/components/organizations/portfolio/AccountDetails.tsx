@@ -57,12 +57,14 @@ function Pairs({
   tone?: Partial<Record<ColumnId, string>>;
 }) {
   return (
-    <dl className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-1.5 text-[13px]">
+    // The label column fits its longest label (up to 60%), and a long value
+    // wraps in the rest: a label is never cut short by its value.
+    <dl className="grid grid-cols-[fit-content(60%)_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-[13px]">
       {ids.map((id) => {
         const field = PORTFOLIO_FIELDS[id];
         return (
           <Fragment key={id}>
-            <dt className="truncate text-ink-muted">{field.label}</dt>
+            <dt className="break-words text-ink-muted">{field.label}</dt>
             <dd
               data-field={id}
               className={`text-right break-words ${mono ? 'font-mono-brand tabular-nums' : ''} ${tone[id] ?? 'text-ink'}`}

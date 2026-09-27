@@ -50,10 +50,15 @@ async function archiveOrganization(id: number): Promise<void> {
   if (failure) throw failure;
 }
 
+/** The page's column: the full width inside the frame's gutter (owner,
+ *  2026-09-27). The cap binds only past about 1920px, where lines would
+ *  otherwise stretch. Header, tiles, tabs and every panel share its edges. */
+const PAGE_COLUMN = 'mx-auto w-full max-w-[1800px]';
+
 function Centered({ children }: { children: ReactNode }) {
   return (
     <OrganizationsFrame bleed>
-      <div className="mx-auto w-full max-w-6xl py-6">{children}</div>
+      <div className={`${PAGE_COLUMN} py-6`}>{children}</div>
     </OrganizationsFrame>
   );
 }
@@ -194,7 +199,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
   const tab = params.tab;
   return (
     <OrganizationsFrame bleed>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 pb-6">
+      <div data-part="column" className={`${PAGE_COLUMN} flex flex-col gap-3 pb-6`}>
         {row ? (
           <section data-part="header" aria-label="Organization summary" className="flex flex-col gap-3">
             <OrganizationHeader

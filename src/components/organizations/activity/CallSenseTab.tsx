@@ -245,9 +245,13 @@ export interface CallSenseTabProps {
   customerId?: number;
   /** A change reads the calls again (a call logged elsewhere on the page). */
   version?: number;
+  /** Inside a page that scrolls on its own (the organization page): the
+   *  list grows with its calls instead of scrolling inside itself. Off by
+   *  default, so the account page's feed keeps its own scroll. */
+  embedded?: boolean;
 }
 
-export function CallSenseTab({ entityType, entityId, customerId, version = 0 }: CallSenseTabProps) {
+export function CallSenseTab({ entityType, entityId, customerId, version = 0, embedded = false }: CallSenseTabProps) {
   const dispatch = useAppDispatch();
   const { items, isLoading, error, saving, saveError } = useAppSelector((s) => s.calls);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -305,7 +309,7 @@ export function CallSenseTab({ entityType, entityId, customerId, version = 0 }: 
   }
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-surface">
+    <div className={embedded ? 'flex flex-col bg-surface' : 'flex-1 flex flex-col overflow-hidden bg-surface'}>
       {parent && <LogCallForm onLog={onLog} saving={saving} error={saveError} contacts={contacts} />}
       {items.length > 0 && (
         <div className="px-6 py-2.5 border-b border-line-subtle flex items-center gap-5 text-[13px] text-ink-muted shrink-0 flex-wrap" aria-label="Call stats">
@@ -316,7 +320,7 @@ export function CallSenseTab({ entityType, entityId, customerId, version = 0 }: 
           <span className="text-danger"><strong>{stats.negative}</strong> negative</span>
         </div>
       )}
-      <div className="flex-1 overflow-y-auto custom-scrollbar relative px-8 py-6 bg-subtle/40">
+      <div data-calls-list="" className={`${embedded ? '' : 'flex-1 overflow-y-auto custom-scrollbar '}relative px-8 py-6 bg-subtle/40`}>
         {isLoading ? (
           <div className="py-16 text-center text-[13px] font-semibold text-ink-faint opacity-60">Loading calls…</div>
         ) : error ? (

@@ -34,6 +34,11 @@ export interface ContactsTabProps {
    * specific account instead of an organization-level one. Omitted on
    * the Organization Details page's own Contacts tab. */
   accountId?: number;
+  /** Inside a page that already sets the column (the organization page):
+   *  no scroll area, side padding or max width of its own, so the stats
+   *  strip and the table span the page's edges. Off by default, so every
+   *  other route renders as before. */
+  embedded?: boolean;
 }
 
 // Shared between the Organization Details page's own Contacts tab and
@@ -43,7 +48,7 @@ export interface ContactsTabProps {
 // Contact for one Account — see fetchContactsForCustomer/
 // fetchContactsForAccount in customersSlice.ts), so this one component
 // renders both rather than each page keeping its own copy.
-export function ContactsTab({ contacts, isLoading, error, customerId, accountId }: ContactsTabProps) {
+export function ContactsTab({ contacts, isLoading, error, customerId, accountId, embedded = false }: ContactsTabProps) {
   const dispatch = useAppDispatch();
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingContact, setIsAddingContact] = useState(false);
@@ -106,10 +111,12 @@ export function ContactsTab({ contacts, isLoading, error, customerId, accountId 
   const showAccountColumn = accountId === undefined;
   const columnCount = showAccountColumn ? 8 : 7;
 
+  const widthClass = embedded ? 'w-full' : 'max-w-7xl w-full mx-auto';
+
   return (
-    <div className="flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar p-6 pt-2">
+    <div className={embedded ? 'flex flex-col gap-6' : 'flex flex-col gap-6 h-full overflow-y-auto custom-scrollbar p-6 pt-2'}>
       {/* Contacts Summary Banner */}
-      <div className="max-w-7xl w-full mx-auto grid grid-cols-1 md:grid-cols-4 gap-4 bg-surface p-4 rounded-2xl border border-line-subtle shadow-sm shrink-0">
+      <div className={`${widthClass} grid grid-cols-1 md:grid-cols-4 gap-4 bg-surface p-4 rounded-2xl border border-line-subtle shadow-sm shrink-0`}>
         <ContactStatCard title="Total Contacts" value={stats.total.toString()} subtext="Across all departments" icon={<Layout className="w-4 h-4 text-accent" />} />
         <ContactStatCard title="Decision Makers" value={stats.decisionMakers.toString()} subtext="High influence" icon={<Sparkles className="w-4 h-4 text-accent" />} />
         <ContactStatCard title="Active Users" value={stats.active.toString()} subtext="Logged in last 30d" icon={<CheckCircle className="w-4 h-4 text-success" />} />
@@ -117,7 +124,7 @@ export function ContactsTab({ contacts, isLoading, error, customerId, accountId 
       </div>
 
       {/* Action Bar & Table */}
-      <div className="max-w-7xl w-full mx-auto bg-surface rounded-2xl border border-line-subtle shadow-sm flex flex-col overflow-hidden">
+      <div className={`${widthClass} bg-surface rounded-2xl border border-line-subtle shadow-sm flex flex-col overflow-hidden`}>
         <div className="p-4 border-b border-line-subtle bg-surface flex items-center justify-between gap-4">
            <div className="relative flex-1 max-w-2xl">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />

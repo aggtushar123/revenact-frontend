@@ -18,7 +18,7 @@ export function KnowledgeTab({ customerId, customerName }: { customerId: number;
   }, [dispatch, customerId]);
   return (
     <div className="flex flex-col gap-6">
-      <CompanyViewTab customerId={customerId} customerName={customerName} />
+      <CompanyViewTab customerId={customerId} customerName={customerName} embedded />
       <section aria-labelledby={headingId} className="flex flex-col gap-2">
         <h2 id={headingId} className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
           Headlines
@@ -32,6 +32,7 @@ export function KnowledgeTab({ customerId, customerName }: { customerId: number;
           }}
           isRegenerating={headlinesGenerating}
           regenerateError={headlinesGenerateError}
+          embedded
         />
       </section>
     </div>
