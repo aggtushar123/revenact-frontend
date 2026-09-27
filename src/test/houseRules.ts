@@ -43,6 +43,29 @@ export function sizeOffenders(source: string): string[] {
   return offenders;
 }
 
+/** Only the colour-token and type-size rules, for older shared files whose
+ *  other habits (e.g. an avatar image) belong to pages this suite does not
+ *  cover. */
+export function sizeAndTokenSuite(title: string, files: Record<string, string>): void {
+  const sources = Object.entries(files).filter(([file]) => !file.includes('.test.'));
+
+  describe(title, () => {
+    it('has sources to check', () => expect(sources.length).toBeGreaterThan(0));
+
+    it('uses tokens only: no hex, rgb() or named palette colours', () => {
+      expect(sources.filter(([, s]) => RAW.test(s)).map(([f]) => f)).toEqual([]);
+    });
+
+    it('uses only the 11/13/15/22 px type sizes', () => {
+      const offenders: string[] = [];
+      for (const [file, source] of sources) {
+        for (const bad of sizeOffenders(source)) offenders.push(`${file}: ${bad}`);
+      }
+      expect(offenders).toEqual([]);
+    });
+  });
+}
+
 /** The house rules over `files` (path → raw source); tests are skipped. */
 export function houseRuleSuite(title: string, files: Record<string, string>): void {
   const sources = Object.entries(files).filter(([file]) => !file.includes('.test.'));

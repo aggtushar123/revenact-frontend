@@ -1,8 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { FileText, MoreHorizontal, Sparkles } from 'lucide-react';
 import type { Note } from '../../../features/customers/customersSlice';
 import { formatDateUS } from '../../../features/customers/formatters';
 import { ApiError } from '../../../lib/apiClient';
+import { PRIMARY } from '../portfolio/styles';
+import { Field } from './FormField';
+import { CONTROL, FORM_ERROR } from './formStyles';
 
 
 export interface NotesTabProps {
@@ -26,6 +29,7 @@ export function NoteForm({
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const ids = useId();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -49,15 +53,19 @@ export function NoteForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2">
-      <input aria-label="Note title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-      <textarea aria-label="Note body" value={body} onChange={(e) => setBody(e.target.value)} placeholder="What do you want the team above you to know?" rows={4} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent resize-y" />
-      <div className="flex justify-end">
-        <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
+    <form onSubmit={submit} aria-label="New note" className="flex flex-col gap-3">
+      <Field id={`${ids}-title`} label="Note title">
+        <input id={`${ids}-title`} value={title} onChange={(e) => setTitle(e.target.value)} className={CONTROL} />
+      </Field>
+      <Field id={`${ids}-body`} label="Note body">
+        <textarea id={`${ids}-body`} value={body} onChange={(e) => setBody(e.target.value)} placeholder="What do you want the team above you to know?" rows={4} className={`${CONTROL} resize-y`} />
+      </Field>
+      <div>
+        <button type="submit" disabled={saving} className={PRIMARY}>
           {saving ? 'Saving…' : 'Save note'}
         </button>
       </div>
-      {error && <div className="text-[12px] text-danger font-semibold" role="alert">{error}</div>}
+      {error && <p className={FORM_ERROR} role="alert">{error}</p>}
     </form>
   );
 }
@@ -67,8 +75,8 @@ function NewNoteForm({ onCreate }: { onCreate: (note: { title: string; body: str
   return (
     <div className="px-6 py-2 border-b border-line-subtle flex flex-col gap-2 bg-surface">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[11.5px] text-ink-faint">Notes you write here are seen by you and your management chain only.</span>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold">
+        <span className="text-[11px] text-ink-faint">Notes you write here are seen by you and your management chain only.</span>
+        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[13px] font-bold">
           {open ? 'Cancel' : 'New note'}
         </button>
       </div>
@@ -91,7 +99,7 @@ export function NotesTab({ notes, isLoading, error, onCreate }: NotesTabProps) {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
-        <span className="text-sm font-semibold text-ink-faint">Loading notes…</span>
+        <span className="text-[13px] font-semibold text-ink-faint">Loading notes…</span>
       </div>
     );
   }
@@ -99,7 +107,7 @@ export function NotesTab({ notes, isLoading, error, onCreate }: NotesTabProps) {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-16">
-        <span className="text-sm font-semibold text-danger">{error}</span>
+        <span className="text-[13px] font-semibold text-danger">{error}</span>
       </div>
     );
   }
@@ -110,7 +118,7 @@ export function NotesTab({ notes, isLoading, error, onCreate }: NotesTabProps) {
         {onCreate && <NewNoteForm onCreate={onCreate} />}
         <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
           <FileText className="w-10 h-10 text-ink-faint mb-2" />
-          <span className="text-sm font-semibold text-ink-faint">No notes found</span>
+          <span className="text-[13px] font-semibold text-ink-faint">No notes found</span>
         </div>
       </div>
     );
@@ -126,7 +134,7 @@ export function NotesTab({ notes, isLoading, error, onCreate }: NotesTabProps) {
       {sortedGroups.map(([day, items]) => (
         <div key={day} className="relative z-10 mb-8">
           {/* Group Date Pill */}
-          <div className="mb-6 inline-block bg-subtle rounded-full px-4 py-1.5 text-[11.5px] font-bold text-ink-muted border border-line/50 shadow-[0_1px_2px_rgba(0,0,0,0.02)] relative z-10 transition-colors">
+          <div className="mb-6 inline-block bg-subtle rounded-full px-4 py-1.5 text-[11px] font-bold text-ink-muted border border-line/50 shadow-sm relative z-10 transition-colors">
             {formatDateUS(day)}
           </div>
 
@@ -153,12 +161,12 @@ function NoteCard({ note }: { note: Note }) {
       {/* Main card content */}
       <div className="flex-1 bg-surface border border-line/80 rounded-xl p-5 shadow-sm hover:shadow-md transition-all duration-200">
         <div className="flex items-start justify-between mb-3.5">
-          <h4 className="text-[14.5px] font-extrabold text-ink pr-4 leading-snug group-hover:text-accent transition-colors">
+          <h4 className="text-[15px] font-extrabold text-ink pr-4 leading-snug group-hover:text-accent transition-colors">
             {note.title}
           </h4>
           <div className="flex items-center gap-2 shrink-0">
             <Sparkles className="w-3.5 h-3.5 text-accent" />
-            <span className="text-[12px] font-bold text-ink-muted">{formatDateUS(note.logged_at)}</span>
+            <span className="text-[13px] font-bold text-ink-muted">{formatDateUS(note.logged_at)}</span>
             <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-ink-faint hover:text-ink-muted ml-1">
               <MoreHorizontal className="w-4 h-4" />
             </button>
@@ -166,13 +174,13 @@ function NoteCard({ note }: { note: Note }) {
         </div>
 
         <div className="flex items-center gap-2 mb-4">
-          <span className="text-[12px] font-medium text-ink-faint">Logged by</span>
+          <span className="text-[13px] font-medium text-ink-faint">Logged by</span>
           <img
             src={`https://i.pravatar.cc/150?u=${encodeURIComponent(note.author_name)}`}
             alt={note.author_name}
             className="w-5 h-5 rounded-full object-cover border border-line-subtle"
           />
-          <span className="text-[12px] font-bold text-ink-muted">{note.author_name}</span>
+          <span className="text-[13px] font-bold text-ink-muted">{note.author_name}</span>
         </div>
 
         <p className="text-[13px] text-ink-muted leading-[1.65] mb-2 pr-2">
@@ -181,7 +189,7 @@ function NoteCard({ note }: { note: Note }) {
 
         {note.links > 0 && (
           <div className="flex justify-end mt-1.5">
-            <span className="text-[11.5px] font-bold text-accent cursor-pointer hover:underline">
+            <span className="text-[11px] font-bold text-accent cursor-pointer hover:underline">
               {note.links} Links
             </span>
           </div>

@@ -152,4 +152,28 @@ describe('AddFlow (spec §1.6 "+ Add")', () => {
     expect(onAdded).not.toHaveBeenCalled();
     expect(postBodies(spy, '/customers/7/tasks/')).toEqual([]);
   });
+
+  it.each(['call', 'task', 'note', 'survey'] as AddKind[])(
+    'lays the %s form out for the sheet: one column, labels above, 44px controls below sm',
+    (what) => {
+      stubOrganizationPage();
+      renderAdd(what);
+      const dialog = screen.getByRole('dialog');
+      const fields = [...dialog.querySelectorAll<HTMLElement>('input, select, textarea')];
+      expect(fields.length).toBeGreaterThan(0);
+      for (const field of fields) {
+        // A visible label, not a placeholder or an aria-label standing in.
+        const labels = [...((field as HTMLInputElement).labels ?? [])];
+        expect(labels.length, field.outerHTML).toBeGreaterThan(0);
+        expect(labels.some((label) => !label.classList.contains('sr-only')), field.outerHTML).toBe(true);
+        expect(field).not.toHaveAttribute('aria-label');
+        if ((field as HTMLInputElement).type !== 'file') expect(field, field.outerHTML).toHaveClass('min-h-11', 'sm:min-h-9');
+      }
+      for (const button of within(dialog).getAllByRole('button').filter((b) => b.getAttribute('aria-label') !== 'Close')) {
+        expect(button, button.outerHTML).toHaveClass('min-h-11', 'sm:min-h-9');
+      }
+      // No column count keyed off the viewport inside the sheet.
+      expect(dialog.innerHTML).not.toMatch(/\b(?:sm|md|lg):grid-cols-/);
+    },
+  );
 });

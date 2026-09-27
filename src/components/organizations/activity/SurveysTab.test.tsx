@@ -365,4 +365,29 @@ describe('LogSurveyForm (the "Log survey" flow the organization page reuses)', (
     expect(await screen.findByText('Pick a date.')).toBeInTheDocument();
     expect(onLogged).not.toHaveBeenCalled();
   });
+
+  it('stays busy until the page has taken the new survey, so a second press cannot log it twice', async () => {
+    const fetchMock = vi.fn((_url: string, options?: { method?: string; body?: string }) =>
+      Promise.resolve({ ok: true, status: 201, json: async () => ({ id: 1, ...JSON.parse(options?.body ?? '{}') }) }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    let finish = () => {};
+    const onLogged = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    render(
+      <Provider store={makeDetailStore()}>
+        <LogSurveyForm customerId={7} allowCes onLogged={onLogged} onCancel={() => {}} />
+      </Provider>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Log' }));
+    await waitFor(() => expect(onLogged).toHaveBeenCalledOnce());
+    expect(screen.getByRole('button', { name: 'Logging…' })).toBeDisabled();
+    finish();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Log' })).toBeEnabled());
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
 });
