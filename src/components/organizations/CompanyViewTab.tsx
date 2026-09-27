@@ -39,6 +39,7 @@ export function CompanyViewTab({
   customerName,
   accountName,
   accountOwnerTile,
+  embedded = false,
 }: {
   customerId: number;
   customerName: string;
@@ -46,6 +47,11 @@ export function CompanyViewTab({
    *  department owners are the organisation's; the account has its own owner. */
   accountName?: string;
   accountOwnerTile?: ReactNode;
+  /** Inside a page that already sets the column (the organization page):
+   *  the cards span its edges, the owner is a divided row rather than a box
+   *  in the card, and the department pickers share the row equally. Off by
+   *  default, so the account page renders as before. */
+  embedded?: boolean;
 }) {
   const dispatch = useAppDispatch();
   const me = useAppSelector((s) => s.auth.user);
@@ -83,7 +89,7 @@ export function CompanyViewTab({
   }, {});
 
   return (
-    <div className="flex flex-col gap-4 max-w-5xl mx-auto w-full">
+    <div className={embedded ? 'flex flex-col gap-4 w-full' : 'flex flex-col gap-4 max-w-5xl mx-auto w-full'}>
       {/* The standing brief first: what they use us for, and what nobody
           here can answer about them yet. */}
       <AccountBriefPanel customerId={customerId} customerName={customerName} />
@@ -96,10 +102,17 @@ export function CompanyViewTab({
           </h2>
         </div>
         {accountOwnerTile}
-        <div className={accountOwnerTile ? 'mt-2' : ''}>
-          <AccountOwnerTile customerId={customerId} members={members} canAssign={canAssign} title={accountName ? 'Organisation owner' : 'Account owner'} />
+        <div className={accountOwnerTile || embedded ? 'mt-2' : ''}>
+          <AccountOwnerTile customerId={customerId} members={members} canAssign={canAssign} title={accountName ? 'Organisation owner' : 'Account owner'} plain={embedded} />
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 mt-2">
+        <div
+          data-owners=""
+          className={
+            embedded
+              ? 'grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-2 border-t border-line-subtle pt-3 mt-3'
+              : 'grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2 mt-2'
+          }
+        >
           {(responsible ?? []).filter((r) => r.function !== 'cs').map((r) => (
             <div key={r.function} className="border border-line-subtle rounded-lg px-3 py-2">
               <div className="text-[10px] font-bold uppercase tracking-wider text-ink-faint">{r.function_display}</div>
@@ -187,7 +200,19 @@ export function CompanyViewTab({
 }
 
 /** The organisation's one accountable person — the shared OwnerTile over the knowledge slice. */
-function AccountOwnerTile({ customerId, members, canAssign, title }: { customerId: number; members: User[]; canAssign: boolean; title?: string }) {
+function AccountOwnerTile({
+  customerId,
+  members,
+  canAssign,
+  title,
+  plain,
+}: {
+  customerId: number;
+  members: User[];
+  canAssign: boolean;
+  title?: string;
+  plain?: boolean;
+}) {
   const dispatch = useAppDispatch();
   const me = useAppSelector((s) => s.auth.user);
   const owner = useAppSelector((s) => s.knowledge.accountOwner[customerId] ?? null);
@@ -198,6 +223,7 @@ function AccountOwnerTile({ customerId, members, canAssign, title }: { customerI
       owner={owner}
       members={members}
       mayChange={mayChange}
+      plain={plain}
       onSave={async (userId, note) => {
         const result = await dispatch(setResponsible({ customerId, function: 'cs', user_id: userId, note }));
         return setResponsible.fulfilled.match(result);

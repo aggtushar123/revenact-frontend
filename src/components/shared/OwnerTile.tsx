@@ -11,6 +11,9 @@ type Props = {
   mayChange: boolean;
   /** Save the new owner (null clears) with a handover note; resolve true on success. */
   onSave: (userId: number | null, note: string) => Promise<boolean>;
+  /** A row divided from what is above it, not a tinted box: for a card
+   *  that already has its own surface (no card in a card). Off by default. */
+  plain?: boolean;
 };
 
 /**
@@ -19,7 +22,7 @@ type Props = {
  * down for the record. The same tile on both pages so ownership reads and
  * behaves the same wherever it appears.
  */
-export function OwnerTile({ title = 'Account owner', owner, members, mayChange, onSave }: Props) {
+export function OwnerTile({ title = 'Account owner', owner, members, mayChange, onSave, plain = false }: Props) {
   const [pending, setPending] = useState<string | null>(null);
   const [note, setNote] = useState('');
 
@@ -32,10 +35,13 @@ export function OwnerTile({ title = 'Account owner', owner, members, mayChange, 
   }
 
   return (
-    <div className="border border-accent/30 bg-accent-dim/40 rounded-lg px-3 py-2 flex flex-col gap-1.5">
+    <div
+      data-owner-tile={plain ? 'row' : 'tile'}
+      className={plain ? 'border-t border-line-subtle pt-3 flex flex-col gap-1.5' : 'border border-accent/30 bg-accent-dim/40 rounded-lg px-3 py-2 flex flex-col gap-1.5'}
+    >
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <div className="text-[10px] font-bold uppercase tracking-wider text-accent">{title}</div>
+          <div className={`text-[10px] font-bold uppercase tracking-wider ${plain ? 'text-ink-faint' : 'text-accent'}`}>{title}</div>
           <div className="text-[13px] font-semibold text-ink">
             {owner ? `${owner.name}${owner.function ? ` · ${FUNCTION_LABELS[owner.function]}` : ''}` : 'Nobody yet'}
           </div>

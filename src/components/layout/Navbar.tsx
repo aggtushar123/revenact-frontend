@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef, useContext } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ACCOUNTS_DATA } from '../organizations/accountsData';
 import type { AccountRow } from '../organizations/accountsData';
-import { mapCustomerToOrgRow } from '../../features/customers/mapToOrgRow';
 import { companyLabel, formatRelativeTime } from '../../features/customers/formatters';
 import { EntityAvatar } from '../shared';
 import {
@@ -74,18 +73,6 @@ export function Navbar() {
   }
 
 
-  // Detect organization details path. Reads the same selectedCustomer that
-  // Details.tsx's own fetchCustomerById() populates (see customersSlice.ts)
-  // rather than fetching independently — Navbar and Details are mounted
-  // together under DashboardLayout for this route, so one fetch backs
-  // both. The id check guards the moment right after navigating from one
-  // org's page to another's, before the new fetch has resolved.
-  const orgDetailMatch = location.pathname.match(/\/organizations\/(\d+)/);
-  const orgId = orgDetailMatch ? parseInt(orgDetailMatch[1], 10) : null;
-  const selectedCustomer = useAppSelector((state) => state.customers.selectedCustomer);
-  const organization =
-    orgId && selectedCustomer?.id === orgId ? mapCustomerToOrgRow(selectedCustomer) : null;
-
   // Detect account details path (/accounts/:id — not /accounts/list,
   // which \d+ excludes, same reasoning as the Contacts breadcrumb
   // below). pages/accounts/Details.tsx itself still falls back to
@@ -128,7 +115,10 @@ export function Navbar() {
   // actions slot (empty until Ask Revenact lands on Organizations), and no
   // avatar.
   const isOrgView = location.pathname === '/organizations/list' || location.pathname === '/organizations/board';
-  const isFramed = isDashboard || isOrgView;
+  // An organization's page wears the same frame (organization page spec
+  // §1.1): the page draws its own name row, so the bar only leads back.
+  const isOrgDetail = /^\/organizations\/\d+$/.test(location.pathname);
+  const isFramed = isDashboard || isOrgView || isOrgDetail;
   const dashboardSharedSearch = sharedSearch(location.search);
 
 
@@ -267,24 +257,16 @@ export function Navbar() {
                  </div>
               </div>
           </div>
-        ) : organization ? (
-          <div className="flex items-center gap-4">
-             <button 
-                onClick={() => navigate('/organizations/list')}
-                className="p-1.5 hover:bg-subtle rounded-lg transition-colors text-ink-faint hover:text-accent border border-transparent hover:border-line-subtle"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              
-              <div className="flex items-center gap-3">
-                 <EntityAvatar
-                    name={organization.org}
-                    logoUrl={organization.logo}
-                    className="w-[36px] h-[36px] rounded-full border border-line-subtle shadow-sm"
-                 />
-                 <h1 className="text-[16px] font-bold text-ink tracking-tight uppercase">{organization.org}</h1>
-              </div>
-          </div>
+        ) : isOrgDetail ? (
+          <nav aria-label="Breadcrumb" className="flex items-center h-full">
+            <Link
+              to="/organizations/list"
+              className="-ml-2 inline-flex min-h-11 sm:min-h-9 items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-ink-muted hover:bg-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+              Organizations
+            </Link>
+          </nav>
         ) : isOrgView ? (
           <div className="flex items-center gap-4 h-full">
             <h1 className="text-[17px] font-bold text-ink tracking-tight">Organizations</h1>

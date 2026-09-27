@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { ClipboardList, Plus, CheckCircle2, Clock, XCircle } from 'lucide-react';
 import { useAppDispatch } from '../../../hooks';
 import {
@@ -13,6 +13,9 @@ import type { Survey } from '../../../features/customers/customersSlice';
 import { ApiError } from '../../../lib/apiClient';
 import { ConfirmDialog } from '../../organizations/ConfirmDialog';
 import { formatDateUS } from '../../../features/customers/formatters';
+import { PRIMARY, QUIET } from '../portfolio/styles';
+import { Field } from './FormField';
+import { CONTROL, FORM_ERROR, FORM_GRID } from './formStyles';
 
 
 const STATUS_STYLES: Record<Survey['status'], { text: string; bg: string; icon: typeof CheckCircle2 }> = {
@@ -45,13 +48,77 @@ export interface SurveysTabProps {
 // delivery — see Survey model's own backend docstring on why); "Log
 // Response" is a small inline score entry per still-`sent` row, not a
 // second modal, since it's just one number.
-export function SurveysTab({ surveys, isLoading, error, entityType, entityId, customerId }: SurveysTabProps) {
+export interface LogSurveyFormProps {
+  customerId: number;
+  /** Set to log it on one of the organization's accounts. */
+  accountId?: number;
+  /** CES is asked of an organization only. */
+  allowCes: boolean;
+  onLogged: () => void | Promise<void>;
+  onCancel: () => void;
+}
+
+/** "Log Survey" on its own: records that a survey was sent (no email goes
+ *  out). SurveysTab shows it inline; the organization page's "+ Add" shows it
+ *  in a sheet. */
+export function LogSurveyForm({ customerId, accountId, allowCes, onLogged, onCancel }: LogSurveyFormProps) {
   const dispatch = useAppDispatch();
-  const [showLogForm, setShowLogForm] = useState(false);
+  const typeId = useId();
+  const sentId = useId();
   const [newType, setNewType] = useState<Survey['survey_type']>('nps');
   const [newSentAt, setNewSentAt] = useState(() => new Date().toISOString().slice(0, 10));
   const [isLogging, setIsLogging] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
+
+  async function handleLogSurvey() {
+    setLogError(null);
+    setIsLogging(true);
+    try {
+      if (accountId === undefined) {
+        await dispatch(createSurveyForCustomer({ customerId, survey_type: newType, sent_at: newSentAt })).unwrap();
+      } else {
+        await dispatch(createSurveyForAccount({ customerId, accountId, survey_type: newType, sent_at: newSentAt })).unwrap();
+      }
+      // Busy until the caller has taken the new survey (it may refetch
+      // first): a second press in that window would log it twice.
+      await onLogged();
+    } catch (err) {
+      setLogError(typeof err === 'string' ? err : err instanceof ApiError ? err.message : 'Could not log that survey.');
+    } finally {
+      setIsLogging(false);
+    }
+  }
+
+  return (
+    <div className="@container flex flex-col gap-3">
+      <div className={FORM_GRID}>
+        <Field id={typeId} label="Type">
+          <select id={typeId} value={newType} onChange={(e) => setNewType(e.target.value as Survey['survey_type'])} className={CONTROL}>
+            <option value="nps">NPS</option>
+            <option value="csat">CSAT</option>
+            {allowCes && <option value="ces">CES</option>}
+          </select>
+        </Field>
+        <Field id={sentId} label="Sent">
+          <input id={sentId} type="date" value={newSentAt} onChange={(e) => setNewSentAt(e.target.value)} className={CONTROL} />
+        </Field>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <button type="button" onClick={handleLogSurvey} disabled={isLogging} className={PRIMARY}>
+          {isLogging ? 'Logging…' : 'Log'}
+        </button>
+        <button type="button" onClick={onCancel} className={QUIET}>
+          Cancel
+        </button>
+      </div>
+      {logError && <p className={FORM_ERROR} role="alert">{logError}</p>}
+    </div>
+  );
+}
+
+export function SurveysTab({ surveys, isLoading, error, entityType, entityId, customerId }: SurveysTabProps) {
+  const dispatch = useAppDispatch();
+  const [showLogForm, setShowLogForm] = useState(false);
   const [respondingId, setRespondingId] = useState<number | null>(null);
   const [responseScore, setResponseScore] = useState('');
   const [responseError, setResponseError] = useState<string | null>(null);
@@ -73,33 +140,6 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
       dispatch(fetchSurveysForCustomer(Number(entityId)));
     } else if (customerId !== undefined) {
       dispatch(fetchSurveysForAccount({ customerId, accountId: Number(entityId) }));
-    }
-  }
-
-  async function handleLogSurvey() {
-    setLogError(null);
-    setIsLogging(true);
-    try {
-      if (entityType === 'organization') {
-        await dispatch(
-          createSurveyForCustomer({ customerId: Number(entityId), survey_type: newType, sent_at: newSentAt })
-        ).unwrap();
-      } else if (customerId !== undefined) {
-        await dispatch(
-          createSurveyForAccount({
-            customerId,
-            accountId: Number(entityId),
-            survey_type: newType,
-            sent_at: newSentAt,
-          })
-        ).unwrap();
-      }
-      await refetch();
-      setShowLogForm(false);
-    } catch (err) {
-      setLogError(err instanceof ApiError ? err.message : 'Could not log that survey.');
-    } finally {
-      setIsLogging(false);
     }
   }
 
@@ -153,7 +193,7 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
-        <span className="text-sm font-semibold text-ink-faint">Loading surveys…</span>
+        <span className="text-[13px] font-semibold text-ink-faint">Loading surveys…</span>
       </div>
     );
   }
@@ -161,7 +201,7 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-16">
-        <span className="text-sm font-semibold text-danger">{error}</span>
+        <span className="text-[13px] font-semibold text-danger">{error}</span>
       </div>
     );
   }
@@ -172,7 +212,7 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
         <div className="flex items-center justify-end">
           <button
             onClick={() => setShowLogForm((v) => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold shadow-sm"
           >
             <Plus className="w-3.5 h-3.5" />
             Log Survey
@@ -180,50 +220,25 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
         </div>
       )}
 
-      {showLogForm && (
-        <div className="flex items-end gap-2 p-3 bg-surface rounded-xl border border-line-subtle shadow-sm">
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Type</label>
-            <select
-              value={newType}
-              onChange={(e) => setNewType(e.target.value as Survey['survey_type'])}
-              className="px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
-            >
-              <option value="nps">NPS</option>
-              <option value="csat">CSAT</option>
-              {entityType === 'organization' && <option value="ces">CES</option>}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">Sent</label>
-            <input
-              type="date"
-              value={newSentAt}
-              onChange={(e) => setNewSentAt(e.target.value)}
-              className="px-2.5 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent"
-            />
-          </div>
-          <button
-            onClick={handleLogSurvey}
-            disabled={isLogging}
-            className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLogging ? 'Logging…' : 'Log'}
-          </button>
-          <button
-            onClick={() => { setShowLogForm(false); setLogError(null); }}
-            className="px-2 py-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink"
-          >
-            Cancel
-          </button>
+      {showLogForm && canLog && (
+        <div className="rounded-xl border border-line-subtle bg-surface p-3">
+        <LogSurveyForm
+          customerId={entityType === 'organization' ? Number(entityId) : (customerId as number)}
+          accountId={entityType === 'account' ? Number(entityId) : undefined}
+          allowCes={entityType === 'organization'}
+          onLogged={async () => {
+            await refetch();
+            setShowLogForm(false);
+          }}
+          onCancel={() => setShowLogForm(false)}
+        />
         </div>
       )}
-      {logError && <p className="text-[12.5px] text-danger">{logError}</p>}
 
       {surveys.length === 0 ? (
         <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
           <ClipboardList className="w-10 h-10 text-ink-faint mb-2" />
-          <span className="text-sm font-semibold text-ink-faint">No surveys logged yet</span>
+          <span className="text-[13px] font-semibold text-ink-faint">No surveys logged yet</span>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -270,18 +285,18 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
                     <button
                       onClick={() => handleSaveEdit(survey)}
                       disabled={isSavingEdit}
-                      className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[13px] font-bold disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {isSavingEdit ? 'Saving…' : 'Save'}
                     </button>
                     <button
                       onClick={() => setEditingId(null)}
-                      className="px-2 py-1.5 text-[12px] font-semibold text-ink-muted hover:text-ink"
+                      className="px-2 py-1.5 text-[13px] font-semibold text-ink-muted hover:text-ink"
                     >
                       Cancel
                     </button>
                   </div>
-                  {editError && <p className="text-[12.5px] text-danger mt-2">{editError}</p>}
+                  {editError && <p className="text-[13px] text-danger mt-2">{editError}</p>}
                 </div>
               );
             }
@@ -297,12 +312,12 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-[13.5px] font-bold text-ink">{TYPE_LABELS[survey.survey_type]}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold ${statusStyle.bg} ${statusStyle.text}`}>
+                      <span className="text-[13px] font-bold text-ink">{TYPE_LABELS[survey.survey_type]}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold ${statusStyle.bg} ${statusStyle.text}`}>
                         {survey.status_display}
                       </span>
                     </div>
-                    <span className="text-[12px] text-ink-faint font-medium">Sent {formatDateUS(survey.sent_at)}</span>
+                    <span className="text-[13px] text-ink-faint font-medium">Sent {formatDateUS(survey.sent_at)}</span>
                   </div>
                 </div>
 
@@ -322,13 +337,13 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
                         />
                         <button
                           onClick={() => handleLogResponse(survey)}
-                          className="px-2.5 py-1 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[11.5px] font-bold"
+                          className="px-2.5 py-1 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[11px] font-bold"
                         >
                           Save
                         </button>
                         <button
                           onClick={() => { setRespondingId(null); setResponseError(null); }}
-                          className="px-1.5 py-1 text-[11.5px] font-semibold text-ink-muted hover:text-ink"
+                          className="px-1.5 py-1 text-[11px] font-semibold text-ink-muted hover:text-ink"
                         >
                           Cancel
                         </button>
@@ -337,13 +352,13 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
                       <>
                         <button
                           onClick={() => { setRespondingId(survey.id); setResponseScore(''); }}
-                          className="text-[12px] font-bold text-accent hover:underline"
+                          className="text-[13px] font-bold text-accent hover:underline"
                         >
                           Log Response
                         </button>
                         <button
                           onClick={() => handleMarkExpired(survey)}
-                          className="text-[12px] font-semibold text-ink-faint hover:text-ink hover:underline"
+                          className="text-[13px] font-semibold text-ink-faint hover:text-ink hover:underline"
                         >
                           Mark Expired
                         </button>
@@ -352,13 +367,13 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
                   ) : null}
                   <button
                     onClick={() => startEdit(survey)}
-                    className="text-[12px] font-semibold text-ink-faint hover:text-ink hover:underline"
+                    className="text-[13px] font-semibold text-ink-faint hover:text-ink hover:underline"
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => setDeletingSurvey(survey)}
-                    className="text-[12px] font-semibold text-ink-faint hover:text-danger hover:underline"
+                    className="text-[13px] font-semibold text-ink-faint hover:text-danger hover:underline"
                   >
                     Delete
                   </button>
@@ -366,7 +381,7 @@ export function SurveysTab({ surveys, isLoading, error, entityType, entityId, cu
               </div>
             );
           })}
-          {responseError && <p className="text-[12.5px] text-danger">{responseError}</p>}
+          {responseError && <p className="text-[13px] text-danger">{responseError}</p>}
 
           {deletingSurvey && (
             <ConfirmDialog

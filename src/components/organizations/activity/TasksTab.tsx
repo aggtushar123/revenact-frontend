@@ -1,7 +1,11 @@
-import { useState, type FormEvent } from 'react';
+import { useId, useState, type FormEvent } from 'react';
 import { CheckCircle, Clock, AlertCircle, MoreHorizontal, Flag } from 'lucide-react';
 import type { Task } from '../../../features/customers/customersSlice';
 import { useMembers } from '../../../features/knowledge/useMembers';
+import { ApiError } from '../../../lib/apiClient';
+import { PRIMARY } from '../portfolio/styles';
+import { Field } from './FormField';
+import { CONTROL, FORM_ERROR, FORM_GRID } from './formStyles';
 
 const priorityConfig: Record<Task['priority'], { color: string; bg: string; border: string; label: string }> = {
   high: { color: 'text-danger', bg: 'bg-danger-dim', border: 'border-danger/30', label: 'High' },
@@ -71,57 +75,86 @@ export interface TasksTabProps {
 
 export type NewTask = { title: string; due_date: string; priority: Task['priority']; assignee_id?: number | null };
 
-function NewTaskForm({ onCreate }: { onCreate: (task: NewTask) => Promise<boolean> }) {
+/** The new-task form on its own, so the organization page's "+ Add" can show
+ *  it in a sheet. It clears itself and calls `onDone` once the task is saved. */
+export function TaskForm({ onCreate, onDone }: { onCreate: (task: NewTask) => Promise<boolean>; onDone?: () => void }) {
   const members = useMembers();
-  const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState('');
   const [priority, setPriority] = useState<Task['priority']>('medium');
   const [assignee, setAssignee] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const ids = useId();
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!title.trim() || !dueDate) return;
+    setError(null);
     setSaving(true);
-    const ok = await onCreate({ title: title.trim(), due_date: dueDate, priority, assignee_id: assignee ? Number(assignee) : null });
-    setSaving(false);
-    if (ok) {
-      setTitle('');
-      setDueDate('');
-      setAssignee('');
-      setOpen(false);
+    try {
+      const ok = await onCreate({ title: title.trim(), due_date: dueDate, priority, assignee_id: assignee ? Number(assignee) : null });
+      setSaving(false);
+      if (ok) {
+        setTitle('');
+        setDueDate('');
+        setAssignee('');
+        onDone?.();
+      } else {
+        setError('Could not save that task.');
+      }
+    } catch (err) {
+      setSaving(false);
+      setError(err instanceof ApiError ? err.message : 'Could not save that task.');
     }
   }
 
   return (
-    <div className="px-6 py-2 border-b border-line-subtle flex flex-col gap-2 bg-surface">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[11.5px] text-ink-faint">A task is seen by its creator, its assignee and their management chains.</span>
-        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold">
-          {open ? 'Cancel' : 'New task'}
-        </button>
-      </div>
-      {open && (
-        <form onSubmit={submit} className="grid grid-cols-1 md:grid-cols-4 gap-2">
-          <input aria-label="Task title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" className="md:col-span-2 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <input aria-label="Due date" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent" />
-          <select aria-label="Priority" value={priority} onChange={(e) => setPriority(e.target.value as Task['priority'])} className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent">
+    <form onSubmit={submit} aria-label="New task" className="@container flex flex-col gap-3">
+      <div className={FORM_GRID}>
+        <Field id={`${ids}-title`} label="Task title" wide>
+          <input id={`${ids}-title`} value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" className={CONTROL} />
+        </Field>
+        <Field id={`${ids}-due`} label="Due date">
+          <input id={`${ids}-due`} type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className={CONTROL} />
+        </Field>
+        <Field id={`${ids}-priority`} label="Priority">
+          <select id={`${ids}-priority`} value={priority} onChange={(e) => setPriority(e.target.value as Task['priority'])} className={CONTROL}>
             <option value="high">High</option>
             <option value="medium">Medium</option>
             <option value="low">Low</option>
           </select>
-          <select aria-label="Assignee" value={assignee} onChange={(e) => setAssignee(e.target.value)} className="md:col-span-3 px-3 py-1.5 bg-surface border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:border-accent">
+        </Field>
+        <Field id={`${ids}-assignee`} label="Assignee" wide>
+          <select id={`${ids}-assignee`} value={assignee} onChange={(e) => setAssignee(e.target.value)} className={CONTROL}>
             <option value="">Assign to me</option>
             {members.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
-          <button type="submit" disabled={saving} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
-            {saving ? 'Saving…' : 'Save task'}
-          </button>
-        </form>
-      )}
+        </Field>
+      </div>
+      <div>
+        <button type="submit" disabled={saving} className={PRIMARY}>
+          {saving ? 'Saving…' : 'Save task'}
+        </button>
+      </div>
+      {error && <p className={FORM_ERROR} role="alert">{error}</p>}
+    </form>
+  );
+}
+
+function NewTaskForm({ onCreate }: { onCreate: (task: NewTask) => Promise<boolean> }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="px-6 py-2 border-b border-line-subtle flex flex-col gap-2 bg-surface">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] text-ink-faint">A task is seen by its creator, its assignee and their management chains.</span>
+        <button type="button" onClick={() => setOpen((v) => !v)} className="px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[13px] font-bold">
+          {open ? 'Cancel' : 'New task'}
+        </button>
+      </div>
+      {open && <TaskForm onCreate={onCreate} onDone={() => setOpen(false)} />}
     </div>
   );
 }
@@ -142,7 +175,7 @@ export function TasksTab({ tasks, isLoading, error, onCreate }: TasksTabProps) {
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
-        <span className="text-sm font-semibold text-ink-faint">Loading tasks…</span>
+        <span className="text-[13px] font-semibold text-ink-faint">Loading tasks…</span>
       </div>
     );
   }
@@ -150,7 +183,7 @@ export function TasksTab({ tasks, isLoading, error, onCreate }: TasksTabProps) {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center flex-1 py-16">
-        <span className="text-sm font-semibold text-danger">{error}</span>
+        <span className="text-[13px] font-semibold text-danger">{error}</span>
       </div>
     );
   }
@@ -161,7 +194,7 @@ export function TasksTab({ tasks, isLoading, error, onCreate }: TasksTabProps) {
         {onCreate && <NewTaskForm onCreate={onCreate} />}
         <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
           <CheckCircle className="w-10 h-10 text-ink-faint mb-2" />
-          <span className="text-sm font-semibold text-ink-faint">No tasks found</span>
+          <span className="text-[13px] font-semibold text-ink-faint">No tasks found</span>
         </div>
       </div>
     );
@@ -198,7 +231,7 @@ function TaskCard({ task }: { task: Task }) {
       <div className="flex items-start justify-between mb-2">
         <div className="flex items-center gap-3 flex-1">
           <StatusIcon className={`w-5 h-5 shrink-0 ${status.color}`} />
-          <h4 className="text-[14px] font-semibold text-ink group-hover:text-accent transition-colors">{task.title}</h4>
+          <h4 className="text-[13px] font-semibold text-ink group-hover:text-accent transition-colors">{task.title}</h4>
         </div>
         <button className="p-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity text-ink-faint hover:text-ink-muted">
           <MoreHorizontal className="w-4 h-4" />
@@ -211,10 +244,10 @@ function TaskCard({ task }: { task: Task }) {
             alt={task.assignee_name}
             className="w-5 h-5 rounded-full border border-line-subtle object-cover"
           />
-          <span className="text-[12px] font-medium text-ink-muted">{task.assignee_name}</span>
+          <span className="text-[13px] font-medium text-ink-muted">{task.assignee_name}</span>
         </div>
         <span className="text-[11px] text-ink-faint">Due: {formatDueDate(task.due_date)}</span>
-        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${priority.bg} ${priority.border} ${priority.color} border`}>
+        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${priority.bg} ${priority.border} ${priority.color} border`}>
           <Flag className="w-2.5 h-2.5" />
           {priority.label}
         </div>

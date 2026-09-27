@@ -52,10 +52,9 @@ const EMPTY_CUSTOMERS_PAGE = { count: 0, next: null, previous: null, results: []
 function DetailsStub() {
   const { id } = useParams();
   const location = useLocation();
-  const state = location.state as { activityFilter?: string } | null;
   return (
     <div>
-      Organization {id} — filter: {state?.activityFilter ?? 'none'}
+      Organization {id} — {location.search || 'no filter'}
     </div>
   );
 }
@@ -242,7 +241,7 @@ describe('SurveysPage (/surveys)', () => {
     renderPage();
     await user.click(await screen.findByText('Shopify'));
 
-    expect(await screen.findByText('Organization 6 — filter: Surveys')).toBeInTheDocument();
+    expect(await screen.findByText('Organization 6 — ?group=feedback')).toBeInTheDocument();
   });
 
   it('editing a survey from the Actions column PATCHes it and updates the row, without navigating', async () => {

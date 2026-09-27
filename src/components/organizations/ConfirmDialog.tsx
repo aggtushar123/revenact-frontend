@@ -32,7 +32,7 @@ export function ConfirmDialog({ title, message, confirmLabel, danger, onConfirm,
   }
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[200] p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-scrim flex items-center justify-center z-[200] p-4" onClick={onClose}>
       <div
         className="bg-surface border border-line rounded-xl shadow-xl w-full max-w-sm p-5 space-y-4"
         onClick={(e) => e.stopPropagation()}

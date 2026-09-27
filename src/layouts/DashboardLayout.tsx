@@ -27,8 +27,11 @@ export function DashboardLayout() {
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   // The dashboard's frame pads itself the way Communications' body does.
   const isDashboard = location.pathname.startsWith('/dashboard');
-  // The Organizations list and board pad themselves the same way (OrganizationsFrame).
-  const isOrgView = location.pathname === '/organizations/list' || location.pathname === '/organizations/board';
+  // The Organizations frame: the list, the board and an organization's page.
+  const isOrgView =
+    location.pathname === '/organizations/list' ||
+    location.pathname === '/organizations/board' ||
+    /^\/organizations\/\d+$/.test(location.pathname);
   // The Navbar's actions slot, which a page below (the dashboard) portals into.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const slotValue = useMemo(() => ({ slot, setSlot }), [slot]);

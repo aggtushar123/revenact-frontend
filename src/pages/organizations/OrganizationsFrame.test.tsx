@@ -14,4 +14,12 @@ describe('OrganizationsFrame', () => {
     const rail = screen.getByRole('complementary', { name: 'Ask Revenact' });
     expect(screen.getByText('List').parentElement!.nextElementSibling).toBe(rail);
   });
+
+  it('with bleed, keeps the 16px phone gutter inside the scroll column, so a -mx-4 strip reaches the edge without widening it', () => {
+    const { container } = render(<OrganizationsFrame bleed><p>Page</p></OrganizationsFrame>);
+    expect(container.firstChild).toHaveClass('px-0', 'sm:px-6');
+    expect(container.firstChild).not.toHaveClass('px-4');
+    expect(container.firstChild).not.toHaveClass('sm:px-4');
+    expect(screen.getByText('Page').parentElement).toHaveClass('overflow-y-auto', 'px-4', 'sm:px-0');
+  });
 });

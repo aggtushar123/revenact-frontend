@@ -83,7 +83,8 @@ export function SurveysPage() {
     // page's own docstring on why it needs one to show real data).
     const customerId = survey.companies[0]?.id;
     if (customerId === undefined) return;
-    navigate(`/organizations/${customerId}`, { state: { activityFilter: 'Surveys' } });
+    // The organization page's Story, filtered to Feedback (surveys).
+    navigate(`/organizations/${customerId}?group=feedback`);
   }
 
   // One-way, no confirm — same "Log Response" convention: an immediate

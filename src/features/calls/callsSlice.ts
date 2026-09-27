@@ -100,6 +100,10 @@ const callsSlice = createSlice({
       state.items = [];
       state.error = null;
     },
+    /** A new log-a-call form starts clean, not with the last one's failure. */
+    clearCallSaveError(state) {
+      state.saveError = null;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -130,5 +134,5 @@ const callsSlice = createSlice({
   },
 });
 
-export const { clearCalls } = callsSlice.actions;
+export const { clearCalls, clearCallSaveError } = callsSlice.actions;
 export default callsSlice.reducer;

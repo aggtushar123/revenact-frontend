@@ -253,17 +253,39 @@ in instead.
    action) keeps it, so failures stay selected even from a Show-more page.
 4. On a row, the organisation name links to `/organizations/:id`; a row click
    or the chevron opens the row instead (inline on desktop, a sheet on
-   phones). `/organizations/:id` dispatches six parallel fetches:
-   the customer, its accounts, contacts, opportunities, risks and canvases.
-5. Tabs: General (metrics banner, `PinnedAttributes`, `ActivityFeed`), Company
-   View, Accounts, Contacts, Pipelines, Custom Objects, Success Plans.
-   Under the pinned attributes, `AIAttributesPanel` lists the AI attributes
-   defined in Settings > AI Attributes with the Copilot's latest answer, a
-   "why" with reasoning and cited sources, the history of answers and
-   corrections, an inline override and a refresh (see the backend's
-   `attributes` contract)
-   (placeholder), Canvas List.
-6. "Ask Copilot" navigates to `/copilot?forCustomerId=&forCustomerName=`.
+   phones).
+5. `/organizations/:id` is the organization's story
+   (`docs/superpowers/specs/2026-09-26-organization-detail-design.md`). It lands
+   in four requests: `GET /organizations/portfolio/?ids={id}&include_churned=1`
+   (the List's own row: the name row and the tiles), `GET /customers/{id}/`
+   (the health breakdown and the edit form), `GET /customers/{id}/accounts/`
+   (the account chips) and `GET /organizations/{id}/story/` (the Story). The
+   tabs, in the URL as `?tab=`, are Story, Details (the connected accounts as
+   list items linking to `/accounts/:id`, with Add and Edit; then the List's six
+   panels; then the email, phone, industry and CSAT response bands from
+   `GET /customers/{id}/`; then `AIAttributesPanel`), People (contacts), Deals & risks (opportunities and
+   risks), Knowledge (Company View, then headlines) and Files (files, then
+   CallSense calls); the last four read their data when first opened. Opening a
+   tab reads its data the first time only: visited tabs stay mounted, with
+   inactive panels hidden, so returning doesn't reload or blank them, and the
+   Story is read only once Story has been opened. The account chips
+   (`?account=`, an id or `none`) filter the Story, whose filters (`group`,
+   `source`, `q`) live in the URL too. "+ Add" offers Log a call, New task, New
+   note and Log survey — there is no "Log activity", since there's no create
+   endpoint for it — with the existing forms, on the chosen account when there
+   is one or at organisation level otherwise; an email opens its thread; any
+   other item opens in place, with its link when it has one. A failed task or
+   note save keeps the sheet open, keeps what was typed, and shows "Could not
+   save that task." or "Could not save that note.", or the server's message.
+   The Feedback filter group shows "Manage surveys", a link to `/surveys`
+   (that page has no per-organization filter yet, a follow-up). Edit opens
+   `OrganizationFormModal`;
+   ⋯ archives (`POST /organizations/bulk/`) or churns
+   (`ChurnOrganizationModal`). A tile jumps to its Details panel; Health opens
+   its breakdown. An id that is not a number, or one the viewer cannot see,
+   says "Organization not found".
+6. Ask Revenact on this page is delivery 3 of that spec; there is no Ask link
+   here meanwhile.
 
 Add and edit run through `OrganizationFormModal`; churn through
 `ChurnOrganizationModal`, one account at a time; archive, owner and lifecycle
@@ -359,7 +381,9 @@ the organisation page and add Organizations.
 
 ### 4.4 Activity feed
 
-Shared by both detail pages. Five top tabs and thirteen filter chips.
+The account page's (`/accounts/:id`) feed. The organization page replaced it
+with the Story (§ Organizations, step 5). Five top tabs and thirteen filter
+chips.
 
 | Filter | State |
 |---|---|
@@ -870,9 +894,9 @@ as a query parameter because a WebSocket handshake cannot carry a header.
 |---|---|
 | Sidebar: Product Feedbacks, Segments, Project Management | "Under Construction" |
 | Settings: Activities, Connect Widget | Placeholder |
-| Success Plans tab on both detail pages | "Coming Soon" |
-| Activity feed: Pulse, Conversations, Revenact Support | "coming soon" |
-| Activity feed: search box, "Add Action", filter icon | No handler |
+| Success Plans tab on the account page | "Coming Soon" |
+| Account page feed: Pulse, Conversations, Revenact Support | "coming soon" |
+| Account page feed: search box, "Add Action", filter icon | No handler |
 | Navbar: Search, Plus, Help, Message | No handler |
 | Navbar list-page title chevrons | No menu |
 | Settings sidebar: "Revenact for desktop" | No handler yet |

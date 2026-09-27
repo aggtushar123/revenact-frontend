@@ -149,6 +149,7 @@ function renderNavbar(
         accountsForCustomer: [],
         accountsLoading: false,
         accountsError: null,
+        accountsCustomerId: null,
         allAccounts: [],
         allAccountsCount: 0,
         allAccountsNext: null,
@@ -310,33 +311,34 @@ describe('Navbar account menu', () => {
   });
 });
 
-describe('Navbar organization breadcrumb (/organizations/:id)', () => {
+describe('Navbar on an organization page (/organizations/:id)', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('shows the real organization name once Details.tsx has loaded it into the store', () => {
-    // Navbar doesn't fetch this itself — it reads the same
-    // selectedCustomer that Details.tsx's fetchCustomerById() populates
-    // (see customersSlice.ts). Preloading it here stands in for that.
+  it('wears the Organizations frame: transparent bar, a way back to the list, the actions slot, no avatar', () => {
+    const setSlot = vi.fn();
+    renderNavbar('/organizations/10', globex, null, [], setSlot);
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('h-16', 'shrink-0', 'flex', 'items-center', 'gap-3', 'px-4');
+    for (const cls of ['bg-surface', 'border-b', 'shadow-sm']) expect(header).not.toHaveClass(cls);
+    const back = within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Organizations' });
+    expect(back).toHaveAttribute('href', '/organizations/list');
+    expect(setSlot).toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(header!.querySelector('[data-nav-actions-slot]')).not.toBeNull();
+    expect(screen.queryByAltText('Alice Admin')).not.toBeInTheDocument();
+  });
+
+  it('leaves the name to the page (no uppercase heading, no third-party logo)', () => {
     renderNavbar('/organizations/10', globex);
-
-    expect(screen.getByRole('heading', { name: 'Globex Corp' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Globex Corp' })).not.toBeInTheDocument();
+    expect(document.querySelector('header img')).toBeNull();
   });
 
-  it('falls back to the plain "Organizations" header while the fetch is still in flight', () => {
-    renderNavbar('/organizations/10', null);
-
-    expect(screen.queryByRole('heading', { name: 'Globex Corp' })).not.toBeInTheDocument();
-    expect(screen.getByText('Organizations')).toBeInTheDocument();
-  });
-
-  it('does not show a stale organization name for a different id than the one loaded', () => {
-    // e.g. navigating from org 10's page straight to org 11's, before the
-    // new fetch has resolved and overwritten selectedCustomer.
-    renderNavbar('/organizations/11', globex);
-
-    expect(screen.queryByRole('heading', { name: 'Globex Corp' })).not.toBeInTheDocument();
+  it('takes you back to the list', async () => {
+    renderNavbar('/organizations/10', globex);
+    await userEvent.click(screen.getByRole('link', { name: 'Organizations' }));
+    expect(await screen.findByText('Organizations Marker')).toBeInTheDocument();
   });
 });
 
