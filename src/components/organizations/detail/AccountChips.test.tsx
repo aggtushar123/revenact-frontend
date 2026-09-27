@@ -35,8 +35,13 @@ describe('AccountChips (spec §1.4)', () => {
     expect(chips().map((chip) => chip.textContent)).toEqual(['All', 'EMEA', 'North America']);
   });
 
-  it('gives an account the story does not list a 0, and hides Organization when it has none', () => {
+  it('leaves out an account the story does not count (outside this viewer\'s scope), and hides Organization when it has none', () => {
     renderChips({ counts: { all: 2, none: 0, '31': 2 } });
+    expect(chips().map((chip) => chip.textContent)).toEqual(['All 2', 'EMEA 2']);
+  });
+
+  it('keeps an in-scope account with nothing matching as 0', () => {
+    renderChips({ counts: { all: 2, none: 0, '31': 2, '32': 0 } });
     expect(chips().map((chip) => chip.textContent)).toEqual(['All 2', 'EMEA 2', 'North America 0']);
   });
 

@@ -37,6 +37,10 @@ export function AccountChips({
   const total = counts ? (counts.all ?? 0) : null;
   const orgCount = counts?.none ?? 0;
   const current = accounts.find((account) => String(account.id) === selected) ?? null;
+  // The accounts endpoint lists every account of the organization; the
+  // story counts only those in this viewer's scope. Once it has counted, an
+  // account it leaves out is not this viewer's to filter by.
+  const shown = counts ? accounts.filter((account) => String(account.id) in counts) : accounts;
 
   const chip = (value: string, label: string, n: number | null) => {
     const pressed = selected === value;
@@ -64,7 +68,7 @@ export function AccountChips({
         ) : accounts.length ? (
           <>
             {chip('', 'All', total)}
-            {accounts.map((account) => chip(String(account.id), account.name, counts ? (counts[String(account.id)] ?? 0) : null))}
+            {shown.map((account) => chip(String(account.id), account.name, counts ? (counts[String(account.id)] ?? 0) : null))}
             {orgCount > 0 || selected === 'none' ? chip('none', 'Organization', counts ? orgCount : null) : null}
           </>
         ) : null}

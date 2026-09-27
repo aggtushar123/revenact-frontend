@@ -45,6 +45,13 @@ describe('the organization page URL state', () => {
     expect(toDetailSearch({ ...p, tab: 'files' }).get('tab')).toBe('files');
   });
 
+  it('writes the sources sorted, so equal filters make the same URL', () => {
+    const a = toDetailSearch(parse('group=conversations&source=email,call')).toString();
+    const b = toDetailSearch(parse('group=conversations&source=call,email')).toString();
+    expect(a).toBe(b);
+    expect(new URLSearchParams(a).get('source')).toBe('call,email');
+  });
+
   it('hands the story its filters and says when any is set', () => {
     const p = parse('account=31&group=tasks&source=note&q=kickoff');
     expect(storyFilters(p)).toEqual({ group: 'tasks', sources: ['note'], account: '31', q: 'kickoff' });

@@ -17,11 +17,11 @@ function fail500(detail = 'Try later.') {
   };
 }
 
-function renderAdd(what: AddKind, accountId?: number) {
+function renderAdd(what: AddKind, accountId?: number, store = makeDetailStore()) {
   const onAdded = vi.fn();
   const onClose = vi.fn();
   render(
-    <Provider store={makeDetailStore()}>
+    <Provider store={store}>
       <MemoryRouter>
         <AddFlow
           what={what}
@@ -132,6 +132,16 @@ describe('AddFlow (spec §1.6 "+ Add")', () => {
     await userEvent.click(within(dialog).getByRole('button', { name: 'Log call' }));
     await waitFor(() => expect(within(dialog).getByRole('alert')).toHaveTextContent('Try later.'));
     expect(onAdded).not.toHaveBeenCalled();
+  });
+
+  it("does not greet a new call sheet with an earlier sheet's failure", () => {
+    stubOrganizationPage();
+    const store = makeDetailStore();
+    store.dispatch({ type: 'calls/log/rejected', payload: 'An old failure.' });
+    renderAdd('call', undefined, store);
+    const dialog = screen.getByRole('dialog', { name: 'Log a call' });
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+    expect(store.getState().calls.saveError).toBeNull();
   });
 
   it('closes from Close without saving', async () => {

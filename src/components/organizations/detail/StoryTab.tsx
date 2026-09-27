@@ -22,6 +22,7 @@ export function StoryTab({
   params,
   accounts,
   isSm,
+  active,
   onUpdate,
   onAdded,
   onOpenTab,
@@ -32,16 +33,27 @@ export function StoryTab({
   params: DetailParams;
   accounts: Account[];
   isSm: boolean;
+  /** Whether the Story tab is the one showing. A hidden tab closes its
+   *  sheets (browser Back to another tab must not leave one open over it). */
+  active: boolean;
   onUpdate: (patch: Partial<DetailParams>, options?: { replace?: boolean }) => void;
-  onAdded: () => void;
+  /** A record was added through + Add; the page reloads what shows it. */
+  onAdded: (what: AddKind) => void;
   onOpenTab: (tab: DetailTab) => void;
   onJump: (panel: PanelKey) => void;
 }) {
   const [adding, setAdding] = useState<AddKind | null>(null);
   const [email, setEmail] = useState<StoryItem | null>(null);
   const [notice, setNotice] = useState('');
-  const accountId = /^\d+$/.test(params.account) ? Number(params.account) : undefined;
-  const accountName = accountId === undefined ? undefined : accounts.find((account) => account.id === accountId)?.name;
+  if (!active && (adding || email)) {
+    setAdding(null);
+    setEmail(null);
+  }
+  // An account the organization does not have (a stale or hand-edited
+  // ?account=) is no place to save: + Add saves on the organization.
+  const chosen = /^\d+$/.test(params.account) ? accounts.find((account) => account.id === Number(params.account)) : undefined;
+  const accountId = chosen?.id;
+  const accountName = chosen?.name;
   const onSearch = useCallback((q: string) => onUpdate({ q }, { replace: true }), [onUpdate]);
 
   return (
@@ -49,7 +61,9 @@ export function StoryTab({
       {story.data ? (
         <AttentionBlock
           attention={story.data.attention}
-          onFilter={(group) => onUpdate({ group })}
+          // The attention counts ignore the search and the sources, so its
+          // row opens the whole group, not a narrowed slice of it.
+          onFilter={(group) => onUpdate({ group, q: '', sources: [] })}
           onOpenTab={onOpenTab}
           onJump={onJump}
         />
@@ -88,7 +102,7 @@ export function StoryTab({
         onClearFilters={() => onUpdate({ account: '', group: '', sources: [], q: '' })}
         onOpenEmail={setEmail}
       />
-      {adding ? (
+      {active && adding ? (
         <AddFlow
           what={adding}
           customerId={orgId}
@@ -99,11 +113,11 @@ export function StoryTab({
           onAdded={() => {
             setAdding(null);
             setNotice('Added to the story.');
-            onAdded();
+            onAdded(adding);
           }}
         />
       ) : null}
-      {email?.link.thread_id ? (
+      {active && email?.link.thread_id ? (
         <EmailThread
           orgId={orgId}
           threadId={email.link.thread_id}

@@ -755,6 +755,10 @@ interface CustomersState {
   accountsForCustomer: Account[];
   accountsLoading: boolean;
   accountsError: string | null;
+  /** The customer the last accounts read asked for: `accountsForCustomer`
+   * is that customer's (once it lands), and a slower read for another one
+   * is dropped. Null before any read. */
+  accountsCustomerId: number | null;
   /** Powers the standalone Accounts page (`/accounts/list`) — every
    * Account across every Customer the tenant has, paginated. Same
    * "raw path in, paginated page out" shape as `allContacts`, and
@@ -946,6 +950,7 @@ const initialState: CustomersState = {
   accountsForCustomer: [],
   accountsLoading: false,
   accountsError: null,
+  accountsCustomerId: null,
   allAccounts: [],
   allAccountsCount: 0,
   allAccountsNext: null,
@@ -2347,19 +2352,23 @@ const customersSlice = createSlice({
         state.selectedCustomerLoading = false;
         state.selectedCustomerError = action.payload ?? 'Could not load this organization.';
       })
-      .addCase(fetchAccountsForCustomer.pending, (state) => {
+      .addCase(fetchAccountsForCustomer.pending, (state, action) => {
         state.accountsLoading = true;
         state.accountsError = null;
+        state.accountsCustomerId = action.meta.arg;
         // Cleared for the same reason as selectedCustomer's own pending
         // case — otherwise switching orgs briefly shows the previous
         // org's accounts under the new one's tab.
         state.accountsForCustomer = [];
       })
       .addCase(fetchAccountsForCustomer.fulfilled, (state, action) => {
+        // A slower read for the organization before this one: not its accounts.
+        if (action.meta.arg !== state.accountsCustomerId) return;
         state.accountsLoading = false;
         state.accountsForCustomer = action.payload;
       })
       .addCase(fetchAccountsForCustomer.rejected, (state, action) => {
+        if (action.meta.arg !== state.accountsCustomerId) return;
         state.accountsLoading = false;
         state.accountsError = action.payload ?? 'Could not load accounts.';
       })

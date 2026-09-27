@@ -12,10 +12,17 @@ describe('storyQuery', () => {
       storyQuery({ group: 'conversations', sources: ['email', 'call'], account: 'none', q: '  renewal ' }),
     );
     expect([...query.keys()]).toEqual(['group', 'source', 'account', 'q', 'limit']);
-    expect(query.get('source')).toBe('email,call');
+    expect(query.get('source')).toBe('call,email');
     expect(query.get('account')).toBe('none');
     expect(query.get('q')).toBe('renewal');
     expect(new URLSearchParams(storyQuery(ALL, 5)).get('limit')).toBe('5');
+  });
+
+  it('sorts the sources, so equal filters make the same key whatever order they were chosen in', () => {
+    const a = storyQuery({ ...ALL, group: 'conversations', sources: ['email', 'call'] });
+    const b = storyQuery({ ...ALL, group: 'conversations', sources: ['call', 'email'] });
+    expect(a).toBe(b);
+    expect(new URLSearchParams(a).get('source')).toBe('call,email');
   });
 });
 

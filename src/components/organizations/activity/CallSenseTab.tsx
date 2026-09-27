@@ -221,9 +221,11 @@ export interface CallSenseTabProps {
   entityType: 'organization' | 'account';
   entityId: number | string;
   customerId?: number;
+  /** A change reads the calls again (a call logged elsewhere on the page). */
+  version?: number;
 }
 
-export function CallSenseTab({ entityType, entityId, customerId }: CallSenseTabProps) {
+export function CallSenseTab({ entityType, entityId, customerId, version = 0 }: CallSenseTabProps) {
   const dispatch = useAppDispatch();
   const { items, isLoading, error, saving, saveError } = useAppSelector((s) => s.calls);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -239,7 +241,7 @@ export function CallSenseTab({ entityType, entityId, customerId }: CallSenseTabP
     if (parent) dispatch(fetchCalls(parent));
     else dispatch(clearCalls());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dispatch, entityType, entityId, customerId]);
+  }, [dispatch, entityType, entityId, customerId, version]);
 
   // The company's contacts, for the participant picker. Fetched here rather
   // than through the customers slice so this tab never disturbs the

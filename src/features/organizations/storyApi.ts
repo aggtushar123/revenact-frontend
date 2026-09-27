@@ -14,13 +14,13 @@ export interface StoryFilters {
   q: string;
 }
 
-/** The query for these filters in one fixed order, so equal filters make an
- *  equal string (the paging key). The backend binds its cursor to the same
+/** The query for these filters in one fixed order, sources sorted, so equal
+ *  filters make an equal string (the paging key). The backend binds its cursor to the same
  *  filters, so a changed filter always starts from page one. */
 export function storyQuery(f: StoryFilters, limit = STORY_PAGE_SIZE): string {
   const query = new URLSearchParams();
   if (f.group) query.set('group', f.group);
-  if (f.sources.length) query.set('source', f.sources.join(','));
+  if (f.sources.length) query.set('source', [...f.sources].sort().join(','));
   if (f.account) query.set('account', f.account);
   if (f.q.trim()) query.set('q', f.q.trim());
   query.set('limit', String(limit));

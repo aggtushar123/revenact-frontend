@@ -4,7 +4,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from '../../components/layout/Navbar';
 import authReducer from '../../features/auth/authSlice';
 import callsReducer from '../../features/calls/callsSlice';
@@ -71,12 +71,32 @@ function Where() {
   return <p data-testid="where">{`${location.pathname}${location.search}`}</p>;
 }
 
+/** The browser's Back button, and a link elsewhere, for tests that move
+ *  through history the way a person does outside the page. */
+function History({ goTo }: { goTo?: string }) {
+  const navigate = useNavigate();
+  return (
+    <p>
+      <button type="button" onClick={() => navigate(-1)}>
+        Browser back
+      </button>
+      {goTo ? <Link to={goTo}>Go to {goTo}</Link> : null}
+    </p>
+  );
+}
+
 /** The organization page on the real store and router. `list` puts the real
  *  List at /organizations/list (a marker otherwise); `nav` adds the real
  *  Navbar. Only fetch is stubbed, by the caller (stubOrganizationPage). */
 export function renderOrganizationPage(
   url = '/organizations/7',
-  { width = 1440, nav = false, list = false }: { width?: number; nav?: boolean; list?: boolean } = {},
+  {
+    width = 1440,
+    nav = false,
+    list = false,
+    history = false,
+    goTo,
+  }: { width?: number; nav?: boolean; list?: boolean; history?: boolean; goTo?: string } = {},
 ) {
   setViewport(width);
   const store = makeDetailStore();
@@ -91,6 +111,7 @@ export function renderOrganizationPage(
               <>
                 <Details />
                 <Where />
+                {history || goTo ? <History goTo={goTo} /> : null}
               </>
             }
           />

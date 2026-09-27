@@ -47,12 +47,13 @@ export function parseDetailParams(search: URLSearchParams): DetailParams {
   });
 }
 
+/** Sources are written sorted, so equal filters make the same URL. */
 export function toDetailSearch(p: DetailParams): URLSearchParams {
   const out = new URLSearchParams();
   if (p.tab !== 'story') out.set('tab', p.tab);
   if (p.account) out.set('account', p.account);
   if (p.group) out.set('group', p.group);
-  if (p.sources.length) out.set('source', p.sources.join(','));
+  if (p.sources.length) out.set('source', [...p.sources].sort().join(','));
   if (p.q) out.set('q', p.q);
   return out;
 }

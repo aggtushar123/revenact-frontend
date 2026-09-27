@@ -2,10 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Account } from '../../features/customers/customersSlice';
-import { pizzaHut } from '../../features/organizations/testPortfolio';
+import { buildPortfolio, globex, pizzaHut } from '../../features/organizations/testPortfolio';
 import {
   ACCOUNTS,
+  QUIET_ATTENTION,
+  buildStory,
   manyItems,
+  pizzaHutCustomer,
   portfolioRequests,
   postBodies,
   requestPaths,
@@ -24,8 +27,9 @@ const landed = () => screen.findByRole('heading', { level: 1, name: 'Pizza Hut' 
  *  an account, PATCH replaces one, and GET /customers/7/accounts/ reads the
  *  saved list. Each read is a fresh array: the store freezes what it keeps. */
 function stubAccountSaves() {
-  let accounts: Account[] = [...ACCOUNTS];
-  const spy = stubOrganizationPage();
+  // One list the story stub counts from too, so a saved account is in scope.
+  const accounts: Account[] = [...ACCOUNTS];
+  const spy = stubOrganizationPage({ accounts });
   const saves: { method: string; path: string; body: Record<string, unknown> }[] = [];
   vi.stubGlobal(
     'fetch',
@@ -40,15 +44,16 @@ function stubAccountSaves() {
       if (method === 'POST' && path === '/customers/7/accounts/') {
         saves.push({ method, path, body });
         const created = { ...ACCOUNTS[1], id: 33, name: String(body.name), domain: String(body.domain ?? '') };
-        accounts = [...accounts, created];
+        accounts.push(created);
         return { ok: true, status: 201, json: async () => created };
       }
       const edit = /^\/customers\/7\/accounts\/(\d+)\/$/.exec(path);
       if (method === 'PATCH' && edit) {
         saves.push({ method, path, body });
         const id = Number(edit[1]);
-        accounts = accounts.map((account) => (account.id === id ? ({ ...account, ...body } as Account) : account));
-        const saved = accounts.find((account) => account.id === id);
+        const at = accounts.findIndex((account) => account.id === id);
+        accounts[at] = { ...accounts[at], ...body } as Account;
+        const saved = accounts[at];
         return { ok: true, status: 200, json: async () => ({ ...saved }) };
       }
       return spy(input, init);
@@ -554,5 +559,91 @@ describe('the organization page (/organizations/:id)', () => {
     expect(screen.queryByRole('link', { name: 'Manage surveys' })).not.toBeInTheDocument();
     await userEvent.click(within(screen.getByRole('group', { name: 'Show' })).getByRole('button', { name: /^Feedback/ }));
     expect(await screen.findByRole('link', { name: 'Manage surveys' })).toHaveAttribute('href', '/surveys');
+  });
+
+  it('closes an open sheet when Back leaves the Story tab, and gives the page its scroll back', async () => {
+    stubOrganizationPage();
+    renderOrganizationPage('/organizations/7?tab=details', { history: true });
+    await landed();
+    await userEvent.click(screen.getByRole('tab', { name: 'Story' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Add to the story' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'New note' }));
+    expect(screen.getByRole('dialog', { name: 'New note' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Browser back' }));
+    await waitFor(() => expect(where().searchParams.get('tab')).toBe('details'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.body.style.overflow).toBe('');
+  });
+
+  it("shows nothing of the last organization under the next one while the next one's story and accounts load", async () => {
+    const spy = stubOrganizationPage();
+    let release = () => {};
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+    const next = { ...globex, id: 8, name: 'Globex' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input));
+        const path = url.pathname.replace(/^\/api\/v1/, '');
+        if (path === '/organizations/portfolio/' && url.searchParams.get('ids') === '8') return ok(buildPortfolio(url.searchParams, [next]));
+        if (path === '/customers/8/') return ok({ ...(pizzaHutCustomer as object), id: 8, name: 'Globex' });
+        if (path === '/organizations/8/story/') {
+          await gate;
+          return ok(buildStory(url.searchParams, [], QUIET_ATTENTION, []));
+        }
+        if (path === '/customers/8/accounts/') {
+          await gate;
+          return ok([]);
+        }
+        return spy(input, init);
+      }),
+    );
+    renderOrganizationPage('/organizations/7', { goTo: '/organizations/8' });
+    await landed();
+    await screen.findByRole('button', { name: 'EMEA 1' });
+    expect(itemKeys().length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('link', { name: 'Go to /organizations/8' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Globex' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^EMEA/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^North America/ })).not.toBeInTheDocument();
+    expect(itemKeys()).toEqual([]);
+    expect(screen.queryByRole('region', { name: 'Needs attention' })).not.toBeInTheDocument();
+    release();
+    await waitFor(() => expect(screen.queryByRole('status', { name: 'Loading accounts' })).not.toBeInTheDocument());
+  });
+
+  it('reads the story again after an edit, so Needs attention follows the saved record', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage();
+    await landed();
+    await screen.findByRole('region', { name: 'Needs attention' });
+    const before = storyQueries(spy).length;
+    const edit = screen.getByRole('button', { name: 'Edit' });
+    await waitFor(() => expect(edit).toBeEnabled());
+    await userEvent.click(edit);
+    await userEvent.click(await screen.findByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(requestPaths(spy)).toContain('PATCH /customers/7/'));
+    await waitFor(() => expect(storyQueries(spy).length).toBeGreaterThan(before));
+  });
+
+  it('reads the calls again when + Add logs one while Files is open behind the Story tab', async () => {
+    const spy = stubOrganizationPage();
+    renderOrganizationPage('/organizations/7?tab=files&account=31');
+    await landed();
+    const callReads = () => requestPaths(spy).filter((path) => path === 'GET /customers/7/calls/').length;
+    await waitFor(() => expect(callReads()).toBe(1));
+    await userEvent.click(screen.getByRole('tab', { name: 'Story' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Add to the story' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Log a call' }));
+    const dialog = screen.getByRole('dialog', { name: 'Log a call' });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Call title' }), 'Renewal check-in');
+    fireEvent.change(within(dialog).getByLabelText('When'), { target: { value: '2026-09-25T10:00' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Log call' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(postBodies(spy, '/customers/7/accounts/31/calls/')).toHaveLength(1);
+    await waitFor(() => expect(callReads()).toBe(2));
   });
 });

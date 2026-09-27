@@ -45,8 +45,9 @@ function story(partial: Partial<StoryState> = {}): StoryState {
 
 function renderTab(state: StoryState = story(), search = '') {
   const handlers = { onUpdate: vi.fn(), onAdded: vi.fn(), onOpenTab: vi.fn(), onJump: vi.fn() };
-  render(
-    <Provider store={makeDetailStore()}>
+  const store = makeDetailStore();
+  const tab = (active: boolean) => (
+    <Provider store={store}>
       <MemoryRouter>
         <StoryTab
           orgId={7}
@@ -54,12 +55,14 @@ function renderTab(state: StoryState = story(), search = '') {
           params={parseDetailParams(new URLSearchParams(search))}
           accounts={ACCOUNTS}
           isSm
+          active={active}
           {...handlers}
         />
       </MemoryRouter>
-    </Provider>,
+    </Provider>
   );
-  return handlers;
+  const { rerender } = render(tab(true));
+  return { ...handlers, setActive: (active: boolean) => rerender(tab(active)) };
 }
 
 describe('StoryTab (spec §1.6)', () => {
@@ -77,7 +80,7 @@ describe('StoryTab (spec §1.6)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Tickets 1' }));
     await userEvent.click(screen.getByRole('button', { name: '3 unanswered questions' }));
     await userEvent.click(screen.getByRole('button', { name: /^Renewal 47d overdue/ }));
-    expect(onUpdate.mock.calls.map(([patch]) => patch)).toEqual([{ group: 'tasks' }, { group: 'tickets' }]);
+    expect(onUpdate.mock.calls.map(([patch]) => patch)).toEqual([{ group: 'tasks', q: '', sources: [] }, { group: 'tickets' }]);
     expect(onOpenTab).toHaveBeenCalledWith('knowledge');
     expect(onJump).toHaveBeenCalledWith('contract');
   });
@@ -122,5 +125,58 @@ describe('StoryTab (spec §1.6)', () => {
     expect(Object.fromEntries(storyQueries(spy)[0])).toEqual({ thread: 't-1', limit: '100' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Close' }));
     expect(screen.getByRole('button', { name: 'Re: Renewal pricing' })).toHaveFocus();
+  });
+
+  it('takes an attention row to its filter from a clean slate: the search and the sources go too', async () => {
+    stubOrganizationPage();
+    const { onUpdate } = renderTab(story(), 'group=conversations&source=email&q=quote');
+    await userEvent.click(screen.getByRole('button', { name: /^2 open High or Critical tickets/ }));
+    expect(onUpdate).toHaveBeenCalledWith({ group: 'tickets', q: '', sources: [] });
+  });
+
+  it('adds on the organization when ?account= names no account it has', async () => {
+    const spy = stubOrganizationPage();
+    const { onAdded } = renderTab(story(), 'account=99');
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the story' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'New note' }));
+    const dialog = screen.getByRole('dialog', { name: 'New note' });
+    expect(dialog).toHaveAccessibleDescription('On the organization');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Note title' }), 'Kickoff');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Note body' }), 'Met the new admin.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save note' }));
+    await waitFor(() => expect(onAdded).toHaveBeenCalledOnce());
+    expect(postBodies(spy, '/customers/7/notes/')).toHaveLength(1);
+    expect(postBodies(spy, '/customers/7/accounts/99/notes/')).toHaveLength(0);
+  });
+
+  it('closes + Add and an open email when the tab is hidden, and gives the page its scroll back', async () => {
+    stubOrganizationPage();
+    const { setActive } = renderTab();
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the story' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'New note' }));
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(document.body.style.overflow).toBe('hidden');
+    setActive(false);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(document.body.style.overflow).toBe('');
+    setActive(true);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Re: Renewal pricing' }));
+    expect(screen.getByRole('dialog', { name: 'Re: Renewal pricing' })).toBeInTheDocument();
+    setActive(false);
+    setActive(true);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('tells the page what kind of record was added', async () => {
+    stubOrganizationPage();
+    const { onAdded } = renderTab();
+    await userEvent.click(screen.getByRole('button', { name: 'Add to the story' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'New note' }));
+    const dialog = screen.getByRole('dialog', { name: 'New note' });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Note title' }), 'Kickoff');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Note body' }), 'Met the new admin.');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save note' }));
+    await waitFor(() => expect(onAdded).toHaveBeenCalledWith('note'));
   });
 });

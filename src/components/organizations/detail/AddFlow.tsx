@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { apiFetch } from '../../../lib/apiClient';
-import { logCall, type LogCallInput } from '../../../features/calls/callsSlice';
+import { clearCallSaveError, logCall, type LogCallInput } from '../../../features/calls/callsSlice';
 import { createNote, createTask, type Contact } from '../../../features/customers/customersSlice';
 import type { FileParent } from '../../../features/files/filesSlice';
 import { ADD_FLOWS, type AddKind } from '../../../features/organizations/storyKinds';
@@ -34,6 +34,12 @@ export function AddFlow({
   const { saving, saveError } = useAppSelector((state) => state.calls);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const parent: FileParent = accountId ? { entityType: 'account', customerId, accountId } : { entityType: 'organization', customerId };
+
+  // The calls slice is global: an earlier sheet's (or CallSense's) failure
+  // must not greet this one.
+  useEffect(() => {
+    if (what === 'call') dispatch(clearCallSaveError());
+  }, [dispatch, what]);
 
   // A call offers the company's contacts as participants, as CallSense does.
   useEffect(() => {

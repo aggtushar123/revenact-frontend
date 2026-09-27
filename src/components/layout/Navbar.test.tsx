@@ -149,6 +149,7 @@ function renderNavbar(
         accountsForCustomer: [],
         accountsLoading: false,
         accountsError: null,
+        accountsCustomerId: null,
         allAccounts: [],
         allAccountsCount: 0,
         allAccountsNext: null,

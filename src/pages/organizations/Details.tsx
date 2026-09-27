@@ -35,6 +35,8 @@ import { FOCUS, QUIET } from '../../components/organizations/portfolio/styles';
 import { AccountFormModal } from './AccountFormModal';
 import { OrganizationsFrame } from './OrganizationsFrame';
 
+const NO_ACCOUNTS: Account[] = [];
+
 /** Archive through the bulk endpoint, as the List does. ConfirmDialog shows a
  *  thrown string as the reason, so a refusal says why. */
 async function archiveOrganization(id: number): Promise<void> {
@@ -90,13 +92,20 @@ function HeaderSkeleton({ isSm }: { isSm: boolean }) {
   );
 }
 
+/** The page is keyed by the route's id, so moving to another organization
+ *  starts from nothing: no story, chips, sheets or visited tabs of the last
+ *  one show under the next one's header. */
+export function Details() {
+  const { id } = useParams<{ id: string }>();
+  return <OrganizationPage key={id} id={id} />;
+}
+
 /** /organizations/:id, the organization's story (spec 2026-09-26, delivery 1):
  *  the name row and tiles from the List's own row, the account chips, and six
  *  tabs whose choice, like the story's filters, lives in the URL. It lands in
  *  four requests; every other tab reads its data when first opened. Ask on
  *  this page is delivery 3, so the frame has no rail yet. */
-export function Details() {
-  const { id } = useParams<{ id: string }>();
+function OrganizationPage({ id }: { id: string | undefined }) {
   const orgId = id && /^\d+$/.test(id) ? Number(id) : null;
   const isSm = useMediaQuery(SM);
   const dispatch = useAppDispatch();
@@ -105,6 +114,7 @@ export function Details() {
 
   const [version, setVersion] = useState(0);
   const [storyVersion, setStoryVersion] = useState(0);
+  const [callsVersion, setCallsVersion] = useState(0);
   const reloadHeader = useCallback(() => setVersion((v) => v + 1), []);
   const org = useOrganization(orgId, version);
 
@@ -117,7 +127,13 @@ export function Details() {
   if (!visited.has(params.tab)) setVisited(new Set(visited).add(params.tab));
   const story = useStory(orgId ?? 0, storyQuery(storyFilters(params)), storyVersion, orgId !== null && visited.has('story'));
 
-  const { accountsForCustomer, accountsLoading, accountsError } = useAppSelector((state) => state.customers);
+  const { accountsForCustomer, accountsLoading, accountsError, accountsCustomerId } = useAppSelector((state) => state.customers);
+  // The accounts slot is global: until it holds this organization's list,
+  // the page shows it loading rather than another organization's accounts.
+  const accountsOurs = orgId !== null && accountsCustomerId === orgId;
+  const accounts = accountsOurs ? accountsForCustomer : NO_ACCOUNTS;
+  const accountsBusy = accountsLoading || !accountsOurs;
+  const accountsFailure = accountsOurs ? accountsError : null;
   const [accountsAttempt, setAccountsAttempt] = useState(0);
   useEffect(() => {
     if (orgId !== null) dispatch(fetchAccountsForCustomer(orgId));
@@ -208,9 +224,9 @@ export function Details() {
 
         {tab === 'story' ? (
           <AccountChips
-            accounts={accountsForCustomer}
-            loading={accountsLoading}
-            error={accountsError}
+            accounts={accounts}
+            loading={accountsBusy}
+            error={accountsFailure}
             counts={story.data?.counts.by_account ?? null}
             selected={params.account}
             onSelect={(account) => update({ account })}
@@ -237,10 +253,16 @@ export function Details() {
                 orgId={orgId}
                 story={story}
                 params={params}
-                accounts={accountsForCustomer}
+                accounts={accounts}
                 isSm={isSm}
+                active={tab === 'story'}
                 onUpdate={update}
-                onAdded={() => setStoryVersion((v) => v + 1)}
+                onAdded={(what) => {
+                  setStoryVersion((v) => v + 1);
+                  // Files keeps CallSense mounted once opened: a call logged
+                  // here reads its list again.
+                  if (what === 'call') setCallsVersion((v) => v + 1);
+                }}
                 onOpenTab={(next) => update({ tab: next })}
                 onJump={jumpTo}
               />
@@ -251,9 +273,9 @@ export function Details() {
                   customerId={orgId}
                   isSm={isSm}
                   accounts={{
-                    items: accountsForCustomer,
-                    loading: accountsLoading,
-                    error: accountsError,
+                    items: accounts,
+                    loading: accountsBusy,
+                    error: accountsFailure,
                     onRetry: () => setAccountsAttempt((n) => n + 1),
                     onAdd: () => setAddingAccount(true),
                     onEdit: setEditingAccount,
@@ -273,14 +295,22 @@ export function Details() {
             ) : key === 'knowledge' ? (
               row ? <KnowledgeTab customerId={orgId} customerName={row.name} /> : <TabSkeleton label="Loading knowledge" />
             ) : (
-              <FilesCallsTab customerId={orgId} />
+              <FilesCallsTab customerId={orgId} callsVersion={callsVersion} />
             )}
           </div>
         ))}
       </div>
 
       {editing && org.customer ? (
-        <OrganizationFormModal customer={org.customer} onSaved={reloadHeader} onClose={() => setEditing(false)} />
+        <OrganizationFormModal
+          customer={org.customer}
+          onSaved={() => {
+            // Needs attention (the renewal) comes with the story.
+            reloadHeader();
+            setStoryVersion((v) => v + 1);
+          }}
+          onClose={() => setEditing(false)}
+        />
       ) : null}
       {churning && row ? (
         <ChurnOrganizationModal
@@ -304,7 +334,16 @@ export function Details() {
         />
       ) : null}
       {addingAccount ? (
-        <AccountFormModal customerId={orgId} onSaved={() => setAccountsAttempt((n) => n + 1)} onClose={() => setAddingAccount(false)} />
+        <AccountFormModal
+          customerId={orgId}
+          onSaved={() => {
+            setAccountsAttempt((n) => n + 1);
+            // The chips list only the accounts the story counts, so the
+            // story counts again to take the new one in.
+            setStoryVersion((v) => v + 1);
+          }}
+          onClose={() => setAddingAccount(false)}
+        />
       ) : null}
       {editingAccount ? (
         <AccountFormModal customerId={orgId} account={editingAccount} onClose={() => setEditingAccount(null)} />
