@@ -10,7 +10,7 @@ const band = (key: string, label: string, count: number, share: number) => ({ ke
 
 const FULL = {
   ...pizzaHutCustomer,
-  email: 'ap@pizzahut.example',
+  email: 'ap@northwind.example',
   phone: '+1 972 555 0100',
   industry: 'Restaurants',
   csat_breakdown: {
@@ -37,18 +37,24 @@ describe('CustomerFacts (spec §2: what GET /customers/{id}/ adds)', () => {
   it('shows the email and phone as links, and the industry', () => {
     renderFacts();
     const section = screen.getByRole('region', { name: 'Contact and CSAT' });
-    expect(within(section).getByRole('link', { name: 'ap@pizzahut.example' })).toHaveAttribute('href', 'mailto:ap@pizzahut.example');
+    expect(within(section).getByRole('link', { name: 'ap@northwind.example' })).toHaveAttribute('href', 'mailto:ap@northwind.example');
     expect(within(section).getByRole('link', { name: '+1 972 555 0100' })).toHaveAttribute('href', 'tel:+19725550100');
     expect(value('Industry')).toHaveTextContent('Restaurants');
   });
 
-  // Round-1 fix, 2026-09-27: a stray "?"/"&"/"=" in the local part must not
-  // be read as the mailto URL's own query string.
-  it("encodes the email's local part before building its mailto: link", () => {
-    renderFacts({ customer: { ...FULL, email: 'a?bcc=x@y.z' } });
+  // A "?", "&" or "#" would start the mailto URL's own query or fragment
+  // (bcc=, body=): such a value is shown as text, never linked.
+  it.each(['a?bcc=x@y.example', 'ap@y.example&cc=x@z.example', 'ap@y.example#x'])('shows %s as text with no mailto link', (email) => {
+    renderFacts({ customer: { ...FULL, email } });
     const section = screen.getByRole('region', { name: 'Contact and CSAT' });
-    const link = within(section).getByRole('link', { name: 'a?bcc=x@y.z' });
-    expect(link).toHaveAttribute('href', 'mailto:a%3Fbcc%3Dx@y.z');
+    expect(within(section).queryByRole('link', { name: email })).not.toBeInTheDocument();
+    expect(value('Email')).toHaveTextContent(email);
+  });
+
+  it("still encodes the local part of a plain address's mailto link", () => {
+    renderFacts({ customer: { ...FULL, email: 'a b+ap@y.example' } });
+    const link = within(screen.getByRole('region', { name: 'Contact and CSAT' })).getByRole('link', { name: 'a b+ap@y.example' });
+    expect(link).toHaveAttribute('href', 'mailto:a%20b%2Bap@y.example');
   });
 
   it('shows a blank field as "—" with no link', () => {

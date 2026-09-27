@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { trapTab } from '../../../lib/focusTrap';
 import { FOCUS } from '../portfolio/styles';
@@ -8,8 +9,9 @@ const FIELD = 'input:not([disabled]), textarea:not([disabled]), select:not([disa
 /** A modal over the organization page: a panel on the right from `sm`, a
  *  bottom sheet below it (spec §1.11). Focus moves to its first field, or to
  *  Close when it has none; Tab stays inside; the page behind does not
- *  scroll; Escape, Close or the scrim close it and focus goes back to
- *  whatever opened it. */
+ *  scroll (it sits on the body, outside the page's own scroll column, so a
+ *  wheel or swipe on the scrim has nothing to scroll); Escape, Close or the
+ *  scrim close it and focus goes back to whatever opened it. */
 export function Sheet({
   title,
   description,
@@ -55,8 +57,8 @@ export function Sheet({
     };
   }, []);
 
-  return (
-    <div data-shape={isSm ? 'panel' : 'sheet'} className="fixed inset-0 z-50 flex">
+  return createPortal(
+    <div data-shape={isSm ? 'panel' : 'sheet'} className="fixed inset-0 z-50 flex overscroll-contain">
       <div data-scrim="" aria-hidden="true" className="absolute inset-0 bg-scrim" onClick={onClose} />
       <div
         ref={ref}
@@ -90,8 +92,9 @@ export function Sheet({
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </header>
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

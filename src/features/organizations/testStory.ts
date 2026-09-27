@@ -57,7 +57,7 @@ function accountFixture(ref: StoryRef, extra: Partial<Account> = {}): Account {
  *  fully-populated and a mostly-blank row. */
 export const ACCOUNTS: Account[] = [
   accountFixture(EMEA, {
-    domain: 'emea.pizzahut.example',
+    domain: 'emea.northwind.example',
     owner: { id: 2, name: 'Carl CSM' } as Account['owner'],
     pulse: [1, 1, 3],
     ai_pulse_score: 'satisfied',

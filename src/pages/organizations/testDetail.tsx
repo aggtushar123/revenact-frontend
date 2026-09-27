@@ -33,7 +33,7 @@ export function makeDetailStore() {
       auth: {
         user: {
           id: 1,
-          email: 'alice@acme.io',
+          email: 'alice@company.example',
           name: 'Alice',
           avatar: '',
           role: 'admin' as const,
@@ -45,8 +45,8 @@ export function makeDetailStore() {
           reports_to: null,
           organisation: {
             id: 1,
-            name: 'Acme Inc',
-            slug: 'acme-inc',
+            name: 'Example Co',
+            slug: 'example-co',
             currency: 'USD' as const,
             currency_display: 'US Dollar ($)',
             default_lifecycle_stage: '',

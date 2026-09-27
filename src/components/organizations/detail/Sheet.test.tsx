@@ -71,4 +71,21 @@ describe('Sheet', () => {
     await userEvent.click(document.querySelector('[data-scrim]') as HTMLElement);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it("sits on the body, outside the page's scroll column, so a wheel or swipe on the scrim cannot scroll the page behind", async () => {
+    const { container } = render(
+      <div data-testid="column" className="overflow-y-auto">
+        <Host isSm />
+      </div>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Open' }));
+    const dialog = screen.getByRole('dialog', { name: 'New task' });
+    const root = dialog.closest('[data-shape]') as HTMLElement;
+    expect(root.parentElement).toBe(document.body);
+    expect(container).not.toContainElement(root);
+    expect(root).toHaveClass('overscroll-contain');
+    expect(dialog.querySelector('.overflow-y-auto')).toHaveClass('overscroll-contain');
+    // Focus still moves in, and Tab stays inside.
+    expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveFocus();
+  });
 });

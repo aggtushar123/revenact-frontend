@@ -427,7 +427,7 @@ describe('the organization page (/organizations/:id)', () => {
                 name: 'Sarah Chen',
                 role: 'executive_sponsor',
                 role_display: 'Executive Sponsor',
-                email: 'sarah.chen@pizzahut.example',
+                email: 'sarah.chen@northwind.example',
                 phone: '+1 (408) 555-0123',
                 status: 'active',
                 sentiment: 'positive',
@@ -473,7 +473,7 @@ describe('the organization page (/organizations/:id)', () => {
     renderOrganizationPage();
     await userEvent.click(await screen.findByRole('button', { name: 'Add account' }));
     await userEvent.type(screen.getByLabelText(/^Name/), 'APAC');
-    await userEvent.type(screen.getByLabelText(/^Domain/), 'apac.pizzahut.example');
+    await userEvent.type(screen.getByLabelText(/^Domain/), 'apac.northwind.example');
     await userEvent.click(screen.getByRole('button', { name: 'Create Account' }));
     await waitFor(() => expect(screen.queryByRole('heading', { name: 'Add Account' })).not.toBeInTheDocument());
     expect(saves).toEqual([

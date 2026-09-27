@@ -35,7 +35,7 @@ describe('AccountsSection (owner decision 2026-09-26: no account detail is lost)
     expect(within(section).getAllByRole('listitem')).toHaveLength(2);
     const emea = item(31);
     expect(within(emea).getByRole('link', { name: 'EMEA' })).toHaveAttribute('href', '/accounts/31');
-    expect(within(emea).getByText('Carl CSM · emea.pizzahut.example')).toBeInTheDocument();
+    expect(within(emea).getByText('Carl CSM · emea.northwind.example')).toBeInTheDocument();
     expect(within(emea).getByText(whole('AI 4 · CSM 5'))).toBeInTheDocument();
     expect(within(emea).getByText('Satisfied')).toBeInTheDocument();
     expect(within(emea).getByRole('img', { name: 'Pulse history: good, good, mixed' })).toBeInTheDocument();

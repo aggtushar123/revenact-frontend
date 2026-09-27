@@ -13,10 +13,12 @@ const BAND_TONE: Record<string, string> = {
 
 const LINK = `flex min-h-11 min-w-0 max-w-full items-center truncate rounded-sm text-ink underline sm:min-h-0 ${FOCUS}`;
 
-/** Encodes only the local part (before the last `@`) so a stray `?`/`&`/`=`
- *  in it can't be read as the mailto URL's own query string (round-1 fix,
- *  2026-09-27) — the domain is never percent-encoded, and the visible link
- *  text stays the raw address. */
+/** An address with `?`, `&` or `#` anywhere could carry its own mailto
+ *  query or fragment (cc=, bcc=, body=): it is shown as text, not linked. */
+const UNSAFE_EMAIL = /[?&#]/;
+
+/** Encodes only the local part (before the last `@`); the domain is never
+ *  percent-encoded, and the visible link text stays the raw address. */
 function mailtoHref(email: string): string {
   const at = email.lastIndexOf('@');
   if (at === -1) return `mailto:${encodeURIComponent(email)}`;
@@ -100,7 +102,9 @@ export function CustomerFacts({
         <div data-facts="" className={`grid gap-x-8 gap-y-4 ${stacked ? '' : 'md:grid-cols-2'}`}>
           <dl className="grid grid-cols-[6rem_minmax(0,1fr)] content-start gap-x-3 gap-y-1.5 text-[13px]">
             <Fact term="Email">
-              {customer.email ? (
+              {customer.email && UNSAFE_EMAIL.test(customer.email) ? (
+                customer.email
+              ) : customer.email ? (
                 <a href={mailtoHref(customer.email)} className={LINK}>
                   {customer.email}
                 </a>
