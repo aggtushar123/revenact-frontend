@@ -275,8 +275,8 @@ export function ContactsTab({ contacts, isLoading, error, customerId, accountId,
         <ContactFormModal
           contact={editingContact}
           onClose={() => setEditingContact(null)}
-          // Never actually called for an edit — see ContactFormModal's
-          // own prop doc — but still required by its type.
+          // Nothing to re-read: updateContact's reducer patches `contacts`
+          // (see ContactFormModal's own prop doc).
           onSaved={() => {}}
         />
       )}

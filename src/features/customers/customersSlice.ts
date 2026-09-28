@@ -842,6 +842,8 @@ interface CustomersState {
   allContactsSummary: ContactsSummary | null;
   /** The last list read asked for: a slower, earlier one never lands. */
   allContactsRequestId?: string;
+  /** The path that read asked for, so a summary refresh lands only on it. */
+  allContactsPath?: string;
   allContactsLoadingMore: boolean;
   allContactsMoreError: string | null;
   /** The person the Contacts page's profile shows (/contacts/:id). */
@@ -1504,6 +1506,20 @@ export const fetchAllContacts = createAsyncThunk<ContactsPage, string | void, { 
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not load contacts.';
       return rejectWithValue(message);
+    }
+  }
+);
+
+/** The summary line again, for the list already on screen (after an edit
+ *  changed someone's sentiment or status): the rows and pages loaded stay
+ *  as they are, and updateContact has already patched the edited row. */
+export const refreshContactsSummary = createAsyncThunk<ContactsSummary | null, string, { rejectValue: string }>(
+  'customers/refreshContactsSummary',
+  async (url, { rejectWithValue }) => {
+    try {
+      return (await apiFetch<ContactsPage>(url)).summary ?? null;
+    } catch (err) {
+      return rejectWithValue(err instanceof ApiError ? err.message : 'Could not read the summary.');
     }
   }
 );
@@ -2683,6 +2699,7 @@ const customersSlice = createSlice({
       })
       .addCase(fetchAllContacts.pending, (state, action) => {
         state.allContactsRequestId = action.meta.requestId;
+        state.allContactsPath = action.meta.arg || '/contacts/';
         state.allContactsLoading = true;
         state.allContactsError = null;
         state.allContactsLoadingMore = false;
@@ -2701,6 +2718,11 @@ const customersSlice = createSlice({
         if (action.meta.requestId !== state.allContactsRequestId) return;
         state.allContactsLoading = false;
         state.allContactsError = action.payload ?? 'Something went wrong.';
+      })
+      // A failed refresh keeps the summary it had.
+      .addCase(refreshContactsSummary.fulfilled, (state, action) => {
+        if (state.allContactsLoading || action.meta.arg !== state.allContactsPath || !action.payload) return;
+        state.allContactsSummary = action.payload;
       })
       .addCase(loadMoreContacts.pending, (state) => {
         state.allContactsLoadingMore = true;

@@ -39,7 +39,7 @@ function Section({ title, count, shown, empty, children }: { title: string; coun
  *  with its chip chosen), their sentiment and why, then their calls newest
  *  first, emails and tickets. Edit and Delete are the existing flows.
  *  "Why this sentiment?" arrives with Ask on Contacts (delivery 2, §4). */
-export function ContactProfile({ id, onDeleted }: { id: number; onDeleted: () => void }) {
+export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: number; onDeleted: () => void; onSaved?: () => void }) {
   const dispatch = useAppDispatch();
   const { selectedContact, selectedContactHistory } = useAppSelector((state) => state.customers);
   const [attempt, setAttempt] = useState(0);
@@ -173,8 +173,14 @@ export function ContactProfile({ id, onDeleted }: { id: number; onDeleted: () =>
         <ContactFormModal
           contact={contact}
           onClose={() => setEditing(false)}
-          // An edit patches every list the person is in (updateContact's reducer).
-          onSaved={() => {}}
+          // updateContact's reducer patches every list the person is in; the
+          // sentiment line and history are the server's reading, so they are
+          // read again (a changed sentiment is now a hand-set one), and the
+          // page refreshes its summary.
+          onSaved={() => {
+            setAttempt((n) => n + 1);
+            onSaved();
+          }}
         />
       ) : null}
       {deleting ? (

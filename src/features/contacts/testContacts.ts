@@ -286,7 +286,9 @@ export function stubContactsApi(stub: ContactsStub = {}) {
       }
       if (method === 'PATCH') {
         const patch = JSON.parse(String(init?.body ?? '{}')) as Partial<Contact>;
-        const updated = { ...found, ...patch };
+        // As ContactSerializer does: a sent sentiment is a hand-set one.
+        const manual = 'sentiment' in patch ? { sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null } : {};
+        const updated = { ...found, ...patch, ...manual };
         people = people.map((p) => (p.id === id ? updated : p));
         return json(200, updated);
       }
@@ -302,7 +304,14 @@ export function stubContactsApi(stub: ContactsStub = {}) {
         historyFailures -= 1;
         return json(500, { detail: 'Try later.' });
       }
-      return json(200, histories[id] ?? emptyHistory(found));
+      // The sentiment is the person's own, as it stands now.
+      const base = histories[id] ?? emptyHistory(found);
+      return json(200, {
+        ...base,
+        sentiment: found.sentiment,
+        sentiment_source: found.sentiment_source,
+        sentiment_evidence: found.sentiment_evidence,
+      });
     }
 
     if (path === '/customers/') {

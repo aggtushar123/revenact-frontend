@@ -103,6 +103,41 @@ describe('Contacts page (spec 2026-09-28 §3)', () => {
     expect(document.querySelector('[data-summary]')).toHaveTextContent('0 people');
   });
 
+  it('editing only the name keeps a computed sentiment: it is not sent, and the profile and list read again', async () => {
+    const spy = stubContactsApi();
+    renderContactsPage('/contacts/41');
+    await screen.findByRole('heading', { level: 2, name: 'Lukas Vermeer' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    const name = screen.getByLabelText(/^Name/);
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Lukas V.');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Lukas V.' })).toBeInTheDocument();
+    const patch = spy.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')!;
+    expect(JSON.parse(String((patch[1] as RequestInit).body))).not.toHaveProperty('sentiment');
+    expect(screen.getByRole('region', { name: 'Sentiment' })).toHaveTextContent('Neutral: 3 positive · 2 neutral · 1 negative');
+    expect(within(people()[0]).getByText('Lukas V.')).toBeInTheDocument();
+  });
+
+  it('changing the sentiment re-reads the person, their history and the summary', async () => {
+    const spy = stubContactsApi();
+    renderContactsPage('/contacts/41');
+    await screen.findByRole('heading', { level: 2, name: 'Lukas Vermeer' });
+    await screen.findByRole('list', { name: 'People' });
+    expect(document.querySelector('[data-summary]')).toHaveTextContent('33% positive · 1 negative');
+    const before = requested(spy).filter((path) => path === '/contacts/41/history/').length;
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await userEvent.selectOptions(screen.getByLabelText(/^Sentiment \(/), 'Negative');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    const patch = spy.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH')!;
+    expect(JSON.parse(String((patch[1] as RequestInit).body))).toMatchObject({ sentiment: 'negative' });
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Sentiment' })).toHaveTextContent(/^Negative/));
+    expect(screen.getByRole('region', { name: 'Sentiment' })).not.toHaveTextContent('3 positive');
+    expect(requested(spy).filter((path) => path === '/contacts/41/history/').length).toBeGreaterThan(before);
+    await waitFor(() => expect(document.querySelector('[data-summary]')).toHaveTextContent('33% positive · 2 negative'));
+    expect(within(people()[0]).getByText('Negative')).toBeInTheDocument();
+  });
+
   it('+ Add opens the existing form with the organisations to choose from', async () => {
     stubContactsApi();
     renderContactsPage();

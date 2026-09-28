@@ -42,13 +42,14 @@ interface ContactFormModalProps {
    * company to choose from. */
   companies?: { id: number; name: string }[];
   onClose: () => void;
-  /** Called after a successful *create* only — an edit already patches
-   * every Redux list a Contact could appear in via updateContact's own
-   * extraReducers, so there's nothing left for the caller to do then.
-   * A create doesn't know which slot (the global list's `allContacts`,
-   * or a scoped page's `contacts`) to land in, so the caller refetches
-   * its own list instead — see createContactForCustomer's own
-   * docstring. Ignored (never called) when editing. */
+  /** Called after a successful save. A create doesn't know which slot
+   * (the global list's `allContacts`, or a scoped page's `contacts`) to
+   * land in, so the caller refetches its own list — see
+   * createContactForCustomer's own docstring. An edit already patches
+   * every Redux list a Contact could appear in (updateContact's own
+   * extraReducers); a caller that shows server-derived reads of the
+   * person (the Contacts page's profile, history and summary) re-reads
+   * them here, and the others pass a no-op. */
   onSaved: () => void;
 }
 
@@ -135,19 +136,26 @@ export function ContactFormModal({
       email: email.trim(),
       phone: phone.trim(),
       status,
-      sentiment,
     };
+    // The backend treats a sent sentiment as a hand-set one and drops the
+    // evidence behind a computed one, so an edit sends it only when it was
+    // changed (a name change must not wipe what their calls said). A new
+    // person has no evidence yet: the chosen sentiment is their start.
+    const sentimentChanged = !isEdit || sentiment !== contact.sentiment;
+    const payload = sentimentChanged ? { ...data, sentiment } : data;
     try {
       if (isEdit) {
-        // No onSaved() — updateContact's own extraReducers already
-        // patched every list this Contact could be showing in.
-        await dispatch(updateContact({ id: contact.id, ...data })).unwrap();
+        // updateContact's own extraReducers patch every list this Contact
+        // could be showing in; onSaved lets a page read what the edit
+        // changed on the server (the Contacts page's profile and summary).
+        await dispatch(updateContact({ id: contact.id, ...payload })).unwrap();
+        onSaved();
       } else if (accountId !== undefined) {
         // Already inside one specific account's own context (the
         // standalone Account page's own Add Contact) — no picker was
         // shown, so `accountId` here is the only account it could be.
         await dispatch(
-          createContactForAccount({ customerId: Number(selectedCompanyId), accountId, ...data })
+          createContactForAccount({ customerId: Number(selectedCompanyId), accountId, ...payload })
         ).unwrap();
         onSaved();
       } else if (selectedAccountId) {
@@ -157,13 +165,13 @@ export function ContactFormModal({
           createContactForAccount({
             customerId: Number(selectedCompanyId),
             accountId: Number(selectedAccountId),
-            ...data,
+            ...payload,
           })
         ).unwrap();
         onSaved();
       } else {
         await dispatch(
-          createContactForCustomer({ customerId: Number(selectedCompanyId), ...data })
+          createContactForCustomer({ customerId: Number(selectedCompanyId), ...payload })
         ).unwrap();
         onSaved();
       }

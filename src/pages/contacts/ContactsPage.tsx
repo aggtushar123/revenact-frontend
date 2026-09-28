@@ -15,7 +15,7 @@ import {
   toContactsSearch,
   type ContactsParams,
 } from '../../features/contacts/contactsParams';
-import { fetchAllContacts, fetchCustomers, loadMoreContacts } from '../../features/customers/customersSlice';
+import { fetchAllContacts, fetchCustomers, loadMoreContacts, refreshContactsSummary } from '../../features/customers/customersSlice';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { MD, SM, useMediaQuery } from '../../lib/useMediaQuery';
 import { ContactsFrame } from './ContactsFrame';
@@ -117,6 +117,7 @@ export function ContactsPage() {
           navigate(listPath);
           setRefresh((n) => n + 1);
         }}
+        onSaved={() => void dispatch(refreshContactsSummary(apiPath))}
       />
     ) : (
       <EmptyState title="Choose a person" detail="Their sentiment and why, and their calls, emails and tickets, show here." action={null} />
