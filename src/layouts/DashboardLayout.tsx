@@ -32,6 +32,8 @@ export function DashboardLayout() {
     location.pathname === '/organizations/list' ||
     location.pathname === '/organizations/board' ||
     /^\/organizations\/\d+$/.test(location.pathname);
+  // The Contacts frame (spec 2026-09-28 §3): the list, and a person on it.
+  const isContacts = /^\/contacts(\/\d+)?$/.test(location.pathname);
   // The Navbar's actions slot, which a page below (the dashboard) portals into.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const slotValue = useMemo(() => ({ slot, setSlot }), [slot]);
@@ -67,7 +69,7 @@ export function DashboardLayout() {
         <Sidebar />
         <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden rv-canvas">
           {!isScenarios && !isCopilot && !isCommunications && <Navbar />}
-          <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications || isDashboard || isOrgView) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
+          <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications || isDashboard || isOrgView || isContacts) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
             <Outlet />
           </main>
         </div>

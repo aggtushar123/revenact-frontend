@@ -409,31 +409,18 @@ describe('Navbar account breadcrumb (/accounts/:id)', () => {
   });
 });
 
-describe('Navbar contact breadcrumb (/contacts/:id)', () => {
+describe('Navbar on Contacts (spec 2026-09-28 §3)', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('shows the real contact name once Details.tsx has loaded it into the store', () => {
-    // Navbar doesn't fetch this itself — it reads the same
-    // selectedContact that pages/contacts/Details.tsx's own
-    // fetchContactById() populates (see customersSlice.ts).
-    renderNavbar('/contacts/1', null, sarahChen);
-
-    expect(screen.getByRole('heading', { name: 'Sarah Chen' })).toBeInTheDocument();
-    expect(screen.getByText('Globex Corp')).toBeInTheDocument();
-  });
-
-  it('does not show a stale contact name for a different id than the one loaded', () => {
-    renderNavbar('/contacts/2', null, sarahChen);
-
+  it.each(['/contacts', '/contacts/1'])('titles %s "Contacts" in the framed bar, with the actions slot and no avatar', (route) => {
+    renderNavbar(route, null, sarahChen);
+    expect(screen.getByRole('heading', { level: 1, name: 'Contacts' })).toBeInTheDocument();
+    // The person's name is the page's to show, not the bar's.
     expect(screen.queryByRole('heading', { name: 'Sarah Chen' })).not.toBeInTheDocument();
-  });
-
-  it('does not show a contact header on /contacts/list (not a numeric id)', () => {
-    renderNavbar('/contacts/list', null, sarahChen);
-
-    expect(screen.queryByRole('heading', { name: 'Sarah Chen' })).not.toBeInTheDocument();
+    expect(document.querySelector('[data-nav-actions-slot]')).not.toBeNull();
+    expect(screen.queryByRole('img', { name: 'Alice Admin' })).toBeNull();
   });
 });
 

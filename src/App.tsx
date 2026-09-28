@@ -39,8 +39,7 @@ import { AgentAccessPage } from './pages/settings/AgentAccessPage';
 import { EntityUploadsPage } from './pages/settings/EntityUploadsPage';
 import { WebhooksPage } from './pages/settings/WebhooksPage';
 import { Integrations } from './pages/integrations/Integrations';
-import { List as ContactsList } from './pages/contacts/List';
-import { ContactDetails } from './pages/contacts/Details';
+import { ContactsPage } from './pages/contacts/ContactsPage';
 import { CustomObjectRecordsPage } from './pages/customObjects/CustomObjectRecordsPage';
 import { PipelinesPage } from './pages/pipelines/PipelinesPage';
 import { SurveysPage } from './pages/surveys/SurveysPage';
@@ -268,11 +267,10 @@ function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="users" element={<RequireCapability capability="manage_users"><UserManagement /></RequireCapability>} />
           
-          <Route path="contacts">
-            <Route index element={<Navigate to="list" replace />} />
-            <Route path="list" element={<ContactsList />} />
-            <Route path=":id" element={<ContactDetails />} />
-          </Route>
+          {/* One page: /contacts lists, /contacts/:id also opens a person
+              (spec 2026-09-28 §3). The old /contacts/list still lands. */}
+          <Route path="contacts/list" element={<Navigate to="/contacts" replace />} />
+          <Route path="contacts/:id?" element={<ContactsPage />} />
 
           <Route path="custom-objects/:id" element={<CustomObjectRecordsPage />} />
 
