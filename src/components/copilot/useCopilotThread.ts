@@ -65,15 +65,24 @@ export function useCopilotThread(
   // Moving to another organisation or account keeps the same conversation
   // (spec: it lasts from the List into an organisation and back), but a
   // refusal there says nothing about the page the person has moved to, so it
-  // does not linger once the context has changed. `context` is undefined for
-  // a caller with nothing structured to ask about (Communications), which
-  // never triggers this.
+  // does not linger once the context has changed. Only a refusal: a failure
+  // worth retrying keeps its question and Retry across a filter change (Retry
+  // asks as it was asked, chip included), and the month's budget is spent on
+  // every page. `context` is undefined for a caller with nothing structured
+  // to ask about (Communications), which never triggers this.
   const contextKey = context ? JSON.stringify(context) : null;
   const [threadContext, setThreadContext] = useState(contextKey);
   if (threadContext !== contextKey) {
     setThreadContext(contextKey);
-    setFailed(null);
+    if (failed?.refused) setFailed(null);
   }
+  // The context on screen now, for a refusal that lands after the person
+  // moved on: it is about the page it was asked on, so it is dropped as the
+  // change above would have dropped it.
+  const liveContext = useRef(contextKey);
+  useEffect(() => {
+    liveContext.current = contextKey;
+  }, [contextKey]);
 
   // Which conversation is on screen now, for a send that outlives it: an
   // answer that lands after New chat or a History pick belongs to the
@@ -88,6 +97,7 @@ export function useCopilotThread(
   async function send(turn: Turn) {
     if (pending) return;
     const askedIn = conversation?.id ?? null;
+    const askedOn = liveContext.current;
     const mine = ++latest.current;
     const stillHere = () => liveId.current === askedIn;
     setFailed(null);
@@ -99,6 +109,7 @@ export function useCopilotThread(
       if (!stillHere()) return;
       const budget = err instanceof ApiError && err.status === 429;
       const refusal = refusalMessage(err);
+      if (refusal !== null && liveContext.current !== askedOn) return;
       const message = budget
         ? BUDGET_MESSAGE
         : (refusal ?? (err instanceof ApiError ? err.message : 'The Copilot did not answer.'));
