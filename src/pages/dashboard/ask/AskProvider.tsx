@@ -5,7 +5,7 @@ import { SM, XL, useMediaQuery } from '../../../lib/useMediaQuery';
 import { fetchConversation } from '../../copilot/copilotApi';
 import type { AskFocus, Conversation } from '../../copilot/types';
 import { ASK_PREFERENCE_KEY, readAskPreference, writeAskPreference } from './askPreference';
-import { AskContext, AskFocusOnContext, withFocus, type AskState, type AskSurface } from './context';
+import { AskContext, AskDraftContext, AskFocusOnContext, withFocus, type AskState, type AskSurface } from './context';
 import { originPath } from './originPath';
 
 /** The navigation state another surface's History sends with a conversation
@@ -134,6 +134,16 @@ export function AskProvider({
     setFocus(null);
     setPendingDraft(null);
   }, []);
+  const draft = useCallback(
+    (question: string, nextFocus: AskFocus) => {
+      setFocus(nextFocus);
+      // A new nonce remounts the composer with the new text. After markSent
+      // the key is 0, so restarting at 1 still differs from the last key.
+      setPendingDraft((prev) => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
+      reveal();
+    },
+    [reveal],
+  );
 
   const value = useMemo<AskState>(
     () => ({
@@ -148,13 +158,7 @@ export function AskProvider({
       focusOn,
       markSent,
       pendingDraft,
-      draft: (question, nextFocus) => {
-        setFocus(nextFocus);
-        // A new nonce remounts the composer with the new text. After markSent
-        // the key is 0, so restarting at 1 still differs from the last key.
-        setPendingDraft((prev) => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
-        reveal();
-      },
+      draft,
       ask: (question, nextFocus) => {
         // One question at a time: while an answer is on its way the thread
         // would drop this send, so leave the draft and its focus as they are.
@@ -193,12 +197,14 @@ export function AskProvider({
         reveal();
       },
     }),
-    [surface, open, setOpen, reveal, conversation, setConversation, thread, focus, clearFocus, focusOn, markSent, pendingDraft, navigate],
+    [surface, open, setOpen, reveal, conversation, setConversation, thread, focus, clearFocus, focusOn, markSent, pendingDraft, draft, navigate],
   );
 
   return (
     <AskContext.Provider value={value}>
-      <AskFocusOnContext.Provider value={focusOn}>{children}</AskFocusOnContext.Provider>
+      <AskFocusOnContext.Provider value={focusOn}>
+        <AskDraftContext.Provider value={draft}>{children}</AskDraftContext.Provider>
+      </AskFocusOnContext.Provider>
     </AskContext.Provider>
   );
 }

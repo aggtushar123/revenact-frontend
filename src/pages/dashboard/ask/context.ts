@@ -60,3 +60,8 @@ export const AskContext = createContext<AskState | null>(null);
  *  Board card) can read it here instead of the whole `AskState` and skip
  *  every re-render a send causes (pending, then the answer). */
 export const AskFocusOnContext = createContext<((focus: AskFocus) => void) | null>(null);
+
+/** Just `draft`, in its own context, for the same reason: its identity
+ *  changes only with the viewport, so a story item's "Ask about this" can
+ *  read it here without re-rendering the whole story on every send. */
+export const AskDraftContext = createContext<((question: string, focus: AskFocus) => void) | null>(null);
