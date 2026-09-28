@@ -399,7 +399,7 @@ describe('the organization page (/organizations/:id)', () => {
     stubOrganizationPage();
     renderOrganizationPage();
     await landed();
-    expect(screen.getByRole('button', { name: /^ARR/ }).parentElement).toHaveClass('grid', 'grid-cols-4');
+    expect(screen.getByRole('button', { name: /^ARR/ }).parentElement).toHaveClass('grid', '@min-[36rem]:grid-cols-4');
   });
 
   it('on phones: a tile strip, scrolling tabs, and sheets from the bottom', async () => {

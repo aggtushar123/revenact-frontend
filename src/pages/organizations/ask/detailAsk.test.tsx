@@ -91,4 +91,35 @@ describe('Ask Revenact on the organisation page', () => {
     await screen.findByRole('link', { name: 'Pizza Hut' });
     expect(within(screen.getByRole('log', { name: 'Ask Revenact messages' })).getByText('Answer to: And here?')).toBeInTheDocument();
   });
+
+  it('wraps the tiles to the page column, so they reflow beside the rail', async () => {
+    stubOrganizationPageAsk();
+    renderOrganizationPage('/organizations/7', { ask: true });
+    await heading();
+    const grid = screen.getByRole('button', { name: /^ARR/ }).parentElement!;
+    expect(grid).toHaveClass('grid-cols-2', '@min-[36rem]:grid-cols-4');
+    expect(grid.closest('[class~="@container"]')).not.toBeNull();
+    expect(column().contains(grid)).toBe(true);
+  });
+
+  it('opens as a full-screen sheet on phones, with the page left as it was', async () => {
+    stubOrganizationPageAsk();
+    renderOrganizationPage('/organizations/7?account=31', { ask: true, width: 375 });
+    await heading();
+    expect(screen.queryByRole('dialog', { name: 'Ask Revenact' })).not.toBeInTheDocument();
+    expect(column().parentElement).toHaveClass('px-4', 'sm:px-0');
+    await userEvent.click(screen.getByRole('button', { name: 'Show Copilot' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Ask Revenact' });
+    expect(within(sheet).getByText('Pizza Hut · EMEA')).toBeInTheDocument();
+    await userEvent.click(within(sheet).getByRole('button', { name: 'Close Ask Revenact' }));
+    expect(screen.queryByRole('dialog', { name: 'Ask Revenact' })).not.toBeInTheDocument();
+  });
+
+  it('never links to the old Copilot page', async () => {
+    stubOrganizationPageAsk();
+    renderOrganizationPage('/organizations/7', { ask: true });
+    await heading();
+    expect(screen.queryByRole('link', { name: /Ask Copilot/i })).not.toBeInTheDocument();
+    expect(document.querySelector('a[href^="/copilot"]')).toBeNull();
+  });
 });

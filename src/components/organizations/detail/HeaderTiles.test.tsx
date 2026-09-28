@@ -77,9 +77,11 @@ describe('HeaderTiles (spec §1.3)', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Could not load the health breakdown.');
   });
 
-  it('is a four-column grid from sm', () => {
+  it('is a grid from sm that wraps to its column: four across from 36rem, two beside the Ask rail', () => {
     renderTiles({ isSm: true });
-    expect(screen.getByRole('button', { name: /^ARR/ }).parentElement).toHaveClass('grid', 'grid-cols-4');
+    const grid = screen.getByRole('button', { name: /^ARR/ }).parentElement!;
+    expect(grid).toHaveClass('grid', 'grid-cols-2', '@min-[36rem]:grid-cols-4');
+    expect(grid.parentElement).toHaveClass('@container');
   });
 
   it('is a snapping strip on phones', () => {
