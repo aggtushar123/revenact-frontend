@@ -1,15 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { CONTACTS } from '../../../features/organizations/testStory';
 import { PersonItem } from './PersonItem';
 
 function renderItem(index: number, isSm = true, extra = {}) {
   const handlers = { onEdit: vi.fn(), onDelete: vi.fn() };
   render(
-    <ul>
-      <PersonItem contact={{ ...CONTACTS[index], ...extra }} isSm={isSm} {...handlers} />
-    </ul>,
+    <MemoryRouter>
+      <ul>
+        <PersonItem contact={{ ...CONTACTS[index], ...extra }} isSm={isSm} {...handlers} />
+      </ul>
+    </MemoryRouter>,
   );
   return handlers;
 }
@@ -27,13 +30,21 @@ describe('PersonItem (spec 2026-09-27 §2)', () => {
     expect(within(item).getByText(/^Contacted .+ ago$/)).toBeInTheDocument();
   });
 
+  it('the name opens their profile on the Contacts page (spec 2026-09-28 §5)', () => {
+    renderItem(0);
+    const name = within(screen.getByRole('heading', { name: 'Dana Buyer' })).getByRole('link', { name: 'Dana Buyer' });
+    expect(name).toHaveAttribute('href', '/contacts/51');
+    expect(name).toHaveClass('min-h-11', 'sm:min-h-0');
+  });
+
   it('tags a person on the organization itself, and says when nobody has been in touch', () => {
     renderItem(2);
     const item = screen.getByRole('listitem');
     for (const text of ['Organization', 'Inactive', 'Negative sentiment', 'Not contacted yet']) {
       expect(within(item).getByText(text)).toBeInTheDocument();
     }
-    expect(within(item).queryByRole('link')).not.toBeInTheDocument();
+    // No email or phone to link: the only link is their name.
+    expect(within(item).getAllByRole('link').map((link) => link.textContent)).toEqual(['Pat Finance']);
   });
 
   it('shows an address that could carry its own mailto query as text', () => {

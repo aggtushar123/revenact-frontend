@@ -25,6 +25,17 @@ describe('CallItem (spec 2026-09-27 §4)', () => {
     expect(item.querySelector('time')).toHaveClass('font-mono-brand', 'tabular-nums');
   });
 
+  it('says "Not enough to analyse" for a call with nothing to read, and nothing while one waits (spec 2026-09-28 §5)', () => {
+    const empty = renderItem({ ...CALLS[1], analysis: 'not_analysable', sentiment: '' });
+    expect(within(empty).getByText('Not enough to analyse')).toHaveClass('bg-subtle', 'text-ink-muted');
+    document.body.innerHTML = '';
+    // A pending call still carries the model's default "neutral": not a reading.
+    const pending = renderItem({ ...CALLS[1], analysis: 'pending', sentiment: 'neutral' });
+    for (const text of ['Neutral', 'Positive', 'Not enough to analyse']) expect(within(pending).queryByText(text)).toBeNull();
+    document.body.innerHTML = '';
+    expect(within(renderItem({ ...CALLS[1], analysis: 'analysed' })).getByText('Positive')).toHaveClass('bg-success-dim');
+  });
+
   it('opens the whole summary in place from its title', async () => {
     const item = renderItem(CALLS[0]);
     const title = within(item).getByRole('button', { name: 'Quarterly check-in' });

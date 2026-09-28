@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import { listScope, parentScope } from '../../lib/listScope';
+import type { Analysis } from '../contacts/contactsTypes';
 import type { Attachment, FileParent } from '../files/filesSlice';
 
 // CallSense on an organisation or account — see revenact-backend
@@ -18,6 +19,9 @@ export interface Call {
   duration_minutes: number | null;
   summary: string;
   sentiment: Sentiment;
+  /** Whether the call has been read (spec 2026-09-28 §1): `sentiment` is a
+   *  reading only when this is `analysed`. Optional: older fixtures have none. */
+  analysis?: Analysis;
   ai_area: string;
   ai_category: string;
   recording_url: string;
