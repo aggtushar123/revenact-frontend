@@ -306,7 +306,17 @@ function OrganizationPage({ id }: { id: string | undefined }) {
             ) : key === 'knowledge' ? (
               row ? <KnowledgeTab customerId={orgId} customerName={row.name} /> : <TabSkeleton label="Loading knowledge" />
             ) : (
-              <FilesCallsTab customerId={orgId} callsVersion={callsVersion} />
+              <FilesCallsTab
+                customerId={orgId}
+                account={params.account}
+                accounts={accounts}
+                isSm={isSm}
+                active={tab === 'files'}
+                callsVersion={callsVersion}
+                // The call is in the calls list already; the story reads again.
+                onCallLogged={() => setStoryVersion((v) => v + 1)}
+                onShowAll={showAll}
+              />
             )}
           </div>
         ))}
