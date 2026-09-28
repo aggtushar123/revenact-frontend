@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import type { ReactNode } from 'react';
-import { renderHook } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { useEffect, type ReactNode } from 'react';
+import { render, renderHook, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, useNavigate } from 'react-router-dom';
 import { parseOrganizationsView, useOrganizationsContext } from './useOrganizationsContext';
 
 const at = (url: string) =>
@@ -45,5 +46,29 @@ describe('useOrganizationsContext', () => {
     for (const path of ['/organizations', '/organizations/new', '/dashboard/overview']) expect(parseOrganizationsView(path)).toBeNull();
     const { result } = renderHook(() => useOrganizationsContext(), { wrapper: at('/organizations/new') });
     expect(result.current).toBeNull();
+  });
+
+  it("holds the same context object across a story filter or search keystroke, on an organisation's page", async () => {
+    const seen: unknown[] = [];
+    function Harness() {
+      const context = useOrganizationsContext();
+      useEffect(() => {
+        seen.push(context);
+      });
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate('/organizations/7?account=31&q=renewal')}>
+          search
+        </button>
+      );
+    }
+    render(
+      <MemoryRouter initialEntries={['/organizations/7?account=31']}>
+        <Harness />
+      </MemoryRouter>,
+    );
+    const before = seen.at(-1);
+    await userEvent.click(screen.getByRole('button', { name: 'search' }));
+    expect(seen.at(-1)).toBe(before);
   });
 });

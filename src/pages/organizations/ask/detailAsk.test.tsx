@@ -64,7 +64,10 @@ describe('Ask Revenact on the organisation page', () => {
   });
 
   it("asks with the page's context, and the question keeps the server's label", async () => {
-    const { copilot } = stubOrganizationPageAsk({ copilot: { label: () => 'Pizza Hut · EMEA' } });
+    // The server's label differs from what the client would work out itself
+    // ("Pizza Hut · EMEA"), so this proves the chip shows the server's word,
+    // not a client recomputation that happens to match it.
+    const { copilot } = stubOrganizationPageAsk({ copilot: { label: () => 'Pizza Hut · EMEA (server)' } });
     renderOrganizationPage('/organizations/7?account=31', { ask: true });
     await heading();
     await within(rail()!).findByText('Pizza Hut · EMEA');
@@ -72,11 +75,11 @@ describe('Ask Revenact on the organisation page', () => {
     await screen.findByText('Answer to: What changed this month?');
     expect(postedBodies(copilot)[0]).toEqual({ content: 'What changed this month?', context: { ...page, account: 31, focus: null } });
     const log = screen.getByRole('log', { name: 'Ask Revenact messages' });
-    expect(within(log).getByText('Pizza Hut · EMEA')).toBeInTheDocument();
+    expect(within(log).getByText('Pizza Hut · EMEA (server)')).toBeInTheDocument();
   });
 
   it('keeps one conversation from the List into the organisation and back', async () => {
-    stubOrganizationPageAsk();
+    const { copilot } = stubOrganizationPageAsk();
     renderOrganizationPage('/organizations/list', { ask: true, list: true, history: true });
     await screen.findByRole('link', { name: 'Pizza Hut' });
     await userEvent.type(composer(), 'Who renews first?{enter}');
@@ -87,6 +90,9 @@ describe('Ask Revenact on the organisation page', () => {
     expect(within(log).getByText('Answer to: Who renews first?')).toBeInTheDocument();
     await userEvent.type(composer(), 'And here?{enter}');
     expect(await within(log).findByText('Answer to: And here?')).toBeInTheDocument();
+    // The second question was asked on the organisation's page, not the List
+    // it started the conversation on.
+    expect(postedBodies(copilot)[1].context).toEqual({ ...page, account: null, focus: null });
     fireEvent.click(screen.getByRole('button', { name: 'Browser back' }));
     await screen.findByRole('link', { name: 'Pizza Hut' });
     expect(within(screen.getByRole('log', { name: 'Ask Revenact messages' })).getByText('Answer to: And here?')).toBeInTheDocument();
