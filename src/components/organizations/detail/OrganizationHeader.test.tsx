@@ -6,7 +6,7 @@ import type { PortfolioRow } from '../../../features/organizations/portfolioType
 import { OrganizationHeader } from './OrganizationHeader';
 
 function renderHeader(row: PortfolioRow = pizzaHut, canEdit = true) {
-  const handlers = { onEdit: vi.fn(), onArchive: vi.fn(), onChurn: vi.fn() };
+  const handlers = { onEdit: vi.fn(), onArchive: vi.fn(), onChurn: vi.fn(), onAddAccount: vi.fn() };
   render(<OrganizationHeader row={row} canEdit={canEdit} {...handlers} />);
   return handlers;
 }
@@ -27,6 +27,20 @@ describe('OrganizationHeader (spec §1.2)', () => {
     expect(onEdit).toHaveBeenCalledOnce();
   });
 
+  it('adds an account from the name row, beside Edit, with a 44px target below sm', async () => {
+    const { onAddAccount } = renderHeader();
+    const add = screen.getByRole('button', { name: 'Add account' });
+    expect(add.parentElement).toBe(screen.getByRole('button', { name: 'Edit' }).parentElement);
+    expect(add).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-9', 'sm:min-w-0');
+    await userEvent.click(add);
+    expect(onAddAccount).toHaveBeenCalledOnce();
+  });
+
+  it('keeps Add account while the record loads: it needs only the organization', () => {
+    renderHeader(pizzaHut, false);
+    expect(screen.getByRole('button', { name: 'Add account' })).toBeEnabled();
+  });
+
   it('Edit waits while the record loads', () => {
     renderHeader(pizzaHut, false);
     expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled();
@@ -44,6 +58,7 @@ describe('OrganizationHeader (spec §1.2)', () => {
         onEdit={vi.fn()}
         onArchive={vi.fn()}
         onChurn={vi.fn()}
+        onAddAccount={vi.fn()}
       />,
     );
     const edit = screen.getByRole('button', { name: 'Edit' });

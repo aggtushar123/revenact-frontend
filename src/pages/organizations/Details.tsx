@@ -210,6 +210,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
               onEdit={() => setEditing(true)}
               onArchive={() => setArchiving(true)}
               onChurn={() => setChurning(true)}
+              onAddAccount={() => setAddingAccount(true)}
             />
             <HeaderTiles row={row} customer={org.customer} customerError={org.customerError} isSm={isSm} onJump={jumpTo} />
           </section>
@@ -236,7 +237,6 @@ function OrganizationPage({ id }: { id: string | undefined }) {
             selected={params.account}
             onSelect={(account) => update({ account })}
             onRetry={() => setAccountsAttempt((n) => n + 1)}
-            onAdd={() => setAddingAccount(true)}
             onEdit={setEditingAccount}
           />
         ) : null}

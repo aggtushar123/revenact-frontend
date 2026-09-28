@@ -312,10 +312,12 @@ describe('the organization page (/organizations/:id)', () => {
     expect(screen.getByRole('heading', { name: 'Add Account' })).toBeInTheDocument();
   });
 
-  it('adds an account from the chip row, and edits the chosen one', async () => {
+  it('adds an account from the name row, and edits the chosen one from the chips', async () => {
     stubOrganizationPage();
     renderOrganizationPage();
-    await userEvent.click(await screen.findByRole('button', { name: 'Add account' }));
+    await landed();
+    const header = document.querySelector('[data-part="header"]') as HTMLElement;
+    await userEvent.click(within(header).getByRole('button', { name: 'Add account' }));
     expect(screen.getByRole('heading', { name: 'Add Account' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await userEvent.click(await screen.findByRole('button', { name: 'EMEA 1' }));

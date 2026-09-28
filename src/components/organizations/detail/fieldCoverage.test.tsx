@@ -24,7 +24,7 @@ function renderPage(row: PortfolioRow) {
     <Provider store={makeDetailStore()}>
       <MemoryRouter>
         <section data-part="header">
-          <OrganizationHeader row={row} canEdit onEdit={() => {}} onArchive={() => {}} onChurn={() => {}} />
+          <OrganizationHeader row={row} canEdit onEdit={() => {}} onArchive={() => {}} onChurn={() => {}} onAddAccount={() => {}} />
           <HeaderTiles row={row} customer={null} customerError={null} isSm onJump={() => {}} />
         </section>
         <DetailsTab

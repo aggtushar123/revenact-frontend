@@ -1,15 +1,15 @@
 import { useId } from 'react';
-import { Ellipsis, Pencil } from 'lucide-react';
+import { Ellipsis, Pencil, Plus } from 'lucide-react';
 import { PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
 import { SignalTag, touchText } from '../portfolio/rowParts';
 import { BUTTON, FOCUS, QUIET } from '../portfolio/styles';
 import { Menu, type MenuItem } from './Menu';
 
-/** The name row (spec §1.2): initials (never a third-party logo), the name,
- *  owner · lifecycle · last touch, the signal, then Edit and ⋯. ⋯ offers
- *  Archive and Churn while they still apply; the server applies its own
- *  rules to both, as on the List. */
+/** The name row (spec §1.2, and 2026-09-27 §1): initials (never a
+ *  third-party logo), the name, owner · lifecycle · last touch, the signal,
+ *  then Edit, Add account and ⋯. ⋯ offers Archive and Churn while they still
+ *  apply; the server applies its own rules to both, as on the List. */
 export function OrganizationHeader({
   row,
   canEdit,
@@ -18,6 +18,7 @@ export function OrganizationHeader({
   onEdit,
   onArchive,
   onChurn,
+  onAddAccount,
 }: {
   row: PortfolioRow;
   /** The customer record has landed, so the edit form can open. */
@@ -28,6 +29,8 @@ export function OrganizationHeader({
   onEdit: () => void;
   onArchive: () => void;
   onChurn: () => void;
+  /** Opens the new-account form; it needs only the organization's id. */
+  onAddAccount: () => void;
 }) {
   const reasonId = useId();
   const blocked = !canEdit && editError ? editError : null;
@@ -79,6 +82,11 @@ export function OrganizationHeader({
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
           Edit
+        </button>
+        <button type="button" onClick={onAddAccount} className={`${BUTTON} min-w-11 justify-center sm:min-w-0`}>
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          {/* Icon-only below sm, where the row is short of room; the name stays. */}
+          <span className="sr-only sm:not-sr-only">Add account</span>
         </button>
         {actions.length ? (
           <Menu
