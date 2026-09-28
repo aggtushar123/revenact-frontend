@@ -12,10 +12,10 @@ import { useChipCounts } from './useChipCounts';
 
 const ORG = { entityType: 'organization' as const, customerId: 7 };
 
-function setup(tab: DetailTab, storyCounts: Record<string, number> | null = null) {
+function setup(tab: DetailTab, storyCounts: Record<string, number> | null = null, customerId = 7) {
   const store = makeDetailStore();
   const wrapper = ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>;
-  const { result } = renderHook(() => useChipCounts(tab, storyCounts, ACCOUNTS), { wrapper });
+  const { result } = renderHook(() => useChipCounts(tab, storyCounts, ACCOUNTS, customerId), { wrapper });
   return { store, result };
 }
 
@@ -53,15 +53,43 @@ describe('useChipCounts: the chips count the active tab (spec 2026-09-27 §1)', 
   it('Files: files plus calls', () => {
     const { store, result } = setup('files');
     act(() => {
+      store.dispatch(fetchFiles.pending('r1', ORG));
+      store.dispatch(fetchCalls.pending('r2', ORG));
       store.dispatch(fetchFiles.fulfilled(FILES, 'r1', ORG));
       store.dispatch(fetchCalls.fulfilled(CALLS, 'r2', ORG));
     });
     expect(result.current).toEqual({ all: 4, none: 2, '31': 2, '32': 0 });
   });
 
+  it("shows no numbers while the lists hold another organization's records", () => {
+    const { store, result } = setup('people', null, 8);
+    act(() => {
+      store.dispatch(fetchContactsForCustomer.pending('r1', 7));
+      store.dispatch(fetchContactsForCustomer.fulfilled(CONTACTS, 'r1', 7));
+      store.dispatch(fetchFiles.pending('r2', ORG));
+      store.dispatch(fetchFiles.fulfilled(FILES, 'r2', ORG));
+      store.dispatch(fetchCalls.pending('r3', ORG));
+      store.dispatch(fetchCalls.fulfilled(CALLS, 'r3', ORG));
+      store.dispatch(fetchOpportunitiesForCustomer.pending('r4', 7));
+      store.dispatch(fetchOpportunitiesForCustomer.fulfilled(OPPORTUNITIES, 'r4', 7));
+      store.dispatch(fetchRisksForCustomer.pending('r5', 7));
+      store.dispatch(fetchRisksForCustomer.fulfilled(RISKS, 'r5', 7));
+    });
+    expect(result.current).toBeNull();
+    const files = renderHook(() => useChipCounts('files', null, ACCOUNTS, 8), {
+      wrapper: ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>,
+    });
+    expect(files.result.current).toBeNull();
+    const deals = renderHook(() => useChipCounts('deals', null, ACCOUNTS, 8), {
+      wrapper: ({ children }: { children: ReactNode }) => <Provider store={store}>{children}</Provider>,
+    });
+    expect(deals.result.current).toBeNull();
+  });
+
   it('shows no numbers after a failed read', () => {
     const { store, result } = setup('people');
     act(() => {
+      store.dispatch(fetchContactsForCustomer.pending('r1', 7));
       store.dispatch(fetchContactsForCustomer.rejected(null, 'r1', 7, 'Could not load contacts.'));
     });
     expect(result.current).toBeNull();

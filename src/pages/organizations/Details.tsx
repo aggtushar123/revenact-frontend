@@ -147,7 +147,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
   }, [dispatch, orgId, accountsAttempt]);
 
   // The chips' numbers follow the tab (spec 2026-09-27 §1).
-  const chipCounts = useChipCounts(params.tab, story.data?.counts.by_account ?? null, accounts);
+  const chipCounts = useChipCounts(params.tab, story.data?.counts.by_account ?? null, accounts, orgId ?? 0);
   const showAll = useCallback(() => update({ account: '' }), [update]);
 
   const [editing, setEditing] = useState(false);

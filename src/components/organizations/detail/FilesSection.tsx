@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector, useCapability } from '../../../hooks';
 import type { Account } from '../../../features/customers/customersSlice';
 import { canDeleteFile, FILE_ACCEPT } from '../../../features/files/fileFormat';
 import { deleteFile, downloadAttachment, fetchFiles, uploadFile, type Attachment, type FileParent } from '../../../features/files/filesSlice';
+import { listScope } from '../../../lib/listScope';
 import { byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ErrorBlock } from '../portfolio/PortfolioSections';
@@ -32,10 +33,11 @@ export function FilesSection({
   onShowAll: () => void;
 }) {
   const dispatch = useAppDispatch();
-  const { items, isLoading, error, uploading, uploadError } = useAppSelector((state) => state.files);
+  const { items, isLoading, error, uploading, uploadError, scope } = useAppSelector((state) => state.files);
   const me = useAppSelector((state) => state.auth.user);
   const isAdmin = useCapability('manage_org_settings');
-  const [loaded, setLoaded] = useState(false);
+  // The shared slot holds this organization's files (not another's).
+  const loaded = scope === listScope(customerId);
   const [attempt, setAttempt] = useState(0);
   const [description, setDescription] = useState('');
   const [dragging, setDragging] = useState(false);
@@ -47,7 +49,7 @@ export function FilesSection({
 
   // Before paint, as People does.
   useLayoutEffect(() => {
-    void dispatch(fetchFiles({ entityType: 'organization', customerId })).then(() => setLoaded(true));
+    void dispatch(fetchFiles({ entityType: 'organization', customerId }));
   }, [dispatch, customerId, attempt]);
 
   const target = chosenAccount(accounts, account);

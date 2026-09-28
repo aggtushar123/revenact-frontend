@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { apiFetch, ApiError } from '../../lib/apiClient';
+import { listScope, parentScope } from '../../lib/listScope';
 import type { Attachment, FileParent } from '../files/filesSlice';
 
 // CallSense on an organisation or account — see revenact-backend
@@ -58,9 +59,13 @@ interface CallsState {
   error: string | null;
   saving: boolean;
   saveError: string | null;
+  /** Whose calls `items` holds (listScope); null while none are. */
+  scope: string | null;
+  /** The last read asked for: a slower, earlier one never lands. */
+  requestId?: string;
 }
 
-const initialState: CallsState = { items: [], isLoading: false, error: null, saving: false, saveError: null };
+const initialState: CallsState = { items: [], isLoading: false, error: null, saving: false, saveError: null, scope: null };
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
@@ -103,6 +108,7 @@ const callsSlice = createSlice({
     clearCalls(state) {
       state.items = [];
       state.error = null;
+      state.scope = null;
     },
     /** A new log-a-call form starts clean, not with the last one's failure. */
     clearCallSaveError(state) {
@@ -111,15 +117,24 @@ const callsSlice = createSlice({
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchCalls.pending, (state) => {
+      .addCase(fetchCalls.pending, (state, action) => {
         state.isLoading = true;
         state.error = null;
+        state.requestId = action.meta.requestId;
+        // Another organization's or account's calls never show under this one.
+        if (parentScope(action.meta.arg) !== state.scope) {
+          state.items = [];
+          state.scope = null;
+        }
       })
       .addCase(fetchCalls.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.requestId) return;
         state.isLoading = false;
         state.items = action.payload;
+        state.scope = parentScope(action.meta.arg);
       })
       .addCase(fetchCalls.rejected, (state, action) => {
+        if (action.meta.requestId !== state.requestId) return;
         state.isLoading = false;
         state.error = action.payload ?? 'Could not load the calls.';
       })
@@ -129,6 +144,9 @@ const callsSlice = createSlice({
       })
       .addCase(logCall.fulfilled, (state, action) => {
         state.saving = false;
+        // Only into the list it belongs to: its own, or its organization's roll-up.
+        const { customerId } = action.meta.arg;
+        if (state.scope !== parentScope(action.meta.arg) && state.scope !== listScope(customerId)) return;
         state.items = [action.payload, ...state.items].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
       })
       .addCase(logCall.rejected, (state, action) => {

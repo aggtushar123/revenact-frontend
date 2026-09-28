@@ -12,6 +12,7 @@ import {
   type Opportunity,
   type Risk,
 } from '../../../features/customers/customersSlice';
+import { listScope } from '../../../lib/listScope';
 import { byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
 import { opportunitiesSummary, risksSummary } from '../../../features/organizations/listSummaries';
 import { KanbanBoard, PipelineCardContent } from '../../pipelines/KanbanBoard';
@@ -60,11 +61,17 @@ export function DealsTab({
     pipelineRisks: risks,
     pipelineRisksLoading,
     pipelineRisksError,
+    pipelineOpportunitiesFor,
+    pipelineRisksFor,
   } = useAppSelector((state) => state.customers);
   const [kind, setKind] = useState<Kind>('opportunities');
   const [view, setView] = useState<'list' | 'board'>('list');
   const [q, setQ] = useState('');
-  const [loaded, setLoaded] = useState({ opportunities: false, risks: false });
+  // Each shared slot holds this organization's records (not another's).
+  const loaded = {
+    opportunities: pipelineOpportunitiesFor === listScope(customerId),
+    risks: pipelineRisksFor === listScope(customerId),
+  };
   const [attempt, setAttempt] = useState(0);
   const [addingOpportunity, setAddingOpportunity] = useState<Opportunity['stage'] | null>(null);
   const [addingRisk, setAddingRisk] = useState<Risk['stage'] | null>(null);
@@ -76,8 +83,8 @@ export function DealsTab({
   // Read before paint, as People does: the chips never count another page's
   // records left in the shared slots.
   useLayoutEffect(() => {
-    void dispatch(fetchOpportunitiesForCustomer(customerId)).then(() => setLoaded((was) => ({ ...was, opportunities: true })));
-    void dispatch(fetchRisksForCustomer(customerId)).then(() => setLoaded((was) => ({ ...was, risks: true })));
+    void dispatch(fetchOpportunitiesForCustomer(customerId));
+    void dispatch(fetchRisksForCustomer(customerId));
   }, [dispatch, customerId, attempt]);
 
   const scopedOpportunities = useMemo(() => byAccount(opportunities, account), [opportunities, account]);

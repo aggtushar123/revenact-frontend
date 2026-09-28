@@ -2,6 +2,7 @@ import { useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { deleteContact, fetchContactsForCustomer, type Account, type Contact } from '../../../features/customers/customersSlice';
+import { listScope } from '../../../lib/listScope';
 import { byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
 import { peopleSummary } from '../../../features/organizations/listSummaries';
 import { ContactFormModal } from '../../contacts/ContactFormModal';
@@ -32,8 +33,10 @@ export function PeopleTab({
   onShowAll: () => void;
 }) {
   const dispatch = useAppDispatch();
-  const { contacts, contactsLoading, contactsError } = useAppSelector((state) => state.customers);
-  const [loaded, setLoaded] = useState(false);
+  const { contacts, contactsLoading, contactsError, contactsFor } = useAppSelector((state) => state.customers);
+  // The shared slot holds this organization's people (not another's, left
+  // behind or on its way).
+  const loaded = contactsFor === listScope(customerId);
   const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState('');
   const [adding, setAdding] = useState(false);
@@ -43,7 +46,7 @@ export function PeopleTab({
   // Read before paint: the read marks the shared slot loading at once, so
   // neither this list nor the chips show people another page left there.
   useLayoutEffect(() => {
-    void dispatch(fetchContactsForCustomer(customerId)).then(() => setLoaded(true));
+    void dispatch(fetchContactsForCustomer(customerId));
   }, [dispatch, customerId, attempt]);
 
   const inScope = useMemo(() => byAccount(contacts, account), [contacts, account]);

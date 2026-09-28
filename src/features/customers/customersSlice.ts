@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { Node, Edge } from '@xyflow/react';
 import type { UserFunction } from '../auth/authSlice';
 import { apiFetch, ApiError } from '../../lib/apiClient';
+import { listScope } from '../../lib/listScope';
 import type { User, CurrencyCode } from '../auth/authSlice';
 
 // Mirrors revenact-backend's CustomerSerializer field-for-field — see
@@ -848,6 +849,10 @@ interface CustomersState {
   contacts: Contact[];
   contactsLoading: boolean;
   contactsError: string | null;
+  /** Whose people `contacts` holds (listScope); null while none are. */
+  contactsFor: string | null;
+  /** The last contacts read asked for: a slower, earlier one never lands. */
+  contactsRequestId?: string;
   /** The global, paginated, searchable/company-filterable contact list
    * for the standalone /contacts/list page — separate from `contacts`
    * above the same way `customers` (the Organizations list) is
@@ -898,10 +903,15 @@ interface CustomersState {
   pipelineOpportunities: Opportunity[];
   pipelineOpportunitiesLoading: boolean;
   pipelineOpportunitiesError: string | null;
+  /** Whose opportunities the slot holds (listScope); null while none are. */
+  pipelineOpportunitiesFor: string | null;
+  pipelineOpportunitiesRequestId?: string;
   /** Same as `pipelineOpportunities` above, for Risks. */
   pipelineRisks: Risk[];
   pipelineRisksLoading: boolean;
   pipelineRisksError: string | null;
+  pipelineRisksFor: string | null;
+  pipelineRisksRequestId?: string;
   /** Surveys for whichever Customer or Account ActivityFeed's
    * "Surveys" filter is currently showing — same single-slot reasoning
    * as `activities`/`emails`/`tasks`/`notes`/`tickets`/
@@ -996,6 +1006,7 @@ const initialState: CustomersState = {
   contacts: [],
   contactsLoading: false,
   contactsError: null,
+  contactsFor: null,
   allContacts: [],
   allContactsCount: 0,
   allContactsNext: null,
@@ -1017,9 +1028,11 @@ const initialState: CustomersState = {
   risksLoading: false,
   risksError: null,
   pipelineOpportunities: [],
+  pipelineOpportunitiesFor: null,
   pipelineOpportunitiesLoading: false,
   pipelineOpportunitiesError: null,
   pipelineRisks: [],
+  pipelineRisksFor: null,
   pipelineRisksLoading: false,
   pipelineRisksError: null,
   entitySurveys: [],
@@ -2265,6 +2278,7 @@ const customersSlice = createSlice({
     // Customer/Account's own Contacts tab.
     clearContacts(state) {
       state.contacts = [];
+      state.contactsFor = null;
       state.contactsLoading = false;
       state.contactsError = null;
     },
@@ -2281,9 +2295,11 @@ const customersSlice = createSlice({
     // Account Details page's own Pipelines tab.
     clearPipelineData(state) {
       state.pipelineOpportunities = [];
+      state.pipelineOpportunitiesFor = null;
       state.pipelineOpportunitiesLoading = false;
       state.pipelineOpportunitiesError = null;
       state.pipelineRisks = [];
+      state.pipelineRisksFor = null;
       state.pipelineRisksLoading = false;
       state.pipelineRisksError = null;
     },
@@ -2640,29 +2656,39 @@ const customersSlice = createSlice({
       // fetchContactsForCustomer and fetchContactsForAccount share the
       // same contacts/contactsLoading/contactsError slots, same
       // reasoning as the other feed filters' slots above.
-      .addCase(fetchContactsForCustomer.pending, (state) => {
+      .addCase(fetchContactsForCustomer.pending, (state, action) => {
         state.contactsLoading = true;
         state.contactsError = null;
+        state.contactsRequestId = action.meta.requestId;
         state.contacts = [];
+        state.contactsFor = null;
       })
       .addCase(fetchContactsForCustomer.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.contactsRequestId) return;
         state.contactsLoading = false;
         state.contacts = action.payload;
+        state.contactsFor = listScope(action.meta.arg);
       })
       .addCase(fetchContactsForCustomer.rejected, (state, action) => {
+        if (action.meta.requestId !== state.contactsRequestId) return;
         state.contactsLoading = false;
         state.contactsError = action.payload ?? 'Could not load contacts.';
       })
-      .addCase(fetchContactsForAccount.pending, (state) => {
+      .addCase(fetchContactsForAccount.pending, (state, action) => {
         state.contactsLoading = true;
         state.contactsError = null;
+        state.contactsRequestId = action.meta.requestId;
         state.contacts = [];
+        state.contactsFor = null;
       })
       .addCase(fetchContactsForAccount.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.contactsRequestId) return;
         state.contactsLoading = false;
         state.contacts = action.payload;
+        state.contactsFor = listScope(action.meta.arg.customerId, action.meta.arg.accountId);
       })
       .addCase(fetchContactsForAccount.rejected, (state, action) => {
+        if (action.meta.requestId !== state.contactsRequestId) return;
         state.contactsLoading = false;
         state.contactsError = action.payload ?? 'Could not load contacts.';
       })
@@ -2780,30 +2806,48 @@ const customersSlice = createSlice({
           (o) => o.id !== action.payload
         );
       })
-      .addCase(fetchOpportunitiesForCustomer.pending, (state) => {
+      .addCase(fetchOpportunitiesForCustomer.pending, (state, action) => {
         state.pipelineOpportunitiesLoading = true;
         state.pipelineOpportunitiesError = null;
+        state.pipelineOpportunitiesRequestId = action.meta.requestId;
+        // Another organization's or account's never show under this one.
+        if (listScope(action.meta.arg) !== state.pipelineOpportunitiesFor) {
+          state.pipelineOpportunities = [];
+          state.pipelineOpportunitiesFor = null;
+        }
       })
       .addCase(fetchOpportunitiesForCustomer.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.pipelineOpportunitiesRequestId) return;
         state.pipelineOpportunitiesLoading = false;
         state.pipelineOpportunities = action.payload;
+        state.pipelineOpportunitiesFor = listScope(action.meta.arg);
       })
       .addCase(fetchOpportunitiesForCustomer.rejected, (state, action) => {
+        if (action.meta.requestId !== state.pipelineOpportunitiesRequestId) return;
         state.pipelineOpportunitiesLoading = false;
         state.pipelineOpportunitiesError = action.payload ?? 'Could not load opportunities.';
       })
       // fetchOpportunitiesForCustomer/fetchOpportunitiesForAccount share
       // the one `pipelineOpportunities` slot, same reasoning as
       // fetchContactsForCustomer/fetchContactsForAccount above.
-      .addCase(fetchOpportunitiesForAccount.pending, (state) => {
+      .addCase(fetchOpportunitiesForAccount.pending, (state, action) => {
         state.pipelineOpportunitiesLoading = true;
         state.pipelineOpportunitiesError = null;
+        state.pipelineOpportunitiesRequestId = action.meta.requestId;
+        // Another organization's or account's never show under this one.
+        if (listScope(action.meta.arg.customerId, action.meta.arg.accountId) !== state.pipelineOpportunitiesFor) {
+          state.pipelineOpportunities = [];
+          state.pipelineOpportunitiesFor = null;
+        }
       })
       .addCase(fetchOpportunitiesForAccount.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.pipelineOpportunitiesRequestId) return;
         state.pipelineOpportunitiesLoading = false;
         state.pipelineOpportunities = action.payload;
+        state.pipelineOpportunitiesFor = listScope(action.meta.arg.customerId, action.meta.arg.accountId);
       })
       .addCase(fetchOpportunitiesForAccount.rejected, (state, action) => {
+        if (action.meta.requestId !== state.pipelineOpportunitiesRequestId) return;
         state.pipelineOpportunitiesLoading = false;
         state.pipelineOpportunitiesError = action.payload ?? 'Could not load opportunities.';
       })
@@ -2842,27 +2886,45 @@ const customersSlice = createSlice({
         state.risks = state.risks.filter((r) => r.id !== action.payload);
         state.pipelineRisks = state.pipelineRisks.filter((r) => r.id !== action.payload);
       })
-      .addCase(fetchRisksForCustomer.pending, (state) => {
+      .addCase(fetchRisksForCustomer.pending, (state, action) => {
         state.pipelineRisksLoading = true;
         state.pipelineRisksError = null;
+        state.pipelineRisksRequestId = action.meta.requestId;
+        // Another organization's or account's never show under this one.
+        if (listScope(action.meta.arg) !== state.pipelineRisksFor) {
+          state.pipelineRisks = [];
+          state.pipelineRisksFor = null;
+        }
       })
       .addCase(fetchRisksForCustomer.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.pipelineRisksRequestId) return;
         state.pipelineRisksLoading = false;
         state.pipelineRisks = action.payload;
+        state.pipelineRisksFor = listScope(action.meta.arg);
       })
       .addCase(fetchRisksForCustomer.rejected, (state, action) => {
+        if (action.meta.requestId !== state.pipelineRisksRequestId) return;
         state.pipelineRisksLoading = false;
         state.pipelineRisksError = action.payload ?? 'Could not load risks.';
       })
-      .addCase(fetchRisksForAccount.pending, (state) => {
+      .addCase(fetchRisksForAccount.pending, (state, action) => {
         state.pipelineRisksLoading = true;
         state.pipelineRisksError = null;
+        state.pipelineRisksRequestId = action.meta.requestId;
+        // Another organization's or account's never show under this one.
+        if (listScope(action.meta.arg.customerId, action.meta.arg.accountId) !== state.pipelineRisksFor) {
+          state.pipelineRisks = [];
+          state.pipelineRisksFor = null;
+        }
       })
       .addCase(fetchRisksForAccount.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.pipelineRisksRequestId) return;
         state.pipelineRisksLoading = false;
         state.pipelineRisks = action.payload;
+        state.pipelineRisksFor = listScope(action.meta.arg.customerId, action.meta.arg.accountId);
       })
       .addCase(fetchRisksForAccount.rejected, (state, action) => {
+        if (action.meta.requestId !== state.pipelineRisksRequestId) return;
         state.pipelineRisksLoading = false;
         state.pipelineRisksError = action.payload ?? 'Could not load risks.';
       })

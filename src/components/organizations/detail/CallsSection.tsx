@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { fetchCalls } from '../../../features/calls/callsSlice';
 import type { Account } from '../../../features/customers/customersSlice';
+import { listScope } from '../../../lib/listScope';
 import { byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
 import { callsSummary } from '../../../features/organizations/listSummaries';
 import { dayLabel, groupByDay, localDay } from '../../../features/organizations/storyDays';
@@ -41,8 +42,9 @@ export function CallsSection({
   onShowAll: () => void;
 }) {
   const dispatch = useAppDispatch();
-  const { items, isLoading, error } = useAppSelector((state) => state.calls);
-  const [loaded, setLoaded] = useState(false);
+  const { items, isLoading, error, scope } = useAppSelector((state) => state.calls);
+  // The shared slot holds this organization's calls (not another's).
+  const loaded = scope === listScope(customerId);
   const [attempt, setAttempt] = useState(0);
   const [logging, setLogging] = useState(false);
   if (!active && logging) setLogging(false);
@@ -50,7 +52,7 @@ export function CallsSection({
 
   // Before paint, as People does.
   useLayoutEffect(() => {
-    void dispatch(fetchCalls({ entityType: 'organization', customerId })).then(() => setLoaded(true));
+    void dispatch(fetchCalls({ entityType: 'organization', customerId }));
   }, [dispatch, customerId, version, attempt]);
 
   const target = chosenAccount(accounts, account);

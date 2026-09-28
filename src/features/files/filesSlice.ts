@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { apiFetch, apiFetchBlob, ApiError } from '../../lib/apiClient';
+import { listScope, parentScope } from '../../lib/listScope';
 
 // The Files tab on an organisation or account — see revenact-backend
 // docs/API_CONTRACTS.md -> Files. Anyone who may open the company may list
@@ -40,9 +41,13 @@ interface FilesState {
   error: string | null;
   uploading: boolean;
   uploadError: string | null;
+  /** Whose files `items` holds (listScope); null while none are. */
+  scope: string | null;
+  /** The last read asked for: a slower, earlier one never lands. */
+  requestId?: string;
 }
 
-const initialState: FilesState = { items: [], isLoading: false, error: null, uploading: false, uploadError: null };
+const initialState: FilesState = { items: [], isLoading: false, error: null, uploading: false, uploadError: null, scope: null };
 
 const message = (err: unknown, fallback: string) => (err instanceof ApiError ? err.message : fallback);
 
@@ -105,19 +110,29 @@ const filesSlice = createSlice({
     clearFiles(state) {
       state.items = [];
       state.error = null;
+      state.scope = null;
     },
   },
   extraReducers: (builder) => {
     builder
-      .addCase(fetchFiles.pending, (state) => {
+      .addCase(fetchFiles.pending, (state, action) => {
         state.isLoading = true;
         state.error = null;
+        state.requestId = action.meta.requestId;
+        // Another organization's or account's files never show under this one.
+        if (parentScope(action.meta.arg) !== state.scope) {
+          state.items = [];
+          state.scope = null;
+        }
       })
       .addCase(fetchFiles.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.requestId) return;
         state.isLoading = false;
         state.items = action.payload;
+        state.scope = parentScope(action.meta.arg);
       })
       .addCase(fetchFiles.rejected, (state, action) => {
+        if (action.meta.requestId !== state.requestId) return;
         state.isLoading = false;
         state.error = action.payload ?? 'Could not load the files.';
       })
@@ -127,7 +142,9 @@ const filesSlice = createSlice({
       })
       .addCase(uploadFile.fulfilled, (state, action) => {
         state.uploading = false;
-        state.items.unshift(action.payload);
+        // Only into the list it belongs to: its own, or its organization's roll-up.
+        const { customerId } = action.meta.arg;
+        if (state.scope === parentScope(action.meta.arg) || state.scope === listScope(customerId)) state.items.unshift(action.payload);
       })
       .addCase(uploadFile.rejected, (state, action) => {
         state.uploading = false;
