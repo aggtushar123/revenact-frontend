@@ -73,7 +73,7 @@ closing it on unmount or token change.
 | `/scenarios`, `/scenarios/create`, `/scenarios/:id` | `ScenariosList`, `CreateScenario` | auth |
 | `/canvas`, `/canvas/create`, `/canvas/:id` | `CanvasPage`, `CanvasEditor` | auth |
 | `/campaigns`, `/campaigns/create`, `/campaigns/:id` | `CampaignsList`, `CampaignEditor` | auth |
-| `/surveys` | `SurveysPage` | auth |
+| `/surveys` (`?customer=<id>` filters to one organisation, `GET /surveys/?customer=<id>`) | `SurveysPage` | auth |
 | `/lifecycle` | `LifecyclePage` | auth |
 | `/custom-objects/:id` | `CustomObjectRecordsPage` | auth |
 | `/integrations` | `Integrations` | auth |
@@ -263,23 +263,30 @@ in instead.
    tabs, in the URL as `?tab=`, are Story, Details (the connected accounts as
    list items linking to `/accounts/:id`, with Add and Edit; then the List's six
    panels; then the email, phone, industry and CSAT response bands from
-   `GET /customers/{id}/`; then `AIAttributesPanel`), People (contacts), Deals & risks (opportunities and
-   risks), Knowledge (Company View, then headlines) and Files (files, then
-   CallSense calls); the last four read their data when first opened. Opening a
+   `GET /customers/{id}/`; then `AIAttributesPanel`), People (a list item per
+   person, with a summary line and search), Deals & risks (an Opportunities /
+   Risks switch over list items, the board from `sm`), Knowledge (Company
+   View, then headlines) and Files (files, then calls grouped by day; both
+   roll up the organisation's own records and every visible account's, each
+   tagged); the last four read their data when first opened. Opening a
    tab reads its data the first time only: visited tabs stay mounted, with
    inactive panels hidden, so returning doesn't reload or blank them, and the
    Story is read only once Story has been opened. The account chips
-   (`?account=`, an id or `none`) filter the Story, whose filters (`group`,
-   `source`, `q`) live in the URL too. "+ Add" offers Log a call, New task, New
+   (`?account=`, an id or `none`) sit above the tabs on Story, People, Deals &
+   risks and Files and filter each (the lists client-side by `account_id`);
+   a chip counts the active tab: story items, people, opportunities plus
+   risks, or files plus calls. New contacts, opportunities, risks, files and
+   calls go on the chosen account. The Story's filters (`group`, `source`,
+   `q`) live in the URL too. "+ Add" offers Log a call, New task, New
    note and Log survey — there is no "Log activity", since there's no create
    endpoint for it — with the existing forms, on the chosen account when there
    is one or at organisation level otherwise; an email opens its thread; any
    other item opens in place, with its link when it has one. A failed task or
    note save keeps the sheet open, keeps what was typed, and shows "Could not
    save that task." or "Could not save that note.", or the server's message.
-   The Feedback filter group shows "Manage surveys", a link to `/surveys`
-   (that page has no per-organization filter yet, a follow-up). Edit opens
-   `OrganizationFormModal`;
+   The Feedback filter group shows "Manage surveys", a link to
+   `/surveys?customer={id}`. Edit opens `OrganizationFormModal`; Add account,
+   beside it, opens `AccountFormModal`;
    ⋯ archives (`POST /organizations/bulk/`) or churns
    (`ChurnOrganizationModal`). A tile jumps to its Details panel; Health opens
    its breakdown. An id that is not a number, or one the viewer cannot see,

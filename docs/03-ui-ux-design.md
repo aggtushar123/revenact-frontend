@@ -456,13 +456,27 @@ Rules specific to it, enforced by `components/organizations/detail/houseRules.te
 
 - Name row: initials in a `bg-subtle` circle (never a third-party logo), the
   name at 22px, "owner · lifecycle · Touched Nd ago" at 13px, the signal tag,
-  then Edit and a ⋯ menu (Archive, Churn while they apply).
+  then Edit, Add account (icon-only below sm) and a ⋯ menu (Archive, Churn while they apply).
 - Tiles: Health (ring and trend; opens the five-part breakdown below the
   tiles), ARR (in the customer's own currency), Renewal (runway) and Pulse
   ("AI n · CSM n", dots, "pulses disagree"). Each is a button; the last three
   jump to their Details panel. A grid of four from `sm`, a snapping strip below.
-- Account chips (All, each account, Organization) carry only a name and the
-  story's count; the chosen one is `bg-accent text-on-accent`.
+- Account chips (All, each account, Organization) sit above the tabs on
+  Story, People, Deals & risks and Files, never on Details or Knowledge.
+  They carry only a name and the active tab's count (story items, people,
+  opportunities plus risks, files plus calls); the chosen one is
+  `bg-accent text-on-accent`, and "Edit <account>" ends the row.
+- People, Deals & risks and Files are lists, never tables
+  (`detail/ListParts.tsx`, `detail/listStyles.ts`): a one-line summary with
+  its figures in DM Mono replaces the stat cards; each tab is one
+  `bg-surface` list with dividers; an item is a leading icon or initials, a
+  13px title with its figure or time in DM Mono on the right, then an 11px
+  line with the account tag (as the Story's). People's ⋯ holds Edit and
+  Delete; a deal opens its edit form; a file's name downloads it. Calls are
+  grouped by day like the Story, with no rail and no inner scroll. Each list
+  has a skeleton, an error with Try again, and empty states that offer "Show
+  all accounts" under an account chip. Phones put a person's links on their
+  own line and drop the board.
 - Details opens with Accounts (`detail/AccountsSection.tsx`): a summary line
   above the list shows counts, the health mix, total ARR, NPS with its
   promoter, passive and detractor split, average CSAT and average CSM (both
@@ -710,7 +724,8 @@ it, and a tapped card opens in the bottom sheet. Every control is 44px.
 
 The organization page below `sm`: the name row, the tiles as a strip that
 snaps sideways, the account chips and the tabs each scroll sideways in their
-own row, and the content is full width. "+ Add" and an email's thread open as
+own row, Add account is icon-only, a person's email and phone take their own
+line, Deals & risks has no board, and the content is full width. "+ Add" and an email's thread open as
 bottom sheets. Every control is 44px.
 
 ---
