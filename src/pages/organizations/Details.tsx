@@ -302,7 +302,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
             ) : key === 'people' ? (
               <PeopleTab customerId={orgId} account={params.account} accounts={accounts} isSm={isSm} onShowAll={showAll} />
             ) : key === 'deals' ? (
-              <DealsTab customerId={orgId} />
+              <DealsTab customerId={orgId} account={params.account} accounts={accounts} isSm={isSm} onShowAll={showAll} />
             ) : key === 'knowledge' ? (
               row ? <KnowledgeTab customerId={orgId} customerName={row.name} /> : <TabSkeleton label="Loading knowledge" />
             ) : (
