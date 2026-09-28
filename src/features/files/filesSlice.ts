@@ -16,6 +16,10 @@ export interface Attachment {
   uploaded_by: { id: number; name: string } | null;
   download_url: string;
   created_at: string;
+  /** The account it is on; null on the organization itself. The
+   *  organization's list rolls up its visible accounts' files. */
+  account_id?: number | null;
+  account_name?: string | null;
 }
 
 export interface FileParent {

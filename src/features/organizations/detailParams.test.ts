@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ACCOUNT_TABS,
   DETAIL_TABS,
   detailPanelId,
   detailTabId,
@@ -15,6 +16,10 @@ const parse = (search: string) => parseDetailParams(new URLSearchParams(search))
 describe('the organization page URL state', () => {
   it('has six tabs, Story first (spec §1)', () => {
     expect(DETAIL_TABS.map((tab) => tab.label)).toEqual(['Story', 'Details', 'People', 'Deals & risks', 'Knowledge', 'Files']);
+  });
+
+  it('lets the account chips filter Story, People, Deals & risks and Files, not Details or Knowledge (spec 2026-09-27 §1)', () => {
+    expect(DETAIL_TABS.filter(({ key }) => ACCOUNT_TABS.has(key)).map(({ key }) => key)).toEqual(['story', 'people', 'deals', 'files']);
   });
 
   it('reads defaults, and drops unknown values rather than failing', () => {

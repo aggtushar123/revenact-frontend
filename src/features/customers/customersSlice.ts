@@ -433,6 +433,9 @@ export interface Contact {
   last_contacted_at: string | null;
   companies: CompanyRef[];
   account_name: string | null;
+  /** The account it is on; null on the organization itself (spec
+   *  2026-09-27 §6). Optional: fixtures from before it read as null. */
+  account_id?: number | null;
 }
 
 export interface ContactSentimentEvidence {
@@ -516,6 +519,8 @@ export interface Opportunity {
   department_display: string;
   companies: CompanyRef[];
   account_name: string | null;
+  /** The account it is on; null on the organization itself. */
+  account_id?: number | null;
 }
 
 // The fields the Add/Edit Opportunity form actually exposes.
@@ -546,6 +551,8 @@ export interface Risk {
   department_display: string;
   companies: CompanyRef[];
   account_name: string | null;
+  /** The account it is on; null on the organization itself. */
+  account_id?: number | null;
 }
 
 // The fields the Add/Edit Risk form actually exposes.

@@ -70,6 +70,10 @@ export function hasStoryFilters(p: DetailParams): boolean {
   return Boolean(p.account || p.group || p.sources.length || p.q.trim());
 }
 
+/** The tabs the account chips filter (spec 2026-09-27 §1). Details and
+ *  Knowledge are the whole organization's, so the chips are not shown there. */
+export const ACCOUNT_TABS: ReadonlySet<DetailTab> = new Set<DetailTab>(['story', 'people', 'deals', 'files']);
+
 export const detailTabId = (base: string, tab: DetailTab) => `${base}-tab-${tab}`;
 /** One panel per tab: a visited tab stays mounted, hidden, while another shows. */
 export const detailPanelId = (base: string, tab: DetailTab) => `${base}-panel-${tab}`;

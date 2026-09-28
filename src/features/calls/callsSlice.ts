@@ -28,6 +28,10 @@ export interface Call {
   participants: { id: number; name: string; role_display: string; sentiment: string }[];
   links: number;
   created_at: string;
+  /** The account it is on; null on the organization itself. The
+   *  organization's list rolls up its visible accounts' calls. */
+  account_id?: number | null;
+  account_name?: string | null;
 }
 
 export interface LogCallInput {
