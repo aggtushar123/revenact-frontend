@@ -17,7 +17,15 @@ export const CITED_SOURCE = {
 type FetchSpy = ReturnType<typeof vi.fn<(url: string, init?: RequestInit) => Promise<unknown>>>;
 
 export function stubCopilot(
-  options: { statuses?: number[]; hold?: boolean; conversations?: unknown[]; conversationById?: Record<number, unknown> } = {},
+  options: {
+    statuses?: number[];
+    hold?: boolean;
+    conversations?: unknown[];
+    conversationById?: Record<number, unknown>;
+    /** The server's label for an organisation page's context ("Pizza Hut ·
+     *  EMEA"), stored on the context and the origin as the backend does. */
+    label?: (context: Record<string, unknown>) => string;
+  } = {},
 ) {
   const statuses = [...(options.statuses ?? [])];
   const messages: Record<string, unknown>[] = [];
@@ -32,6 +40,7 @@ export function stubCopilot(
       const status = statuses.shift() ?? 200;
       if (status >= 400) return reply({ detail: status === 429 ? 'Budget exhausted.' : 'Server error.' }, status);
       const body = JSON.parse(String(init.body)) as { content: string; context?: Record<string, unknown> };
+      if (body.context && options.label) body.context = { ...body.context, label: options.label(body.context) };
       if (body.context && origin === null) {
         origin = { ...body.context };
         delete origin.focus;

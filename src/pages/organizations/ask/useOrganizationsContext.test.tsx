@@ -28,9 +28,22 @@ describe('useOrganizationsContext', () => {
     expect(result.current).toEqual({ surface: 'organizations', focus: null, ...expected });
   });
 
-  it('has no context off the list and the board', () => {
-    expect(parseOrganizationsView('/organizations/7')).toBeNull();
-    const { result } = renderHook(() => useOrganizationsContext(), { wrapper: at('/organizations/7') });
+  it.each([
+    ['/organizations/7', { organization: 7, account: null }],
+    ['/organizations/7?account=31', { organization: 7, account: 31 }],
+    ['/organizations/7?account=31&tab=people&q=renewal', { organization: 7, account: 31 }],
+    // "Organization" (records on the organisation itself) and the whole-organisation tabs carry no account.
+    ['/organizations/7?account=none', { organization: 7, account: null }],
+    ['/organizations/7?account=31&tab=details', { organization: 7, account: null }],
+  ])("%s: an organisation's page", (url, expected) => {
+    expect(parseOrganizationsView(url.split('?')[0])).toBe('detail');
+    const { result } = renderHook(() => useOrganizationsContext(), { wrapper: at(url) });
+    expect(result.current).toEqual({ surface: 'organizations', view: 'detail', focus: null, ...expected });
+  });
+
+  it('has no context off the list, the board and an organisation', () => {
+    for (const path of ['/organizations', '/organizations/new', '/dashboard/overview']) expect(parseOrganizationsView(path)).toBeNull();
+    const { result } = renderHook(() => useOrganizationsContext(), { wrapper: at('/organizations/new') });
     expect(result.current).toBeNull();
   });
 });
