@@ -4,6 +4,7 @@ import { useAppDispatch, useAppSelector } from '../../hooks';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
 import { fetchAccountsForCustomer, type Account } from '../../features/customers/customersSlice';
 import {
+  ACCOUNT_TABS,
   DETAIL_TABS,
   detailPanelId,
   detailTabId,
@@ -29,6 +30,7 @@ import { StoryTab } from '../../components/organizations/detail/StoryTab';
 import { useDetailParams } from '../../components/organizations/detail/useDetailParams';
 import { useOrganization } from '../../components/organizations/detail/useOrganization';
 import { useStory } from '../../components/organizations/detail/useStory';
+import { useChipCounts } from '../../components/organizations/detail/useChipCounts';
 import { EmptyState, ErrorBlock } from '../../components/organizations/portfolio/PortfolioSections';
 import { errorMessage } from '../../components/organizations/portfolio/usePortfolio';
 import { FOCUS, QUIET } from '../../components/organizations/portfolio/styles';
@@ -144,6 +146,9 @@ function OrganizationPage({ id }: { id: string | undefined }) {
     if (orgId !== null) dispatch(fetchAccountsForCustomer(orgId));
   }, [dispatch, orgId, accountsAttempt]);
 
+  // The chips' numbers follow the tab (spec 2026-09-27 §1).
+  const chipCounts = useChipCounts(params.tab, story.data?.counts.by_account ?? null, accounts);
+
   const [editing, setEditing] = useState(false);
   const [churning, setChurning] = useState(false);
   const [archiving, setArchiving] = useState(false);
@@ -228,12 +233,12 @@ function OrganizationPage({ id }: { id: string | undefined }) {
           </div>
         ) : null}
 
-        {tab === 'story' ? (
+        {ACCOUNT_TABS.has(tab) ? (
           <AccountChips
             accounts={accounts}
             loading={accountsBusy}
             error={accountsFailure}
-            counts={story.data?.counts.by_account ?? null}
+            counts={chipCounts}
             selected={params.account}
             onSelect={(account) => update({ account })}
             onRetry={() => setAccountsAttempt((n) => n + 1)}
