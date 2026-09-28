@@ -564,13 +564,13 @@ describe('the organization page (/organizations/:id)', () => {
     expect(screen.queryByRole('button', { name: 'More actions for Pizza Hut' })).not.toBeInTheDocument();
   });
 
-  it('links Feedback to the Surveys page, where surveys are edited, expired and deleted', async () => {
+  it('links Feedback to the Surveys page filtered to this organization', async () => {
     stubOrganizationPage();
     renderOrganizationPage();
     await landed();
     expect(screen.queryByRole('link', { name: 'Manage surveys' })).not.toBeInTheDocument();
     await userEvent.click(within(screen.getByRole('group', { name: 'Show' })).getByRole('button', { name: /^Feedback/ }));
-    expect(await screen.findByRole('link', { name: 'Manage surveys' })).toHaveAttribute('href', '/surveys');
+    expect(await screen.findByRole('link', { name: 'Manage surveys' })).toHaveAttribute('href', '/surveys?customer=7');
   });
 
   it('closes an open sheet when Back leaves the Story tab, and gives the page its scroll back', async () => {

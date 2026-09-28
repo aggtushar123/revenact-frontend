@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Account } from '../../../features/customers/customersSlice';
+import { chosenAccount } from '../../../features/organizations/accountScope';
 import { hasStoryFilters, type DetailParams, type DetailTab } from '../../../features/organizations/detailParams';
 import type { PanelKey } from '../../../features/organizations/portfolioFields';
 import type { AddKind } from '../../../features/organizations/storyKinds';
@@ -51,7 +52,7 @@ export function StoryTab({
   }
   // An account the organization does not have (a stale or hand-edited
   // ?account=) is no place to save: + Add saves on the organization.
-  const chosen = /^\d+$/.test(params.account) ? accounts.find((account) => account.id === Number(params.account)) : undefined;
+  const chosen = chosenAccount(accounts, params.account);
   const accountId = chosen?.id;
   const accountName = chosen?.name;
   const onSearch = useCallback((q: string) => onUpdate({ q }, { replace: true }), [onUpdate]);
@@ -84,11 +85,10 @@ export function StoryTab({
         }}
       />
       {params.group === 'feedback' ? (
-        // Surveys are edited, expired and deleted on the Surveys page, which
-        // has no per-organization filter yet, so this links to all of them.
+        // Surveys are edited, expired and deleted on the Surveys page, filtered to this organization.
         <p className="flex flex-wrap items-center gap-2 text-[13px] text-ink-muted">
           <span>Edit, expire or delete a survey on the Surveys page.</span>
-          <Link to="/surveys" className={`${QUIET} border border-line`}>
+          <Link to={`/surveys?customer=${orgId}`} className={`${QUIET} border border-line`}>
             Manage surveys
           </Link>
         </p>

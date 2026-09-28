@@ -920,6 +920,9 @@ interface CustomersState {
   surveys: Survey[];
   surveysLoading: boolean;
   surveysError: string | null;
+  /** The last fetchSurveys asked for: an earlier, slower read (another
+   *  organization's) never overwrites it. */
+  surveysRequestId?: string;
   /** Canvases for whichever Customer or Account the "Canvas List" tab
    * is currently showing — same single-slot reasoning as
    * `entitySurveys` above. Deliberately separate from `canvases` below
@@ -1767,14 +1770,15 @@ export const deleteRisk = createAsyncThunk<number, number, { rejectValue: string
 );
 
 // Powers the standalone Surveys page — every Survey across every
-// Customer/Account the caller's organisation owns, unpaginated (see
-// SurveyListView's own docstring on the backend — its own rollup
-// cards are computed client-side from this same list).
-export const fetchSurveys = createAsyncThunk<Survey[], void, { rejectValue: string }>(
+// Customer/Account the caller's organisation owns, or with `customerId`
+// one organisation's (organisation-level and its visible accounts', spec
+// 2026-09-27 §5). Unpaginated (see SurveyListView's own docstring on the
+// backend — its own rollup cards are computed client-side from this list).
+export const fetchSurveys = createAsyncThunk<Survey[], number | void, { rejectValue: string }>(
   'customers/fetchSurveys',
-  async (_, { rejectWithValue }) => {
+  async (customerId, { rejectWithValue }) => {
     try {
-      return await apiFetch<Survey[]>('/surveys/');
+      return await apiFetch<Survey[]>(customerId ? `/surveys/?customer=${customerId}` : '/surveys/');
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not load surveys.';
       return rejectWithValue(message);
@@ -2862,15 +2866,18 @@ const customersSlice = createSlice({
         state.pipelineRisksLoading = false;
         state.pipelineRisksError = action.payload ?? 'Could not load risks.';
       })
-      .addCase(fetchSurveys.pending, (state) => {
+      .addCase(fetchSurveys.pending, (state, action) => {
         state.surveysLoading = true;
         state.surveysError = null;
+        state.surveysRequestId = action.meta.requestId;
       })
       .addCase(fetchSurveys.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.surveysRequestId) return;
         state.surveysLoading = false;
         state.surveys = action.payload;
       })
       .addCase(fetchSurveys.rejected, (state, action) => {
+        if (action.meta.requestId !== state.surveysRequestId) return;
         state.surveysLoading = false;
         state.surveysError = action.payload ?? 'Could not load surveys.';
       })

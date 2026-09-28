@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useId, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ClipboardList, Plus, ThumbsUp, Smile, Gauge, Pencil, Trash2, Clock } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { fetchSurveys, fetchCustomers, updateSurvey, deleteSurvey } from '../../features/customers/customersSlice';
@@ -38,14 +38,31 @@ export function SurveysPage() {
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null);
   const [deletingSurvey, setDeletingSurvey] = useState<Survey | null>(null);
 
+  // ?customer=<id> narrows the page to one organization (spec 2026-09-27
+  // §5); the organization page's "Manage surveys" links here with it.
+  const [search, setSearch] = useSearchParams();
+  const pickerId = useId();
+  const customerParam = search.get('customer') ?? '';
+  const customerId = /^[1-9]\d*$/.test(customerParam) ? Number(customerParam) : null;
+
   useEffect(() => {
-    dispatch(fetchSurveys());
-    // Company picker for "Log Survey" — same source as PipelinesPage's
-    // own Add Opportunity/Add Risk.
+    dispatch(fetchSurveys(customerId ?? undefined));
+  }, [dispatch, customerId]);
+  useEffect(() => {
+    // The company pickers (Log Survey, and the organization filter) — same
+    // source as PipelinesPage's own Add Opportunity/Add Risk.
     dispatch(fetchCustomers());
   }, [dispatch]);
 
   const companies = useMemo(() => customers.map((c) => ({ id: c.id, name: c.name })), [customers]);
+  // The picker lists the first page of organizations; one not on it is
+  // named from its surveys, or by its id.
+  const filteredName =
+    customerId === null
+      ? null
+      : (companies.find((c) => c.id === customerId)?.name ??
+        surveys.flatMap((s) => s.companies).find((c) => c.id === customerId)?.name ??
+        `Organization ${customerId}`);
 
   const rollup = useMemo(() => {
     const buckets: Record<Survey['survey_type'], { sent: number; responded: number; scoreSum: number }> = {
@@ -99,7 +116,7 @@ export function SurveysPage() {
         <div>
           <h1 className="text-[20px] font-bold text-ink tracking-tight">Surveys</h1>
           <p className="text-[13px] text-ink-faint font-medium mt-0.5">
-            Every NPS/CSAT/CES survey logged across every Organization and Account.
+            {filteredName ? `Every NPS/CSAT/CES survey logged for ${filteredName} and its accounts.` : 'Every NPS/CSAT/CES survey logged across every Organization and Account.'}
           </p>
         </div>
         <button
@@ -109,6 +126,28 @@ export function SurveysPage() {
           <Plus className="w-4 h-4" />
           Log Survey
         </button>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <label htmlFor={pickerId} className="text-[13px] font-semibold text-ink">
+          Organization
+        </label>
+        <select
+          id={pickerId}
+          value={customerId === null ? '' : String(customerId)}
+          onChange={(e) => setSearch(e.target.value ? { customer: e.target.value } : {})}
+          className="min-h-11 w-full max-w-xs rounded-lg border border-line bg-surface px-3 text-[13px] text-ink sm:min-h-9 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+        >
+          <option value="">All organizations</option>
+          {customerId !== null && !companies.some((c) => c.id === customerId) ? (
+            <option value={String(customerId)}>{filteredName}</option>
+          ) : null}
+          {companies.map((c) => (
+            <option key={c.id} value={String(c.id)}>
+              {c.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       {surveysError && <p className="text-[12.5px] text-danger">{surveysError}</p>}
@@ -167,7 +206,7 @@ export function SurveysPage() {
         ) : rows.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 gap-1 text-center">
             <ClipboardList className="w-8 h-8 text-ink-faint mb-1" />
-            <p className="text-[14px] font-semibold text-ink-muted">No surveys logged yet.</p>
+            <p className="text-[13px] font-semibold text-ink-muted">{filteredName ? `No surveys logged for ${filteredName} yet.` : 'No surveys logged yet.'}</p>
           </div>
         ) : (
           <div className="overflow-x-auto flex-1">

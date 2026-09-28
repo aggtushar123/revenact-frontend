@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
@@ -59,7 +59,12 @@ function DetailsStub() {
   );
 }
 
-function renderPage() {
+function Where() {
+  const location = useLocation();
+  return <p data-testid="where">{`${location.pathname}${location.search}`}</p>;
+}
+
+function renderPage(url = '/surveys') {
   const store = configureStore({
     reducer: { customers: customersReducer, auth: authReducer },
     preloadedState: {
@@ -97,9 +102,17 @@ function renderPage() {
   });
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/surveys']}>
+      <MemoryRouter initialEntries={[url]}>
         <Routes>
-          <Route path="/surveys" element={<SurveysPage />} />
+          <Route
+            path="/surveys"
+            element={
+              <>
+                <SurveysPage />
+                <Where />
+              </>
+            }
+          />
           <Route path="/organizations/:id" element={<DetailsStub />} />
         </Routes>
       </MemoryRouter>
@@ -230,7 +243,7 @@ describe('SurveysPage (/surveys)', () => {
         expect.objectContaining({ method: 'POST' })
       )
     );
-    expect(await screen.findByText('Shopify')).toBeInTheDocument();
+    expect(await within(await screen.findByRole('table')).findByText('Shopify')).toBeInTheDocument();
   });
 
   it('clicking a row navigates to its Customer\'s Details page with the Surveys filter active', async () => {
@@ -376,5 +389,53 @@ describe('SurveysPage (/surveys)', () => {
 
     expect(screen.getByText('Score Trend')).toBeInTheDocument();
     expect(screen.queryByText('Not enough responses yet.')).not.toBeInTheDocument();
+  });
+
+  it('filters to one organization from ?customer=, and the picker keeps its choice in the URL', async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes('/surveys/?customer=6')) return Promise.resolve(jsonResponse(200, [sentNps]));
+      if (url.endsWith('/surveys/')) return Promise.resolve(jsonResponse(200, [sentNps, respondedCsat]));
+      if (url.includes('/customers/')) {
+        return Promise.resolve(
+          jsonResponse(200, { count: 2, next: null, previous: null, results: [{ id: 6, name: 'Shopify' }, { id: 8, name: 'WeWork' }] }),
+        );
+      }
+      return Promise.resolve(jsonResponse(200, []));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    renderPage('/surveys?customer=6');
+
+    const table = await screen.findByRole('table');
+    expect(await within(table).findByText('Shopify')).toBeInTheDocument();
+    expect(within(table).queryByText('WeWork')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Organization')).toHaveValue('6');
+    expect(await screen.findByText('Every NPS/CSAT/CES survey logged for Shopify and its accounts.')).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Organization'), '');
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/surveys$/);
+    expect(await within(screen.getByRole('table')).findByText('WeWork')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Organization'), '8');
+    expect(screen.getByTestId('where')).toHaveTextContent('/surveys?customer=8');
+  });
+
+  it('shows an organization it cannot name as its own option, with an empty list rather than an error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        Promise.resolve(jsonResponse(200, url.includes('/surveys/') ? [] : EMPTY_CUSTOMERS_PAGE)),
+      ),
+    );
+    renderPage('/surveys?customer=999');
+    expect(await screen.findByText('No surveys logged for Organization 999 yet.')).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Organization 999' })).toBeInTheDocument();
+  });
+
+  it('ignores a malformed ?customer= and reads every survey', async () => {
+    const fetchMock = makeFetchMock({ surveys: [sentNps] });
+    vi.stubGlobal('fetch', fetchMock);
+    renderPage('/surveys?customer=abc');
+    expect(await screen.findByText('Shopify')).toBeInTheDocument();
+    expect(screen.getByLabelText('Organization')).toHaveValue('');
   });
 });
