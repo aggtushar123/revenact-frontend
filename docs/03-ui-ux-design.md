@@ -456,7 +456,7 @@ Rules specific to it, enforced by `components/organizations/detail/houseRules.te
 
 - Name row: initials in a `bg-subtle` circle (never a third-party logo), the
   name at 22px, "owner · lifecycle · Touched Nd ago" at 13px, the signal tag,
-  then Edit, Add account (icon-only below sm) and a ⋯ menu (Archive, Churn while they apply).
+  then Edit and Add account (both icon-only below sm) and a ⋯ menu (Archive, Churn while they apply).
 - Tiles: Health (ring and trend; opens the five-part breakdown below the
   tiles), ARR (in the customer's own currency), Renewal (runway) and Pulse
   ("AI n · CSM n", dots, "pulses disagree"). Each is a button; the last three
@@ -724,7 +724,7 @@ it, and a tapped card opens in the bottom sheet. Every control is 44px.
 
 The organization page below `sm`: the name row, the tiles as a strip that
 snaps sideways, the account chips and the tabs each scroll sideways in their
-own row, Add account is icon-only, a person's email and phone take their own
+own row, Edit and Add account are icon-only, a person's email and phone take their own
 line, Deals & risks has no board, and the content is full width. "+ Add" and an email's thread open as
 bottom sheets. Every control is 44px.
 

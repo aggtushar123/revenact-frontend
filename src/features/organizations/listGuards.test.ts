@@ -60,4 +60,28 @@ describe('list slots keep a slower read for another organization out', () => {
     expect(store.getState().files.scope).toBe('organization:8');
     expect(store.getState().calls.scope).toBeNull();
   });
+
+  it('a read again for the same organization keeps its rows until the new ones land', () => {
+    const store = makeDetailStore();
+    const org = { entityType: 'organization' as const, customerId: A };
+    store.dispatch(fetchContactsForCustomer.pending('a', A));
+    store.dispatch(fetchContactsForCustomer.fulfilled(CONTACTS, 'a', A));
+    store.dispatch(fetchOpportunitiesForCustomer.pending('b', A));
+    store.dispatch(fetchOpportunitiesForCustomer.fulfilled(OPPORTUNITIES, 'b', A));
+    store.dispatch(fetchFiles.pending('c', org));
+    store.dispatch(fetchFiles.fulfilled(FILES, 'c', org));
+    store.dispatch(fetchCalls.pending('d', org));
+    store.dispatch(fetchCalls.fulfilled(CALLS, 'd', org));
+
+    store.dispatch(fetchContactsForCustomer.pending('a2', A));
+    store.dispatch(fetchOpportunitiesForCustomer.pending('b2', A));
+    store.dispatch(fetchFiles.pending('c2', org));
+    store.dispatch(fetchCalls.pending('d2', org));
+    const { customers, files, calls } = store.getState();
+    expect(customers.contacts).toHaveLength(3);
+    expect(customers.contactsFor).toBe('organization:7');
+    expect(customers.pipelineOpportunities).toHaveLength(2);
+    expect(files.items).toHaveLength(2);
+    expect(calls.items).toHaveLength(2);
+  });
 });

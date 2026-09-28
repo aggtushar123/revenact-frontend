@@ -4,14 +4,15 @@ import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { fetchCalls } from '../../../features/calls/callsSlice';
 import type { Account } from '../../../features/customers/customersSlice';
 import { listScope } from '../../../lib/listScope';
-import { byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
+import { awaitingAccount, byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
 import { callsSummary } from '../../../features/organizations/listSummaries';
 import { dayLabel, groupByDay, localDay } from '../../../features/organizations/storyDays';
 import { ErrorBlock } from '../portfolio/PortfolioSections';
 import { BUTTON } from '../portfolio/styles';
 import { AddFlow } from './AddFlow';
 import { CallItem } from './CallItem';
-import { ListSkeleton, ScopedEmpty, SummaryLine } from './ListParts';
+import { AccountNames } from './accountNames';
+import { AddPaused, ListSkeleton, ScopedEmpty, SummaryLine } from './ListParts';
 import { LIST, SECTION_HEADING } from './listStyles';
 
 /** Calls (spec 2026-09-27 §4): the organization's calls and every visible
@@ -49,6 +50,7 @@ export function CallsSection({
   const [logging, setLogging] = useState(false);
   if (!active && logging) setLogging(false);
   const headingId = useId();
+  const pausedId = useId();
 
   // Before paint, as People does.
   useLayoutEffect(() => {
@@ -56,6 +58,7 @@ export function CallsSection({
   }, [dispatch, customerId, version, attempt]);
 
   const target = chosenAccount(accounts, account);
+  const paused = awaitingAccount(accounts, account);
   const shown = useMemo(() => byAccount(items, account), [items, account]);
   const days = useMemo(() => groupByDay(shown.map((call) => ({ ...call, all_day: false }))), [shown]);
   const today = localDay(new Date());
@@ -91,32 +94,41 @@ export function CallsSection({
   }
 
   return (
-    <section aria-labelledby={headingId} aria-busy={isLoading} className="flex flex-col gap-2">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={headingId} className={SECTION_HEADING}>
-          Calls
-        </h2>
-        <button type="button" onClick={() => setLogging(true)} className={BUTTON}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Log a call
-        </button>
-      </div>
-      {loaded && !failed && shown.length > 0 ? <SummaryLine parts={callsSummary(shown)} /> : null}
-      {body}
-      {active && logging ? (
-        <AddFlow
-          what="call"
-          customerId={customerId}
-          accountId={target?.id}
-          accountName={target?.name}
-          isSm={isSm}
-          onClose={() => setLogging(false)}
-          onAdded={() => {
-            setLogging(false);
-            onLogged();
-          }}
-        />
-      ) : null}
-    </section>
+    <AccountNames.Provider value={accounts}>
+      <section aria-labelledby={headingId} aria-busy={isLoading} className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 id={headingId} className={SECTION_HEADING}>
+            Calls
+          </h2>
+          <button
+            type="button"
+            onClick={() => setLogging(true)}
+            disabled={paused}
+            aria-describedby={paused ? pausedId : undefined}
+            className={BUTTON}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Log a call
+          </button>
+        </div>
+        {paused ? <AddPaused id={pausedId} /> : null}
+        {loaded && !failed && shown.length > 0 ? <SummaryLine parts={callsSummary(shown)} /> : null}
+        {body}
+        {active && logging ? (
+          <AddFlow
+            what="call"
+            customerId={customerId}
+            accountId={target?.id}
+            accountName={target?.name}
+            isSm={isSm}
+            onClose={() => setLogging(false)}
+            onAdded={() => {
+              setLogging(false);
+              onLogged();
+            }}
+          />
+        ) : null}
+      </section>
+    </AccountNames.Provider>
   );
 }

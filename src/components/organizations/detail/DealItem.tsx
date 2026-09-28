@@ -1,7 +1,6 @@
 import { useOrgCurrency } from '../../../hooks';
 import type { Opportunity, Risk } from '../../../features/customers/customersSlice';
 import { formatMoney } from '../../../features/customers/formatters';
-import { accountTag } from '../../../features/organizations/accountScope';
 import { PRIORITY_COLORS } from '../../pipelines/kanbanConfig';
 import { FOCUS } from '../portfolio/styles';
 import { AccountTag } from './ListParts';
@@ -30,7 +29,7 @@ export function DealItem({ deal, onOpen }: { deal: Opportunity | Risk; onOpen: (
           <span className="rounded-full bg-subtle px-2 py-0.5 text-ink">{deal.stage_display}</span>
           <span className={`rounded-full border px-2 py-0.5 ${PRIORITY_COLORS[deal.priority]}`}>{deal.priority_display} priority</span>
           <span>{deal.department ? deal.department_display : 'Whole company'}</span>
-          <AccountTag name={accountTag(deal)} />
+          <AccountTag record={deal} />
         </span>
       </button>
     </li>

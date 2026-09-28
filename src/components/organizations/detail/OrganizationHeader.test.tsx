@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { initech, pizzaHut } from '../../../features/organizations/testPortfolio';
 import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
@@ -34,6 +34,14 @@ describe('OrganizationHeader (spec §1.2)', () => {
     expect(add).toHaveClass('min-h-11', 'min-w-11', 'sm:min-h-9', 'sm:min-w-0');
     await userEvent.click(add);
     expect(onAddAccount).toHaveBeenCalledOnce();
+  });
+
+  it('shows Edit as an icon below sm, as Add account, so the name keeps the room; 44px, still named Edit', () => {
+    renderHeader();
+    const edit = screen.getByRole('button', { name: 'Edit' });
+    expect(edit).toHaveClass('min-h-11', 'min-w-11', 'justify-center', 'sm:min-h-9', 'sm:min-w-0');
+    expect(within(edit).getByText('Edit')).toHaveClass('sr-only', 'sm:not-sr-only');
+    expect(edit.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('keeps Add account while the record loads: it needs only the organization', () => {

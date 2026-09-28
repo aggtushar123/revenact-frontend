@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ComponentProps } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
@@ -84,6 +84,42 @@ describe('People (spec 2026-09-27 §2)', () => {
     expect(await screen.findByRole('heading', { name: 'Robin Ops' })).toBeInTheDocument();
     expect(postBodies(spy, '/customers/7/accounts/31/contacts/')).toEqual([expect.objectContaining({ name: 'Robin Ops' })]);
     expect(requestPaths(spy).filter((path) => path === 'GET /customers/7/contacts/')).toHaveLength(2);
+  });
+
+  it('keeps the people in place while the list reads again after an add', async () => {
+    const spy = stubOrganizationPage({ lists: ORGANIZATION_LISTS });
+    let reads = 0;
+    let answer: () => void = () => {};
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if ((init?.method ?? 'GET') === 'GET' && new URL(String(input)).pathname.endsWith('/customers/7/contacts/')) {
+          reads += 1;
+          if (reads === 2) await new Promise<void>((resolve) => (answer = resolve));
+        }
+        return spy(input, init);
+      }),
+    );
+    render(ui());
+    await waitFor(() => expect(people()).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: 'Add contact' }));
+    await userEvent.type(screen.getByLabelText(/^Name/), 'Robin Ops');
+    await userEvent.type(screen.getByLabelText(/^Email/), 'robin@pizzahut.example');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add Contact' }).find((button) => button.closest('form'))!);
+    await waitFor(() => expect(reads).toBe(2));
+    expect(people()).toEqual(['51', '52', '53']);
+    expect(screen.queryByText('No people yet')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading people' })).not.toBeInTheDocument();
+    answer();
+    await waitFor(() => expect(people()).toHaveLength(4));
+  });
+
+  it("tags each person with the account's current name, after a rename too", async () => {
+    renderPeople({ accounts: ACCOUNTS.map((a) => (a.id === 31 ? { ...a, name: 'EMEA West' } : a)) });
+    await waitFor(() => expect(people()).toHaveLength(3));
+    const dana = document.querySelector('[data-person="51"]') as HTMLElement;
+    expect(within(dana).getByText('EMEA West')).toBeInTheDocument();
+    expect(within(dana).queryByText('EMEA')).not.toBeInTheDocument();
   });
 
   it('adds on the organization under All', async () => {

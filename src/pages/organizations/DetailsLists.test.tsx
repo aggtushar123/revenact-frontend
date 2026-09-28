@@ -67,6 +67,79 @@ describe('the organization page, delivery 2: the lists and the account chips', (
     expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
   });
 
+  it('adds, edits and deletes on People after Files was visited: both tabs stay right, and the chips count each change', async () => {
+    const spy = stubOrganizationPage({ lists: ORGANIZATION_LISTS });
+    renderOrganizationPage('/organizations/7?tab=files');
+    const files = await screen.findByRole('tabpanel', { name: 'Files' });
+    expect(await within(files).findByText('Order form.pdf')).toBeInTheDocument();
+    await waitFor(() => expect(chip('All 4')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }));
+    const people = screen.getByRole('tabpanel', { name: 'People' });
+    expect(await within(people).findByRole('heading', { name: 'Pat Finance' })).toBeInTheDocument();
+    await waitFor(() => expect(chip('All 3')).toBeInTheDocument());
+
+    // Add on the organization.
+    await userEvent.click(within(people).getByRole('button', { name: 'Add contact' }));
+    await userEvent.type(screen.getByLabelText(/^Name/), 'Robin Ops');
+    await userEvent.type(screen.getByLabelText(/^Email/), 'robin@pizzahut.example');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add Contact' }).find((button) => button.closest('form'))!);
+    expect(await within(people).findByRole('heading', { name: 'Robin Ops' })).toBeInTheDocument();
+    await waitFor(() => expect(chip('All 4')).toBeInTheDocument());
+    expect(chip('Organization 2')).toBeInTheDocument();
+
+    // Edit.
+    await userEvent.click(within(people).getByRole('button', { name: 'Actions for Robin Ops' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    const name = screen.getByLabelText(/^Name/);
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Robin Lead');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await within(people).findByRole('heading', { name: 'Robin Lead' })).toBeInTheDocument();
+
+    // Delete: the chips count it at once, without another read.
+    const reads = spy.mock.calls.length;
+    await userEvent.click(within(people).getByRole('button', { name: 'Actions for Pat Finance' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(within(people).queryByRole('heading', { name: 'Pat Finance' })).not.toBeInTheDocument());
+    await waitFor(() => expect(chip('All 3')).toBeInTheDocument());
+    expect(chip('Organization 1')).toBeInTheDocument();
+    expect(spy.mock.calls.slice(reads).map(([, init]) => init?.method ?? 'GET')).toEqual(['DELETE']);
+
+    // Files kept its lists and its counts.
+    await userEvent.click(screen.getByRole('tab', { name: 'Files' }));
+    expect(within(files).getByText('Order form.pdf')).toBeInTheDocument();
+    expect(within(files).getByText('Quarterly check-in')).toBeInTheDocument();
+    expect(chip('All 4')).toBeInTheDocument();
+
+    // Back on People, still the edited list.
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }));
+    expect(within(people).getByRole('heading', { name: 'Robin Lead' })).toBeInTheDocument();
+    expect(chip('All 3')).toBeInTheDocument();
+  });
+
+  it('deletes a file after People was visited: the chips count the delete, and People is unchanged', async () => {
+    stubOrganizationPage({ lists: ORGANIZATION_LISTS });
+    renderOrganizationPage('/organizations/7?tab=people');
+    const people = await screen.findByRole('tabpanel', { name: 'People' });
+    expect(await within(people).findByRole('heading', { name: 'Dana Buyer' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Files' }));
+    const files = screen.getByRole('tabpanel', { name: 'Files' });
+    expect(await within(files).findByText('QBR deck.pptx')).toBeInTheDocument();
+    await waitFor(() => expect(chip('All 4')).toBeInTheDocument());
+    await userEvent.click(within(files).getByRole('button', { name: /delete qbr deck\.pptx/i }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(within(files).queryByText('QBR deck.pptx')).not.toBeInTheDocument());
+    await waitFor(() => expect(chip('All 3')).toBeInTheDocument());
+    expect(chip('Organization 1')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }));
+    expect(within(people).getAllByRole('heading')).toHaveLength(3);
+    expect(chip('All 3')).toBeInTheDocument();
+  });
+
   it('renders the phone layouts at 375px: links on their own line, no board, 44px chips', async () => {
     stubOrganizationPage({ lists: ORGANIZATION_LISTS });
     renderOrganizationPage('/organizations/7?tab=people', { width: 375 });

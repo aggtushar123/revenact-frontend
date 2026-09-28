@@ -1,7 +1,6 @@
 import { Ellipsis, Mail, Phone } from 'lucide-react';
 import type { Contact } from '../../../features/customers/customersSlice';
 import { capitalize, formatRelativeTime, initials } from '../../../features/customers/formatters';
-import { accountTag } from '../../../features/organizations/accountScope';
 import { mailtoHref, telHref } from '../../../lib/contactLinks';
 import { AccountTag } from './ListParts';
 import { ITEM_LINK, META, ROW_ACTION, ROW_ICON } from './listStyles';
@@ -67,7 +66,7 @@ export function PersonItem({
           {isSm ? <span className="shrink-0 text-[11px] text-ink-muted">{contacted}</span> : null}
         </div>
         <p className={META}>
-          <AccountTag name={accountTag(contact)} />
+          <AccountTag record={contact} />
           <span className="inline-flex items-center gap-1">
             <span aria-hidden="true" className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-success' : 'bg-line-strong'}`} />
             {capitalize(contact.status)}

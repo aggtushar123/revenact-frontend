@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../../hooks';
 import {
@@ -13,7 +13,7 @@ import {
   type Risk,
 } from '../../../features/customers/customersSlice';
 import { listScope } from '../../../lib/listScope';
-import { byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
+import { awaitingAccount, byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
 import { opportunitiesSummary, risksSummary } from '../../../features/organizations/listSummaries';
 import { KanbanBoard, PipelineCardContent } from '../../pipelines/KanbanBoard';
 import { OPPORTUNITY_STAGE_COLUMNS, RISK_STAGE_COLUMNS } from '../../pipelines/kanbanConfig';
@@ -24,7 +24,8 @@ import { ErrorBlock } from '../portfolio/PortfolioSections';
 import { BUTTON, FOCUS } from '../portfolio/styles';
 import { CountChip } from './CountChip';
 import { DealItem } from './DealItem';
-import { ListSearch, ListSkeleton, NoMatch, ScopedEmpty, SummaryLine } from './ListParts';
+import { AccountNames } from './accountNames';
+import { AddPaused, ListSearch, ListSkeleton, NoMatch, ScopedEmpty, SummaryLine } from './ListParts';
 import { LIST } from './listStyles';
 
 type Kind = 'opportunities' | 'risks';
@@ -92,6 +93,8 @@ export function DealsTab({
   const shownOpportunities = useMemo(() => scopedOpportunities.filter((row) => titled(row.title, q)), [scopedOpportunities, q]);
   const shownRisks = useMemo(() => scopedRisks.filter((row) => titled(row.title, q)), [scopedRisks, q]);
   const target = chosenAccount(accounts, account);
+  const paused = awaitingAccount(accounts, account);
+  const pausedId = useId();
 
   const isOpps = kind === 'opportunities';
   const error = isOpps ? pipelineOpportunitiesError : pipelineRisksError;
@@ -111,7 +114,7 @@ export function DealsTab({
         entities={shownOpportunities}
         renderCard={(entity) => PipelineCardContent(entity, currency)}
         onCardClick={setEditingOpportunity}
-        onAddClick={(stage) => setAddingOpportunity(stage)}
+        onAddClick={paused ? undefined : (stage) => setAddingOpportunity(stage)}
         onMove={(id, stage) => dispatch(updateOpportunity({ id, stage }))}
         minHeight="400px"
       />
@@ -121,7 +124,7 @@ export function DealsTab({
         entities={shownRisks}
         renderCard={(entity) => PipelineCardContent(entity, currency)}
         onCardClick={setEditingRisk}
-        onAddClick={(stage) => setAddingRisk(stage)}
+        onAddClick={paused ? undefined : (stage) => setAddingRisk(stage)}
         onMove={(id, stage) => dispatch(updateRisk({ id, stage }))}
         minHeight="400px"
       />
@@ -159,102 +162,107 @@ export function DealsTab({
   );
 
   return (
-    <div aria-busy={pipelineOpportunitiesLoading || pipelineRisksLoading} className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <div role="group" aria-label="Deals or risks" className="flex gap-2">
-          <CountChip
-            label="Opportunities"
-            count={loaded.opportunities ? scopedOpportunities.length : null}
-            pressed={isOpps}
-            onClick={() => setKind('opportunities')}
-          />
-          <CountChip label="Risks" count={loaded.risks ? scopedRisks.length : null} pressed={!isOpps} onClick={() => setKind('risks')} />
-        </div>
-        {isSm ? (
-          <div role="group" aria-label="View" className="ml-auto flex gap-1 rounded-lg border border-line p-0.5">
-            {segment('list', 'List', <ListIcon className="h-4 w-4" aria-hidden="true" />)}
-            {segment('board', 'Board', <LayoutGrid className="h-4 w-4" aria-hidden="true" />)}
+    <AccountNames.Provider value={accounts}>
+      <div aria-busy={pipelineOpportunitiesLoading || pipelineRisksLoading} className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div role="group" aria-label="Deals or risks" className="flex gap-2">
+            <CountChip
+              label="Opportunities"
+              count={loaded.opportunities ? scopedOpportunities.length : null}
+              pressed={isOpps}
+              onClick={() => setKind('opportunities')}
+            />
+            <CountChip label="Risks" count={loaded.risks ? scopedRisks.length : null} pressed={!isOpps} onClick={() => setKind('risks')} />
           </div>
+          {isSm ? (
+            <div role="group" aria-label="View" className="ml-auto flex gap-1 rounded-lg border border-line p-0.5">
+              {segment('list', 'List', <ListIcon className="h-4 w-4" aria-hidden="true" />)}
+              {segment('board', 'Board', <LayoutGrid className="h-4 w-4" aria-hidden="true" />)}
+            </div>
+          ) : null}
+        </div>
+        <div className={isSm ? 'flex items-center gap-2' : 'flex flex-col gap-2'}>
+          <ListSearch label={isOpps ? 'Search opportunities' : 'Search risks'} value={q} onChange={setQ} isSm={isSm} />
+          <button
+            type="button"
+            onClick={() => (isOpps ? setAddingOpportunity('discovery') : setAddingRisk('open'))}
+            disabled={paused}
+            aria-describedby={paused ? pausedId : undefined}
+            className={`${BUTTON} ${isSm ? 'ml-auto' : 'justify-center'}`}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {`Add ${isOpps ? 'opportunity' : 'risk'}${target ? ` to ${target.name}` : ''}`}
+          </button>
+        </div>
+        {paused ? <AddPaused id={pausedId} /> : null}
+        {loaded[kind] && !failed && scopedCount > 0 ? (
+          <SummaryLine parts={isOpps ? opportunitiesSummary(scopedOpportunities, currency) : risksSummary(scopedRisks, currency)} />
+        ) : null}
+        {body}
+
+        {addingOpportunity ? (
+          <OpportunityFormModal
+            customerId={customerId}
+            accountId={target?.id}
+            defaultStage={addingOpportunity}
+            onClose={() => setAddingOpportunity(null)}
+            onSaved={() => void dispatch(fetchOpportunitiesForCustomer(customerId))}
+          />
+        ) : null}
+        {editingOpportunity ? (
+          <OpportunityFormModal
+            opportunity={editingOpportunity}
+            onClose={() => setEditingOpportunity(null)}
+            onDeleteRequest={() => {
+              setDeletingOpportunity(editingOpportunity);
+              setEditingOpportunity(null);
+            }}
+          />
+        ) : null}
+        {deletingOpportunity ? (
+          <ConfirmDialog
+            title={`Delete ${deletingOpportunity.title}?`}
+            message="This can't be undone."
+            confirmLabel="Delete"
+            danger
+            onConfirm={async () => {
+              await dispatch(deleteOpportunity(deletingOpportunity.id)).unwrap();
+            }}
+            onClose={() => setDeletingOpportunity(null)}
+          />
+        ) : null}
+        {addingRisk ? (
+          <RiskFormModal
+            customerId={customerId}
+            accountId={target?.id}
+            defaultStage={addingRisk}
+            onClose={() => setAddingRisk(null)}
+            onSaved={() => void dispatch(fetchRisksForCustomer(customerId))}
+          />
+        ) : null}
+        {editingRisk ? (
+          <RiskFormModal
+            risk={editingRisk}
+            onClose={() => setEditingRisk(null)}
+            onDeleteRequest={() => {
+              setDeletingRisk(editingRisk);
+              setEditingRisk(null);
+            }}
+          />
+        ) : null}
+        {deletingRisk ? (
+          <ConfirmDialog
+            title={`Delete ${deletingRisk.title}?`}
+            message="This can't be undone."
+            confirmLabel="Delete"
+            danger
+            onConfirm={async () => {
+              await dispatch(deleteRisk(deletingRisk.id)).unwrap();
+            }}
+            onClose={() => setDeletingRisk(null)}
+          />
         ) : null}
       </div>
-      <div className={isSm ? 'flex items-center gap-2' : 'flex flex-col gap-2'}>
-        <ListSearch label={isOpps ? 'Search opportunities' : 'Search risks'} value={q} onChange={setQ} isSm={isSm} />
-        <button
-          type="button"
-          onClick={() => (isOpps ? setAddingOpportunity('discovery') : setAddingRisk('open'))}
-          className={`${BUTTON} ${isSm ? 'ml-auto' : 'justify-center'}`}
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {`Add ${isOpps ? 'opportunity' : 'risk'}${target ? ` to ${target.name}` : ''}`}
-        </button>
-      </div>
-      {loaded[kind] && !failed && scopedCount > 0 ? (
-        <SummaryLine parts={isOpps ? opportunitiesSummary(scopedOpportunities, currency) : risksSummary(scopedRisks, currency)} />
-      ) : null}
-      {body}
-
-      {addingOpportunity ? (
-        <OpportunityFormModal
-          customerId={customerId}
-          accountId={target?.id}
-          defaultStage={addingOpportunity}
-          onClose={() => setAddingOpportunity(null)}
-          onSaved={() => void dispatch(fetchOpportunitiesForCustomer(customerId))}
-        />
-      ) : null}
-      {editingOpportunity ? (
-        <OpportunityFormModal
-          opportunity={editingOpportunity}
-          onClose={() => setEditingOpportunity(null)}
-          onDeleteRequest={() => {
-            setDeletingOpportunity(editingOpportunity);
-            setEditingOpportunity(null);
-          }}
-        />
-      ) : null}
-      {deletingOpportunity ? (
-        <ConfirmDialog
-          title={`Delete ${deletingOpportunity.title}?`}
-          message="This can't be undone."
-          confirmLabel="Delete"
-          danger
-          onConfirm={async () => {
-            await dispatch(deleteOpportunity(deletingOpportunity.id)).unwrap();
-          }}
-          onClose={() => setDeletingOpportunity(null)}
-        />
-      ) : null}
-      {addingRisk ? (
-        <RiskFormModal
-          customerId={customerId}
-          accountId={target?.id}
-          defaultStage={addingRisk}
-          onClose={() => setAddingRisk(null)}
-          onSaved={() => void dispatch(fetchRisksForCustomer(customerId))}
-        />
-      ) : null}
-      {editingRisk ? (
-        <RiskFormModal
-          risk={editingRisk}
-          onClose={() => setEditingRisk(null)}
-          onDeleteRequest={() => {
-            setDeletingRisk(editingRisk);
-            setEditingRisk(null);
-          }}
-        />
-      ) : null}
-      {deletingRisk ? (
-        <ConfirmDialog
-          title={`Delete ${deletingRisk.title}?`}
-          message="This can't be undone."
-          confirmLabel="Delete"
-          danger
-          onConfirm={async () => {
-            await dispatch(deleteRisk(deletingRisk.id)).unwrap();
-          }}
-          onClose={() => setDeletingRisk(null)}
-        />
-      ) : null}
-    </div>
+    </AccountNames.Provider>
   );
 }

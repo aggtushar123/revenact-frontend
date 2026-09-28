@@ -49,6 +49,13 @@ describe('FilesSection (spec 2026-09-27 §4)', () => {
     expect(screen.getByRole('region', { name: 'Files' }).querySelector('.overflow-y-auto, .overflow-auto')).toBeNull();
   });
 
+  it("tags each file with the account's current name, after a rename too", async () => {
+    renderFiles({ accounts: ACCOUNTS.map((a) => (a.id === 31 ? { ...a, name: 'EMEA West' } : a)) });
+    await waitFor(() => expect(fileIds()).toEqual(['81', '82']));
+    const [order] = within(screen.getByRole('list', { name: 'Files' })).getAllByRole('listitem');
+    expect(within(order).getByText('EMEA West')).toBeInTheDocument();
+  });
+
   it('narrows to the chosen account, and to the organization itself', async () => {
     renderFiles({ account: '31' });
     await waitFor(() => expect(fileIds()).toEqual(['81']));

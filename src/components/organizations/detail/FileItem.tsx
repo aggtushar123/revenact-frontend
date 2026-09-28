@@ -2,7 +2,6 @@ import { FileText, Mic, Trash2 } from 'lucide-react';
 import { formatDate } from '../../../features/customers/formatters';
 import { formatSize } from '../../../features/files/fileFormat';
 import type { Attachment } from '../../../features/files/filesSlice';
-import { accountTag } from '../../../features/organizations/accountScope';
 import { AccountTag } from './ListParts';
 import { META, ROW_ACTION, ROW_ICON, TITLE_BUTTON } from './listStyles';
 
@@ -38,7 +37,7 @@ export function FileItem({
         </div>
         {file.description ? <p className="truncate text-[13px] text-ink-muted">{file.description}</p> : null}
         <p className={META}>
-          <AccountTag name={accountTag(file)} />
+          <AccountTag record={file} />
           <span className="min-w-0 truncate">{[file.uploaded_by?.name, source].filter(Boolean).join(' · ')}</span>
           <time dateTime={file.created_at} className="font-mono-brand tabular-nums">
             {formatDate(file.created_at.slice(0, 10))}

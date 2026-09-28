@@ -275,8 +275,13 @@ in instead.
    (`?account=`, an id or `none`) sit above the tabs on Story, People, Deals &
    risks and Files and filter each (the lists client-side by `account_id`);
    a chip counts the active tab: story items, people, opportunities plus
-   risks, or files plus calls. New contacts, opportunities, risks, files and
-   calls go on the chosen account. The Story's filters (`group`, `source`,
+   risks, or files plus calls, and shows no number while that list loads or
+   still holds another organisation's records (a slower reply for the
+   organisation opened before never lands). New contacts, opportunities,
+   risks, files and calls go on the chosen account; while `?account=` names
+   an account the page does not have yet, the add and upload controls wait
+   and say why. Each list keeps its rows while it reads again after a save.
+   The Story's filters (`group`, `source`,
    `q`) live in the URL too. "+ Add" offers Log a call, New task, New
    note and Log survey — there is no "Log activity", since there's no create
    endpoint for it — with the existing forms, on the chosen account when there

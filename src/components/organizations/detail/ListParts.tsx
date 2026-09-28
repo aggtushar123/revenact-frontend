@@ -1,14 +1,27 @@
-import { Fragment, useId } from 'react';
+import { Fragment, useContext, useId } from 'react';
 import { Search } from 'lucide-react';
+import { accountTag } from '../../../features/organizations/accountScope';
 import type { SummaryPart } from '../../../features/organizations/listSummaries';
 import { EmptyState } from '../portfolio/PortfolioSections';
 import { FOCUS, QUIET } from '../portfolio/styles';
+import { AccountNames } from './accountNames';
 import { LIST } from './listStyles';
 
-/** The account a record is on, as the Story tags it. */
-export function AccountTag({ name }: { name: string }) {
+/** The account a record is on, as the Story tags it, named from the
+ *  organization's accounts when a list tab provides them. */
+export function AccountTag({ record }: { record: { account_id?: number | null; account_name?: string | null } }) {
+  const name = accountTag(record, useContext(AccountNames));
   return (
     <span className="inline-block min-w-0 max-w-[10rem] truncate rounded-full bg-subtle px-2 py-0.5 text-ink">{name}</span>
+  );
+}
+
+/** Why the add or upload controls wait (see awaitingAccount). */
+export function AddPaused({ id }: { id: string }) {
+  return (
+    <p id={id} className="text-[13px] text-ink-muted">
+      Waiting for the chosen account. Choose All to add on the organization.
+    </p>
   );
 }
 

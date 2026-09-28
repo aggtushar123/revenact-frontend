@@ -50,6 +50,28 @@ describe('useChipCounts: the chips count the active tab (spec 2026-09-27 §1)', 
     expect(result.current).toEqual({ all: 3, none: 1, '31': 1, '32': 1 });
   });
 
+  it('Deals & risks: counts the opportunities alone when the risks failed', () => {
+    const { store, result } = setup('deals');
+    act(() => {
+      store.dispatch(fetchOpportunitiesForCustomer.pending('r1', 7));
+      store.dispatch(fetchRisksForCustomer.pending('r2', 7));
+      store.dispatch(fetchOpportunitiesForCustomer.fulfilled(OPPORTUNITIES, 'r1', 7));
+      store.dispatch(fetchRisksForCustomer.rejected(null, 'r2', 7, 'Could not load risks.'));
+    });
+    expect(result.current).toEqual({ all: 2, none: 1, '31': 1, '32': 0 });
+  });
+
+  it('Files: counts the files alone when the calls failed', () => {
+    const { store, result } = setup('files');
+    act(() => {
+      store.dispatch(fetchFiles.pending('r1', ORG));
+      store.dispatch(fetchCalls.pending('r2', ORG));
+      store.dispatch(fetchFiles.fulfilled(FILES, 'r1', ORG));
+      store.dispatch(fetchCalls.rejected(null, 'r2', ORG, 'Could not load the calls.'));
+    });
+    expect(result.current).toEqual({ all: 2, none: 1, '31': 1, '32': 0 });
+  });
+
   it('Files: files plus calls', () => {
     const { store, result } = setup('files');
     act(() => {

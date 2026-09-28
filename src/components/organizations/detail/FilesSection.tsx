@@ -5,12 +5,13 @@ import type { Account } from '../../../features/customers/customersSlice';
 import { canDeleteFile, FILE_ACCEPT } from '../../../features/files/fileFormat';
 import { deleteFile, downloadAttachment, fetchFiles, uploadFile, type Attachment, type FileParent } from '../../../features/files/filesSlice';
 import { listScope } from '../../../lib/listScope';
-import { byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
+import { awaitingAccount, byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ErrorBlock } from '../portfolio/PortfolioSections';
 import { BUTTON, FOCUS } from '../portfolio/styles';
 import { FileItem } from './FileItem';
-import { ListSkeleton, ScopedEmpty } from './ListParts';
+import { AccountNames } from './accountNames';
+import { AddPaused, ListSkeleton, ScopedEmpty } from './ListParts';
 import { LIST, SECTION_HEADING } from './listStyles';
 
 /** Files (spec 2026-09-27 §4): the organization's own files and every
@@ -46,6 +47,7 @@ export function FilesSection({
   const input = useRef<HTMLInputElement>(null);
   const headingId = useId();
   const descriptionId = useId();
+  const pausedId = useId();
 
   // Before paint, as People does.
   useLayoutEffect(() => {
@@ -53,11 +55,13 @@ export function FilesSection({
   }, [dispatch, customerId, attempt]);
 
   const target = chosenAccount(accounts, account);
+  const paused = awaitingAccount(accounts, account);
   const parent: FileParent = target ? { entityType: 'account', customerId, accountId: target.id } : { entityType: 'organization', customerId };
   const shown = byAccount(items, account);
   const failed = error !== null && !isLoading;
 
   async function send(files: FileList | File[]) {
+    if (paused) return;
     for (const file of Array.from(files)) {
       await dispatch(uploadFile({ ...parent, file, description: description.trim() || undefined }));
     }
@@ -109,71 +113,80 @@ export function FilesSection({
   }
 
   return (
-    <section
-      aria-labelledby={headingId}
-      className={`flex flex-col gap-2 rounded-xl ${dragging ? 'bg-subtle' : ''}`}
-      onDragOver={(event) => {
-        event.preventDefault();
-        setDragging(true);
-      }}
-      onDragLeave={() => setDragging(false)}
-      onDrop={onDrop}
-    >
-      <div className={isSm ? 'flex items-end justify-between gap-3' : 'flex flex-col gap-2'}>
-        <div className="min-w-0">
-          <h2 id={headingId} className={SECTION_HEADING}>
-            Files
-          </h2>
-          <p className="text-[13px] text-ink-muted">Up to 25 MB each. New files go on {target?.name ?? 'the organization'}.</p>
-        </div>
-        <div className={isSm ? 'flex items-end gap-2' : 'flex flex-col gap-2'}>
-          <div className="flex flex-col gap-1">
-            <label htmlFor={descriptionId} className="text-[11px] font-semibold text-ink-muted">
-              Description (optional)
-            </label>
-            <input
-              id={descriptionId}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 text-[15px] text-ink sm:min-h-9 sm:w-56 sm:text-[13px] ${FOCUS}`}
-            />
+    <AccountNames.Provider value={accounts}>
+      <section
+        aria-labelledby={headingId}
+        className={`flex flex-col gap-2 rounded-xl ${dragging ? 'bg-subtle' : ''}`}
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+      >
+        <div className={isSm ? 'flex items-end justify-between gap-3' : 'flex flex-col gap-2'}>
+          <div className="min-w-0">
+            <h2 id={headingId} className={SECTION_HEADING}>
+              Files
+            </h2>
+            <p className="text-[13px] text-ink-muted">Up to 25 MB each. New files go on {target?.name ?? 'the organization'}.</p>
           </div>
-          <input
-            ref={input}
-            type="file"
-            multiple
-            accept={FILE_ACCEPT}
-            tabIndex={-1}
-            aria-label="Choose files"
-            className="sr-only"
-            onChange={(event) => {
-              if (event.target.files) void send(event.target.files);
-            }}
-          />
-          <button type="button" onClick={() => input.current?.click()} disabled={uploading} className={`${BUTTON} justify-center`}>
-            <UploadCloud className="h-4 w-4" aria-hidden="true" />
-            {uploading ? 'Uploading…' : 'Upload file'}
-          </button>
+          <div className={isSm ? 'flex items-end gap-2' : 'flex flex-col gap-2'}>
+            <div className="flex flex-col gap-1">
+              <label htmlFor={descriptionId} className="text-[11px] font-semibold text-ink-muted">
+                Description (optional)
+              </label>
+              <input
+                id={descriptionId}
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                className={`min-h-11 w-full rounded-lg border border-line bg-surface px-3 text-[15px] text-ink sm:min-h-9 sm:w-56 sm:text-[13px] ${FOCUS}`}
+              />
+            </div>
+            <input
+              ref={input}
+              type="file"
+              multiple
+              accept={FILE_ACCEPT}
+              tabIndex={-1}
+              aria-label="Choose files"
+              className="sr-only"
+              onChange={(event) => {
+                if (event.target.files) void send(event.target.files);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => input.current?.click()}
+              disabled={uploading || paused}
+              aria-describedby={paused ? pausedId : undefined}
+              className={`${BUTTON} justify-center`}
+            >
+              <UploadCloud className="h-4 w-4" aria-hidden="true" />
+              {uploading ? 'Uploading…' : 'Upload file'}
+            </button>
+          </div>
         </div>
-      </div>
-      {uploadError || downloadError ? (
-        <p role="alert" className="text-[13px] text-danger">
-          {downloadError ?? uploadError}
-        </p>
-      ) : null}
-      {body}
-      {deleting ? (
-        <ConfirmDialog
-          title={`Delete ${deleting.name}?`}
-          message="This can't be undone."
-          confirmLabel="Delete"
-          danger
-          onConfirm={async () => {
-            await dispatch(deleteFile(deleting.id)).unwrap();
-          }}
-          onClose={() => setDeleting(null)}
-        />
-      ) : null}
-    </section>
+        {paused ? <AddPaused id={pausedId} /> : null}
+        {uploadError || downloadError ? (
+          <p role="alert" className="text-[13px] text-danger">
+            {downloadError ?? uploadError}
+          </p>
+        ) : null}
+        {body}
+        {deleting ? (
+          <ConfirmDialog
+            title={`Delete ${deleting.name}?`}
+            message="This can't be undone."
+            confirmLabel="Delete"
+            danger
+            onConfirm={async () => {
+              await dispatch(deleteFile(deleting.id)).unwrap();
+            }}
+            onClose={() => setDeleting(null)}
+          />
+        ) : null}
+      </section>
+    </AccountNames.Provider>
   );
 }

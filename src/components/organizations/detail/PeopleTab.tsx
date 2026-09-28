@@ -1,15 +1,16 @@
-import { useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { useId, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { deleteContact, fetchContactsForCustomer, type Account, type Contact } from '../../../features/customers/customersSlice';
 import { listScope } from '../../../lib/listScope';
-import { byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
+import { awaitingAccount, byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
 import { peopleSummary } from '../../../features/organizations/listSummaries';
 import { ContactFormModal } from '../../contacts/ContactFormModal';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ErrorBlock } from '../portfolio/PortfolioSections';
 import { BUTTON } from '../portfolio/styles';
-import { ListSearch, ListSkeleton, NoMatch, ScopedEmpty, SummaryLine } from './ListParts';
+import { AccountNames } from './accountNames';
+import { AddPaused, ListSearch, ListSkeleton, NoMatch, ScopedEmpty, SummaryLine } from './ListParts';
 import { LIST } from './listStyles';
 import { PersonItem } from './PersonItem';
 
@@ -56,6 +57,8 @@ export function PeopleTab({
     return inScope.filter((person) => `${person.name} ${person.role_display} ${person.email}`.toLowerCase().includes(needle));
   }, [inScope, q]);
   const target = chosenAccount(accounts, account);
+  const paused = awaitingAccount(accounts, account);
+  const pausedId = useId();
   const failed = contactsError !== null && !contactsLoading;
 
   let body: ReactNode;
@@ -82,38 +85,47 @@ export function PeopleTab({
   }
 
   return (
-    <div aria-busy={contactsLoading} className="flex flex-col gap-3">
-      <div className={isSm ? 'flex items-center gap-2' : 'flex flex-col gap-2'}>
-        <ListSearch label="Search people" value={q} onChange={setQ} isSm={isSm} />
-        <button type="button" onClick={() => setAdding(true)} className={`${BUTTON} ${isSm ? 'ml-auto' : 'justify-center'}`}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          {target ? `Add contact to ${target.name}` : 'Add contact'}
-        </button>
-      </div>
-      {loaded && !failed && inScope.length > 0 ? <SummaryLine parts={peopleSummary(inScope)} /> : null}
-      {body}
+    <AccountNames.Provider value={accounts}>
+      <div aria-busy={contactsLoading} className="flex flex-col gap-3">
+        <div className={isSm ? 'flex items-center gap-2' : 'flex flex-col gap-2'}>
+          <ListSearch label="Search people" value={q} onChange={setQ} isSm={isSm} />
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            disabled={paused}
+            aria-describedby={paused ? pausedId : undefined}
+            className={`${BUTTON} ${isSm ? 'ml-auto' : 'justify-center'}`}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {target ? `Add contact to ${target.name}` : 'Add contact'}
+          </button>
+        </div>
+        {paused ? <AddPaused id={pausedId} /> : null}
+        {loaded && !failed && inScope.length > 0 ? <SummaryLine parts={peopleSummary(inScope)} /> : null}
+        {body}
 
-      {adding ? (
-        <ContactFormModal
-          customerId={customerId}
-          accountId={target?.id}
-          onClose={() => setAdding(false)}
-          onSaved={() => void dispatch(fetchContactsForCustomer(customerId))}
-        />
-      ) : null}
-      {editing ? <ContactFormModal contact={editing} onClose={() => setEditing(null)} onSaved={() => {}} /> : null}
-      {deleting ? (
-        <ConfirmDialog
-          title={`Delete ${deleting.name}?`}
-          message="This can't be undone."
-          confirmLabel="Delete"
-          danger
-          onConfirm={async () => {
-            await dispatch(deleteContact(deleting.id)).unwrap();
-          }}
-          onClose={() => setDeleting(null)}
-        />
-      ) : null}
-    </div>
+        {adding ? (
+          <ContactFormModal
+            customerId={customerId}
+            accountId={target?.id}
+            onClose={() => setAdding(false)}
+            onSaved={() => void dispatch(fetchContactsForCustomer(customerId))}
+          />
+        ) : null}
+        {editing ? <ContactFormModal contact={editing} onClose={() => setEditing(null)} onSaved={() => {}} /> : null}
+        {deleting ? (
+          <ConfirmDialog
+            title={`Delete ${deleting.name}?`}
+            message="This can't be undone."
+            confirmLabel="Delete"
+            danger
+            onConfirm={async () => {
+              await dispatch(deleteContact(deleting.id)).unwrap();
+            }}
+            onClose={() => setDeleting(null)}
+          />
+        ) : null}
+      </div>
+    </AccountNames.Provider>
   );
 }

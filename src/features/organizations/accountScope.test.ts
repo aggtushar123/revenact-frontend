@@ -50,4 +50,11 @@ describe('the account chips on the lists (spec 2026-09-27 §1)', () => {
     expect(accountTag({ account_name: null })).toBe('Organization');
     expect(accountTag({})).toBe('Organization');
   });
+
+  it("names the tag from the organization's accounts when it has them, so a rename shows at once", () => {
+    const renamed = ACCOUNTS.map((a) => (a.id === 31 ? { ...a, name: 'EMEA West' } : a));
+    expect(accountTag({ account_id: 31, account_name: 'EMEA' }, renamed)).toBe('EMEA West');
+    expect(accountTag({ account_id: 99, account_name: 'Gone' }, renamed)).toBe('Gone');
+    expect(accountTag({ account_id: null, account_name: null }, renamed)).toBe('Organization');
+  });
 });

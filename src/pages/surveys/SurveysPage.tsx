@@ -32,7 +32,7 @@ const STATUS_LABEL_COLOR: Record<Survey['status'], string> = {
 export function SurveysPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { surveys, surveysLoading, surveysError, customers } = useAppSelector((state) => state.customers);
+  const { surveys: held, surveysLoading, surveysError, surveysFor, customers } = useAppSelector((state) => state.customers);
   const [selectedType, setSelectedType] = useState<Survey['survey_type'] | null>(null);
   const [isLogging, setIsLogging] = useState(false);
   const [editingSurvey, setEditingSurvey] = useState<Survey | null>(null);
@@ -53,6 +53,11 @@ export function SurveysPage() {
     // source as PipelinesPage's own Add Opportunity/Add Risk.
     dispatch(fetchCustomers());
   }, [dispatch]);
+
+  // Until the chosen filter's read lands, the store still holds the previous
+  // filter's surveys: the rollups, chart and table wait rather than show them.
+  const current = surveysFor === customerId;
+  const surveys = useMemo(() => (current ? held : []), [current, held]);
 
   const companies = useMemo(() => customers.map((c) => ({ id: c.id, name: c.name })), [customers]);
   // The picker lists the first page of organizations; one not on it is
@@ -152,39 +157,51 @@ export function SurveysPage() {
 
       {surveysError && <p className="text-[12.5px] text-danger">{surveysError}</p>}
 
-      <div className="grid grid-cols-3 gap-4">
-        {TYPE_CARDS.map(({ type, label, icon: Icon }) => {
-          const bucket = rollup[type];
-          const responseRate = bucket.sent > 0 ? Math.round((bucket.responded / bucket.sent) * 100) : null;
-          const avgScore = bucket.responded > 0 ? Math.round(bucket.scoreSum / bucket.responded) : null;
-          const isActive = selectedType === type;
-          return (
-            <button
-              key={type}
-              onClick={() => setSelectedType(isActive ? null : type)}
-              aria-pressed={isActive}
-              className={`text-left p-4 rounded-xl border shadow-sm transition-all ${
-                isActive ? 'border-accent bg-accent-dim/30' : 'border-line-subtle bg-surface hover:bg-subtle/40'
-              }`}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <Icon className="w-4 h-4 text-accent" />
-                <span className="text-[13px] font-bold text-ink">{label}</span>
-              </div>
-              <div className="flex items-baseline gap-2 mb-1">
-                <span className="text-[24px] font-bold text-ink leading-none">{bucket.sent}</span>
-                <span className="text-[11.5px] text-ink-faint font-medium">sent</span>
-              </div>
-              <div className="text-[12px] text-ink-muted font-medium">
-                {responseRate === null ? 'No responses yet' : `${responseRate}% responded`}
-                {avgScore !== null && ` · avg ${avgScore}`}
-              </div>
-            </button>
-          );
-        })}
-      </div>
+      {!current && !surveysError ? (
+        <div role="status" aria-label="Loading the survey rollups" className="grid grid-cols-3 gap-4">
+          {TYPE_CARDS.map(({ type }) => (
+            <div key={type} aria-hidden="true" className="flex flex-col gap-2 rounded-xl border border-line-subtle bg-surface p-4">
+              <span className="block h-3 w-16 animate-pulse rounded bg-subtle" />
+              <span className="block h-6 w-10 animate-pulse rounded bg-subtle" />
+              <span className="block h-3 w-24 animate-pulse rounded bg-subtle" />
+            </div>
+          ))}
+        </div>
+      ) : current ? (
+        <div className="grid grid-cols-3 gap-4">
+          {TYPE_CARDS.map(({ type, label, icon: Icon }) => {
+            const bucket = rollup[type];
+            const responseRate = bucket.sent > 0 ? Math.round((bucket.responded / bucket.sent) * 100) : null;
+            const avgScore = bucket.responded > 0 ? Math.round(bucket.scoreSum / bucket.responded) : null;
+            const isActive = selectedType === type;
+            return (
+              <button
+                key={type}
+                onClick={() => setSelectedType(isActive ? null : type)}
+                aria-pressed={isActive}
+                className={`text-left p-4 rounded-xl border shadow-sm transition-all ${
+                  isActive ? 'border-accent bg-accent-dim/30' : 'border-line-subtle bg-surface hover:bg-subtle/40'
+                }`}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <Icon className="w-4 h-4 text-accent" />
+                  <span className="text-[13px] font-bold text-ink">{label}</span>
+                </div>
+                <div className="flex items-baseline gap-2 mb-1">
+                  <span className="text-[24px] font-bold text-ink leading-none">{bucket.sent}</span>
+                  <span className="text-[11.5px] text-ink-faint font-medium">sent</span>
+                </div>
+                <div className="text-[12px] text-ink-muted font-medium">
+                  {responseRate === null ? 'No responses yet' : `${responseRate}% responded`}
+                  {avgScore !== null && ` · avg ${avgScore}`}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
-      <SurveyTrendChart surveys={surveys} />
+      {current ? <SurveyTrendChart surveys={surveys} /> : null}
 
       <div className="flex-1 bg-surface rounded-xl border border-line-subtle shadow-sm overflow-hidden flex flex-col">
         <div className="px-5 py-3 border-b border-line-subtle flex items-center justify-between">

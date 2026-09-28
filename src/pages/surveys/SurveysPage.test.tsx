@@ -438,4 +438,31 @@ describe('SurveysPage (/surveys)', () => {
     expect(await screen.findByText('Shopify')).toBeInTheDocument();
     expect(screen.getByLabelText('Organization')).toHaveValue('');
   });
+
+  it("shows the rollups loading, not the previous filter's numbers, while a new filter loads", async () => {
+    let answer: (body: unknown) => void = () => {};
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) => {
+        if (url.includes('/surveys/?customer=8')) return new Promise((resolve) => (answer = (body) => resolve(jsonResponse(200, body))));
+        if (url.endsWith('/surveys/')) return Promise.resolve(jsonResponse(200, [sentNps, respondedCsat]));
+        if (url.includes('/customers/')) {
+          return Promise.resolve(
+            jsonResponse(200, { count: 2, next: null, previous: null, results: [{ id: 6, name: 'Shopify' }, { id: 8, name: 'WeWork' }] }),
+          );
+        }
+        return Promise.resolve(jsonResponse(200, []));
+      }),
+    );
+    const user = userEvent.setup();
+    renderPage();
+    expect(await screen.findByText('100% responded · avg 85')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Organization'), '8');
+    expect(screen.queryByText('100% responded · avg 85')).not.toBeInTheDocument();
+    expect(screen.queryByText('No responses yet')).not.toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Loading the survey rollups' })).toBeInTheDocument();
+    answer([respondedCsat]);
+    expect(await screen.findByText('100% responded · avg 85')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading the survey rollups' })).not.toBeInTheDocument();
+  });
 });

@@ -44,6 +44,13 @@ export function chosenAccount(accounts: Account[], selected: string): Account | 
   return /^\d+$/.test(selected) ? accounts.find((account) => account.id === Number(selected)) : undefined;
 }
 
+/** A chip names an account the list of accounts does not hold (yet): while
+ *  it loads, after it failed, or a stale id. Nothing is added then, rather
+ *  than saved on the organization instead. */
+export function awaitingAccount(accounts: Account[], selected: string): boolean {
+  return /^\d+$/.test(selected) && !chosenAccount(accounts, selected);
+}
+
 /** What an empty list is empty for: null under All. */
 export function scopeLabel(accounts: Account[], selected: string): string | null {
   if (!selected) return null;
@@ -51,7 +58,10 @@ export function scopeLabel(accounts: Account[], selected: string): string | null
   return chosenAccount(accounts, selected)?.name ?? 'this account';
 }
 
-/** The tag a list item shows: its account's name, or "Organization". */
-export function accountTag(record: { account_name?: string | null }): string {
-  return record.account_name ?? 'Organization';
+/** The tag a list item shows: its account's name, or "Organization". The
+ *  name comes from `accounts` when it has the record's account (current
+ *  after a rename), else from the record. */
+export function accountTag(record: { account_id?: number | null; account_name?: string | null }, accounts: Account[] = []): string {
+  const account = record.account_id == null ? undefined : accounts.find((a) => a.id === record.account_id);
+  return account?.name ?? record.account_name ?? 'Organization';
 }

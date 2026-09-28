@@ -3,7 +3,6 @@ import { ExternalLink, FileText, Phone, Sparkles } from 'lucide-react';
 import { durationLabel } from '../../../features/calls/callFormat';
 import type { Call } from '../../../features/calls/callsSlice';
 import { downloadAttachment } from '../../../features/files/filesSlice';
-import { accountTag } from '../../../features/organizations/accountScope';
 import { timeLabel } from '../../../features/organizations/storyDays';
 import { AccountTag } from './ListParts';
 import { ITEM_LINK, META, ROW_ICON, TITLE_BUTTON } from './listStyles';
@@ -80,7 +79,7 @@ export function CallItem({ call }: { call: Call }) {
           <p className="truncate text-[13px] text-ink-muted">{call.summary}</p>
         )}
         <p className={META}>
-          <AccountTag name={accountTag(call)} />
+          <AccountTag record={call} />
           <span className="min-w-0 truncate">{who}</span>
           {source ? <span className="min-w-0 truncate">{source}</span> : null}
           {sentiment ? <span className={`rounded-full px-2 py-0.5 ${sentiment.tone}`}>{sentiment.label}</span> : null}

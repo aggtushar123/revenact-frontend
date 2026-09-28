@@ -933,6 +933,11 @@ interface CustomersState {
   /** The last fetchSurveys asked for: an earlier, slower read (another
    *  organization's) never overwrites it. */
   surveysRequestId?: string;
+  /** The organization the last fetchSurveys asked for (null: every one). */
+  surveysFilter?: number | null;
+  /** Whose surveys `surveys` holds: an organization's id, null for every
+   *  one, undefined before the first read lands. */
+  surveysFor?: number | null;
   /** Canvases for whichever Customer or Account the "Canvas List" tab
    * is currently showing — same single-slot reasoning as
    * `entitySurveys` above. Deliberately separate from `canvases` below
@@ -2660,8 +2665,12 @@ const customersSlice = createSlice({
         state.contactsLoading = true;
         state.contactsError = null;
         state.contactsRequestId = action.meta.requestId;
-        state.contacts = [];
-        state.contactsFor = null;
+        // A read again for the same scope keeps its rows until the new ones
+        // land; another organization's or account's never show under this one.
+        if (listScope(action.meta.arg) !== state.contactsFor) {
+          state.contacts = [];
+          state.contactsFor = null;
+        }
       })
       .addCase(fetchContactsForCustomer.fulfilled, (state, action) => {
         if (action.meta.requestId !== state.contactsRequestId) return;
@@ -2678,8 +2687,12 @@ const customersSlice = createSlice({
         state.contactsLoading = true;
         state.contactsError = null;
         state.contactsRequestId = action.meta.requestId;
-        state.contacts = [];
-        state.contactsFor = null;
+        // A read again for the same scope keeps its rows until the new ones
+        // land; another organization's or account's never show under this one.
+        if (listScope(action.meta.arg.customerId, action.meta.arg.accountId) !== state.contactsFor) {
+          state.contacts = [];
+          state.contactsFor = null;
+        }
       })
       .addCase(fetchContactsForAccount.fulfilled, (state, action) => {
         if (action.meta.requestId !== state.contactsRequestId) return;
@@ -2932,11 +2945,13 @@ const customersSlice = createSlice({
         state.surveysLoading = true;
         state.surveysError = null;
         state.surveysRequestId = action.meta.requestId;
+        state.surveysFilter = action.meta.arg ?? null;
       })
       .addCase(fetchSurveys.fulfilled, (state, action) => {
         if (action.meta.requestId !== state.surveysRequestId) return;
         state.surveysLoading = false;
         state.surveys = action.payload;
+        state.surveysFor = action.meta.arg ?? null;
       })
       .addCase(fetchSurveys.rejected, (state, action) => {
         if (action.meta.requestId !== state.surveysRequestId) return;
@@ -2946,6 +2961,9 @@ const customersSlice = createSlice({
       // Same "no .rejected case, create/update/delete patch `surveys`
       // directly" reasoning as Opportunity/Risk above.
       .addCase(createSurvey.fulfilled, (state, action) => {
+        // A list filtered to one organization takes only that organization's.
+        const filter = state.surveysFilter ?? null;
+        if (filter !== null && !action.payload.companies.some((company) => company.id === filter)) return;
         state.surveys.unshift(action.payload);
       })
       .addCase(updateSurvey.fulfilled, (state, action) => {

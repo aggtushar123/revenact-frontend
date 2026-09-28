@@ -78,10 +78,11 @@ export function OrganizationHeader({
           onClick={onEdit}
           disabled={!canEdit}
           aria-describedby={blocked ? reasonId : undefined}
-          className={BUTTON}
+          className={`${BUTTON} min-w-11 justify-center sm:min-w-0`}
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
-          Edit
+          {/* Icon-only below sm, as Add account: the name gets the room. */}
+          <span className="sr-only sm:not-sr-only">Edit</span>
         </button>
         <button type="button" onClick={onAddAccount} className={`${BUTTON} min-w-11 justify-center sm:min-w-0`}>
           <Plus className="h-4 w-4" aria-hidden="true" />

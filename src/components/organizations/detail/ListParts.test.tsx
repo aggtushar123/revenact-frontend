@@ -5,7 +5,7 @@ import { AccountTag, ListSearch, ListSkeleton, NoMatch, ScopedEmpty, SummaryLine
 
 describe('the list parts People, Deals & risks and Files share', () => {
   it('tags a record with its account, truncating a long name', () => {
-    render(<AccountTag name="EMEA" />);
+    render(<AccountTag record={{ account_id: 31, account_name: "EMEA" }} />);
     expect(screen.getByText('EMEA')).toHaveClass('truncate', 'bg-subtle', 'rounded-full');
   });
 
