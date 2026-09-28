@@ -29,13 +29,18 @@ export const SENTIMENT_DOT: Record<Reading, string> = {
   negative: 'bg-danger',
 };
 
-/** "142 people · 38 decision makers · 61% positive · 12 negative". */
+/** "142 people · 38 decision makers · 120 active · 61% positive · 12
+ *  negative · +12.5% growth (30d)"; active and growth only when served,
+ *  growth left out when it is null (nobody 30 days ago). */
 export function contactsSummaryParts(s: ContactsSummary): SummaryPart[] {
+  const growth = s.growth_30d_pct;
   return [
     { value: String(s.total), label: plural(s.total, 'person', 'people') },
     { value: String(s.decision_makers), label: plural(s.decision_makers, 'decision maker', 'decision makers') },
+    ...(s.active !== undefined ? [{ value: String(s.active), label: 'active' }] : []),
     { value: `${s.total ? Math.round((s.positive / s.total) * 100) : 0}%`, label: 'positive' },
     { value: String(s.negative), label: 'negative' },
+    ...(typeof growth === 'number' ? [{ value: `${growth > 0 ? '+' : ''}${growth}%`, label: 'growth (30d)' }] : []),
   ];
 }
 

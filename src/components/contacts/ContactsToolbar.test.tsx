@@ -5,7 +5,7 @@ import { NO_FILTERS, type ContactsParams } from '../../features/contacts/contact
 import { CUSTOMERS, stubContactsApi } from '../../features/contacts/testContacts';
 import { ContactsToolbar } from './ContactsToolbar';
 
-const SUMMARY = { total: 142, positive: 87, neutral: 43, negative: 12, decision_makers: 38 };
+const SUMMARY = { total: 142, positive: 87, neutral: 43, negative: 12, decision_makers: 38, active: 120, growth_30d_pct: 12.5 };
 
 function renderToolbar(params: ContactsParams = NO_FILTERS, extra: Partial<Parameters<typeof ContactsToolbar>[0]> = {}) {
   const handlers = { onChange: vi.fn(), onAdd: vi.fn() };
@@ -21,7 +21,9 @@ describe('ContactsToolbar (spec 2026-09-28 §3)', () => {
   it('leads with the summary line', () => {
     stubContactsApi();
     renderToolbar();
-    expect(document.querySelector('[data-summary]')).toHaveTextContent('142 people · 38 decision makers · 61% positive · 12 negative');
+    expect(document.querySelector('[data-summary]')).toHaveTextContent(
+      '142 people · 38 decision makers · 120 active · 61% positive · 12 negative · +12.5% growth (30d)',
+    );
   });
 
   it('an organisation filters and clears the account; the account waits for an organisation', async () => {

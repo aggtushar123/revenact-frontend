@@ -25,6 +25,13 @@ describe('ContactListItem (spec 2026-09-28 §3)', () => {
     }
     expect(within(item).getByText('Neutral')).toHaveClass('text-ink-muted');
     expect(within(item).getByText(/^Contacted .+ ago$/)).toBeInTheDocument();
+    expect(within(item).getByText('Active')).toBeInTheDocument();
+  });
+
+  it('says when someone is inactive', () => {
+    const owen = renderItem(OWEN);
+    expect(within(owen).getByText('Inactive')).toBeInTheDocument();
+    expect(within(owen).queryByText('Active')).toBeNull();
   });
 
   it('names the organisation alone when they are on it, says where a hand-set sentiment came from, and when nobody has been in touch', () => {

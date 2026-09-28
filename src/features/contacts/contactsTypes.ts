@@ -17,6 +17,12 @@ export interface ContactsSummary {
   neutral: number;
   negative: number;
   decision_makers: number;
+  /** Optional: served from backend PR #71 on; a response without it
+   *  leaves "n active" out of the summary line. */
+  active?: number;
+  /** Against the total of 30 days ago; null when there was nobody then (a
+   *  change off zero is undefined). Optional as `active` is. */
+  growth_30d_pct?: number | null;
 }
 
 export interface ContactsPage {

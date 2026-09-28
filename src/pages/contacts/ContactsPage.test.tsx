@@ -20,7 +20,7 @@ describe('Contacts page (spec 2026-09-28 §3)', () => {
     renderContactsPage();
     expect(await screen.findByRole('list', { name: 'People' })).toBeInTheDocument();
     expect(people()).toHaveLength(3);
-    expect(document.querySelector('[data-summary]')).toHaveTextContent('3 people · 1 decision maker · 33% positive · 1 negative');
+    expect(document.querySelector('[data-summary]')).toHaveTextContent('3 people · 1 decision maker · 2 active · 33% positive · 1 negative');
     expect(within(screen.getByRole('region', { name: 'Profile' })).getByText('Choose a person')).toBeInTheDocument();
   });
 

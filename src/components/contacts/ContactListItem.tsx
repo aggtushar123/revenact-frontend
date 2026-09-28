@@ -14,8 +14,8 @@ import { FOCUS } from '../organizations/portfolio/styles';
 
 /** One person in the Contacts list (spec 2026-09-28 §3), never a table row:
  *  initials, name and role, "Organisation › Account", sentiment in words
- *  and its colour with "n calls" beside it, and when they were last
- *  contacted. The whole item opens their profile. */
+ *  and its colour with "n calls" beside it, when they were last
+ *  contacted, and whether they are active. The whole item opens their profile. */
 export function ContactListItem({ contact, to, selected }: { contact: Contact; to: To; selected: boolean }) {
   const place = placeLabel(placeOf(contact));
   const contacted = contact.last_contacted_at ? `Contacted ${formatRelativeTime(contact.last_contacted_at)}` : 'Not contacted yet';
@@ -42,6 +42,7 @@ export function ContactListItem({ contact, to, selected }: { contact: Contact; t
             </span>
             <span className="font-mono-brand tabular-nums">{callsLabel(contact)}</span>
             <span>{contacted}</span>
+            <span>{contact.status === 'inactive' ? 'Inactive' : 'Active'}</span>
           </span>
         </span>
       </Link>

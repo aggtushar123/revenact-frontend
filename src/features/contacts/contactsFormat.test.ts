@@ -32,6 +32,19 @@ describe('contactsFormat (spec 2026-09-28 §3, §5)', () => {
     expect(contactsSummaryParts({ total: 0, positive: 0, neutral: 0, negative: 0, decision_makers: 0 })[2].value).toBe('0%');
   });
 
+  it('adds how many are active and the 30-day growth when the summary carries them', () => {
+    const base = { total: 142, positive: 87, neutral: 43, negative: 12, decision_makers: 38 };
+    const text = (parts: { value: string; label: string }[]) => parts.map((p) => `${p.value} ${p.label}`).join(' · ');
+    expect(text(contactsSummaryParts({ ...base, active: 120, growth_30d_pct: 12.5 }))).toBe(
+      '142 people · 38 decision makers · 120 active · 61% positive · 12 negative · +12.5% growth (30d)',
+    );
+    expect(text(contactsSummaryParts({ ...base, active: 120, growth_30d_pct: -3 }))).toContain('-3% growth (30d)');
+    expect(text(contactsSummaryParts({ ...base, active: 120, growth_30d_pct: 0 }))).toContain('0% growth (30d)');
+    // No contacts 30 days ago: growth is undefined, not zero.
+    expect(text(contactsSummaryParts({ ...base, active: 120, growth_30d_pct: null }))).not.toContain('growth');
+    expect(text(contactsSummaryParts(base))).toBe('142 people · 38 decision makers · 61% positive · 12 negative');
+  });
+
   it('reads a record: its sentiment, "Not enough to analyse", or nothing while pending', () => {
     expect(readingOf({ analysis: 'analysed', sentiment: 'negative' })).toEqual({ label: 'Negative', tone: 'bg-danger-dim text-danger' });
     expect(readingOf({ analysis: 'not_analysable', sentiment: null })).toEqual({

@@ -4,12 +4,12 @@ import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { SENTIMENT_DOT, placeOf, sentimentWhy } from '../../features/contacts/contactsFormat';
 import { deleteContact, fetchContactById, fetchContactHistory } from '../../features/customers/customersSlice';
-import { initials } from '../../features/customers/formatters';
+import { formatRelativeTime, initials } from '../../features/customers/formatters';
 import { mailtoHref, telHref } from '../../lib/contactLinks';
 import { ErrorState } from '../../pages/dashboard/shared/DataState';
 import { ConfirmDialog } from '../organizations/ConfirmDialog';
 import { ListSkeleton } from '../organizations/detail/ListParts';
-import { ITEM_LINK, SECTION_HEADING } from '../organizations/detail/listStyles';
+import { ITEM_LINK, META, SECTION_HEADING } from '../organizations/detail/listStyles';
 import { BUTTON, QUIET } from '../organizations/portfolio/styles';
 import { ContactFormModal } from './ContactFormModal';
 import { HistoryCallItem, HistoryEmailItem, HistoryTicketItem } from './HistoryItems';
@@ -99,7 +99,11 @@ export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: numb
         </span>
         <div className="min-w-0 flex-1">
           <h2 className="break-words text-[22px] font-semibold text-ink">{contact.name}</h2>
-          <p className="text-[13px] text-ink-muted">{contact.role_display}</p>
+          <p className="text-[13px] text-ink-muted">
+            {contact.role_display}
+            <span aria-hidden="true"> · </span>
+            <span>{contact.status === 'inactive' ? 'Inactive' : 'Active'}</span>
+          </p>
           {organisation ? (
             <p className="flex min-w-0 flex-wrap items-center gap-x-1 text-[13px]">
               <Link to={`/organizations/${organisation.id}`} className={ITEM_LINK}>
@@ -150,7 +154,15 @@ export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: numb
 
       <section aria-label="Sentiment" className="flex items-start gap-2 text-[13px] text-ink">
         <span aria-hidden="true" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${SENTIMENT_DOT[history.sentiment]}`} />
-        <p>{sentimentWhy(history.sentiment, history.sentiment_source, history.sentiment_evidence)}</p>
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p>{sentimentWhy(history.sentiment, history.sentiment_source, history.sentiment_evidence)}</p>
+          <p className={META}>
+            <span>{contact.last_contacted_at ? `Last contacted ${formatRelativeTime(contact.last_contacted_at)}` : 'Not contacted yet'}</span>
+            {history.sentiment_source === 'computed' && contact.sentiment_computed_at ? (
+              <span>{`Sentiment read ${formatRelativeTime(contact.sentiment_computed_at)}`}</span>
+            ) : null}
+          </p>
+        </div>
       </section>
 
       <Section title="Calls" count={history.counts.calls} shown={history.calls.length} empty="No calls with them yet.">

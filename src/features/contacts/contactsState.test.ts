@@ -20,7 +20,7 @@ describe('the Contacts page state (spec 2026-09-28 §3)', () => {
     await store.dispatch(fetchAllContacts('/contacts/?customer=7'));
     const state = store.getState().customers;
     expect(state.allContacts.map((c) => c.name)).toEqual(['Mira Patel', 'Owen Price']);
-    expect(state.allContactsSummary).toEqual({ total: 2, positive: 1, neutral: 0, negative: 1, decision_makers: 1 });
+    expect(state.allContactsSummary).toEqual({ total: 2, positive: 1, neutral: 0, negative: 1, decision_makers: 1, active: 1 });
   });
 
   it('never lets a slower, earlier read land over a newer one', async () => {

@@ -58,10 +58,11 @@ export const MIRA: Contact = person(42, 'Mira Patel', {
   sentiment: 'positive',
 });
 
-/** On Pizza Hut itself; negative, set by hand, never contacted. */
+/** On Pizza Hut itself; negative, set by hand, never contacted, inactive. */
 export const OWEN: Contact = person(43, 'Owen Price', {
   role: 'finance_manager',
   role_display: 'Finance Manager',
+  status: 'inactive',
   sentiment: 'negative',
 });
 
@@ -215,6 +216,7 @@ export function summaryOf(rows: Contact[]): ContactsSummary {
     neutral: rows.filter((r) => r.sentiment === 'neutral').length,
     negative: rows.filter((r) => r.sentiment === 'negative').length,
     decision_makers: rows.filter((r) => DECISION.has(r.role)).length,
+    active: rows.filter((r) => r.status === 'active').length,
   };
 }
 
@@ -231,6 +233,8 @@ export interface ContactsStub {
   failList?: number;
   /** How many history reads fail (500) before they succeed. */
   failHistory?: number;
+  /** The summary's `growth_30d_pct`; left out of it when not given. */
+  growth?: number | null;
 }
 
 /** Stubs fetch with the Contacts page's endpoints, filtering as the backend
@@ -272,7 +276,7 @@ export function stubContactsApi(stub: ContactsStub = {}) {
         nextUrl.searchParams.set('page', String(page + 1));
         next = nextUrl.toString();
       }
-      return json(200, { count: rows.length, next, previous: null, results: slice, summary: summaryOf(rows) });
+      return json(200, { count: rows.length, next, previous: null, results: slice, summary: { ...summaryOf(rows), ...('growth' in stub ? { growth_30d_pct: stub.growth } : {}) } });
     }
 
     const one = /^\/contacts\/(\d+)\/$/.exec(path);

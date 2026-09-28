@@ -25,7 +25,7 @@ describe('Contacts, end to end (spec 2026-09-28 §7)', () => {
     await waitFor(() => expect(within(screen.getByRole('list', { name: 'People' })).getAllByRole('listitem')).toHaveLength(1));
     expect(where()).toBe('/contacts?customer=6');
     expect(requested(spy)).toContain('/contacts/?customer=6');
-    expect(document.querySelector('[data-summary]')).toHaveTextContent('1 person · 0 decision makers · 0% positive · 0 negative');
+    expect(document.querySelector('[data-summary]')).toHaveTextContent('1 person · 0 decision makers · 1 active · 0% positive · 0 negative');
 
     // 2. Open Lukas: his profile beside the list, the filter kept.
     await userEvent.click(screen.getByRole('link', { name: /Lukas Vermeer/ }));

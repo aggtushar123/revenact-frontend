@@ -37,6 +37,27 @@ describe('ContactProfile (spec 2026-09-28 §3)', () => {
     expect(within(profile).getByRole('link', { name: '+44 20 7946 0001' })).toHaveAttribute('href', 'tel:+442079460001');
   });
 
+  it('says whether they are active, when they were last contacted and when their sentiment was read, on phones too', async () => {
+    renderProfile();
+    const profile = await screen.findByRole('article', { name: 'Lukas Vermeer' });
+    expect(within(profile).getByText('Active')).toBeInTheDocument();
+    const contacted = within(profile).getByText(/^Last contacted .+ ago$/);
+    const read = within(profile).getByText(/^Sentiment read .+ ago$/);
+    for (const el of [contacted, read]) {
+      for (let node: Element | null = el; node && node !== profile; node = node.parentElement) {
+        expect(node.className).not.toMatch(/(^|\s)hidden(\s|$)/);
+      }
+    }
+  });
+
+  it('a hand-set sentiment has no reading time; nobody in touch says so; inactive shows', async () => {
+    renderProfile(MIRA.id, { people: [{ ...MIRA, status: 'inactive' }] });
+    const profile = await screen.findByRole('article', { name: 'Mira Patel' });
+    expect(within(profile).getByText('Inactive')).toBeInTheDocument();
+    expect(within(profile).getByText('Not contacted yet')).toBeInTheDocument();
+    expect(within(profile).queryByText(/^Sentiment read/)).toBeNull();
+  });
+
   it('says what the sentiment rests on; "Why this sentiment?" waits for Ask (delivery 2)', async () => {
     renderProfile();
     const sentiment = await screen.findByRole('region', { name: 'Sentiment' });

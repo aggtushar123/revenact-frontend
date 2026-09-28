@@ -524,23 +524,32 @@ glass), in `ContactsFrame` (the same bleed gutter as the organisation page —
 `OrganizationsFrame`'s classes — with a slot for the Ask rail that delivery 2
 fills).
 
-- **Header.** The summary line ("142 people · 38 decision makers · 61%
-  positive · 12 negative", over the whole filtered set), then search and the
+- **Header.** The summary line ("142 people · 38 decision makers · 120
+  active · 61% positive · 12 negative · +12.5% growth (30d)", over the whole
+  filtered set; "n active" and the growth only when the backend serves
+  `summary.active` / `summary.growth_30d_pct`, and growth left out when it is
+  null), then search and the
   organisation, account (waits for an organisation), sentiment and role
   filters — each with its own visible label, not a placeholder standing in
   for one — all in the URL (`q`, `customer`, `account`, `sentiment`, `role`),
   and + Add (the existing `ContactFormModal`).
 - **List.** One item per person: initials, name and role, "Organisation ›
   Account" (or the organisation alone), sentiment in words in its colour with
-  "n calls" beside it, and last contacted. Load more at the end; skeleton,
+  "n calls" beside it, last contacted, and Active/Inactive. Load more at the end; skeleton,
   error with Try again, and empty states (Clear filters when filtered).
-- **Profile.** `/contacts/:id` chooses the person. Name (22px), role,
+- **Profile.** `/contacts/:id` chooses the person. Name (22px), role and
+  Active/Inactive,
   "Organisation › Account" (the organisation links to its page, the account
   to it with `?account=` so its chip is chosen), email and phone links
   (sanitised). Their sentiment and why ("Neutral: 3 positive · 2 neutral · 1
   negative across 6 calls and 2 emails, latest 12 Sep"), built only from
   `sentiment_evidence` — never from the interactions listed below it, which
-  can include kinds `sentiment_evidence` doesn't count. Calls newest first:
+  can include kinds `sentiment_evidence` doesn't count. Under it, on phones
+  too: "Last contacted 2 weeks ago" (or "Not contacted yet") and, for a
+  computed sentiment, "Sentiment read 2 weeks ago" (`sentiment_computed_at`).
+  An edit sends the sentiment only when it was changed (a sent one becomes
+  hand-set and drops its evidence), then reads the person, their history and
+  the summary line again. Calls newest first:
   date, title, sentiment or "Not enough to analyse" (nothing while pending —
   `readingOf()`: `not_analysable` → "Not enough to analyse", `pending` →
   nothing, otherwise the sentiment), the summary its title opens, the

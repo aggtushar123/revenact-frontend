@@ -33,7 +33,7 @@ The owner wants every call on any organisation or account to carry a sentiment, 
 The layout is a list and a profile panel (owner's choice A), like the Communications inbox.
 
 - **Header:**
-  - A summary line: "142 people · 38 decision makers · 61% positive · 12 negative".
+  - A summary line: "142 people · 38 decision makers · 120 active · 61% positive · 12 negative · +12.5% growth (30d)" (active and growth from backend PR #71's `summary.active` / `summary.growth_30d_pct`; growth left out when null).
   - Search and filters for organisation, account, sentiment and role, all kept in the URL.
   - "+ Add".
 - **The list, on the left.** One item per person, never a table row. Each item shows:
