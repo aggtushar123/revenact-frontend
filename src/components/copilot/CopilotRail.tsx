@@ -143,7 +143,7 @@ export function CopilotRail({
               <UserTurn text={failed.text} chip={chipOf(failed.context)} />
               <div role="alert" className={`self-start flex flex-wrap items-center gap-2 text-[13px] ${failed.budget ? 'text-ink-muted' : 'text-danger'}`}>
                 <span>{failed.message}</span>
-                {failed.budget ? null : (
+                {failed.budget || failed.refused ? null : (
                   <button
                     type="button"
                     onClick={thread.retry}

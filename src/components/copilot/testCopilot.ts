@@ -25,6 +25,9 @@ export function stubCopilot(
     /** The server's label for an organisation page's context ("Pizza Hut ·
      *  EMEA"), stored on the context and the origin as the backend does. */
     label?: (context: Record<string, unknown>) => string;
+    /** A `400 {"context": refuse}` for every question asked with a context,
+     *  as the backend answers an organisation or account the asker may not open. */
+    refuse?: Record<string, string[]>;
   } = {},
 ) {
   const statuses = [...(options.statuses ?? [])];
@@ -40,6 +43,7 @@ export function stubCopilot(
       const status = statuses.shift() ?? 200;
       if (status >= 400) return reply({ detail: status === 429 ? 'Budget exhausted.' : 'Server error.' }, status);
       const body = JSON.parse(String(init.body)) as { content: string; context?: Record<string, unknown> };
+      if (body.context && options.refuse) return reply({ context: options.refuse }, 400);
       if (body.context && options.label) body.context = { ...body.context, label: options.label(body.context) };
       if (body.context && origin === null) {
         origin = { ...body.context };

@@ -122,4 +122,14 @@ describe('Ask Revenact on the organisation page', () => {
     expect(screen.queryByRole('link', { name: /Ask Copilot/i })).not.toBeInTheDocument();
     expect(document.querySelector('a[href^="/copilot"]')).toBeNull();
   });
+
+  it("says so on the rail when the account is no longer the asker's, without retrying", async () => {
+    const { copilot } = stubOrganizationPageAsk({ copilot: { refuse: { account: ['Not an account of this organisation you can open.'] } } });
+    renderOrganizationPage('/organizations/7?account=31', { ask: true });
+    await heading();
+    await userEvent.type(composer(), 'What changed?{enter}');
+    expect(await within(rail()!).findByRole('alert')).toHaveTextContent('You can no longer ask about this account. Choose All and ask again.');
+    expect(within(rail()!).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(postedBodies(copilot)).toHaveLength(1);
+  });
 });

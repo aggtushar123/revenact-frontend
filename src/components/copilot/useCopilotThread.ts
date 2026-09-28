@@ -15,6 +15,9 @@ export interface Turn {
 export interface FailedTurn extends Turn {
   /** A 429: the month's AI budget is spent, so there is nothing to retry. */
   budget: boolean;
+  /** A 400 refusing the page itself (an organisation or account the asker
+   *  may no longer open): asking again would ask the same, so no retry. */
+  refused: boolean;
   message: string;
 }
 
@@ -26,6 +29,18 @@ export interface CopilotThread {
 }
 
 export const BUDGET_MESSAGE = "This month's AI budget is used up.";
+
+/** What a `400 {"context": {"organization" | "account": [...]}}` means to the
+ *  asker (backend delivery 3): the page is no longer theirs to ask about.
+ *  Null for any other failure. */
+export function refusalMessage(err: unknown): string | null {
+  if (!(err instanceof ApiError) || err.status !== 400) return null;
+  const context = (err.body as { context?: unknown } | null)?.context;
+  if (!context || typeof context !== 'object') return null;
+  if ('organization' in context) return 'You can no longer ask about this organization.';
+  if ('account' in context) return 'You can no longer ask about this account. Choose All and ask again.';
+  return null;
+}
 
 /** Sending on one conversation, with the states the rail shows: in flight,
  *  budget spent, or failed and retryable with the question kept. */
@@ -69,8 +84,11 @@ export function useCopilotThread(
     } catch (err) {
       if (!stillHere()) return;
       const budget = err instanceof ApiError && err.status === 429;
-      const message = budget ? BUDGET_MESSAGE : err instanceof ApiError ? err.message : 'The Copilot did not answer.';
-      setFailed({ ...turn, budget, message });
+      const refusal = refusalMessage(err);
+      const message = budget
+        ? BUDGET_MESSAGE
+        : (refusal ?? (err instanceof ApiError ? err.message : 'The Copilot did not answer.'));
+      setFailed({ ...turn, budget, refused: refusal !== null, message });
     } finally {
       if (latest.current === mine) setPending(null);
     }
@@ -79,7 +97,7 @@ export function useCopilotThread(
   // Retry resends the question as it was asked, context included (the chip
   // on the failed bubble), not the screen as it is now.
   function retry() {
-    if (!failed || failed.budget) return;
+    if (!failed || failed.budget || failed.refused) return;
     void send({ text: failed.text, content: failed.content, context: failed.context });
   }
 

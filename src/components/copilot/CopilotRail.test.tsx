@@ -213,6 +213,25 @@ describe('CopilotRail', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
+  it("says an organisation or account that is no longer the asker's was refused, and offers no retry", async () => {
+    const page: SurfaceContext = { surface: 'organizations', view: 'detail', organization: 7, account: 31, focus: null };
+    const cases: [Record<string, string[]>, string][] = [
+      [{ account: ['Not an account of this organisation you can open.'] }, 'You can no longer ask about this account. Choose All and ask again.'],
+      [{ organization: ['Not an organisation you can open.'] }, 'You can no longer ask about this organization.'],
+    ];
+    for (const [refuse, message] of cases) {
+      const { spy } = stubCopilot({ refuse });
+      const { unmount } = renderRail({ context: { kind: 'surface', context: page, label: 'Pizza Hut · EMEA' } });
+      await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'What changed?{enter}');
+      expect(await screen.findByRole('alert')).toHaveTextContent(message);
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+      // The question stays, with its chip.
+      expect(screen.getByText('What changed?')).toBeInTheDocument();
+      expect(postedBodies(spy)).toHaveLength(1);
+      unmount();
+    }
+  });
+
   it('leaves focus where the person moved it while the answer was on its way', async () => {
     const { release } = stubCopilot({ hold: true });
     render(
