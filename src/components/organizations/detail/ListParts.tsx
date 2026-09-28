@@ -67,7 +67,7 @@ export function ScopedEmpty({
     return (
       <EmptyState
         title={`No ${what} on ${scope}`}
-        detail="The other accounts' show under All."
+        detail="The other accounts show under All."
         action={
           <button type="button" onClick={onShowAll} className={`${QUIET} border border-line`}>
             Show all accounts
