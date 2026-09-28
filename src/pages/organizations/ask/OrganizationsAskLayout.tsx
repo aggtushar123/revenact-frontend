@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { surfaceLabel } from '../../../components/copilot/surfaceLabels';
-import type { DetailNames } from '../../../features/organizations/detailAskContext';
+import { detailIdOf, type DetailNames } from '../../../features/organizations/detailAskContext';
 import { ORGANIZATIONS_ASK_KEY } from '../../dashboard/ask/askPreference';
 import { AskProvider } from '../../dashboard/ask/AskProvider';
 import { AskRail } from '../../dashboard/ask/AskRail';
@@ -36,11 +36,15 @@ export function OrganizationsAskLayout() {
     [options, names],
   );
   const surface: AskSurface = useMemo(() => ({ name: 'organizations', context, chipLabel }), [context, chipLabel]);
+  // The page in the shared scroll column: another organisation, or the List
+  // or the Board, starts at the top; a tab or query change does not.
+  const view = parseOrganizationsView(pathname);
+  const scrollKey = view === 'detail' ? `detail:${detailIdOf(pathname)}` : view;
   return (
     <PortfolioOptionsContext.Provider value={report}>
       <DetailNamesContext.Provider value={reportNames}>
         <AskProvider surface={surface} preferenceKey={ORGANIZATIONS_ASK_KEY}>
-          <OrganizationsFrame rail={<AskRail />} bleed={parseOrganizationsView(pathname) === 'detail'}>
+          <OrganizationsFrame rail={<AskRail />} bleed={view === 'detail'} scrollKey={scrollKey}>
             <Outlet />
           </OrganizationsFrame>
         </AskProvider>
