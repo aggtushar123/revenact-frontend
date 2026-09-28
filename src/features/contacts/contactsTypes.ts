@@ -58,7 +58,10 @@ export interface HistoryEmail extends HistoryRow {
   sent_at: string;
   sender_name: string;
   snippet: string;
-  link: { thread_id: string };
+  /** Null when the backend cannot thread the email; the app has no page
+   *  for a thread outside an organisation's Story either way (an email
+   *  never links). */
+  link: { thread_id: string | null };
 }
 
 export interface HistoryTicket extends HistoryRow {

@@ -86,7 +86,7 @@ export const LUKAS_HISTORY: ContactHistory = {
   sentiment: 'neutral',
   sentiment_source: 'computed',
   sentiment_evidence: LUKAS.sentiment_evidence,
-  counts: { calls: 3, emails: 1, tickets: 1 },
+  counts: { calls: 3, emails: 2, tickets: 1 },
   calls: [
     {
       id: 71,
@@ -144,6 +144,20 @@ export const LUKAS_HISTORY: ContactHistory = {
       organisation: KRAFT,
       account: null,
       link: { thread_id: 't-19' },
+    },
+    {
+      id: 87,
+      subject: 'Kick-off agenda',
+      sent_at: '2026-09-09T08:00:00Z',
+      sender_name: 'Lukas Vermeer',
+      snippet: 'Here is what we plan to cover on the call.',
+      analysis: 'analysed',
+      sentiment: 'neutral',
+      classification: NO_CLASS,
+      organisation: KRAFT,
+      account: null,
+      // The backend serves no thread id for an email it cannot thread.
+      link: { thread_id: null },
     },
   ],
   tickets: [
