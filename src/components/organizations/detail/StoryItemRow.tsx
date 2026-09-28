@@ -32,7 +32,7 @@ const ICON: Record<StoryKind, LucideIcon> = {
   health: HeartPulse,
 };
 
-const LINK = `mt-1 inline-flex min-h-11 items-center gap-1 rounded-sm text-[13px] font-semibold text-ink underline sm:min-h-0 ${FOCUS}`;
+const LINK = `mt-1 inline-flex min-h-11 items-center gap-1 rounded-sm text-[13px] font-semibold text-ink underline sm:min-h-9 ${FOCUS}`;
 
 /** `link.url`: a ticket in its source system or a call's recording, in a new
  *  tab. The backend sends only http(s) URLs; the check stays because the
@@ -61,7 +61,7 @@ function AskAbout({ item }: { item: StoryItem }) {
       type="button"
       onClick={() => draft(askAboutQuestion(focus), focus)}
       aria-label={`Ask about this: ${item.title}`}
-      className={`ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded-sm font-semibold text-ink-muted hover:text-ink active:opacity-70 sm:min-h-0 ${FOCUS}`}
+      className={`ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded-sm font-semibold text-ink-muted hover:text-ink active:opacity-70 sm:min-h-9 ${FOCUS}`}
     >
       <Sparkles className="h-3 w-3" aria-hidden="true" />
       Ask about this
@@ -100,8 +100,9 @@ export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEma
   const meta = [KIND_NAME[item.kind] ?? 'Record', item.actor?.name, source ? `via ${source}` : null]
     .filter(Boolean)
     .join(' · ');
-  // A 44px target below sm (the line height centres the title in it).
-  const titleButton = `inline-block min-h-11 max-w-full truncate rounded-sm text-left leading-[2.75rem] hover:underline active:opacity-70 sm:min-h-0 sm:leading-normal ${FOCUS}`;
+  // A 44px target below sm and 36px from sm (house rule §4.5); the line
+  // height centres the title in it.
+  const titleButton = `inline-block min-h-11 max-w-full truncate rounded-sm text-left leading-[2.75rem] hover:underline active:opacity-70 sm:min-h-9 sm:leading-9 ${FOCUS}`;
 
   return (
     <li data-story-item={`${item.kind}:${item.id}`} className="flex gap-3 px-3 py-2.5">

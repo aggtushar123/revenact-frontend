@@ -25,10 +25,11 @@ describe('StoryItemRow: Ask about this', () => {
     expect(draft).toHaveBeenCalledWith('What should I know about this call?', { kind: 'call', id: 12 });
   });
 
-  it('is a 44px target on phones, the meta line size from sm', () => {
+  it('is a 44px target on phones and a 36px one from sm (house rule §4.5)', () => {
     renderRow(vi.fn());
     const button = screen.getByRole('button', { name: /^Ask about this/ });
-    expect(button).toHaveClass('min-h-11', 'sm:min-h-0');
+    expect(button).toHaveClass('min-h-11', 'sm:min-h-9');
+    expect(button).not.toHaveClass('sm:min-h-0');
     expect(button).toHaveTextContent('Ask about this');
   });
 
