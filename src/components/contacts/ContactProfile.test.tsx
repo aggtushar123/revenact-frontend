@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
@@ -116,6 +116,42 @@ describe('ContactProfile (spec 2026-09-28 §3)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByRole('heading', { level: 2, name: 'Lukas V.' })).toBeInTheDocument();
     expect(store.getState().customers.selectedContact?.name).toBe('Lukas V.');
+  });
+
+  it('after a save the person stays on screen while they reload (no skeleton), and focus is back on Edit', async () => {
+    const { spy } = renderProfile();
+    await screen.findByRole('article', { name: 'Lukas Vermeer' });
+    let skeleton = false;
+    const observer = new MutationObserver(() => {
+      if (screen.queryByRole('status', { name: 'Loading this person' })) skeleton = true;
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    await userEvent.selectOptions(screen.getByLabelText(/^Sentiment \(/), 'Negative');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Sentiment' })).toHaveTextContent(/^Negative/));
+    observer.disconnect();
+    expect(skeleton).toBe(false);
+    expect(requested(spy).filter((path) => path === '/contacts/41/history/')).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Edit' })).toHaveFocus();
+  });
+
+  it('switching to a different person still shows the skeleton', async () => {
+    stubContactsApi();
+    const store = configureStore({ reducer: { customers: customersReducer } });
+    const wrap = (id: number) => (
+      <Provider store={store}>
+        <MemoryRouter>
+          <ContactProfile id={id} onDeleted={vi.fn()} />
+        </MemoryRouter>
+      </Provider>
+    );
+    const view = render(wrap(41));
+    await screen.findByRole('article', { name: 'Lukas Vermeer' });
+    view.rerender(wrap(42));
+    expect(screen.getByRole('status', { name: 'Loading this person' })).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: 'Lukas Vermeer' })).toBeNull();
+    expect(await screen.findByRole('article', { name: 'Mira Patel' })).toBeInTheDocument();
   });
 
   it('deletes after confirming, then hands back to the page', async () => {

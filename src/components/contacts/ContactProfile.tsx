@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Mail, Pencil, Phone, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks';
@@ -44,6 +44,7 @@ export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: numb
   const { selectedContact, selectedContactHistory } = useAppSelector((state) => state.customers);
   const [attempt, setAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
+  const editButton = useRef<HTMLButtonElement>(null);
   const [deleting, setDeleting] = useState(false);
   // Tied to `id` by the closure below, not read off the shared slice: two
   // requests for different people race through the same
@@ -141,7 +142,7 @@ export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: numb
           </p>
         </div>
         <div className="flex gap-2">
-          <button type="button" onClick={() => setEditing(true)} className={BUTTON}>
+          <button ref={editButton} type="button" onClick={() => setEditing(true)} className={BUTTON}>
             <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
             Edit
           </button>
@@ -191,7 +192,11 @@ export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: numb
       {editing ? (
         <ContactFormModal
           contact={contact}
-          onClose={() => setEditing(false)}
+          onClose={() => {
+            setEditing(false);
+            // Back where the edit began, not lost to the page body.
+            editButton.current?.focus();
+          }}
           // updateContact's reducer patches every list the person is in; the
           // sentiment line and history are the server's reading, so they are
           // read again (a changed sentiment is now a hand-set one), and the

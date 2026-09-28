@@ -2755,8 +2755,10 @@ const customersSlice = createSlice({
         state.selectedContactRequestId = action.meta.requestId;
         state.selectedContactLoading = true;
         state.selectedContactError = null;
-        // Cleared, not left stale — same reasoning as fetchCustomerById.
-        state.selectedContact = null;
+        // Another person: cleared, not left stale (same reasoning as
+        // fetchCustomerById). The same person read again (after a save)
+        // stays on screen until the fresh copy lands.
+        if (state.selectedContact?.id !== action.meta.arg) state.selectedContact = null;
       })
       .addCase(fetchContactById.fulfilled, (state, action) => {
         if (action.meta.requestId !== state.selectedContactRequestId) return;
@@ -2772,7 +2774,7 @@ const customersSlice = createSlice({
         state.selectedContactHistoryRequestId = action.meta.requestId;
         state.selectedContactHistoryLoading = true;
         state.selectedContactHistoryError = null;
-        state.selectedContactHistory = null;
+        if (state.selectedContactHistory?.contact_id !== action.meta.arg) state.selectedContactHistory = null;
       })
       .addCase(fetchContactHistory.fulfilled, (state, action) => {
         if (action.meta.requestId !== state.selectedContactHistoryRequestId) return;
