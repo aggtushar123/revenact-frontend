@@ -335,10 +335,14 @@ left for the phone sheet).
     shows (covering it exactly, 320px), in its place when it is hidden or
     collapsed, so the figures narrow rather than being covered.
 - **Organizations shape.** The same pill in the same transparent top bar, and
-  the same rail in `OrganizationsFrame`'s `rail` slot, on `/organizations/list`
-  and `/organizations/board`. `OrganizationsAskLayout` draws the frame and the
-  rail once, above both views; each page's own `OrganizationsFrame` inside it
-  passes its content straight through rather than drawing a second frame.
+  the same rail in `OrganizationsFrame`'s `rail` slot, on `/organizations/list`,
+  `/organizations/board` and `/organizations/:id`. `OrganizationsAskLayout`
+  draws the frame and the rail once, above all three; each page's own
+  `OrganizationsFrame` inside it passes its content straight through rather
+  than drawing a second frame. On an organisation's page the layout draws
+  the page's `bleed` frame, so with the rail closed the page keeps its full
+  width and 24px gutter; with it open the page narrows beside it, and the
+  tiles wrap to their column (`@container`, four across from 36rem).
   Only the rail is glass: rows, cards, tiles, the side panel and the sheets
   stay solid `bg-surface`. The rail wins its room: from `xl` the side panel
   sits between the columns and the rail, both showing together; below `xl`,
@@ -397,7 +401,8 @@ left for the phone sheet).
   was asked with; a question's own chip is what carries those. Organizations
   conversations carry the Network icon and "Organizations" followed by the
   server's own `labels` ("Organizations · Owner: Carl CSM"; there is no
-  `origin_label` field), capped at 60% of the row and truncated. Picking a
+  `origin_label` field), or, when started on an organisation's page, the
+  server's `label` ("Pizza Hut · EMEA"), capped at 60% of the row and truncated. Picking a
   conversation from History always navigates to the surface it started on
   (Dashboard or Organizations), whichever page is currently showing.
 
@@ -450,7 +455,9 @@ ARR. Rules specific to it, enforced by
 ### Organization page (`/organizations/:id`)
 
 The organization's story, framed like the list (transparent top bar with
-"‹ Organizations", `OrganizationsFrame`, no rail until Ask arrives in delivery 3).
+"‹ Organizations", `OrganizationsFrame`, and the glass Ask rail beside it,
+a sheet on phones). Each story item's meta line ends with a quiet "Ask about
+this" (Sparkles, 11px, a 44px target below `sm`).
 Rules specific to it, enforced by `components/organizations/detail/houseRules.test.ts`
 (which also scans `pages/organizations/Details.tsx`):
 

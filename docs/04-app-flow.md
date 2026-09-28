@@ -296,8 +296,20 @@ in instead.
    (`ChurnOrganizationModal`). A tile jumps to its Details panel; Health opens
    its breakdown. An id that is not a number, or one the viewer cannot see,
    says "Organization not found".
-6. Ask Revenact on this page is delivery 3 of that spec; there is no Ask link
-   here meanwhile.
+6. Ask Revenact sits beside this page (delivery 3 of that spec): the page is
+   a child of `OrganizationsAskLayout`, so one conversation lasts from the List
+   into an organisation and back. Each question posts `context:
+   {surface:'organizations', view:'detail', organization, account, focus}`:
+   `account` is the account chip on Story, People, Deals & risks and Files
+   (null for All, for `none`, and on Details and Knowledge), never a name. The
+   chip reads "Pizza Hut" or "Pizza Hut · EMEA", from the names the page
+   reports to the layout; a sent question shows the server's `label`. "Ask
+   about this" on a story item prefills "What should I know about this call?"
+   and sets `focus: {kind, id}` for that one question (the send, the chip's ×
+   or any change to the URL drops it). A `400` under `context.organization` or
+   `context.account` shows "You can no longer ask about this organization." or
+   "…this account. Choose All and ask again." on the rail, with no Retry. There
+   is no link to `/copilot`.
 
 Add and edit run through `OrganizationFormModal`; churn through
 `ChurnOrganizationModal`, one account at a time; archive, owner and lifecycle
@@ -340,8 +352,10 @@ columns are full-width panels that snap sideways, with a strip of column tabs
 that jumps to one. The board has no selection mode; bulk work stays on the
 list.
 
-**Ask Revenact** is on both routes (spec §3). `OrganizationsAskLayout`, a
-pathless layout route above the list and the board, draws `OrganizationsFrame`
+**Ask Revenact** is on both routes (spec §3), and on every organisation's page
+(delivery 3, item 6 above). `OrganizationsAskLayout`, a
+pathless layout route above the list, the board and `/organizations/:id`,
+draws `OrganizationsFrame` (the `bleed` variant on an organisation's page)
 and `AskRail` once, holding one conversation (the shared `AskProvider` with
 the `organizations` surface), so both survive the tab switch and every
 filter; a page's own `OrganizationsFrame` inside it is a pass-through
@@ -370,7 +384,9 @@ rows go `@min-[60rem]:flex-nowrap`, tiles `@min-[50rem]:grid-cols-5`. History
 tags an Organizations conversation with "Organizations" followed by the
 server's own `labels`, joined with " · " ("Organizations · Owner: Carl CSM";
 there is no `origin_label` field), and reopening one goes to its view with
-its filters, then shows the thread. A conversation that started on the
+its filters, then shows the thread. One started on an organisation's page is
+tagged with the server's `label` ("Pizza Hut · EMEA") and reopens
+`/organizations/{id}`, with `?account={account}` when it had one. A conversation that started on the
 Dashboard, picked here, navigates to its dashboard view carrying the
 conversation History already loaded (and its id) in the navigation state; the
 Dashboard's rail shows that conversation for the visit at once, and only
