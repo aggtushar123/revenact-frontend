@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Account } from '../../features/customers/customersSlice';
 import { buildPortfolio, globex, pizzaHut } from '../../features/organizations/testPortfolio';
@@ -373,6 +373,17 @@ describe('the organization page (/organizations/:id)', () => {
     renderOrganizationPage('/organizations/abc');
     expect(screen.getByText('Organization not found')).toBeInTheDocument();
     expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('asks for nothing for /organizations/0 or a zero-padded id, as its Ask context reads them', () => {
+    for (const url of ['/organizations/0', '/organizations/007']) {
+      const spy = stubOrganizationPage();
+      renderOrganizationPage(url);
+      expect(screen.getByText('Organization not found')).toBeInTheDocument();
+      expect(spy).not.toHaveBeenCalled();
+      cleanup();
+      vi.unstubAllGlobals();
+    }
   });
 
   it('shows a failed header read with Try again', async () => {

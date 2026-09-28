@@ -5,6 +5,7 @@ import {
   detailIdOf,
   detailLabel,
   detailPath,
+  parseOrganizationId,
   isStoryFocus,
   storyFocusLabel,
   type DetailNames,
@@ -22,6 +23,13 @@ describe('the organisation page as a question carries it', () => {
     expect(detailIdOf('/organizations/board')).toBeNull();
     expect(detailIdOf('/organizations/007')).toBeNull();
     expect(detailIdOf('/organizations/7/story')).toBeNull();
+    expect(detailIdOf('/organizations/0')).toBeNull();
+  });
+
+  it('parses a route id as a positive integer, the one rule the page and its Ask share', () => {
+    expect(parseOrganizationId('7')).toBe(7);
+    expect(parseOrganizationId('120')).toBe(120);
+    for (const bad of ['0', '007', '-1', '1.5', 'abc', '', ' 7', undefined]) expect(parseOrganizationId(bad)).toBeNull();
   });
 
   it('carries the account chip on the tabs that show it, and never "none"', () => {

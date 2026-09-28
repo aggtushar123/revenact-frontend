@@ -11,7 +11,7 @@ import {
   storyFilters,
   type DetailTab,
 } from '../../features/organizations/detailParams';
-import type { DetailNames } from '../../features/organizations/detailAskContext';
+import { parseOrganizationId, type DetailNames } from '../../features/organizations/detailAskContext';
 import { bulkUpdate } from '../../features/organizations/portfolioApi';
 import type { PanelKey } from '../../features/organizations/portfolioFields';
 import { storyQuery } from '../../features/organizations/storyApi';
@@ -116,7 +116,7 @@ export function Details() {
  *  beside it (delivery 3): OrganizationsAskLayout draws the frame and the
  *  rail, and the page reports its names for the question's chip. */
 function OrganizationPage({ id }: { id: string | undefined }) {
-  const orgId = id && /^\d+$/.test(id) ? Number(id) : null;
+  const orgId = parseOrganizationId(id);
   const isSm = useMediaQuery(SM);
   const dispatch = useAppDispatch();
   const { params, update } = useDetailParams();

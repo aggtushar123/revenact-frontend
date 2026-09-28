@@ -15,10 +15,17 @@ export interface DetailNames {
   accounts: Record<number, string>;
 }
 
+/** The route's `:id` as an organisation id: a positive integer written
+ *  plainly ("7"), else null ("0", "007", "abc"). The page and its Ask
+ *  context both read the id through this, so they never disagree. */
+export function parseOrganizationId(raw: string | undefined): number | null {
+  return raw !== undefined && /^[1-9]\d*$/.test(raw) ? Number(raw) : null;
+}
+
 /** `/organizations/7` gives 7; any other path gives null. */
 export function detailIdOf(pathname: string): number | null {
-  const match = /^\/organizations\/([1-9]\d*)$/.exec(pathname);
-  return match ? Number(match[1]) : null;
+  const match = /^\/organizations\/([^/]+)$/.exec(pathname);
+  return match ? parseOrganizationId(match[1]) : null;
 }
 
 /** The page as a question carries it. The account follows the account chip
