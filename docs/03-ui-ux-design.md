@@ -179,10 +179,11 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 | Component | Where |
 |---|---|
 | Portfolio rows and board (`components/organizations/portfolio/`) | `/organizations/list`: `AccountRow` (a rounded item, not a table row; a two-line card below `sm`), `AccountDetails` (six panels, part of the row), `SummaryTiles`, `PortfolioToolbar`/`FiltersPanel`/`PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `AccountSheet`. `/organizations/board`: `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`. See "Portfolio rows and board" below |
-| `AccountsTable`, `ContactsTable` | Same shape, no bulk actions |
+| `AccountsTable` | Same shape, no bulk actions |
+| Contacts list and profile (`components/contacts/`) | `/contacts`: `ContactsToolbar` (summary line, search, organisation, account, sentiment and role filters in the URL, + Add), `ContactList` of `ContactListItem`s (never a table row; Load more), `ContactProfile` (sentiment and why, then `HistoryItems`: calls newest first, emails, tickets). See "Contacts" below |
 | `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by Pipelines and the Accounts board |
 | Dashboard tables | `AccountHealthDetailTable`, `RenewalQueueTable`, `ActivityDetailedTable`, `GoingDarkTable`, `SwingTable` |
-| `MetricsPanel` | Accounts and Contacts (each its own): count, health donut with COUNT/MRR/ARR toggle, NPS, lifecycle donut, renewal window |
+| `MetricsPanel` | Accounts: count, health donut with COUNT/MRR/ARR toggle, NPS, lifecycle donut, renewal window |
 | `PinnedAttributes` | Label and value pairs typed as text, truncated, dot, owner or pulse |
 | `EntityAvatar` | Company logo, else deterministic initials in one of five semantic hues |
 | `PresenceStrip` | Session participants, maximum five |
@@ -514,6 +515,51 @@ Rules specific to it, enforced by `components/organizations/detail/houseRules.te
   "kind · who · via source". No card in a card.
 - Every one of the 34 table fields renders once across the name row, the
   tiles and Details (`detail/fieldCoverage.test.tsx`).
+
+### Contacts
+
+Spec `docs/superpowers/specs/2026-09-28-contacts-redesign-design.md` §3 and §5.
+A list and a profile panel, like the Communications inbox but solid (no
+glass), in `ContactsFrame` (the same bleed gutter as the organisation page —
+`OrganizationsFrame`'s classes — with a slot for the Ask rail that delivery 2
+fills).
+
+- **Header.** The summary line ("142 people · 38 decision makers · 61%
+  positive · 12 negative", over the whole filtered set), then search and the
+  organisation, account (waits for an organisation), sentiment and role
+  filters — each with its own visible label, not a placeholder standing in
+  for one — all in the URL (`q`, `customer`, `account`, `sentiment`, `role`),
+  and + Add (the existing `ContactFormModal`).
+- **List.** One item per person: initials, name and role, "Organisation ›
+  Account" (or the organisation alone), sentiment in words in its colour with
+  "n calls" beside it, and last contacted. Load more at the end; skeleton,
+  error with Try again, and empty states (Clear filters when filtered).
+- **Profile.** `/contacts/:id` chooses the person. Name (22px), role,
+  "Organisation › Account" (the organisation links to its page, the account
+  to it with `?account=` so its chip is chosen), email and phone links
+  (sanitised). Their sentiment and why ("Neutral: 3 positive · 2 neutral · 1
+  negative across 6 calls and 2 emails, latest 12 Sep"), built only from
+  `sentiment_evidence` — never from the interactions listed below it, which
+  can include kinds `sentiment_evidence` doesn't count. Calls newest first:
+  date, title, sentiment or "Not enough to analyse" (nothing while pending —
+  `readingOf()`: `not_analysable` → "Not enough to analyse", `pending` →
+  nothing, otherwise the sentiment), the summary its title opens, the
+  classification, host and length, the organisation › account tag and the
+  recording. Then emails, then tickets ("Department · Status", falling back
+  to the status alone when the ticket carries no department). Edit and
+  Delete are the existing flows. "Why this sentiment?" is hidden, not
+  disabled, until Ask on Contacts wires it (delivery 2).
+- **Phones** (below 768px). The list is full width; a person opens as their
+  own screen with a "‹ Contacts" back link that keeps the filters. Rendered
+  conditionally, not hidden with CSS.
+- **Organisation page ties.** A person's name on the People tab opens
+  `/contacts/:id`; a call there with nothing to read says "Not enough to
+  analyse" and a pending one shows no sentiment.
+- **What a call's reading is read from** (backend, `services/customers/
+  calls.py::call_text`): the classifier reads the summary first, else the
+  transcript, else just the title — the transcript's own opening lines are
+  often small talk, so a summary (a digest of the whole call) pre-empts it
+  rather than the two being concatenated.
 
 ### Overlays
 
