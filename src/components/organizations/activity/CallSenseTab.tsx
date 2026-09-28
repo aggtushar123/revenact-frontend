@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent } from 'rea
 import { Phone, Plus, Clock, Link2, FileText, Sparkles, ChevronDown, ChevronUp, Users } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { clearCalls, fetchCalls, logCall, type Call, type LogCallInput } from '../../../features/calls/callsSlice';
+import { durationLabel } from '../../../features/calls/callFormat';
 import { downloadAttachment, type FileParent } from '../../../features/files/filesSlice';
 import type { Contact } from '../../../features/customers/customersSlice';
 import { apiFetch } from '../../../lib/apiClient';
@@ -28,14 +29,6 @@ const SENTIMENT: Record<string, { label: string; cls: string }> = {
 function timeOf(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
-
-function durationLabel(minutes: number | null): string {
-  if (minutes === null) return '';
-  if (minutes < 60) return `${minutes} min`;
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  return m ? `${h} h ${m} min` : `${h} h`;
 }
 
 /** The log-a-call form on its own, so the organization page's "+ Add" can

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { FileText, Image as ImageIcon, FileAudio, FileSpreadsheet, Presentation, Download, Trash2, UploadCloud, Mic } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useCapability } from '../../../hooks';
 import { clearFiles, deleteFile, downloadAttachment, fetchFiles, uploadFile, type Attachment, type FileParent } from '../../../features/files/filesSlice';
+import { FILE_ACCEPT, formatSize } from '../../../features/files/fileFormat';
 import { formatDate } from '../../../features/customers/formatters';
 
 /**
@@ -12,14 +13,6 @@ import { formatDate } from '../../../features/customers/formatters';
  * session (the API never exposes a plain file URL), so a link cannot be
  * forwarded to someone outside the company.
  */
-
-const ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md,.vtt,.srt,.json,.png,.jpg,.jpeg,.gif,.webp,.mp3,.m4a,.wav';
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 function iconFor(file: Attachment) {
   const type = file.content_type;
@@ -104,7 +97,7 @@ export function FilesTab({ entityType, entityId, customerId }: FilesTabProps) {
                 placeholder="Description (optional)"
                 className="px-3 py-1.5 bg-surface border border-line rounded-lg text-[12.5px] text-ink focus:outline-none focus:border-accent w-56"
               />
-              <input ref={input} type="file" multiple accept={ACCEPT} className="sr-only" aria-label="Choose files" onChange={(e) => e.target.files && void send(e.target.files)} />
+              <input ref={input} type="file" multiple accept={FILE_ACCEPT} className="sr-only" aria-label="Choose files" onChange={(e) => e.target.files && void send(e.target.files)} />
               <button type="button" onClick={() => input.current?.click()} disabled={uploading} className="flex items-center gap-1.5 px-3 py-1.5 bg-accent text-on-accent rounded-lg text-[12px] font-bold disabled:opacity-50">
                 <UploadCloud className="w-3.5 h-3.5" /> {uploading ? 'Uploading…' : 'Upload file'}
               </button>
