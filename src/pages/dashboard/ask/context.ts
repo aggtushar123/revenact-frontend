@@ -12,6 +12,12 @@ export interface AskSurface {
   chipLabel: (context: SurfaceContext) => string;
 }
 
+export interface PendingDraft {
+  text: string;
+  nonce: number;
+  edited?: boolean;
+}
+
 export interface AskState {
   /** The surface this rail asks from. */
   surface: AskSurface;
@@ -31,7 +37,10 @@ export interface AskState {
   focusOn: (focus: AskFocus) => void;
   /** A question left: its focus and prefilled draft are spent. */
   markSent: () => void;
-  pendingDraft: { text: string; nonce: number } | null;
+  /** The prefilled question; `edited` once the person has changed it. */
+  pendingDraft: PendingDraft | null;
+  /** The person changed the composer's text: a prefill is theirs now. */
+  markDraftEdited: () => void;
   /** Prefill an editable question about `focus` and open the rail; never sends. */
   draft: (question: string, focus: AskFocus) => void;
   /** Open the rail and send `question` now, grounded in the screen as it is. */

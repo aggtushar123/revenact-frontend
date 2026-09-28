@@ -5,7 +5,7 @@ import { SM, XL, useMediaQuery } from '../../../lib/useMediaQuery';
 import { fetchConversation } from '../../copilot/copilotApi';
 import type { AskFocus, Conversation } from '../../copilot/types';
 import { ASK_PREFERENCE_KEY, readAskPreference, writeAskPreference } from './askPreference';
-import { AskContext, AskDraftContext, AskFocusOnContext, withFocus, type AskState, type AskSurface } from './context';
+import { AskContext, AskDraftContext, AskFocusOnContext, withFocus, type AskState, type AskSurface, type PendingDraft } from './context';
 import { originPath } from './originPath';
 
 /** The navigation state another surface's History sends with a conversation
@@ -62,7 +62,7 @@ export function AskProvider({
   const [choice, setChoice] = useState<boolean | null>(() => (handedId !== null ? true : readAskPreference(preferenceKey)));
   const [sheetOpen, setSheetOpen] = useState(handedId !== null);
   const [focus, setFocus] = useState<AskFocus | null>(null);
-  const [pendingDraft, setPendingDraft] = useState<{ text: string; nonce: number } | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<PendingDraft | null>(null);
 
   // The handover is spent once read: clear it from the history entry, so a
   // reload or Back and Forward neither refetches it nor forces the rail
@@ -94,12 +94,15 @@ export function AskProvider({
 
   // A focus names accounts on the screen it came from, so another area or
   // filter drops it (a drill closes on the same change). Adjusted during
-  // render, as DrillContext does. The typed draft stays: it is the person's text.
+  // render, as DrillContext does. The prefilled question goes with it while
+  // untouched ("What should I know about this call?" names the item that is
+  // no longer the focus); once edited it is the person's text, and stays.
   const locationKey = pathname + search;
   const [madeAt, setMadeAt] = useState(locationKey);
   if (madeAt !== locationKey) {
     setMadeAt(locationKey);
     setFocus(null);
+    if (pendingDraft && !pendingDraft.edited) setPendingDraft(null);
   }
 
   // Open by default from xl; the person's own choice wins once made. Below
@@ -134,6 +137,9 @@ export function AskProvider({
     setFocus(null);
     setPendingDraft(null);
   }, []);
+  const markDraftEdited = useCallback(() => {
+    setPendingDraft((prev) => (prev && !prev.edited ? { ...prev, edited: true } : prev));
+  }, []);
   const draft = useCallback(
     (question: string, nextFocus: AskFocus) => {
       setFocus(nextFocus);
@@ -158,6 +164,7 @@ export function AskProvider({
       focusOn,
       markSent,
       pendingDraft,
+      markDraftEdited,
       draft,
       ask: (question, nextFocus) => {
         // One question at a time: while an answer is on its way the thread
@@ -197,7 +204,7 @@ export function AskProvider({
         reveal();
       },
     }),
-    [surface, open, setOpen, reveal, conversation, setConversation, thread, focus, clearFocus, focusOn, markSent, pendingDraft, draft, navigate],
+    [surface, open, setOpen, reveal, conversation, setConversation, thread, focus, clearFocus, focusOn, markSent, pendingDraft, markDraftEdited, draft, navigate],
   );
 
   return (

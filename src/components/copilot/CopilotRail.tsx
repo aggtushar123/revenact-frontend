@@ -43,6 +43,8 @@ export interface CopilotRailProps {
   draft?: { text: string; nonce: number } | null;
   /** Called as a question is sent. */
   onSent?: () => void;
+  /** Called when the person edits the composer's text. */
+  onDraftEdited?: () => void;
 }
 
 function UserTurn({ text, chip }: { text: string; chip?: string }) {
@@ -79,6 +81,7 @@ export function CopilotRail({
   chipLabel,
   draft,
   onSent,
+  onDraftEdited,
 }: CopilotRailProps) {
   const own = useCopilotThread(conversation, onConversation);
   const thread = given ?? own;
@@ -180,6 +183,7 @@ export function CopilotRail({
             key={draft?.nonce ?? 0}
             initialValue={draft?.text}
             autoFocus={Boolean(draft)}
+            onEdit={onDraftEdited}
             inputRef={inputRef}
             onSend={(text) => void send(text)}
             disabled={Boolean(pending)}

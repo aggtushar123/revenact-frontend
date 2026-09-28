@@ -89,6 +89,7 @@ export function AskRail() {
     chipLabel,
     draft: ask.pendingDraft,
     onSent: ask.markSent,
+    onDraftEdited: ask.markDraftEdited,
   };
 
   const controls = (

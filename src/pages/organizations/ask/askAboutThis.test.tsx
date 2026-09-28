@@ -58,6 +58,28 @@ describe('Ask about this', () => {
     expect(within(rail()).queryByText(/This call/)).not.toBeInTheDocument();
   });
 
+  it('drops the untouched prefilled question with the focus, when the URL changes', async () => {
+    stubOrganizationPageAsk();
+    renderOrganizationPage('/organizations/7', { ask: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Ask about this: Quarterly check-in' }));
+    expect(composer()).toHaveValue('What should I know about this call?');
+    const chips = screen.getByRole('group', { name: 'Filter by account' });
+    await userEvent.click(within(chips).getByRole('button', { name: /^EMEA/ }));
+    await within(rail()).findByText('Pizza Hut · EMEA');
+    expect(composer()).toHaveValue('');
+  });
+
+  it('keeps the question the person edited when the URL changes', async () => {
+    stubOrganizationPageAsk();
+    renderOrganizationPage('/organizations/7', { ask: true });
+    await userEvent.click(await screen.findByRole('button', { name: 'Ask about this: Quarterly check-in' }));
+    await userEvent.type(composer(), ' And the next step');
+    const chips = screen.getByRole('group', { name: 'Filter by account' });
+    await userEvent.click(within(chips).getByRole('button', { name: /^EMEA/ }));
+    await within(rail()).findByText('Pizza Hut · EMEA');
+    expect(composer()).toHaveValue('What should I know about this call? And the next step');
+  });
+
   it('opens the sheet on phones, prefilled', async () => {
     stubOrganizationPageAsk();
     renderOrganizationPage('/organizations/7', { ask: true, width: 375 });
