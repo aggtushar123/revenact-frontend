@@ -21,7 +21,7 @@ interface ContactFormModalProps {
    * — a fixed id when opened from a page that already has one (the
    * Organization Details page's own Contacts tab, or the standalone
    * Account page's — see `accountId` below), or picked from
-   * `companies` on the standalone /contacts/list page, which has no
+   * `companies` on the Contacts page (/contacts), which has no
    * single Customer of its own. Ignored for Edit — a Contact can't be
    * moved between parents (see ContactDetailView's own docstring on
    * the backend), so Company is shown read-only there instead. */
@@ -33,7 +33,7 @@ interface ContactFormModalProps {
    * below (already inside one specific account's own context, nothing
    * to pick). Omitted everywhere else, which is what lets that picker
    * show up on the Organization Details page's own Contacts tab and
-   * the standalone /contacts/list page — a Contact can be an
+   * the Contacts page (/contacts) — a Contact can be an
    * organisation-level one *or* belong to one specific Account (see
    * the Contact model's own docstring on the backend), and both of
    * those surfaces can create either kind. */
@@ -113,7 +113,7 @@ export function ContactFormModal({
   }, [isEdit, accountId, effectiveCompanyId]);
 
   // The previously-picked account may not exist under a newly-picked
-  // company (on the standalone /contacts/list page, where Company
+  // company (on the Contacts page (/contacts), where Company
   // itself is a dropdown) — reset rather than silently keep a stale id.
   useEffect(() => {
     setSelectedAccountId('');

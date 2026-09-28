@@ -59,7 +59,7 @@ export function ContactsTab({ contacts, isLoading, error, customerId, accountId,
   // Client-side filter, not a server round-trip — this list is already
   // fully loaded (the nested Customer/Account-scoped endpoints turn
   // pagination off, see CustomerContactListView's own docstring),
-  // unlike the standalone /contacts/list page's server-side `?search=`.
+  // unlike the Contacts page's (/contacts) server-side `?search=`.
   const filteredContacts = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return contacts;
@@ -83,7 +83,7 @@ export function ContactsTab({ contacts, isLoading, error, customerId, accountId,
   // Add is the one mutation that needs an explicit refetch — Edit/
   // Delete already patch `contacts` directly via updateContact/
   // deleteContact's own extraReducers (same "caller refetches only for
-  // create" reasoning as the standalone /contacts/list page's own
+  // create" reasoning as the Contacts page's (/contacts) own
   // ContactFormModal usage).
   const refetch = () => {
     if (customerId === undefined) return;

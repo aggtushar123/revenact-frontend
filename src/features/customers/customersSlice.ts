@@ -404,7 +404,7 @@ export interface CalendarEvent {
 // Email/Task/Note/Ticket/CalendarEvent above (each one filter within
 // ActivityFeed), Contact backs its own sibling tab — the Organization
 // Details page's Contacts tab, the standalone Account page's Contacts
-// tab, and the global /contacts/list page — so it also carries
+// tab, and the Contacts page (/contacts) — so it also carries
 // `companies`/`account_name`, which those other models don't need
 // (their parent scope is always already known from which endpoint
 // fetched them; the global list page spans every Customer/Account at
@@ -456,36 +456,6 @@ export interface ContactSentimentEvidence {
   latest_at: string | null;
 }
 
-// GET /api/v1/contacts/<id>/interactions/ — what the sentiment rests on.
-export interface ContactInteraction {
-  kind: 'call' | 'email' | 'ticket';
-  id: number;
-  title: string;
-  snippet: string;
-  when: string;
-  sentiment: 'positive' | 'neutral' | 'negative' | '';
-  ai_category: string;
-}
-
-export interface ContactInteractions {
-  sentiment: 'positive' | 'neutral' | 'negative' | null;
-  score: number;
-  source: 'manual' | 'computed';
-  evidence: ContactSentimentEvidence | Record<string, never>;
-  interactions: ContactInteraction[];
-}
-
-// Mirrors revenact-backend's ContactStatsView response exactly — see
-// docs/API_CONTRACTS.md -> GET /api/v1/contacts/stats/.
-export interface ContactStats {
-  total: number;
-  active: number;
-  sentiment: { positive: number; neutral: number; negative: number };
-  sentiment_pct: { positive: number; neutral: number; negative: number };
-  /** null (not 0) when there were no contacts yet 30 days ago — a
-   * percentage change off a zero base is undefined, not zero. */
-  growth_30d_pct: number | null;
-}
 
 // The fields the Add/Edit Contact form actually exposes — everything
 // ContactSerializer accepts except `customer`/`account` (never sent;
@@ -859,11 +829,9 @@ interface CustomersState {
   contactsFor: string | null;
   /** The last contacts read asked for: a slower, earlier one never lands. */
   contactsRequestId?: string;
-  /** The global, paginated, searchable/company-filterable contact list
-   * for the standalone /contacts/list page — separate from `contacts`
-   * above the same way `customers` (the Organizations list) is
-   * separate from `selectedCustomer`: this page isn't scoped to one
-   * Customer/Account at all. */
+  /** The Contacts page's list (/contacts): every person the viewer may
+   * open, filtered, paged by "Load more" — separate from `contacts`
+   * above, which is one organisation's or account's people. */
   allContacts: Contact[];
   allContactsCount: number;
   allContactsNext: string | null;
@@ -876,20 +844,10 @@ interface CustomersState {
   allContactsRequestId?: string;
   allContactsLoadingMore: boolean;
   allContactsMoreError: string | null;
-  /** Total/Active/Sentiment/Growth rollups for the standalone
-   * /contacts/list page's MetricsPanel — null until the first fetch
-   * resolves, same reasoning as `stats` (Customer's own). */
-  contactStats: ContactStats | null;
-  contactStatsLoading: boolean;
-  contactStatsError: string | null;
-  /** The single Contact the new /contacts/:id page is showing — same
-   * "separate from the paginated/scoped lists" reasoning as
-   * selectedCustomer vs. `customers`/`accountsForCustomer`. */
+  /** The person the Contacts page's profile shows (/contacts/:id). */
   selectedContact: Contact | null;
   selectedContactLoading: boolean;
   selectedContactError: string | null;
-  selectedContactInteractions: ContactInteractions | null;
-  selectedContactInteractionsLoading: boolean;
   selectedContactRequestId?: string;
   /** Their calls, emails and tickets (GET /contacts/<id>/history/). */
   selectedContactHistory: ContactHistory | null;
@@ -1039,14 +997,9 @@ const initialState: CustomersState = {
   allContactsSummary: null,
   allContactsLoadingMore: false,
   allContactsMoreError: null,
-  contactStats: null,
-  contactStatsLoading: false,
-  contactStatsError: null,
   selectedContact: null,
   selectedContactLoading: false,
   selectedContactError: null,
-  selectedContactInteractions: null,
-  selectedContactInteractionsLoading: false,
   selectedContactHistory: null,
   selectedContactHistoryLoading: false,
   selectedContactHistoryError: null,
@@ -1555,31 +1508,6 @@ export const fetchAllContacts = createAsyncThunk<ContactsPage, string | void, { 
   }
 );
 
-export const fetchContactStats = createAsyncThunk<ContactStats, void, { rejectValue: string }>(
-  'customers/fetchContactStats',
-  async (_, { rejectWithValue }) => {
-    try {
-      return await apiFetch<ContactStats>('/contacts/stats/');
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Could not load contact stats.';
-      return rejectWithValue(message);
-    }
-  }
-);
-
-// Powers the new /contacts/:id page.
-export const fetchContactInteractions = createAsyncThunk<ContactInteractions, number, { rejectValue: string }>(
-  'customers/fetchContactInteractions',
-  async (id, { rejectWithValue }) => {
-    try {
-      return await apiFetch<ContactInteractions>(`/contacts/${id}/interactions/`);
-    } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Could not load this contact\'s interactions.';
-      return rejectWithValue(message);
-    }
-  }
-);
-
 /** The next page of the Contacts list (a response's own `next` link), appended. */
 export const loadMoreContacts = createAsyncThunk<ContactsPage, string, { rejectValue: string }>(
   'customers/loadMoreContacts',
@@ -1627,7 +1555,7 @@ export const fetchContactHistory = createAsyncThunk<ContactHistory, number, { re
 
 // Adds an organization-level Contact under `customerId` — used both by
 // the Organization Details page's own Contacts tab (customerId fixed)
-// and the standalone /contacts/list page's "Add Contact" (customerId
+// and the Contacts page's (/contacts) "Add Contact" (customerId
 // picked from a dropdown; that page only ever creates org-level
 // Contacts, there's no account-picker on it). No extraReducers case:
 // unlike createAccount (which unshifts into the single
@@ -2792,29 +2720,6 @@ const customersSlice = createSlice({
         if (state.allContactsNext !== action.meta.arg) return;
         state.allContactsLoadingMore = false;
         state.allContactsMoreError = action.payload ?? 'Could not load more people.';
-      })
-      .addCase(fetchContactStats.pending, (state) => {
-        state.contactStatsLoading = true;
-        state.contactStatsError = null;
-      })
-      .addCase(fetchContactStats.fulfilled, (state, action) => {
-        state.contactStatsLoading = false;
-        state.contactStats = action.payload;
-      })
-      .addCase(fetchContactStats.rejected, (state, action) => {
-        state.contactStatsLoading = false;
-        state.contactStatsError = action.payload ?? 'Something went wrong.';
-      })
-      .addCase(fetchContactInteractions.pending, (state) => {
-        state.selectedContactInteractionsLoading = true;
-      })
-      .addCase(fetchContactInteractions.fulfilled, (state, action) => {
-        state.selectedContactInteractionsLoading = false;
-        state.selectedContactInteractions = action.payload;
-      })
-      .addCase(fetchContactInteractions.rejected, (state) => {
-        state.selectedContactInteractionsLoading = false;
-        state.selectedContactInteractions = null;
       })
       .addCase(fetchContactById.pending, (state, action) => {
         state.selectedContactRequestId = action.meta.requestId;
