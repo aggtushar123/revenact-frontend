@@ -53,17 +53,18 @@ export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: numb
   // tick, or A's late failure after B is already on screen (fix round 1,
   // 2026-09-28). `cancelled` drops a reply that arrives after `id` (or
   // `attempt`) has moved on, exactly as useOrganization does for the
-  // organisation page.
-  const [error, setError] = useState<string | null>(null);
+  // organisation page. The failure carries the `id` and `attempt` it
+  // belongs to, so moving on hides it without a reset inside the effect.
+  const [failure, setFailure] = useState<{ id: number; attempt: number; message: string } | null>(null);
+  const error = failure?.id === id && failure.attempt === attempt ? failure.message : null;
 
   useEffect(() => {
     let cancelled = false;
-    setError(null);
     Promise.allSettled([dispatch(fetchContactById(id)).unwrap(), dispatch(fetchContactHistory(id)).unwrap()]).then(
       ([byId, history]) => {
         if (cancelled) return;
         const failed = byId.status === 'rejected' ? byId.reason : history.status === 'rejected' ? history.reason : null;
-        if (failed !== null) setError(typeof failed === 'string' ? failed : 'Something went wrong.');
+        if (failed !== null) setFailure({ id, attempt, message: typeof failed === 'string' ? failed : 'Something went wrong.' });
       },
     );
     return () => {
