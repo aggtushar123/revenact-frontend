@@ -63,11 +63,12 @@ describe('the other tabs in delivery 1', () => {
     expect(requestPaths(spy)).toContain('GET /customers/7/brief/');
   });
 
-  it('Files holds the files and the CallSense calls', async () => {
+  it('Files holds the files and the calls, each read once for the organization', async () => {
     const spy = stubOrganizationPage();
-    renderWithStore(<FilesCallsTab customerId={7} />);
+    renderWithStore(<FilesCallsTab customerId={7} account="" accounts={ACCOUNTS} isSm active onCallLogged={() => {}} onShowAll={() => {}} />);
     expect(screen.getByRole('region', { name: 'Files' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Calls' })).toBeInTheDocument();
     await waitFor(() => expect(requestPaths(spy)).toEqual(expect.arrayContaining(['GET /customers/7/files/', 'GET /customers/7/calls/'])));
+    expect(requestPaths(spy).filter((path) => path === 'GET /customers/7/files/')).toHaveLength(1);
   });
 });

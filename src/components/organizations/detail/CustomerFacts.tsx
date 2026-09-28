@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from 'react';
 import type { CsatBreakdown, Customer } from '../../../features/customers/customersSlice';
+import { mailtoHref } from '../../../lib/contactLinks';
 import { FOCUS, QUIET } from '../portfolio/styles';
 
 /** Bands run best to worst; the tone follows the band, not the customer. */
@@ -15,18 +16,6 @@ const BAND_TONE: Record<string, string> = {
 const BAND_ROW = 'grid grid-cols-[minmax(0,8rem)_minmax(0,1fr)_7rem]';
 
 const LINK = `flex min-h-11 min-w-0 max-w-full items-center truncate rounded-sm text-ink underline sm:min-h-0 ${FOCUS}`;
-
-/** An address with `?`, `&` or `#` anywhere could carry its own mailto
- *  query or fragment (cc=, bcc=, body=): it is shown as text, not linked. */
-const UNSAFE_EMAIL = /[?&#]/;
-
-/** Encodes only the local part (before the last `@`); the domain is never
- *  percent-encoded, and the visible link text stays the raw address. */
-function mailtoHref(email: string): string {
-  const at = email.lastIndexOf('@');
-  if (at === -1) return `mailto:${encodeURIComponent(email)}`;
-  return `mailto:${encodeURIComponent(email.slice(0, at))}@${email.slice(at + 1)}`;
-}
 
 function Fact({ term, children }: { term: string; children: ReactNode }) {
   return (
@@ -109,10 +98,10 @@ export function CustomerFacts({
         <div data-facts="" className={`grid gap-x-8 gap-y-4 ${stacked ? '' : 'md:grid-cols-2 xl:grid-cols-3'}`}>
           <dl className="grid grid-cols-[6rem_minmax(0,1fr)] content-start gap-x-3 gap-y-1.5 text-[13px]">
             <Fact term="Email">
-              {customer.email && UNSAFE_EMAIL.test(customer.email) ? (
+              {customer.email && !mailtoHref(customer.email) ? (
                 customer.email
               ) : customer.email ? (
-                <a href={mailtoHref(customer.email)} className={LINK}>
+                <a href={mailtoHref(customer.email) ?? undefined} className={LINK}>
                   {customer.email}
                 </a>
               ) : (

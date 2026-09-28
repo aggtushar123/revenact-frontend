@@ -1,439 +1,133 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ComponentProps } from 'react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
+import {
+  ACCOUNTS,
+  ORGANIZATION_LISTS,
+  postBodies,
+  requestPaths,
+  stubOrganizationPage,
+  type OrganizationLists,
+} from '../../../features/organizations/testStory';
 import { makeDetailStore } from '../../../pages/organizations/testDetail';
 import { DealsTab } from './DealsTab';
 
-// These tests lived in the old organization page's test, under its Pipelines
-// tab. Deals & risks keeps that content in delivery 1 (spec §4), so they
-// render DealsTab directly; it reads opportunities and risks when opened.
-function renderDeals() {
-  render(
+function ui(props: Partial<ComponentProps<typeof DealsTab>> = {}) {
+  return (
     <Provider store={makeDetailStore()}>
       <MemoryRouter>
-        <DealsTab customerId={10} />
+        <DealsTab customerId={7} account="" accounts={ACCOUNTS} isSm onShowAll={() => {}} {...props} />
       </MemoryRouter>
-    </Provider>,
+    </Provider>
   );
 }
 
+function renderDeals(props: Partial<ComponentProps<typeof DealsTab>> = {}, lists: OrganizationLists = ORGANIZATION_LISTS) {
+  const spy = stubOrganizationPage({ lists });
+  const onShowAll = vi.fn();
+  render(ui({ onShowAll, ...props }));
+  return { spy, onShowAll };
+}
 
-// Minimal but real shape, matching revenact-backend's CustomerSerializer —
-// see customersSlice.test.ts / docs/API_CONTRACTS.md -> customers.
-const globex = {
-  id: 10,
-  name: 'Globex Corp',
-  address: '123 Main St',
-  domain: 'globex.example',
-  owner: null,
-  created_by: null,
-  modified_by: null,
-  created_at: '2026-08-31T00:00:00Z',
-  updated_at: '2026-08-31T00:00:00Z',
-  lifecycle_stage: 'onboarding' as const,
-  health_score: '5.0',
-  health_category: 'average' as const,
-  pulse: [],
-  ai_pulse_score: '' as const,
-  ai_pulse_reason: '',
-  account_pulse: {
-    value: '2.3',
-    label: 'At risk' as const,
-    category: 2 as const,
-    breakdown: [
-      { key: 'ai_pulse' as const, label: 'AI pulse', weight: '3.0', reading: '2.0', note: 'what the model reads' },
-      { key: 'csm_pulse' as const, label: 'CSM pulse', weight: '2.5', reading: null, note: 'not set' },
-      { key: 'sentiment' as const, label: 'Recent sentiment', weight: '2.0', reading: '3.0', note: '1 positive, 1 negative of 2 in the last 30 days' },
-      { key: 'touch' as const, label: 'Last contact', weight: '1.5', reading: '4.8', note: '4 days ago' },
-      { key: 'support' as const, label: 'Open tickets', weight: '1.0', reading: '1.0', note: '12 open' },
-    ],
-  },
-  nps_score: null,
-  csat_score: null,
-  joined_date: null,
-  renewal_date: null,
-  contract_start_date: null,
-  contract_end_date: null,
-  currency: 'USD' as const,
-  currency_display: 'US Dollar ($)',
-  arr_billed_at_account: '0.00',
-  arr_billed_at_hq: '0.00',
-  implementation_fee: '0.00',
-  total_contract_value: '0.00',
-  total_forecasted_renewal_revenue: '0.00',
-  primary_product: null,
-  primary_product_name: '',
-  additional_products_count: null,
-  top_source_channel: '',
-  total_contracted_seats: null,
-  total_active_seats: null,
-  seat_utilization_percentage: null,
-  total_hires: null,
-  scope_web_app: '',
-  ces_percentage: null,
-  churn_date: null,
-  churn_reason: '' as const,
-  churn_reason_display: '',
-  churn_comment: '',
-  is_archived: false,
-};
+const deals = () => [...document.querySelectorAll('[data-deal]')].map((el) => el.getAttribute('data-deal'));
+const summary = () => document.querySelector('[data-summary]');
 
-describe('Deals & risks tab (the Pipelines tab inside the organization page)', () => {
-  beforeEach(() => {
-    vi.unstubAllGlobals();
+describe('Deals & risks (spec 2026-09-27 §3)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('lists the opportunities with a summary line, and switches to the risks', async () => {
+    renderDeals();
+    expect(screen.getByRole('status', { name: 'Loading opportunities' })).toBeInTheDocument();
+    await waitFor(() => expect(deals()).toEqual(['61', '62']));
+    expect(summary()).toHaveTextContent('2 opportunities · $1,500.00 pipeline MRR · 1 high priority · 0 closed won');
+    expect(screen.getByRole('button', { name: 'Opportunities 2' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('button', { name: 'Risks 1' }));
+    expect(deals()).toEqual(['71']);
+    expect(summary()).toHaveTextContent('1 risk · $800.00 MRR at risk · 1 high priority · 0 realised');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
-  it('fetches and renders this organization\'s own real opportunities and risks on the Pipelines tab', async () => {
+  it('narrows to the chosen account; the switch counts follow, and an empty kind offers All', async () => {
+    const { onShowAll } = renderDeals({ account: '31' });
+    await waitFor(() => expect(deals()).toEqual(['61']));
+    await userEvent.click(screen.getByRole('button', { name: 'Risks 0' }));
+    expect(screen.getByText('No risks on EMEA')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Show all accounts' }));
+    expect(onShowAll).toHaveBeenCalledOnce();
+  });
+
+  it('searches titles, and says when nothing matches', async () => {
+    renderDeals();
+    await waitFor(() => expect(deals()).toHaveLength(2));
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search opportunities' }), 'add-on');
+    expect(deals()).toEqual(['62']);
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Search opportunities' }), 'zzz');
+    expect(screen.getByRole('button', { name: 'Clear search' })).toBeInTheDocument();
+  });
+
+  it('opens the edit form on select, and deletes from it', async () => {
+    const { spy } = renderDeals();
+    await waitFor(() => expect(deals()).toHaveLength(2));
+    await userEvent.click(screen.getByRole('button', { name: /EMEA seat expansion/ }));
+    expect(screen.getByRole('heading', { name: 'Edit EMEA seat expansion' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(screen.getByText('Delete EMEA seat expansion?')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(deals()).toEqual(['62']));
+    expect(requestPaths(spy)).toContain('DELETE /opportunities/61/');
+  });
+
+  it('adds an opportunity on the chosen account, and a risk too', async () => {
+    const { spy } = renderDeals({ account: '31' });
+    await waitFor(() => expect(deals()).toEqual(['61']));
+    await userEvent.click(screen.getByRole('button', { name: 'Add opportunity to EMEA' }));
+    await userEvent.type(screen.getByLabelText(/^Title/), 'Upsell');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add Opportunity' }).find((button) => button.closest('form'))!);
+    await waitFor(() => expect(deals()).toHaveLength(2));
+    expect(postBodies(spy, '/customers/7/accounts/31/opportunities/')).toEqual([expect.objectContaining({ title: 'Upsell' })]);
+
+    await userEvent.click(screen.getByRole('button', { name: /^Risks/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add risk to EMEA' }));
+    await userEvent.type(screen.getByLabelText(/^Title/), 'Budget freeze');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add Risk' }).find((button) => button.closest('form'))!);
+    await waitFor(() => expect(postBodies(spy, '/customers/7/accounts/31/risks/')).toHaveLength(1));
+  });
+
+  it('keeps the board as an option from sm, and lists only on phones', async () => {
+    renderDeals();
+    await waitFor(() => expect(deals()).toHaveLength(2));
+    await userEvent.click(screen.getByRole('button', { name: 'Board' }));
+    expect(screen.getByText('Solution Validation')).toBeInTheDocument();
+    expect(screen.getByText('EMEA seat expansion')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+    expect(deals()).toEqual(['61', '62']);
+
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+    renderDeals({ isSm: false });
+    await waitFor(() => expect(deals()).toHaveLength(2));
+    expect(screen.queryByRole('group', { name: 'View' })).not.toBeInTheDocument();
+  });
+
+  it('shows a failed read with Try again', async () => {
+    const spy = stubOrganizationPage({ lists: ORGANIZATION_LISTS });
+    let fail = true;
     vi.stubGlobal(
       'fetch',
-      vi.fn((url: string) => {
-        if (url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                title: 'Renewal Expansion Opportunity',
-                mrr: '30000.00',
-                stage: 'qualification',
-                stage_display: 'Qualification',
-                priority: 'high',
-                priority_display: 'High',
-                department: '' as const, department_display: '',
-                companies: [{ id: 10, name: 'Globex Corp' }],
-                account_name: null,
-              },
-            ],
-          });
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (fail && new URL(String(input)).pathname.endsWith('/customers/7/opportunities/')) {
+          fail = false;
+          return { ok: false, status: 500, json: async () => ({ detail: 'Try later.' }) };
         }
-        if (url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                title: 'Renewal Risk — Contract Expiry',
-                mrr: '8500.00',
-                stage: 'open',
-                stage_display: 'Open',
-                priority: 'high',
-                priority_display: 'High',
-                department: '' as const, department_display: '',
-                companies: [{ id: 10, name: 'Globex Corp' }],
-                account_name: null,
-              },
-            ],
-          });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
+        return spy(input, init);
+      }),
     );
-
-    renderDeals();
-    const user = userEvent.setup();
-
-    expect(await screen.findByText('Renewal Expansion Opportunity')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/opportunities/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-
-    await user.click(screen.getByRole('button', { name: /^Risks/ }));
-    expect(await screen.findByText('Renewal Risk — Contract Expiry')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/risks/'),
-      expect.objectContaining({ method: 'GET' })
-    );
-  });
-
-  describe('Pipelines tab search/Add/Edit/Delete', () => {
-    const orgOpp = {
-      id: 1,
-      title: 'Renewal Expansion Opportunity',
-      mrr: '30000.00',
-      stage: 'qualification',
-      stage_display: 'Qualification',
-      priority: 'high',
-      priority_display: 'High',
-      department: '' as const, department_display: '',
-      companies: [{ id: 10, name: 'Globex Corp' }],
-      account_name: null,
-    };
-    const accountLevelOpp = {
-      ...orgOpp,
-      id: 2,
-      title: 'Seat Expansion Opportunity',
-      account_name: 'North America',
-    };
-    const orgRisk = {
-      id: 1,
-      title: 'Renewal Risk — Contract Expiry',
-      mrr: '8500.00',
-      stage: 'open',
-      stage_display: 'Open',
-      priority: 'high',
-      priority_display: 'High',
-      department: '' as const, department_display: '',
-      companies: [{ id: 10, name: 'Globex Corp' }],
-      account_name: null,
-    };
-
-    async function openPipelinesTab(fetchMock: ReturnType<typeof vi.fn>) {
-      vi.stubGlobal('fetch', fetchMock);
-      renderDeals();
-      const user = userEvent.setup();
-      await screen.findByText('Renewal Expansion Opportunity');
-      return user;
-    }
-
-    function baseFetchMock({ opportunities, risks }: { opportunities: unknown; risks: unknown }) {
-      return vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => opportunities });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => risks });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-    }
-
-    it('filters the already-loaded opportunities client-side as you type', async () => {
-      const user = await openPipelinesTab(
-        baseFetchMock({ opportunities: [orgOpp, accountLevelOpp], risks: [] })
-      );
-      expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
-
-      await user.type(screen.getByPlaceholderText('Search opportunities by title...'), 'Seat');
-
-      expect(screen.queryByText('Renewal Expansion Opportunity')).not.toBeInTheDocument();
-      expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
-    });
-
-    it('shows both organisation-level and account-level opportunities together, labeled by Account', async () => {
-      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp, accountLevelOpp], risks: [] }));
-
-      expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
-      expect(screen.getByText('Globex Corp')).toBeInTheDocument();
-      expect(screen.getByText('Globex Corp • North America')).toBeInTheDocument();
-    });
-
-    it('the Board toggle switches to a Kanban board grouped by stage', async () => {
-      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp, accountLevelOpp], risks: [] }));
-
-      // List (the default) has no stage-column headers of its own —
-      // stage is just a per-row pill.
-      expect(screen.queryByText('Discovery')).not.toBeInTheDocument();
-
-      const user = userEvent.setup();
-      await user.click(screen.getByTitle('Board view'));
-
-      // Both opportunities are 'qualification' — same column, both
-      // cards still visible (not narrowed by drag state or anything).
-      expect(screen.getByText('Qualification')).toBeInTheDocument();
-      expect(screen.getByText('Renewal Expansion Opportunity')).toBeInTheDocument();
-      expect(screen.getByText('Seat Expansion Opportunity')).toBeInTheDocument();
-      // Every other stage column still renders, just empty — "Closed
-      // Won" isn't checked here since it collides with the summary
-      // banner's own "Closed Won" stat card title above the board.
-      expect(screen.getByText('Discovery')).toBeInTheDocument();
-      expect(screen.getByText('Negotiation')).toBeInTheDocument();
-    });
-
-    it('the Board toggle works for Risks too, grouped by its own 4 stages', async () => {
-      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp], risks: [orgRisk] }));
-      const user = userEvent.setup();
-      await user.click(screen.getByRole('button', { name: /^Risks/ }));
-      await user.click(screen.getByTitle('Board view'));
-
-      expect(screen.getByText('Open')).toBeInTheDocument();
-      expect(screen.getByText('Renewal Risk — Contract Expiry')).toBeInTheDocument();
-      expect(screen.getByText('Mitigated')).toBeInTheDocument();
-      expect(screen.getByText('Abandoned')).toBeInTheDocument();
-    });
-
-    it('clicking a column\'s own + opens Add with that column\'s stage preselected', async () => {
-      await openPipelinesTab(baseFetchMock({ opportunities: [orgOpp], risks: [] }));
-      const user = userEvent.setup();
-      await user.click(screen.getByTitle('Board view'));
-
-      // "Negotiation" column's own + button, not the toolbar's "Add
-      // Opportunity" (which defaults to Discovery).
-      // "Negotiation" text sits in an inner wrapper alongside the
-      // count pill; its own "+" button is a sibling one level up, in
-      // the column header row both share.
-      const negotiationHeader = screen.getByText('Negotiation').closest('div')!.parentElement!;
-      await user.click(within(negotiationHeader).getByRole('button'));
-
-      expect(await screen.findByRole('heading', { name: 'Add Opportunity' })).toBeInTheDocument();
-      expect(screen.getByRole('combobox', { name: /stage/i })).toHaveValue('negotiation');
-    });
-
-    it('adding an opportunity posts to /customers/10/opportunities/ (organization-level)', async () => {
-      // A reassignable backing array (not mutated in place — Redux
-      // freezes whatever a fulfilled action's payload was, so a later
-      // .push() against that same frozen array reference throws) — the
-      // refetch that follows a successful create (see
-      // OpportunityFormModal's own `onSaved`) needs its own GET to
-      // actually reflect the new row, same as a real backend would.
-      let opportunitiesData: unknown[] = [orgOpp];
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'POST' && url.endsWith('/customers/10/opportunities/')) {
-          const created = { ...orgOpp, id: 99, title: 'New Opp' };
-          opportunitiesData = [...opportunitiesData, created];
-          return Promise.resolve({ ok: true, status: 201, json: async () => created });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => opportunitiesData });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Add Opportunity' }));
-      await user.type(screen.getByLabelText('Title *'), 'New Opp');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Opportunity' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/customers/10/opportunities/'),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-      expect(await screen.findByText('New Opp')).toBeInTheDocument();
-    });
-
-    it('editing an opportunity PATCHes /api/v1/opportunities/<id>/ and updates it in place', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'PATCH' && url.endsWith('/opportunities/1/')) {
-          const body = JSON.parse(options!.body!);
-          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...orgOpp, ...body }) });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [orgOpp] });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByText('Renewal Expansion Opportunity'));
-      const titleInput = screen.getByLabelText('Title *');
-      await user.clear(titleInput);
-      await user.type(titleInput, 'Renamed Opportunity');
-      await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/opportunities/1/'),
-          expect.objectContaining({ method: 'PATCH' })
-        )
-      );
-      expect(await screen.findByText('Renamed Opportunity')).toBeInTheDocument();
-    });
-
-    it('deleting an opportunity from its edit modal DELETEs /api/v1/opportunities/<id>/ and removes the row', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'DELETE' && url.endsWith('/opportunities/1/')) {
-          return Promise.resolve({ ok: true, status: 204, json: async () => null });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [orgOpp] });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByText('Renewal Expansion Opportunity'));
-      await user.click(screen.getByRole('button', { name: 'Delete' }));
-      const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
-      await user.click(confirmButtons[confirmButtons.length - 1]);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/opportunities/1/'),
-          expect.objectContaining({ method: 'DELETE' })
-        )
-      );
-      expect(screen.queryByText('Renewal Expansion Opportunity')).not.toBeInTheDocument();
-    });
-
-    it('switching to the Risks sub-tab shows risks instead, and Add Risk posts to /customers/10/risks/', async () => {
-      // Same reassignable-backing-array reasoning as the Opportunity
-      // Add test above.
-      let risksData: unknown[] = [orgRisk];
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'POST' && url.endsWith('/customers/10/risks/')) {
-          const created = { ...orgRisk, id: 99, title: 'New Risk' };
-          risksData = [...risksData, created];
-          return Promise.resolve({ ok: true, status: 201, json: async () => created });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/opportunities/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [orgOpp] });
-        }
-        if (method === 'GET' && url.endsWith('/customers/10/risks/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => risksData });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/') || url.includes('/contacts/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: /^Risks/ }));
-      expect(await screen.findByText('Renewal Risk — Contract Expiry')).toBeInTheDocument();
-      expect(screen.queryByText('Renewal Expansion Opportunity')).not.toBeInTheDocument();
-
-      await user.click(screen.getByRole('button', { name: 'Add Risk' }));
-      await user.type(screen.getByLabelText('Title *'), 'New Risk');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Risk' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/customers/10/risks/'),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-      expect(await screen.findByText('New Risk')).toBeInTheDocument();
-    });
+    render(ui());
+    expect(await screen.findByText('Try later.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(deals()).toEqual(['61', '62']));
   });
 });

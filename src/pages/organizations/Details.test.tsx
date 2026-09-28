@@ -128,7 +128,7 @@ describe('the organization page (/organizations/:id)', () => {
     expect(document.querySelector('img')).toBeNull();
   });
 
-  it('filters the story by account in the URL, and shows the chips on the Story tab only', async () => {
+  it('filters the story by account in the URL, and keeps the chips on Story, People, Deals & risks and Files', async () => {
     const spy = stubOrganizationPage();
     renderOrganizationPage();
     await userEvent.click(await screen.findByRole('button', { name: 'EMEA 1' }));
@@ -139,7 +139,14 @@ describe('the organization page (/organizations/:id)', () => {
     expect(screen.getByRole('button', { name: 'Edit EMEA' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'People' }));
     expect(where().searchParams.get('tab')).toBe('people');
-    expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+    const chips = screen.getByRole('group', { name: 'Filter by account' });
+    expect(within(chips).getByRole('button', { name: /^EMEA/ })).toHaveAttribute('aria-pressed', 'true');
+    // The chips sit above the tabs.
+    expect(chips.compareDocumentPosition(screen.getByRole('tablist'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    for (const whole of ['Details', 'Knowledge']) {
+      await userEvent.click(screen.getByRole('tab', { name: whole }));
+      expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+    }
     expect(where().searchParams.get('account')).toBe('31');
   });
 
@@ -312,10 +319,12 @@ describe('the organization page (/organizations/:id)', () => {
     expect(screen.getByRole('heading', { name: 'Add Account' })).toBeInTheDocument();
   });
 
-  it('adds an account from the chip row, and edits the chosen one', async () => {
+  it('adds an account from the name row, and edits the chosen one from the chips', async () => {
     stubOrganizationPage();
     renderOrganizationPage();
-    await userEvent.click(await screen.findByRole('button', { name: 'Add account' }));
+    await landed();
+    const header = document.querySelector('[data-part="header"]') as HTMLElement;
+    await userEvent.click(within(header).getByRole('button', { name: 'Add account' }));
     expect(screen.getByRole('heading', { name: 'Add Account' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await userEvent.click(await screen.findByRole('button', { name: 'EMEA 1' }));
@@ -555,13 +564,13 @@ describe('the organization page (/organizations/:id)', () => {
     expect(screen.queryByRole('button', { name: 'More actions for Pizza Hut' })).not.toBeInTheDocument();
   });
 
-  it('links Feedback to the Surveys page, where surveys are edited, expired and deleted', async () => {
+  it('links Feedback to the Surveys page filtered to this organization', async () => {
     stubOrganizationPage();
     renderOrganizationPage();
     await landed();
     expect(screen.queryByRole('link', { name: 'Manage surveys' })).not.toBeInTheDocument();
     await userEvent.click(within(screen.getByRole('group', { name: 'Show' })).getByRole('button', { name: /^Feedback/ }));
-    expect(await screen.findByRole('link', { name: 'Manage surveys' })).toHaveAttribute('href', '/surveys');
+    expect(await screen.findByRole('link', { name: 'Manage surveys' })).toHaveAttribute('href', '/surveys?customer=7');
   });
 
   it('closes an open sheet when Back leaves the Story tab, and gives the page its scroll back', async () => {

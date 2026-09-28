@@ -6,7 +6,7 @@ import { ACCOUNTS } from '../../../features/organizations/testStory';
 import { AccountChips } from './AccountChips';
 
 function renderChips(props: Partial<ComponentProps<typeof AccountChips>> = {}) {
-  const handlers = { onSelect: vi.fn(), onRetry: vi.fn(), onAdd: vi.fn(), onEdit: vi.fn() };
+  const handlers = { onSelect: vi.fn(), onRetry: vi.fn(), onEdit: vi.fn() };
   render(
     <AccountChips
       accounts={ACCOUNTS}
@@ -54,19 +54,17 @@ describe('AccountChips (spec §1.4)', () => {
     expect(onSelect.mock.calls.map(([value]) => value)).toEqual(['32', '', 'none']);
   });
 
-  it('adds an account, and edits the chosen one', async () => {
-    const { onAdd, onEdit } = renderChips({ selected: '31' });
-    await userEvent.click(screen.getByRole('button', { name: 'Add account' }));
-    expect(onAdd).toHaveBeenCalledOnce();
+  it('edits the chosen account, and leaves adding one to the name row', async () => {
+    const { onEdit } = renderChips({ selected: '31' });
+    expect(screen.queryByRole('button', { name: 'Add account' })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Edit EMEA' }));
     expect(onEdit).toHaveBeenCalledWith(ACCOUNTS[0]);
   });
 
-  it('offers no edit while All is chosen, and only Add when there are no accounts', () => {
+  it('offers no edit while All is chosen, and nothing when there are no accounts', () => {
     renderChips({ accounts: [] });
     expect(chips()).toEqual([]);
     expect(screen.queryByRole('button', { name: /^Edit/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Add account' })).toBeInTheDocument();
   });
 
   it('shows a skeleton while the accounts load', () => {
@@ -81,13 +79,12 @@ describe('AccountChips (spec §1.4)', () => {
     expect(onRetry).toHaveBeenCalledOnce();
   });
 
-  it('keeps the chips, Edit and Add account in one wrapping row from sm', () => {
+  it('keeps the chips and Edit in one wrapping row from sm', () => {
     renderChips({ selected: '31' });
     const group = screen.getByRole('group', { name: 'Filter by account' });
     expect(group).toHaveClass('sm:contents');
     expect(group.parentElement).toHaveClass('flex', 'flex-wrap');
     expect(screen.getByRole('button', { name: 'Edit EMEA' }).parentElement).toBe(group.parentElement);
-    expect(screen.getByRole('button', { name: 'Add account' }).parentElement).toBe(group.parentElement);
   });
 
   it('gives each chip a 44px target below sm and 36px from sm', () => {

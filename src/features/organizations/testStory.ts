@@ -1,5 +1,7 @@
 import { vi } from 'vitest';
-import type { Account, Customer } from '../customers/customersSlice';
+import type { Account, Contact, Customer, Opportunity, Risk } from '../customers/customersSlice';
+import type { Attachment } from '../files/filesSlice';
+import type { Call } from '../calls/callsSlice';
 import type { BulkRequest, PortfolioRow } from './portfolioTypes';
 import { GROUP_KEYS, KIND_GROUP, STORY_KINDS } from './storyKinds';
 import type { StoryActor, StoryAttention, StoryCounts, StoryItem, StoryKind, StoryRef, StoryResponse } from './storyTypes';
@@ -11,7 +13,8 @@ import { buildPortfolio, customerFixture, pizzaHut } from './testPortfolio';
 // backend's facet counts, its `thread` read, its horizon and paging; the
 // cursor is an offset here), the create endpoints "+ Add" uses (each adds its
 // record to the story as the backend would render it), archive and PATCH,
-// and empty lists for the other tabs' reads.
+// and the lists People, Deals & risks and Files read (empty unless `lists`
+// is given), with their saves, edits and deletes.
 
 export const EMEA: StoryRef = { id: 31, name: 'EMEA' };
 export const NORTH_AMERICA: StoryRef = { id: 32, name: 'North America' };
@@ -202,6 +205,191 @@ export const MEMBERS = [
   { id: 2, name: 'Carl CSM', function: 'cs' },
 ];
 
+const PIZZA_REF = [{ id: 7, name: 'Pizza Hut' }];
+
+function contactFixture(id: number, name: string, extra: Partial<Contact>): Contact {
+  return {
+    id,
+    name,
+    role: 'other',
+    role_display: 'Other',
+    email: '',
+    phone: '',
+    status: 'active',
+    sentiment: 'neutral',
+    sentiment_source: 'manual',
+    sentiment_evidence: {},
+    sentiment_computed_at: null,
+    last_contacted_at: null,
+    companies: PIZZA_REF,
+    account_name: null,
+    account_id: null,
+    ...extra,
+  };
+}
+
+/** Pizza Hut's people: one on each account and one on the organization.
+ *  The phone number is in Ofcom's range reserved for drama. */
+export const CONTACTS: Contact[] = [
+  contactFixture(51, 'Dana Buyer', {
+    role: 'decision_maker',
+    role_display: 'Decision Maker',
+    email: 'dana@emea.northwind.example',
+    phone: '+44 20 7946 0000',
+    sentiment: 'positive',
+    last_contacted_at: '2026-09-25T12:00:00Z',
+    account_id: 31,
+    account_name: 'EMEA',
+  }),
+  contactFixture(52, 'Sam Admin', {
+    role: 'technical_lead',
+    role_display: 'Technical Lead',
+    email: 'sam@na.northwind.example',
+    account_id: 32,
+    account_name: 'North America',
+  }),
+  contactFixture(53, 'Pat Finance', { role: 'finance_manager', role_display: 'Finance Manager', status: 'inactive', sentiment: 'negative' }),
+];
+
+export const OPPORTUNITIES: Opportunity[] = [
+  {
+    id: 61,
+    title: 'EMEA seat expansion',
+    mrr: '1200.00',
+    stage: 'negotiation',
+    stage_display: 'Negotiation',
+    priority: 'high',
+    priority_display: 'High',
+    department: 'cs',
+    department_display: 'Customer Success',
+    companies: PIZZA_REF,
+    account_id: 31,
+    account_name: 'EMEA',
+  },
+  {
+    id: 62,
+    title: 'Analytics add-on',
+    mrr: '300.00',
+    stage: 'discovery',
+    stage_display: 'Discovery',
+    priority: 'medium',
+    priority_display: 'Medium',
+    department: '',
+    department_display: '',
+    companies: PIZZA_REF,
+    account_id: null,
+    account_name: null,
+  },
+];
+
+export const RISKS: Risk[] = [
+  {
+    id: 71,
+    title: 'Admin left',
+    mrr: '800.00',
+    stage: 'open',
+    stage_display: 'Open',
+    priority: 'high',
+    priority_display: 'High',
+    department: 'cs',
+    department_display: 'Customer Success',
+    companies: PIZZA_REF,
+    account_id: 32,
+    account_name: 'North America',
+  },
+];
+
+export const FILES: Attachment[] = [
+  {
+    id: 81,
+    name: 'Order form.pdf',
+    content_type: 'application/pdf',
+    size: 245760,
+    description: 'Signed order form',
+    source: 'upload',
+    uploaded_by: { id: 1, name: 'Alice' },
+    download_url: '/api/v1/files/81/download/',
+    created_at: '2026-09-20T12:00:00Z',
+    account_id: 31,
+    account_name: 'EMEA',
+  },
+  {
+    id: 82,
+    name: 'QBR deck.pptx',
+    content_type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    size: 3145728,
+    description: '',
+    source: 'upload',
+    uploaded_by: { id: 2, name: 'Carl CSM' },
+    download_url: '/api/v1/files/82/download/',
+    created_at: '2026-09-18T12:00:00Z',
+    account_id: null,
+    account_name: null,
+  },
+];
+
+function callFixture(extra: Partial<Call> & Pick<Call, 'id' | 'title' | 'occurred_at'>): Call {
+  return {
+    host_name: 'Carl CSM',
+    duration_minutes: 30,
+    summary: '',
+    sentiment: '',
+    ai_area: '',
+    ai_category: '',
+    recording_url: '',
+    connector_name: null,
+    connector_provider: null,
+    logged_by: { id: 2, name: 'Carl CSM' },
+    transcript: null,
+    participants: [],
+    links: 0,
+    created_at: extra.occurred_at,
+    account_id: null,
+    account_name: null,
+    ...extra,
+  };
+}
+
+/** Newest first, at noon UTC so each stays on its calendar day everywhere. */
+export const CALLS: Call[] = [
+  callFixture({
+    id: 12,
+    title: 'Quarterly check-in',
+    occurred_at: '2026-09-25T12:00:00Z',
+    summary: 'The admin left and usage fell. Agreed a retraining session.',
+    sentiment: 'negative',
+    participants: [{ id: 53, name: 'Pat Finance', role_display: 'Finance Manager', sentiment: 'negative' }],
+  }),
+  callFixture({
+    id: 13,
+    title: 'EMEA renewal call',
+    occurred_at: '2026-09-24T12:00:00Z',
+    summary: 'Quote accepted in principle.',
+    sentiment: 'positive',
+    duration_minutes: 45,
+    recording_url: 'https://recordings.example/13',
+    account_id: 31,
+    account_name: 'EMEA',
+  }),
+];
+
+/** What People, Deals & risks and Files read for Pizza Hut. */
+export interface OrganizationLists {
+  contacts?: Contact[];
+  opportunities?: Opportunity[];
+  risks?: Risk[];
+  files?: Attachment[];
+  calls?: Call[];
+}
+
+export const ORGANIZATION_LISTS: OrganizationLists = {
+  contacts: CONTACTS,
+  opportunities: OPPORTUNITIES,
+  risks: RISKS,
+  files: FILES,
+  calls: CALLS,
+};
+
 /** `n` tasks on the organization, newest first, created an hour apart (a
  *  task is in the story at its `created_at`). */
 export function manyItems(n: number): StoryItem[] {
@@ -297,6 +485,10 @@ export interface OrganizationPageStub {
   failCustomer?: number;
   /** How many story reads fail (500 "Try later.") before they succeed. */
   failStory?: number;
+  /** What People, Deals & risks and Files read (default: every list empty).
+   *  Saves on these paths append, tagged with the account as the backend's
+   *  serializers tag them; PATCH and DELETE change them in place. */
+  lists?: OrganizationLists;
 }
 
 const EMPTY_LIST =
@@ -334,6 +526,14 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
   let storyFailures = stub.failStory ?? 0;
   let created = 0;
   const accounts = stub.accounts ?? ACCOUNTS;
+  const lists = {
+    contacts: [...(stub.lists?.contacts ?? [])],
+    opportunities: [...(stub.lists?.opportunities ?? [])],
+    risks: [...(stub.lists?.risks ?? [])],
+    files: [...(stub.lists?.files ?? [])],
+    calls: [...(stub.lists?.calls ?? [])],
+  };
+  type ListKey = keyof typeof lists;
 
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -386,6 +586,86 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
       return json(200, { ...((stub.customer ?? pizzaHutCustomer) as object), ...body });
     }
 
+    const save = /^\/customers\/(\d+)\/(?:accounts\/(\d+)\/)?(contacts|opportunities|risks|files)\/$/.exec(path);
+    if (save && method === 'POST') {
+      const body = bodyOf(init);
+      const accountId = save[2] ? Number(save[2]) : null;
+      const account = accountId ? (accounts.find((a) => a.id === accountId) ?? null) : null;
+      const tag = { account_id: accountId, account_name: account?.name ?? null };
+      created += 1;
+      const id = 900 + created;
+      if (save[3] === 'files') {
+        const file = body.file as File;
+        const record: Attachment = {
+          id,
+          name: file.name,
+          content_type: file.type || 'application/octet-stream',
+          size: file.size,
+          description: String(body.description ?? ''),
+          source: 'upload',
+          uploaded_by: { id: 1, name: 'Alice' },
+          download_url: `/api/v1/files/${id}/download/`,
+          created_at: new Date().toISOString(),
+          ...tag,
+        };
+        lists.files.unshift(record);
+        return json(201, record);
+      }
+      const companies = [{ id: Number(save[1]), name: current?.name ?? '' }];
+      if (save[3] === 'contacts') {
+        const record: Contact = {
+          id,
+          name: String(body.name ?? ''),
+          role: (body.role as Contact['role']) ?? 'other',
+          role_display: 'Other',
+          email: String(body.email ?? ''),
+          phone: String(body.phone ?? ''),
+          status: 'active',
+          sentiment: 'neutral',
+          sentiment_source: 'manual',
+          sentiment_evidence: {},
+          sentiment_computed_at: null,
+          last_contacted_at: null,
+          companies,
+          ...tag,
+        };
+        lists.contacts.push(record);
+        return json(201, record);
+      }
+      const deal = {
+        id,
+        title: String(body.title ?? ''),
+        mrr: String(body.mrr || '0.00'),
+        priority: (body.priority as Opportunity['priority']) ?? 'medium',
+        priority_display: 'Medium',
+        department: (body.department as Opportunity['department']) ?? '',
+        department_display: '',
+        companies,
+        ...tag,
+      };
+      if (save[3] === 'opportunities') {
+        const record: Opportunity = { ...deal, stage: (body.stage as Opportunity['stage']) ?? 'discovery', stage_display: 'Discovery' };
+        lists.opportunities.push(record);
+        return json(201, record);
+      }
+      const record: Risk = { ...deal, stage: (body.stage as Risk['stage']) ?? 'open', stage_display: 'Open' };
+      lists.risks.push(record);
+      return json(201, record);
+    }
+
+    const one = /^\/(contacts|opportunities|risks|files)\/(\d+)\/$/.exec(path);
+    if (one && (method === 'PATCH' || method === 'DELETE')) {
+      const list = lists[one[1] as ListKey] as { id: number }[];
+      const at = list.findIndex((item) => item.id === Number(one[2]));
+      if (at === -1) return json(404, { detail: 'Not found.' });
+      if (method === 'DELETE') {
+        list.splice(at, 1);
+        return json(204, null);
+      }
+      list[at] = { ...list[at], ...bodyOf(init) };
+      return json(200, list[at]);
+    }
+
     const create = /^\/customers\/(\d+)\/(?:accounts\/(\d+)\/)?(tasks|notes|surveys|calls)\/$/.exec(path);
     if (create && method === 'POST') {
       const body = bodyOf(init);
@@ -428,11 +708,11 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
       }
       const at = body.occurred_at ? new Date(String(body.occurred_at)).toISOString() : now;
       book.push({ ...logged, kind: 'call', occurred_at: at, all_day: false, title, summary: String(body.summary ?? ''), actor: { id: null, name: 'Alice' } });
-      return json(201, {
+      const call: Call = {
         id,
         title,
         host_name: 'Alice',
-        occurred_at: body.occurred_at,
+        occurred_at: String(body.occurred_at ?? at),
         duration_minutes: null,
         summary: String(body.summary ?? ''),
         sentiment: '',
@@ -441,12 +721,16 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
         recording_url: '',
         connector_name: null,
         connector_provider: null,
-        logged_by: ALICE,
+        logged_by: { id: 1, name: 'Alice' },
         transcript: null,
         participants: [],
         links: 0,
         created_at: now,
-      });
+        account_id: accountId,
+        account_name: account?.name ?? null,
+      };
+      lists.calls.unshift(call);
+      return json(201, call);
     }
 
     if (method === 'GET') {
@@ -461,6 +745,11 @@ export function stubOrganizationPage(stub: OrganizationPageStub = {}) {
       if (path === '/auth/members/') return json(200, MEMBERS);
       if (/^\/customers\/\d+\/brief\/$/.test(path)) return json(200, EMPTY_BRIEF);
       if (/^\/customers\/\d+\/responsible\/$/.test(path)) return json(200, { responsible: [] });
+      const listRead = /^\/customers\/(\d+)\/(contacts|opportunities|risks|files|calls)\/$/.exec(path);
+      if (listRead && current && Number(listRead[1]) === current.id) {
+        // A fresh copy of each record: the store freezes what it keeps.
+        return json(200, (lists[listRead[2] as ListKey] as object[]).map((record) => ({ ...record })));
+      }
       if (EMPTY_LIST.test(path) || path === '/attributes/values/' || path === '/knowledge/gaps/') return json(200, []);
     }
     return json(404, { detail: `Not stubbed: ${method} ${path}` });

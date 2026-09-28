@@ -143,13 +143,15 @@ describe('alignment on the organization page', () => {
   });
 
   describe('Files', () => {
-    it('has one Files heading and no scroll area inside the calls', () => {
-      const { container } = renderWithStore(<FilesCallsTab customerId={7} />);
+    it('has one Files and one Calls heading, and no scroll area or rail inside either', () => {
+      renderWithStore(<FilesCallsTab customerId={7} account="" accounts={[]} isSm active onCallLogged={() => {}} onShowAll={() => {}} />);
       expect(screen.getAllByRole('heading', { name: 'Files' })).toHaveLength(1);
-      expect(screen.getByRole('region', { name: 'Files' })).toBeInTheDocument();
-      const calls = screen.getByRole('region', { name: 'Calls' });
-      expect(calls.querySelector('.overflow-y-auto, .overflow-hidden')).toBeNull();
-      expect(container.querySelector('[data-calls-list]')).not.toHaveClass('flex-1');
+      expect(screen.getAllByRole('heading', { name: 'Calls' })).toHaveLength(1);
+      for (const name of ['Files', 'Calls']) {
+        const section = screen.getByRole('region', { name });
+        expect(section.querySelector('.overflow-y-auto, .overflow-auto, [data-calls-list]')).toBeNull();
+        expect(section).not.toHaveClass('max-w-7xl', 'mx-auto', 'px-6', 'px-8');
+      }
     });
 
     it('CallSenseTab keeps its own scroll by default (the account page feed)', () => {

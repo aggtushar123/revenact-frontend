@@ -1,343 +1,186 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ComponentProps } from 'react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
+import {
+  ACCOUNTS,
+  CONTACTS,
+  ORGANIZATION_LISTS,
+  postBodies,
+  requestPaths,
+  stubOrganizationPage,
+  type OrganizationLists,
+} from '../../../features/organizations/testStory';
 import { makeDetailStore } from '../../../pages/organizations/testDetail';
 import { PeopleTab } from './PeopleTab';
 
-// These tests lived in the old organization page's test, under its Contacts
-// tab. People keeps that content in delivery 1 (spec §4), so they render
-// PeopleTab directly; it reads the contacts itself when opened.
-function renderPeople() {
-  render(
+function ui(props: Partial<ComponentProps<typeof PeopleTab>> = {}) {
+  return (
     <Provider store={makeDetailStore()}>
       <MemoryRouter>
-        <PeopleTab customerId={10} />
+        <PeopleTab customerId={7} account="" accounts={ACCOUNTS} isSm onShowAll={() => {}} {...props} />
       </MemoryRouter>
-    </Provider>,
+    </Provider>
   );
 }
 
+function renderPeople(props: Partial<ComponentProps<typeof PeopleTab>> = {}, lists: OrganizationLists = ORGANIZATION_LISTS) {
+  const spy = stubOrganizationPage({ lists });
+  const onShowAll = vi.fn();
+  render(ui({ onShowAll, ...props }));
+  return { spy, onShowAll };
+}
 
-// Minimal but real shape, matching revenact-backend's CustomerSerializer —
-// see customersSlice.test.ts / docs/API_CONTRACTS.md -> customers.
-const globex = {
-  id: 10,
-  name: 'Globex Corp',
-  address: '123 Main St',
-  domain: 'globex.example',
-  owner: null,
-  created_by: null,
-  modified_by: null,
-  created_at: '2026-08-31T00:00:00Z',
-  updated_at: '2026-08-31T00:00:00Z',
-  lifecycle_stage: 'onboarding' as const,
-  health_score: '5.0',
-  health_category: 'average' as const,
-  pulse: [],
-  ai_pulse_score: '' as const,
-  ai_pulse_reason: '',
-  account_pulse: {
-    value: '2.3',
-    label: 'At risk' as const,
-    category: 2 as const,
-    breakdown: [
-      { key: 'ai_pulse' as const, label: 'AI pulse', weight: '3.0', reading: '2.0', note: 'what the model reads' },
-      { key: 'csm_pulse' as const, label: 'CSM pulse', weight: '2.5', reading: null, note: 'not set' },
-      { key: 'sentiment' as const, label: 'Recent sentiment', weight: '2.0', reading: '3.0', note: '1 positive, 1 negative of 2 in the last 30 days' },
-      { key: 'touch' as const, label: 'Last contact', weight: '1.5', reading: '4.8', note: '4 days ago' },
-      { key: 'support' as const, label: 'Open tickets', weight: '1.0', reading: '1.0', note: '12 open' },
-    ],
-  },
-  nps_score: null,
-  csat_score: null,
-  joined_date: null,
-  renewal_date: null,
-  contract_start_date: null,
-  contract_end_date: null,
-  currency: 'USD' as const,
-  currency_display: 'US Dollar ($)',
-  arr_billed_at_account: '0.00',
-  arr_billed_at_hq: '0.00',
-  implementation_fee: '0.00',
-  total_contract_value: '0.00',
-  total_forecasted_renewal_revenue: '0.00',
-  primary_product: null,
-  primary_product_name: '',
-  additional_products_count: null,
-  top_source_channel: '',
-  total_contracted_seats: null,
-  total_active_seats: null,
-  seat_utilization_percentage: null,
-  total_hires: null,
-  scope_web_app: '',
-  ces_percentage: null,
-  churn_date: null,
-  churn_reason: '' as const,
-  churn_reason_display: '',
-  churn_comment: '',
-  is_archived: false,
-};
+const people = () => [...document.querySelectorAll('[data-person]')].map((el) => el.getAttribute('data-person'));
+const summary = () => document.querySelector('[data-summary]');
 
-describe('People tab (the Contacts tab inside the organization page)', () => {
-  beforeEach(() => {
-    vi.unstubAllGlobals();
+describe('People (spec 2026-09-27 §2)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('lists every person with a one-line summary in place of the stat cards, read once', async () => {
+    const { spy } = renderPeople();
+    expect(screen.getByRole('status', { name: 'Loading people' })).toBeInTheDocument();
+    await waitFor(() => expect(people()).toEqual(['51', '52', '53']));
+    expect(summary()).toHaveTextContent('3 people · 1 decision maker · 2 active · 33% positive sentiment');
+    expect(screen.queryByText('Total Contacts')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /filter|download/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(requestPaths(spy).filter((path) => path === 'GET /customers/7/contacts/')).toHaveLength(1);
   });
 
-  it('fetches and renders this organization\'s own real contacts on the Contacts tab', async () => {
+  it('narrows to the chosen account, and the summary follows', async () => {
+    renderPeople({ account: '31' });
+    await waitFor(() => expect(people()).toEqual(['51']));
+    expect(summary()).toHaveTextContent('1 person · 1 decision maker · 1 active · 100% positive sentiment');
+  });
+
+  it('narrows to the people on the organization itself', async () => {
+    renderPeople({ account: 'none' });
+    await waitFor(() => expect(people()).toEqual(['53']));
+  });
+
+  it('searches by name, role or email, and says when nothing matches', async () => {
+    renderPeople();
+    await waitFor(() => expect(people()).toHaveLength(3));
+    const box = screen.getByRole('searchbox', { name: 'Search people' });
+    await userEvent.type(box, 'technical');
+    expect(people()).toEqual(['52']);
+    await userEvent.clear(box);
+    await userEvent.type(box, 'zzz');
+    expect(screen.getByText('Nothing matches “zzz”')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(people()).toHaveLength(3);
+  });
+
+  it('adds a person on the chosen account, then reads the list again', async () => {
+    const { spy } = renderPeople({ account: '31' });
+    await waitFor(() => expect(people()).toEqual(['51']));
+    await userEvent.click(screen.getByRole('button', { name: 'Add contact to EMEA' }));
+    await userEvent.type(screen.getByLabelText(/^Name/), 'Robin Ops');
+    await userEvent.type(screen.getByLabelText(/^Email/), 'robin@pizzahut.example');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add Contact' }).find((button) => button.closest('form'))!);
+    expect(await screen.findByRole('heading', { name: 'Robin Ops' })).toBeInTheDocument();
+    expect(postBodies(spy, '/customers/7/accounts/31/contacts/')).toEqual([expect.objectContaining({ name: 'Robin Ops' })]);
+    expect(requestPaths(spy).filter((path) => path === 'GET /customers/7/contacts/')).toHaveLength(2);
+  });
+
+  it('keeps the people in place while the list reads again after an add', async () => {
+    const spy = stubOrganizationPage({ lists: ORGANIZATION_LISTS });
+    let reads = 0;
+    let answer: () => void = () => {};
     vi.stubGlobal(
       'fetch',
-      vi.fn((url: string) => {
-        if (url.includes('/contacts/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [
-              {
-                id: 1,
-                name: 'Sarah Chen',
-                role: 'executive_sponsor',
-                role_display: 'Executive Sponsor',
-                email: 'sarah.chen@globex.example',
-                phone: '+1 (408) 555-0123',
-                status: 'active',
-                sentiment: 'positive',
-                last_contacted_at: '2026-08-31T00:00:00Z',
-                companies: [{ id: 10, name: 'Globex Corp' }],
-                account_name: null,
-                sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null,
-              },
-            ],
-          });
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if ((init?.method ?? 'GET') === 'GET' && new URL(String(input)).pathname.endsWith('/customers/7/contacts/')) {
+          reads += 1;
+          if (reads === 2) await new Promise<void>((resolve) => (answer = resolve));
         }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      })
+        return spy(input, init);
+      }),
     );
-
-    renderPeople();
-
-    expect(await screen.findByText('Sarah Chen')).toBeInTheDocument();
-    expect(screen.getByText('Executive Sponsor')).toBeInTheDocument();
-    expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/customers/10/contacts/'),
-      expect.objectContaining({ method: 'GET' })
-    );
+    render(ui());
+    await waitFor(() => expect(people()).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: 'Add contact' }));
+    await userEvent.type(screen.getByLabelText(/^Name/), 'Robin Ops');
+    await userEvent.type(screen.getByLabelText(/^Email/), 'robin@pizzahut.example');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add Contact' }).find((button) => button.closest('form'))!);
+    await waitFor(() => expect(reads).toBe(2));
+    expect(people()).toEqual(['51', '52', '53']);
+    expect(screen.queryByText('No people yet')).not.toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading people' })).not.toBeInTheDocument();
+    answer();
+    await waitFor(() => expect(people()).toHaveLength(4));
   });
 
-  describe('Contacts tab search/Add/Edit/Delete', () => {
-    const sarahChen = {
-      id: 1,
-      name: 'Sarah Chen',
-      role: 'executive_sponsor',
-      role_display: 'Executive Sponsor',
-      email: 'sarah.chen@globex.example',
-      phone: '+1 (408) 555-0123',
-      status: 'active',
-      sentiment: 'positive',
-      last_contacted_at: '2026-08-31T00:00:00Z',
-      companies: [{ id: 10, name: 'Globex Corp' }],
-      account_name: null,
-      sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null,
-    };
-    const jamesWilson = {
-      ...sarahChen,
-      id: 2,
-      name: 'James Wilson',
-      role_display: 'Champion',
-      email: 'j.wilson@globex.example',
-    };
+  it("tags each person with the account's current name, after a rename too", async () => {
+    renderPeople({ accounts: ACCOUNTS.map((a) => (a.id === 31 ? { ...a, name: 'EMEA West' } : a)) });
+    await waitFor(() => expect(people()).toHaveLength(3));
+    const dana = document.querySelector('[data-person="51"]') as HTMLElement;
+    expect(within(dana).getByText('EMEA West')).toBeInTheDocument();
+    expect(within(dana).queryByText('EMEA')).not.toBeInTheDocument();
+  });
 
-    async function openContactsTab(fetchMock: ReturnType<typeof vi.fn>) {
-      vi.stubGlobal('fetch', fetchMock);
-      renderPeople();
-      const user = userEvent.setup();
-      await screen.findByText('Sarah Chen');
-      return user;
-    }
+  it('adds on the organization under All', async () => {
+    const { spy } = renderPeople();
+    await waitFor(() => expect(people()).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: 'Add contact' }));
+    await userEvent.type(screen.getByLabelText(/^Name/), 'Robin Ops');
+    await userEvent.type(screen.getByLabelText(/^Email/), 'robin@pizzahut.example');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add Contact' }).find((button) => button.closest('form'))!);
+    await waitFor(() => expect(postBodies(spy, '/customers/7/contacts/')).toHaveLength(1));
+  });
 
-    function baseFetchMock(contactsResponse: unknown) {
-      return vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => contactsResponse });
+  it('edits and deletes through ⋯ with the existing flows', async () => {
+    const { spy } = renderPeople();
+    await waitFor(() => expect(people()).toHaveLength(3));
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for Pat Finance' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Edit' }));
+    const name = screen.getByLabelText(/^Name/);
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Pat Treasurer');
+    // Email is required on the form, and Pat has none yet.
+    await userEvent.type(screen.getByLabelText(/^Email/), 'pat@pizzahut.example');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await screen.findByRole('heading', { name: 'Pat Treasurer' })).toBeInTheDocument();
+    expect(requestPaths(spy)).toContain('PATCH /contacts/53/');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Actions for Pat Treasurer' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Delete' }));
+    expect(screen.getByText('Delete Pat Treasurer?')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(people()).toEqual(['51', '52']));
+    expect(requestPaths(spy)).toContain('DELETE /contacts/53/');
+  });
+
+  it('designs its empty states: nobody yet, and nobody on the chosen account', async () => {
+    renderPeople({}, {});
+    expect(await screen.findByText('No people yet')).toBeInTheDocument();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
+    const { onShowAll } = renderPeople({ account: '32' }, { contacts: [CONTACTS[0]] });
+    expect(await screen.findByText('No people on North America')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Show all accounts' }));
+    expect(onShowAll).toHaveBeenCalledOnce();
+  });
+
+  it('shows a failed read with Try again', async () => {
+    const spy = stubOrganizationPage({ lists: ORGANIZATION_LISTS });
+    let fail = true;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (fail && new URL(String(input)).pathname.endsWith('/customers/7/contacts/')) {
+          fail = false;
+          return { ok: false, status: 500, json: async () => ({ detail: 'Try later.' }) };
         }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-    }
-
-    it('filters the already-loaded contacts client-side as you type', async () => {
-      const user = await openContactsTab(baseFetchMock([sarahChen, jamesWilson]));
-      expect(screen.getByText('James Wilson')).toBeInTheDocument();
-
-      await user.type(screen.getByPlaceholderText('Search contacts by name, role or email...'), 'sarah');
-
-      expect(screen.queryByText('James Wilson')).not.toBeInTheDocument();
-      expect(screen.getByText('Sarah Chen')).toBeInTheDocument();
-    });
-
-    it('shows both organisation-level and account-level contacts together, labeled by Account', async () => {
-      const accountLevelContact = {
-        ...jamesWilson,
-        id: 3,
-        name: 'Priya Nair',
-        account_name: 'North America',
-      };
-      await openContactsTab(baseFetchMock([sarahChen, accountLevelContact]));
-
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
-      // Sarah Chen (org-level, account_name: null) shows "Organization";
-      // Priya Nair (account-level) shows her account's own name.
-      expect(screen.getByText('Organization')).toBeInTheDocument();
-      expect(screen.getByText('North America')).toBeInTheDocument();
-    });
-
-    it('adding a contact with an Account picked posts to the account-level endpoint instead', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'GET' && url.endsWith('/customers/10/accounts/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () => [{ id: 17, name: 'North America', customers: [{ id: 10, name: 'Globex Corp' }] }],
-          });
-        }
-        if (method === 'POST' && url.endsWith('/customers/10/accounts/17/contacts/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 201,
-            json: async () => ({ ...sarahChen, id: 99, name: 'New Person', account_name: 'North America' }),
-          });
-        }
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
-        }
-        const body = url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Add Contact' }));
-      await user.type(screen.getByLabelText('Name *'), 'New Person');
-      await user.type(screen.getByLabelText('Email *'), 'new.person@globex.example');
-      await user.selectOptions(await screen.findByLabelText('Account (optional)'), '17');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Contact' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/customers/10/accounts/17/contacts/'),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-    });
-
-    it('adding a contact posts to /customers/10/contacts/ (organization-level)', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'POST' && url.endsWith('/customers/10/contacts/')) {
-          return Promise.resolve({
-            ok: true,
-            status: 201,
-            json: async () => ({ ...sarahChen, id: 99, name: 'New Person' }),
-          });
-        }
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Add Contact' }));
-      await user.type(screen.getByLabelText('Name *'), 'New Person');
-      await user.type(screen.getByLabelText('Email *'), 'new.person@globex.example');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Contact' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/customers/10/contacts/'),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-    });
-
-    it('editing a contact PATCHes /api/v1/contacts/<id>/ and updates it in place', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'PATCH' && url.endsWith('/contacts/1/')) {
-          const body = JSON.parse(options!.body!);
-          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...sarahChen, ...body }) });
-        }
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Actions for Sarah Chen' }));
-      await user.click(screen.getByRole('button', { name: 'Edit Contact' }));
-      const nameInput = screen.getByLabelText('Name *');
-      await user.clear(nameInput);
-      await user.type(nameInput, 'Sarah Chen-Wu');
-      await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/contacts/1/'),
-          expect.objectContaining({ method: 'PATCH' })
-        )
-      );
-      expect(await screen.findByText('Sarah Chen-Wu')).toBeInTheDocument();
-    });
-
-    it('deleting a contact DELETEs /api/v1/contacts/<id>/ and removes the row', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'DELETE' && url.endsWith('/contacts/1/')) {
-          return Promise.resolve({ ok: true, status: 204, json: async () => null });
-        }
-        if (method === 'GET' && url.includes('/contacts/')) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [sarahChen] });
-        }
-        const body = url.includes('/attributes/') || url.includes('/accounts/') || url.includes('/activities/') || url.includes('/emails/') || url.includes('/tasks/') || url.includes('/notes/') || url.includes('/tickets/') || url.includes('/calendar-events/')
-          ? []
-          : globex;
-        return Promise.resolve({ ok: true, status: 200, json: async () => body });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Actions for Sarah Chen' }));
-      await user.click(screen.getByRole('button', { name: 'Delete Contact' }));
-      await user.click(screen.getByRole('button', { name: 'Delete' }));
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/contacts/1/'),
-          expect.objectContaining({ method: 'DELETE' })
-        )
-      );
-      expect(screen.queryByText('Sarah Chen')).not.toBeInTheDocument();
-    });
+        return spy(input, init);
+      }),
+    );
+    render(ui());
+    expect(await screen.findByText('Try later.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(people()).toEqual(['51', '52', '53']));
   });
 });

@@ -8,6 +8,7 @@ houseRuleSuite('organization page house rules', {
     string,
     string
   >),
+  ...(import.meta.glob('./listStyles.ts', { query: '?raw', eager: true, import: 'default' }) as Record<string, string>),
 });
 
 // The four tabs whose forms + Add shows in its sheet (and whose own tabs the

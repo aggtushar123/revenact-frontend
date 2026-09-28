@@ -1,31 +1,45 @@
-import { useId } from 'react';
-import { CallSenseTab } from '../activity/CallSenseTab';
-import { FilesTab } from '../activity/FilesTab';
+import type { Account } from '../../../features/customers/customersSlice';
+import { CallsSection } from './CallsSection';
+import { FilesSection } from './FilesSection';
 
-/** Files (spec §1.8): today's Files and CallSense sub-tabs inside the new
- *  frame. The story already carries each call's summary; here are the
- *  recordings, participants and transcripts. */
+/** Files (spec 2026-09-27 §4): two sections, Files then Calls, each holding
+ *  the organization's own records and every visible account's, tagged and
+ *  narrowed by the account chip. */
 export function FilesCallsTab({
   customerId,
+  account,
+  accounts,
+  isSm,
+  active,
   callsVersion = 0,
+  onCallLogged,
+  onShowAll,
 }: {
   customerId: number;
-  /** Bumped when + Add logs a call, so the list reads again. */
+  account: string;
+  accounts: Account[];
+  isSm: boolean;
+  /** Whether this tab is showing (it stays mounted, hidden, once visited). */
+  active: boolean;
+  /** Bumped when the Story's + Add logs a call, so the calls read again. */
   callsVersion?: number;
+  /** A call was logged on this tab. */
+  onCallLogged: () => void;
+  onShowAll: () => void;
 }) {
-  const callsId = useId();
   return (
     <div className="flex flex-col gap-6">
-      {/* FilesTab titles itself "Files": one heading, not a label above it. */}
-      <section aria-label="Files" className="flex flex-col">
-        <FilesTab entityType="organization" entityId={customerId} />
-      </section>
-      <section aria-labelledby={callsId} className="flex flex-col gap-2">
-        <h2 id={callsId} className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
-          Calls
-        </h2>
-        <CallSenseTab entityType="organization" entityId={customerId} version={callsVersion} embedded />
-      </section>
+      <FilesSection customerId={customerId} account={account} accounts={accounts} isSm={isSm} onShowAll={onShowAll} />
+      <CallsSection
+        customerId={customerId}
+        account={account}
+        accounts={accounts}
+        isSm={isSm}
+        active={active}
+        version={callsVersion}
+        onLogged={onCallLogged}
+        onShowAll={onShowAll}
+      />
     </div>
   );
 }
