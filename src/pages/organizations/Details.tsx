@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
@@ -11,6 +11,7 @@ import {
   storyFilters,
   type DetailTab,
 } from '../../features/organizations/detailParams';
+import { parseOrganizationId, type DetailNames } from '../../features/organizations/detailAskContext';
 import { bulkUpdate } from '../../features/organizations/portfolioApi';
 import type { PanelKey } from '../../features/organizations/portfolioFields';
 import { storyQuery } from '../../features/organizations/storyApi';
@@ -35,6 +36,7 @@ import { EmptyState, ErrorBlock } from '../../components/organizations/portfolio
 import { errorMessage } from '../../components/organizations/portfolio/usePortfolio';
 import { FOCUS, QUIET } from '../../components/organizations/portfolio/styles';
 import { AccountFormModal } from './AccountFormModal';
+import { useReportDetailNames } from './ask/detailNames';
 import { OrganizationsFrame } from './OrganizationsFrame';
 
 const NO_ACCOUNTS: Account[] = [];
@@ -110,10 +112,11 @@ export function Details() {
 /** /organizations/:id, the organization's story (spec 2026-09-26, delivery 1):
  *  the name row and tiles from the List's own row, the account chips, and six
  *  tabs whose choice, like the story's filters, lives in the URL. It lands in
- *  four requests; every other tab reads its data when first opened. Ask on
- *  this page is delivery 3, so the frame has no rail yet. */
+ *  four requests; every other tab reads its data when first opened. Ask sits
+ *  beside it (delivery 3): OrganizationsAskLayout draws the frame and the
+ *  rail, and the page reports its names for the question's chip. */
 function OrganizationPage({ id }: { id: string | undefined }) {
-  const orgId = id && /^\d+$/.test(id) ? Number(id) : null;
+  const orgId = parseOrganizationId(id);
   const isSm = useMediaQuery(SM);
   const dispatch = useAppDispatch();
   const { params, update } = useDetailParams();
@@ -148,6 +151,17 @@ function OrganizationPage({ id }: { id: string | undefined }) {
 
   // The chips' numbers follow the tab (spec 2026-09-27 §1).
   const chipCounts = useChipCounts(params.tab, story.data?.counts.by_account ?? null, accounts, orgId ?? 0);
+
+  // The Ask chip's names: "Pizza Hut · EMEA" (spec §3).
+  const orgName = org.row?.name ?? null;
+  const names = useMemo<DetailNames | null>(
+    () =>
+      orgId !== null && orgName !== null
+        ? { organization: orgId, name: orgName, accounts: Object.fromEntries(accounts.map((account) => [account.id, account.name])) }
+        : null,
+    [orgId, orgName, accounts],
+  );
+  useReportDetailNames(names);
   const showAll = useCallback(() => update({ account: '' }), [update]);
 
   const [editing, setEditing] = useState(false);

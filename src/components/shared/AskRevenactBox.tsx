@@ -24,9 +24,12 @@ interface AskRevenactBoxProps {
   initialValue?: string;
   /** Focus the input on mount. */
   autoFocus?: boolean;
+  /** Called when the person changes the text (typing, a mention), so an
+   *  owner can tell an edited prefill from an untouched one. */
+  onEdit?: () => void;
 }
 
-export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled = false, inputRef: givenRef, initialValue = '', autoFocus = false }) => {
+export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled = false, inputRef: givenRef, initialValue = '', autoFocus = false, onEdit }) => {
   const [query, setQuery] = useState(initialValue);
   const [modelMode, setModelMode] = useState<'Fast' | 'Reasoning' | 'Pro'>('Fast');
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
@@ -66,6 +69,7 @@ export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled
 
   const handleInsertMention = (mention: string) => {
     setQuery((prev) => `${prev} @${mention} `);
+    onEdit?.();
     setIsMentionMenuOpen(false);
     inputRef.current?.focus();
   };
@@ -78,7 +82,10 @@ export const AskRevenactBox: React.FC<AskRevenactBoxProps> = ({ onSend, disabled
           ref={inputRef}
           type="text"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            onEdit?.();
+          }}
           onKeyDown={handleKeyDown}
           placeholder="Ask Revenact"
           autoFocus={autoFocus}

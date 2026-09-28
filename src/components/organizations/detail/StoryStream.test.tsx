@@ -87,8 +87,9 @@ describe('StoryStream (spec §1.6 "Stream")', () => {
     const { onOpenEmail } = renderStream(state());
     const title = within(row('email:41')).getByRole('button', { name: 'Re: Renewal pricing' });
     expect(title).toHaveAttribute('aria-haspopup', 'dialog');
-    // A 44px target below sm, like every control.
-    expect(title).toHaveClass('min-h-11', 'sm:min-h-0');
+    // A 44px target below sm and 36px from sm, like every control (§4.5).
+    expect(title).toHaveClass('min-h-11', 'sm:min-h-9', 'sm:leading-9');
+    expect(title).not.toHaveClass('sm:min-h-0');
     await userEvent.click(title);
     expect(onOpenEmail).toHaveBeenCalledWith(STORY_ITEMS[0]);
   });
@@ -103,6 +104,8 @@ describe('StoryStream (spec §1.6 "Stream")', () => {
     expect(link).toHaveAttribute('href', 'https://acme.zendesk.example/tickets/88');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    expect(link).toHaveClass('min-h-11', 'sm:min-h-9');
+    expect(link).not.toHaveClass('sm:min-h-0');
   });
 
   it('opens an email with no thread in place, links only http(s), and has no toggle with nothing to show', async () => {

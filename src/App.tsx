@@ -195,12 +195,13 @@ function App() {
 
           <Route path="organizations">
             <Route index element={<Navigate to="list" replace />} />
-            {/* One Ask conversation above both views (spec §3). */}
+            {/* One Ask conversation above both views and every
+                organization's page (spec §3). */}
             <Route element={<OrganizationsAskLayout />}>
               <Route path="list" element={<List />} />
               <Route path="board" element={<Board />} />
+              <Route path=":id" element={<OrganizationDetails />} />
             </Route>
-            <Route path=":id" element={<OrganizationDetails />} />
           </Route>
 
           <Route path="accounts">

@@ -17,4 +17,10 @@ describe('originPath', () => {
       originPath({ surface: 'organizations', view: 'board', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] }),
     ).toBe('/organizations/board?owner=2');
   });
+
+  it("goes back to an organisation's page with its account chip", () => {
+    const page = { surface: 'organizations' as const, view: 'detail' as const, organization: 7, account: null, label: 'Pizza Hut' };
+    expect(originPath(page)).toBe('/organizations/7');
+    expect(originPath({ ...page, account: 31, label: 'Pizza Hut · EMEA' })).toBe('/organizations/7?account=31');
+  });
 });

@@ -3,9 +3,9 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useCopilotThread, type CopilotThread } from '../../../components/copilot/useCopilotThread';
 import { SM, XL, useMediaQuery } from '../../../lib/useMediaQuery';
 import { fetchConversation } from '../../copilot/copilotApi';
-import type { Conversation, DashboardFocus } from '../../copilot/types';
+import type { AskFocus, Conversation } from '../../copilot/types';
 import { ASK_PREFERENCE_KEY, readAskPreference, writeAskPreference } from './askPreference';
-import { AskContext, AskFocusOnContext, withFocus, type AskState, type AskSurface } from './context';
+import { AskContext, AskDraftContext, AskFocusOnContext, withFocus, type AskState, type AskSurface, type PendingDraft } from './context';
 import { originPath } from './originPath';
 
 /** The navigation state another surface's History sends with a conversation
@@ -47,7 +47,7 @@ export function AskProvider({
     movedOn.current = true;
     setShownConversation(next);
   }, []);
-  const rawThread = useCopilotThread(conversation, setConversation);
+  const rawThread = useCopilotThread(conversation, setConversation, surface.context);
   const thread = useMemo<CopilotThread>(
     () => ({
       ...rawThread,
@@ -61,8 +61,8 @@ export function AskProvider({
   // A handed-over conversation shows for this visit, whatever the saved choice.
   const [choice, setChoice] = useState<boolean | null>(() => (handedId !== null ? true : readAskPreference(preferenceKey)));
   const [sheetOpen, setSheetOpen] = useState(handedId !== null);
-  const [focus, setFocus] = useState<DashboardFocus | null>(null);
-  const [pendingDraft, setPendingDraft] = useState<{ text: string; nonce: number } | null>(null);
+  const [focus, setFocus] = useState<AskFocus | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<PendingDraft | null>(null);
 
   // The handover is spent once read: clear it from the history entry, so a
   // reload or Back and Forward neither refetches it nor forces the rail
@@ -94,12 +94,15 @@ export function AskProvider({
 
   // A focus names accounts on the screen it came from, so another area or
   // filter drops it (a drill closes on the same change). Adjusted during
-  // render, as DrillContext does. The typed draft stays: it is the person's text.
+  // render, as DrillContext does. The prefilled question goes with it while
+  // untouched ("What should I know about this call?" names the item that is
+  // no longer the focus); once edited it is the person's text, and stays.
   const locationKey = pathname + search;
   const [madeAt, setMadeAt] = useState(locationKey);
   if (madeAt !== locationKey) {
     setMadeAt(locationKey);
     setFocus(null);
+    if (pendingDraft && !pendingDraft.edited) setPendingDraft(null);
   }
 
   // Open by default from xl; the person's own choice wins once made. Below
@@ -129,11 +132,24 @@ export function AskProvider({
   }, [isSm]);
 
   const clearFocus = useCallback(() => setFocus(null), []);
-  const focusOn = useCallback((next: DashboardFocus) => setFocus(next), []);
+  const focusOn = useCallback((next: AskFocus) => setFocus(next), []);
   const markSent = useCallback(() => {
     setFocus(null);
     setPendingDraft(null);
   }, []);
+  const markDraftEdited = useCallback(() => {
+    setPendingDraft((prev) => (prev && !prev.edited ? { ...prev, edited: true } : prev));
+  }, []);
+  const draft = useCallback(
+    (question: string, nextFocus: AskFocus) => {
+      setFocus(nextFocus);
+      // A new nonce remounts the composer with the new text. After markSent
+      // the key is 0, so restarting at 1 still differs from the last key.
+      setPendingDraft((prev) => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
+      reveal();
+    },
+    [reveal],
+  );
 
   const value = useMemo<AskState>(
     () => ({
@@ -148,13 +164,8 @@ export function AskProvider({
       focusOn,
       markSent,
       pendingDraft,
-      draft: (question, nextFocus) => {
-        setFocus(nextFocus);
-        // A new nonce remounts the composer with the new text. After markSent
-        // the key is 0, so restarting at 1 still differs from the last key.
-        setPendingDraft((prev) => ({ text: question, nonce: (prev?.nonce ?? 0) + 1 }));
-        reveal();
-      },
+      markDraftEdited,
+      draft,
       ask: (question, nextFocus) => {
         // One question at a time: while an answer is on its way the thread
         // would drop this send, so leave the draft and its focus as they are.
@@ -193,12 +204,14 @@ export function AskProvider({
         reveal();
       },
     }),
-    [surface, open, setOpen, reveal, conversation, setConversation, thread, focus, clearFocus, focusOn, markSent, pendingDraft, navigate],
+    [surface, open, setOpen, reveal, conversation, setConversation, thread, focus, clearFocus, focusOn, markSent, pendingDraft, markDraftEdited, draft, navigate],
   );
 
   return (
     <AskContext.Provider value={value}>
-      <AskFocusOnContext.Provider value={focusOn}>{children}</AskFocusOnContext.Provider>
+      <AskFocusOnContext.Provider value={focusOn}>
+        <AskDraftContext.Provider value={draft}>{children}</AskDraftContext.Provider>
+      </AskFocusOnContext.Provider>
     </AskContext.Provider>
   );
 }

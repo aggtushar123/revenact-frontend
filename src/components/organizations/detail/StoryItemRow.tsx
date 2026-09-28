@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef, useState } from 'react';
+import { useContext, useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   Activity,
   CalendarDays,
@@ -8,13 +8,16 @@ import {
   LifeBuoy,
   Mail,
   Phone,
+  Sparkles,
   SquareCheck,
   StickyNote,
   type LucideIcon,
 } from 'lucide-react';
+import { askAboutQuestion } from '../../../features/organizations/detailAskContext';
 import { KIND_NAME, sourceName } from '../../../features/organizations/storyKinds';
 import { timeLabel } from '../../../features/organizations/storyDays';
 import type { StoryItem, StoryKind } from '../../../features/organizations/storyTypes';
+import { AskDraftContext } from '../../../pages/dashboard/ask/context';
 import { FOCUS } from '../portfolio/styles';
 
 const ICON: Record<StoryKind, LucideIcon> = {
@@ -29,7 +32,7 @@ const ICON: Record<StoryKind, LucideIcon> = {
   health: HeartPulse,
 };
 
-const LINK = `mt-1 inline-flex min-h-11 items-center gap-1 rounded-sm text-[13px] font-semibold text-ink underline sm:min-h-0 ${FOCUS}`;
+const LINK = `mt-1 inline-flex min-h-11 items-center gap-1 rounded-sm text-[13px] font-semibold text-ink underline sm:min-h-9 ${FOCUS}`;
 
 /** `link.url`: a ticket in its source system or a call's recording, in a new
  *  tab. The backend sends only http(s) URLs; the check stays because the
@@ -46,9 +49,29 @@ function ItemLink({ item }: { item: StoryItem }) {
   );
 }
 
+/** "Ask about this" (spec §3): prefills a question about this one item and
+ *  opens the Ask rail, the item the focus of that question only. Only inside
+ *  an Ask provider. */
+function AskAbout({ item }: { item: StoryItem }) {
+  const draft = useContext(AskDraftContext);
+  if (!draft) return null;
+  const focus = { kind: item.kind, id: item.id };
+  return (
+    <button
+      type="button"
+      onClick={() => draft(askAboutQuestion(focus), focus)}
+      aria-label={`Ask about this: ${item.title}`}
+      className={`ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 rounded-sm font-semibold text-ink-muted hover:text-ink active:opacity-70 sm:min-h-9 ${FOCUS}`}
+    >
+      <Sparkles className="h-3 w-3" aria-hidden="true" />
+      Ask about this
+    </button>
+  );
+}
+
 /** One story item (spec §1.6): icon, title, time, a one-line summary, then
- *  the account tag and kind · who · source. An email with a thread opens it;
- *  any other item with more to show opens in place. */
+ *  the account tag, kind · who · source, and "Ask about this". An email with
+ *  a thread opens it; any other item with more to show opens in place. */
 export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEmail: (item: StoryItem) => void }) {
   const [expanded, setExpanded] = useState(false);
   const detailId = useId();
@@ -77,8 +100,9 @@ export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEma
   const meta = [KIND_NAME[item.kind] ?? 'Record', item.actor?.name, source ? `via ${source}` : null]
     .filter(Boolean)
     .join(' · ');
-  // A 44px target below sm (the line height centres the title in it).
-  const titleButton = `inline-block min-h-11 max-w-full truncate rounded-sm text-left leading-[2.75rem] hover:underline active:opacity-70 sm:min-h-0 sm:leading-normal ${FOCUS}`;
+  // A 44px target below sm and 36px from sm (house rule §4.5); the line
+  // height centres the title in it.
+  const titleButton = `inline-block min-h-11 max-w-full truncate rounded-sm text-left leading-[2.75rem] hover:underline active:opacity-70 sm:min-h-9 sm:leading-9 ${FOCUS}`;
 
   return (
     <li data-story-item={`${item.kind}:${item.id}`} className="flex gap-3 px-3 py-2.5">
@@ -127,6 +151,7 @@ export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEma
             {item.account?.name ?? 'Organization'}
           </span>
           <span className="min-w-0 truncate">{meta}</span>
+          <AskAbout item={item} />
         </p>
       </div>
     </li>

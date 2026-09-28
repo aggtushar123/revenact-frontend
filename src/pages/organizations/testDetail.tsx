@@ -1,6 +1,7 @@
 // Test-only helpers for the organization page: its store and its render.
 // Never hot-reloaded: Where sits beside the helpers so a test imports one module.
 /* eslint-disable react-refresh/only-export-components */
+import { useMemo, useState, type ReactNode } from 'react';
 import { configureStore } from '@reduxjs/toolkit';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
@@ -12,8 +13,11 @@ import customersReducer from '../../features/customers/customersSlice';
 import filesReducer from '../../features/files/filesSlice';
 import knowledgeReducer from '../../features/knowledge/knowledgeSlice';
 import notificationsReducer from '../../features/notifications/notificationsSlice';
+import { NavActionsSlotContext } from '../../layouts/navActionsSlot';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 import { setViewport } from '../../test/viewport';
+import { dashboardRoutes } from '../dashboard/routes';
+import { OrganizationsAskLayout } from './ask/OrganizationsAskLayout';
 import { Details } from './Details';
 import { List } from './List';
 
@@ -85,9 +89,27 @@ function History({ goTo }: { goTo?: string }) {
   );
 }
 
+/** DashboardLayout's Navbar actions slot, where the Ask pill portals. With
+ *  the real Navbar (`nav`) the Navbar renders the slot element; without it a
+ *  bare one stands in (`data-testid="nav-actions"`). */
+function SlotHost({ bare, children }: { bare: boolean; children: ReactNode }) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  const value = useMemo(() => ({ slot, setSlot }), [slot]);
+  return (
+    <NavActionsSlotContext.Provider value={value}>
+      {bare ? <div ref={setSlot} data-testid="nav-actions" /> : null}
+      {children}
+    </NavActionsSlotContext.Provider>
+  );
+}
+
 /** The organization page on the real store and router. `list` puts the real
  *  List at /organizations/list (a marker otherwise); `nav` adds the real
- *  Navbar. Only fetch is stubbed, by the caller (stubOrganizationPage). */
+ *  Navbar. `ask` puts both under OrganizationsAskLayout, as App.tsx does,
+ *  with the Navbar's actions slot and the real dashboard routes beside them
+ *  (every view a Where) for History's cross-surface handover. Only fetch is
+ *  stubbed, by the caller (stubOrganizationPage, or stubOrganizationPageAsk
+ *  with `ask`). */
 export function renderOrganizationPage(
   url = '/organizations/7',
   {
@@ -96,35 +118,54 @@ export function renderOrganizationPage(
     list = false,
     history = false,
     goTo,
-  }: { width?: number; nav?: boolean; list?: boolean; history?: boolean; goTo?: string } = {},
+    ask = false,
+  }: { width?: number; nav?: boolean; list?: boolean; history?: boolean; goTo?: string; ask?: boolean } = {},
 ) {
   setViewport(width);
   const store = makeDetailStore();
+  const pages = [
+    <Route
+      key="page"
+      path="/organizations/:id"
+      element={
+        <>
+          <Details />
+          <Where />
+          {history || goTo ? <History goTo={goTo} /> : null}
+        </>
+      }
+    />,
+    <Route
+      key="list"
+      path="/organizations/list"
+      element={
+        <>
+          {list ? <List /> : <p>Organizations list</p>}
+          <Where />
+        </>
+      }
+    />,
+  ];
+  const routes = (
+    <Routes>
+      {ask ? <Route element={<OrganizationsAskLayout />}>{pages}</Route> : pages}
+      {ask ? dashboardRoutes(() => <Where />) : null}
+    </Routes>
+  );
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
-        {nav ? <Navbar /> : null}
-        <Routes>
-          <Route
-            path="/organizations/:id"
-            element={
-              <>
-                <Details />
-                <Where />
-                {history || goTo ? <History goTo={goTo} /> : null}
-              </>
-            }
-          />
-          <Route
-            path="/organizations/list"
-            element={
-              <>
-                {list ? <List /> : <p>Organizations list</p>}
-                <Where />
-              </>
-            }
-          />
-        </Routes>
+        {ask ? (
+          <SlotHost bare={!nav}>
+            {nav ? <Navbar /> : null}
+            {routes}
+          </SlotHost>
+        ) : (
+          <>
+            {nav ? <Navbar /> : null}
+            {routes}
+          </>
+        )}
       </MemoryRouter>
     </Provider>,
   );

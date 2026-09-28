@@ -166,6 +166,22 @@ describe('the Ask rail on the dashboard', () => {
     expect(within(log).getByText('Revenue › Forecast · Owner: 2')).toBeInTheDocument();
   });
 
+  it('keeps a failed question and its Retry when the filters change', async () => {
+    const { spy } = stubCopilot({ statuses: [502] });
+    renderDashboard('/dashboard/overview', () => <Probe />, 1440);
+    await userEvent.type(screen.getByPlaceholderText('Ask Revenact'), 'What needs me?{enter}');
+    expect(await within(rail()!).findByRole('alert')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: 'Go to forecast for owner 2' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/dashboard/revenue/forecast?owner=2');
+    expect(within(rail()!).getByRole('alert')).toBeInTheDocument();
+    expect(within(rail()!).getByText('What needs me?')).toBeInTheDocument();
+    await userEvent.click(within(rail()!).getByRole('button', { name: 'Retry' }));
+    await screen.findByText('Answer to: What needs me?');
+    // Retry asks as it was asked: the Overview, not the screen moved to.
+    const [, again] = postedBodies(spy);
+    expect(again.context).toMatchObject({ area: 'overview' });
+  });
+
   it('opens the drill panel over the rail, not beside it', async () => {
     stubCopilot();
     renderDashboard('/dashboard/overview', () => <Probe />, 1440);

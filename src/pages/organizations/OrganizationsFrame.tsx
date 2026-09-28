@@ -1,4 +1,4 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useRef, type ReactNode } from 'react';
 
 /** Set inside the frame OrganizationsAskLayout draws, so a page's own frame
  *  inside it renders just its content rather than a second frame. */
@@ -21,6 +21,7 @@ const InFrame = createContext(false);
 export function OrganizationsFrame({
   rail = null,
   bleed = false,
+  scrollKey = null,
   children,
 }: {
   rail?: ReactNode;
@@ -31,14 +32,23 @@ export function OrganizationsFrame({
    *  From sm up the gutter is 24px (owner, 2026-09-27: the page uses the
    *  full width, not a centred column). The List and the Board keep px-4. */
   bleed?: boolean;
+  /** Which page the column shows (the layout's: an organisation's id, or
+   *  the List or the Board). The column is shared across those routes, so
+   *  when this changes it scrolls back to the top; a tab or query change
+   *  within one page keeps the key, and its place. */
+  scrollKey?: string | null;
   children: ReactNode;
 }) {
   const inFrame = useContext(InFrame);
+  const column = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (column.current) column.current.scrollTop = 0;
+  }, [scrollKey]);
   if (inFrame) return <>{children}</>;
   return (
     <InFrame.Provider value={true}>
       <div className={`relative flex-1 min-h-0 w-full flex gap-3 pb-4 ${bleed ? 'px-0 sm:px-6' : 'px-4'}`}>
-        <div className={`flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col ${bleed ? 'px-4 sm:px-0' : ''}`}>{children}</div>
+        <div ref={column} className={`flex-1 min-w-0 min-h-0 overflow-y-auto flex flex-col ${bleed ? 'px-4 sm:px-0' : ''}`}>{children}</div>
         {rail}
       </div>
     </InFrame.Provider>

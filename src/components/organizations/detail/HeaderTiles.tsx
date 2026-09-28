@@ -15,8 +15,11 @@ function Title({ children }: { children: ReactNode }) {
 }
 
 /** The four tiles (spec §1.3). Health opens its breakdown below them; ARR,
- *  Renewal and Pulse jump to their Details panel. A four-column grid from
- *  `sm`; a strip that snaps sideways on phones. */
+ *  Renewal and Pulse jump to their Details panel. From `sm` a grid that
+ *  wraps to its own column, not the window (`@container`): four across once
+ *  the column is 36rem wide, which it always is from `sm` with the Ask rail
+ *  closed, and two beside the open rail on a narrow window. A strip that
+ *  snaps sideways on phones. */
 export function HeaderTiles({
   row,
   customer,
@@ -39,8 +42,12 @@ export function HeaderTiles({
   const band = HEALTH_LABEL[row.health.category];
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className={isSm ? 'grid grid-cols-4 gap-3' : '-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4'}>
+    <div className="@container flex flex-col gap-3">
+      <div
+        className={
+          isSm ? 'grid grid-cols-2 gap-3 @min-[36rem]:grid-cols-4' : '-mx-4 flex snap-x snap-mandatory scroll-px-4 gap-3 overflow-x-auto px-4'
+        }
+      >
         <button
           type="button"
           onClick={() => setOpen((value) => !value)}
