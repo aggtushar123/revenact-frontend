@@ -138,4 +138,15 @@ describe('Ask Revenact on the organisation page', () => {
     expect(within(rail()!).queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
     expect(postedBodies(copilot)).toHaveLength(1);
   });
+
+  it('clears a refusal once the person moves to another organisation, even in the same conversation', async () => {
+    stubOrganizationPageAsk({ copilot: { refuse: { organization: ['Not an organisation you can open.'] } } });
+    renderOrganizationPage('/organizations/7', { ask: true, goTo: '/organizations/9' });
+    await heading();
+    await userEvent.type(composer(), 'What changed?{enter}');
+    expect(await within(rail()!).findByRole('alert')).toHaveTextContent('You can no longer ask about this organization.');
+    await userEvent.click(screen.getByRole('link', { name: 'Go to /organizations/9' }));
+    await screen.findByText('Organization not found');
+    expect(within(rail()!).queryByRole('alert')).not.toBeInTheDocument();
+  });
 });

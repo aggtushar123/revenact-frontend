@@ -32,14 +32,11 @@ export function useOrganizationsContext(): OrganizationsContext | OrganizationDe
   // On the detail view, `params` is not a dependency: the page's context is
   // only its organisation and account, so a story filter or search keystroke
   // (which changes `params`' identity, not these) never rebuilds it.
+  const listParams = view === 'detail' ? null : params;
   return useMemo(() => {
     if (!view) return null;
     if (view === 'detail') return { surface: 'organizations', view, organization: organization!, account, focus: null };
-    const shown = view === 'board' ? boardParams(params) : params;
+    const shown = view === 'board' ? boardParams(listParams!) : listParams!;
     return { surface: 'organizations', view, filters: toContextFilters(shown, view), focus: null };
-    // `params` is read by design only off the detail view; the ternary drops
-    // it there so a story filter or search keystroke never rebuilds the
-    // detail context.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, view === 'detail' ? null : params, organization, account]);
+  }, [view, listParams, organization, account]);
 }

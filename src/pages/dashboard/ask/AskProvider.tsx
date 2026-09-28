@@ -47,7 +47,7 @@ export function AskProvider({
     movedOn.current = true;
     setShownConversation(next);
   }, []);
-  const rawThread = useCopilotThread(conversation, setConversation);
+  const rawThread = useCopilotThread(conversation, setConversation, surface.context);
   const thread = useMemo<CopilotThread>(
     () => ({
       ...rawThread,

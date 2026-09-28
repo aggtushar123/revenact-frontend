@@ -13,6 +13,10 @@ const log = () => screen.getByRole('log', { name: 'Ask Revenact messages' });
 const emeaOrigin = { surface: 'organizations', view: 'detail', organization: 7, account: 31, label: 'Pizza Hut · EMEA' };
 const wholeOrigin = { surface: 'organizations', view: 'detail', organization: 7, account: null, label: 'Pizza Hut' };
 const listOrigin = { surface: 'organizations', view: 'list', filters: { owner: '2' }, labels: ['Owner: Carl CSM'] };
+// No organisation in the stub answers to id 999: the portfolio row comes
+// back empty for it, as it would for one archived or moved out of reach
+// since the conversation was left.
+const goneOrigin = { surface: 'organizations', view: 'detail', organization: 999, account: null, label: 'Gone Co' };
 
 function chat(id: number, title: string, origin: Record<string, unknown>, answer: string, focus: unknown = null) {
   const summary = { id, title, created_at: '', updated_at: '', origin };
@@ -29,12 +33,13 @@ function chat(id: number, title: string, origin: Record<string, unknown>, answer
 const emea = chat(21, 'What changed in EMEA?', emeaOrigin, 'The admin left.', { kind: 'call', id: 12 });
 const whole = chat(22, 'Is Pizza Hut healthy?', wholeOrigin, 'Mostly, but the renewal is close.');
 const renews = chat(9, 'Who renews first?', listOrigin, 'Pizza Hut, and it is overdue.');
+const gone = chat(23, 'Is Gone Co healthy?', goneOrigin, 'It used to be steady.');
 
 function stubHistory() {
   return stubOrganizationPageAsk({
     copilot: {
-      conversations: [emea.summary, whole.summary, renews.summary],
-      conversationById: { 21: emea.full, 22: whole.full, 9: renews.full },
+      conversations: [emea.summary, whole.summary, renews.summary, gone.summary],
+      conversationById: { 21: emea.full, 22: whole.full, 9: renews.full, 23: gone.full },
     },
   });
 }
@@ -92,5 +97,15 @@ describe("History on an organisation's page", () => {
     await pick(/What changed in EMEA\?/);
     await waitFor(() => expect(where()).toBe('/organizations/7?account=31'));
     expect(await within(log()).findByText('The admin left.')).toBeInTheDocument();
+  });
+
+  it('shows the not-found state, without crashing, restoring a conversation whose organisation is no longer there', async () => {
+    stubHistory();
+    renderOrganizationPage('/organizations/list', { ask: true, list: true });
+    await screen.findByRole('link', { name: 'Pizza Hut' });
+    await pick(/Is Gone Co healthy\?/);
+    await waitFor(() => expect(where()).toBe('/organizations/999'));
+    expect(await screen.findByText('Organization not found')).toBeInTheDocument();
+    expect(await within(log()).findByText('It used to be steady.')).toBeInTheDocument();
   });
 });

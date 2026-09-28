@@ -47,6 +47,7 @@ export function refusalMessage(err: unknown): string | null {
 export function useCopilotThread(
   conversation: Conversation | null,
   onConversation: (conversation: Conversation) => void,
+  context?: SurfaceContext | null,
 ): CopilotThread {
   const [pending, setPending] = useState<Turn | null>(null);
   const [failed, setFailed] = useState<FailedTurn | null>(null);
@@ -59,6 +60,19 @@ export function useCopilotThread(
     setThreadId(id);
     setFailed(null);
     setPending(null);
+  }
+
+  // Moving to another organisation or account keeps the same conversation
+  // (spec: it lasts from the List into an organisation and back), but a
+  // refusal there says nothing about the page the person has moved to, so it
+  // does not linger once the context has changed. `context` is undefined for
+  // a caller with nothing structured to ask about (Communications), which
+  // never triggers this.
+  const contextKey = context ? JSON.stringify(context) : null;
+  const [threadContext, setThreadContext] = useState(contextKey);
+  if (threadContext !== contextKey) {
+    setThreadContext(contextKey);
+    setFailed(null);
   }
 
   // Which conversation is on screen now, for a send that outlives it: an
