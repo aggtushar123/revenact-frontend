@@ -1,6 +1,8 @@
 // Mirrors revenact-backend's copilot serializers field-for-field — see
 // docs/API_CONTRACTS.md -> copilot.
 
+import type { StoryKind } from '../../features/organizations/storyTypes';
+
 export type MessageRole = 'user' | 'assistant';
 
 /** The dashboard areas a question can be asked from. Mirrors the backend's
@@ -88,9 +90,46 @@ export interface OrganizationsOrigin {
   labels: string[];
 }
 
-/** Every structured context a question can carry, told apart by `surface`. */
-export type SurfaceContext = DashboardContext | OrganizationsContext;
-export type SurfaceOrigin = DashboardOrigin | OrganizationsOrigin;
+/** "Ask about this" on one story item (spec 2026-09-26 §3): the item's own
+ *  `kind` and `id`, for one question. The server re-reads it under the
+ *  story's rules and stores `null` when the asker may not read it. */
+export interface StoryFocus {
+  kind: StoryKind;
+  id: number;
+}
+
+/** Whatever the shared Ask slot narrows the next question to: a dashboard
+ *  drill or attention item, an Organizations row, or a story item. The kinds
+ *  never overlap, so `kind` tells them apart. */
+export type AskFocus = DashboardFocus | StoryFocus;
+
+/** Where a question on one organisation's page was asked (spec 2026-09-26
+ *  §3, backend delivery 3). `account` is the account chip, null for every
+ *  account. The client never sends names: the server builds `label` ("Pizza
+ *  Hut" or "Pizza Hut · EMEA") and echoes it on a stored context. */
+export interface OrganizationDetailContext {
+  surface: 'organizations';
+  view: 'detail';
+  organization: number;
+  account: number | null;
+  focus: StoryFocus | null;
+  label?: string;
+}
+
+/** A conversation's first organisation-page context without its focus;
+ *  `label` is always there, built by the server. */
+export interface OrganizationDetailOrigin {
+  surface: 'organizations';
+  view: 'detail';
+  organization: number;
+  account: number | null;
+  label: string;
+}
+
+/** Every structured context a question can carry, told apart by `surface`
+ *  (and, on Organizations, by `view`). */
+export type SurfaceContext = DashboardContext | OrganizationsContext | OrganizationDetailContext;
+export type SurfaceOrigin = DashboardOrigin | OrganizationsOrigin | OrganizationDetailOrigin;
 export type SurfaceName = SurfaceContext['surface'];
 
 /** A record an answer was built from. A snapshot taken when the

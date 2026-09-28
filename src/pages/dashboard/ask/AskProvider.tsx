@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useCopilotThread, type CopilotThread } from '../../../components/copilot/useCopilotThread';
 import { SM, XL, useMediaQuery } from '../../../lib/useMediaQuery';
 import { fetchConversation } from '../../copilot/copilotApi';
-import type { Conversation, DashboardFocus } from '../../copilot/types';
+import type { AskFocus, Conversation } from '../../copilot/types';
 import { ASK_PREFERENCE_KEY, readAskPreference, writeAskPreference } from './askPreference';
 import { AskContext, AskFocusOnContext, withFocus, type AskState, type AskSurface } from './context';
 import { originPath } from './originPath';
@@ -61,7 +61,7 @@ export function AskProvider({
   // A handed-over conversation shows for this visit, whatever the saved choice.
   const [choice, setChoice] = useState<boolean | null>(() => (handedId !== null ? true : readAskPreference(preferenceKey)));
   const [sheetOpen, setSheetOpen] = useState(handedId !== null);
-  const [focus, setFocus] = useState<DashboardFocus | null>(null);
+  const [focus, setFocus] = useState<AskFocus | null>(null);
   const [pendingDraft, setPendingDraft] = useState<{ text: string; nonce: number } | null>(null);
 
   // The handover is spent once read: clear it from the history entry, so a
@@ -129,7 +129,7 @@ export function AskProvider({
   }, [isSm]);
 
   const clearFocus = useCallback(() => setFocus(null), []);
-  const focusOn = useCallback((next: DashboardFocus) => setFocus(next), []);
+  const focusOn = useCallback((next: AskFocus) => setFocus(next), []);
   const markSent = useCallback(() => {
     setFocus(null);
     setPendingDraft(null);

@@ -1,12 +1,12 @@
 import { useContext, useEffect } from 'react';
-import type { DashboardFocus } from '../../copilot/types';
+import type { AskFocus } from '../../copilot/types';
 import { AskFocusOnContext } from '../../dashboard/ask/context';
 
 /** Just `focusOn`, read from its own context so a caller that only narrows
  *  the next question (never reads the conversation, the thread or the open
  *  state) doesn't re-render whenever a send changes the shared `AskState`.
  *  Null outside an Ask provider, as `useAsk()` is. */
-export function useAskFocusOn(): ((focus: DashboardFocus) => void) | null {
+export function useAskFocusOn(): ((focus: AskFocus) => void) | null {
   return useContext(AskFocusOnContext);
 }
 
