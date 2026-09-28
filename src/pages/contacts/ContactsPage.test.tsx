@@ -115,11 +115,22 @@ describe('Contacts page (spec 2026-09-28 §3)', () => {
     stubContactsApi();
     renderContactsPage('/contacts/41');
     await screen.findByRole('heading', { level: 2, name: 'Lukas Vermeer' });
-    expect(document.querySelector('[data-frame="contacts"]')).toHaveClass('px-4', 'pb-4');
+    expect(document.querySelector('[data-frame="contacts"]')).toHaveClass('pb-4');
     expect(document.querySelector('[data-pane="list"]')).toHaveClass('overflow-y-auto', 'shrink-0');
     expect(document.querySelector('[data-pane="profile"]')).toHaveClass('overflow-y-auto', 'flex-1');
     expect(screen.queryByRole('table')).toBeNull();
     expect(screen.queryByText(/Total Contacts/i)).toBeNull();
+  });
+
+  it('the gutter matches the organisation page: 16px inside the column below sm, 24px around it from sm, the column capped at 1800px', async () => {
+    stubContactsApi();
+    renderContactsPage('/contacts');
+    await screen.findByRole('list', { name: 'People' });
+    const frame = document.querySelector('[data-frame="contacts"]')!;
+    expect(frame).toHaveClass('px-0', 'sm:px-6');
+    expect(frame).not.toHaveClass('px-4');
+    expect(frame.firstElementChild).toHaveClass('overflow-y-auto', 'px-4', 'sm:px-0');
+    expect(document.querySelector('[data-part="column"]')).toHaveClass('mx-auto', 'w-full', 'max-w-[1800px]');
   });
 
   it('the old /contacts/list lands on /contacts', async () => {

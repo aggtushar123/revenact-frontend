@@ -33,7 +33,8 @@ export function DashboardLayout() {
     location.pathname === '/organizations/board' ||
     /^\/organizations\/\d+$/.test(location.pathname);
   // The Contacts frame (spec 2026-09-28 §3): the list, and a person on it.
-  const isContacts = /^\/contacts(\/\d+)?$/.test(location.pathname);
+  // A trailing slash still reads as the same route (fix round 1, 2026-09-28).
+  const isContacts = /^\/contacts(\/\d+)?\/?$/.test(location.pathname);
   // The Navbar's actions slot, which a page below (the dashboard) portals into.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const slotValue = useMemo(() => ({ slot, setSlot }), [slot]);

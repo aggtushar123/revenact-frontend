@@ -41,24 +41,37 @@ function Section({ title, count, shown, empty, children }: { title: string; coun
  *  "Why this sentiment?" arrives with Ask on Contacts (delivery 2, §4). */
 export function ContactProfile({ id, onDeleted }: { id: number; onDeleted: () => void }) {
   const dispatch = useAppDispatch();
-  const {
-    selectedContact,
-    selectedContactError,
-    selectedContactHistory,
-    selectedContactHistoryError,
-  } = useAppSelector((state) => state.customers);
+  const { selectedContact, selectedContactHistory } = useAppSelector((state) => state.customers);
   const [attempt, setAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // Tied to `id` by the closure below, not read off the shared slice: two
+  // requests for different people race through the same
+  // selectedContactError/selectedContactHistoryError fields, so a
+  // component still showing person A could otherwise paint B's error for a
+  // tick, or A's late failure after B is already on screen (fix round 1,
+  // 2026-09-28). `cancelled` drops a reply that arrives after `id` (or
+  // `attempt`) has moved on, exactly as useOrganization does for the
+  // organisation page.
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void dispatch(fetchContactById(id));
-    void dispatch(fetchContactHistory(id));
+    let cancelled = false;
+    setError(null);
+    Promise.allSettled([dispatch(fetchContactById(id)).unwrap(), dispatch(fetchContactHistory(id)).unwrap()]).then(
+      ([byId, history]) => {
+        if (cancelled) return;
+        const failed = byId.status === 'rejected' ? byId.reason : history.status === 'rejected' ? history.reason : null;
+        if (failed !== null) setError(typeof failed === 'string' ? failed : 'Something went wrong.');
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [dispatch, id, attempt]);
 
   const contact = selectedContact?.id === id ? selectedContact : null;
   const history = selectedContactHistory?.contact_id === id ? selectedContactHistory : null;
-  const error = selectedContactError ?? selectedContactHistoryError;
 
   if (error) {
     return (
@@ -118,6 +131,8 @@ export function ContactProfile({ id, onDeleted }: { id: number; onDeleted: () =>
                 <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span className="font-mono-brand tabular-nums">{contact.phone}</span>
               </a>
+            ) : contact.phone ? (
+              <span className="font-mono-brand tabular-nums">{contact.phone}</span>
             ) : null}
           </p>
         </div>

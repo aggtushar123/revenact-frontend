@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import customersReducer from '../../features/customers/customersSlice';
-import { MIRA, requested, stubContactsApi, type ContactsStub } from '../../features/contacts/testContacts';
+import { LUKAS, MIRA, emptyHistory, requested, stubContactsApi, type ContactsStub } from '../../features/contacts/testContacts';
 import { ContactProfile } from './ContactProfile';
 
 function renderProfile(id = 41, stub: ContactsStub = {}) {
@@ -105,5 +105,58 @@ describe('ContactProfile (spec 2026-09-28 §3)', () => {
     await screen.findByRole('article', { name: 'Lukas Vermeer' });
     for (const name of ['Edit', 'Delete']) expect(screen.getByRole('button', { name })).toHaveClass('min-h-11', 'sm:min-h-9');
     expect(screen.getByRole('link', { name: 'Kraft Heinz' })).toHaveClass('min-h-11');
+  });
+
+  it('a phone telHref cannot use shows as plain text, like the email fallback (fix round 1, 2026-09-28)', async () => {
+    renderProfile(41, { people: [{ ...LUKAS, phone: 'Ask reception' }] });
+    const profile = await screen.findByRole('article', { name: 'Lukas Vermeer' });
+    expect(within(profile).queryByRole('link', { name: 'Ask reception' })).toBeNull();
+    expect(within(profile).getByText('Ask reception')).toBeInTheDocument();
+  });
+
+  it("switching people: the previous person's stale error and history never show, and the new person's own history lands (fix round 1, 2026-09-28)", async () => {
+    const attrIds = (attr: string) => [...document.querySelectorAll(`[${attr}]`)].map((el) => el.getAttribute(attr));
+    let releaseLukasHistory: () => void = () => {};
+    const heldLukasHistory = new Promise<void>((resolve) => {
+      releaseLukasHistory = resolve;
+    });
+    const spy = vi.fn(async (input: RequestInfo | URL) => {
+      const path = new URL(String(input)).pathname.replace(/^\/api\/v1/, '');
+      if (path === '/contacts/41/') return { ok: true, status: 200, json: async () => LUKAS };
+      if (path === '/contacts/41/history/') {
+        await heldLukasHistory;
+        return { ok: false, status: 500, json: async () => ({ detail: 'Try later.' }) };
+      }
+      if (path === '/contacts/42/') return { ok: true, status: 200, json: async () => MIRA };
+      if (path === '/contacts/42/history/') return { ok: true, status: 200, json: async () => emptyHistory(MIRA) };
+      return { ok: false, status: 404, json: async () => ({ detail: 'Not found.' }) };
+    });
+    vi.stubGlobal('fetch', spy);
+    const store = configureStore({ reducer: { customers: customersReducer } });
+    const wrap = (id: number) => (
+      <Provider store={store}>
+        <MemoryRouter>
+          <ContactProfile id={id} onDeleted={vi.fn()} />
+        </MemoryRouter>
+      </Provider>
+    );
+    const view = render(wrap(41));
+    // Lukas's contact loads, but his history is held: still the skeleton,
+    // not his profile (which needs both) — the same moment a real user
+    // could click away to another person.
+    await screen.findByRole('status', { name: 'Loading this person' });
+    expect(screen.queryByRole('article')).toBeNull();
+
+    // Move to Mira while Lukas's history is still in flight (and about to fail).
+    view.rerender(wrap(42));
+    await screen.findByRole('article', { name: 'Mira Patel' });
+    expect(attrIds('data-history-call')).toEqual([]);
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    // Lukas's slow, failing history reply lands late: it must never surface.
+    await act(async () => releaseLukasHistory());
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(attrIds('data-history-call')).toEqual([]);
+    expect(screen.getByRole('article', { name: 'Mira Patel' })).toBeInTheDocument();
   });
 });

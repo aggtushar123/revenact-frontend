@@ -22,6 +22,12 @@ import { ContactsFrame } from './ContactsFrame';
 
 const BACK = `-ml-2 inline-flex min-h-11 w-fit items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-ink-muted hover:bg-subtle hover:text-ink active:bg-line-subtle ${FOCUS}`;
 
+// The page's own column, full width but capped (fix round 1, 2026-09-28):
+// same cap as the organisation page's (Details.tsx's PAGE_COLUMN), so
+// Contacts reads as one family with it rather than stretching edge to edge
+// on very wide screens.
+const COLUMN = 'mx-auto w-full max-w-[1800px]';
+
 /** The Contacts page (spec 2026-09-28 §3): the summary line and filters, a
  *  list of people on the left and the chosen person's profile on the right.
  *  `/contacts/:id` chooses them; the filters live in the URL (`q`,
@@ -152,7 +158,9 @@ export function ContactsPage() {
 
   return (
     <ContactsFrame>
-      {body}
+      <div data-part="column" className={`${COLUMN} flex min-h-0 flex-1 flex-col`}>
+        {body}
+      </div>
       {adding ? (
         <ContactFormModal companies={organisations} onClose={() => setAdding(false)} onSaved={() => setRefresh((n) => n + 1)} />
       ) : null}

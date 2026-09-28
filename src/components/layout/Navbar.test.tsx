@@ -414,7 +414,8 @@ describe('Navbar on Contacts (spec 2026-09-28 §3)', () => {
     vi.unstubAllGlobals();
   });
 
-  it.each(['/contacts', '/contacts/1'])('titles %s "Contacts" in the framed bar, with the actions slot and no avatar', (route) => {
+  // A trailing slash is still the same route (fix round 1, 2026-09-28).
+  it.each(['/contacts', '/contacts/1', '/contacts/1/'])('titles %s "Contacts" in the framed bar, with the actions slot and no avatar', (route) => {
     renderNavbar(route, null, sarahChen);
     expect(screen.getByRole('heading', { level: 1, name: 'Contacts' })).toBeInTheDocument();
     // The person's name is the page's to show, not the bar's.

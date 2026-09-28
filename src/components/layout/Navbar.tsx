@@ -111,7 +111,8 @@ export function Navbar() {
   const isOrgDetail = /^\/organizations\/\d+$/.test(location.pathname);
   // Contacts wears the same frame (spec 2026-09-28 §3): the list and the
   // person open on it share one page, titled here; the page draws the rest.
-  const isContacts = /^\/contacts(\/\d+)?$/.test(location.pathname);
+  // A trailing slash still reads as the same route (fix round 1, 2026-09-28).
+  const isContacts = /^\/contacts(\/\d+)?\/?$/.test(location.pathname);
   const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts;
   const dashboardSharedSearch = sharedSearch(location.search);
 
