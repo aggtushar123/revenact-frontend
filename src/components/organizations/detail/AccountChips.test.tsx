@@ -91,4 +91,41 @@ describe('AccountChips (spec §1.4)', () => {
     renderChips();
     for (const chip of chips()) expect(chip).toHaveClass('min-h-11', 'sm:min-h-9');
   });
+
+  describe('where the chips do not apply (Details and Knowledge, owner 2026-09-28)', () => {
+    const NOTE = 'Details and Knowledge cover the whole organization';
+
+    it('filters by default: no note, no dimming', () => {
+      renderChips();
+      expect(screen.queryByText(NOTE)).not.toBeInTheDocument();
+      for (const chip of chips()) {
+        expect(chip).not.toHaveAttribute('aria-describedby');
+        expect(chip).not.toHaveClass('text-ink-muted');
+      }
+    });
+
+    it('dims every chip with the muted ink, ties the note to it, and shows names only', () => {
+      renderChips({ applies: false, selected: '31' });
+      const note = screen.getByText(NOTE);
+      expect(note.id).not.toBe('');
+      expect(chips().map((chip) => chip.textContent)).toEqual(['All', 'EMEA', 'North America']);
+      for (const chip of chips()) {
+        expect(chip).toHaveClass('text-ink-muted', 'min-h-11', 'sm:min-h-9');
+        expect(chip).toHaveAttribute('aria-describedby', note.id);
+        expect(chip).not.toHaveAttribute('aria-disabled');
+        expect(chip).toBeEnabled();
+      }
+      // The chosen one stays marked, outlined rather than filled.
+      expect(chips()[1]).toHaveAttribute('aria-pressed', 'true');
+      expect(chips()[1]).not.toHaveClass('bg-accent');
+    });
+
+    it('still changes the remembered account, and Edit stays usable', async () => {
+      const { onSelect, onEdit } = renderChips({ applies: false, selected: '31' });
+      await userEvent.click(screen.getByRole('button', { name: 'North America' }));
+      expect(onSelect).toHaveBeenCalledWith('32');
+      await userEvent.click(screen.getByRole('button', { name: 'Edit EMEA' }));
+      expect(onEdit).toHaveBeenCalledWith(ACCOUNTS[0]);
+    });
+  });
 });

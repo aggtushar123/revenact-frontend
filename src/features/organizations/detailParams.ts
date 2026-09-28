@@ -71,7 +71,9 @@ export function hasStoryFilters(p: DetailParams): boolean {
 }
 
 /** The tabs the account chips filter (spec 2026-09-27 §1). Details and
- *  Knowledge are the whole organization's, so the chips are not shown there. */
+ *  Knowledge are the whole organization's: the chips show there dimmed and
+ *  filter nothing, while `?account=` is kept for the other tabs (owner,
+ *  2026-09-28). */
 export const ACCOUNT_TABS: ReadonlySet<DetailTab> = new Set<DetailTab>(['story', 'people', 'deals', 'files']);
 
 export const detailTabId = (base: string, tab: DetailTab) => `${base}-tab-${tab}`;
