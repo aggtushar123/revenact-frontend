@@ -5,7 +5,8 @@ import { QUIET } from '../portfolio/styles';
 import { CountChip } from './CountChip';
 
 /** The account chips (spec §1.4, and 2026-09-27 §1): All, each account and
- *  the organization itself, numbered by the active tab's counts (the story's
+ *  the organization itself (always, 0 where it has nothing, so the row is the
+ *  same on every tab; owner 2026-09-28), numbered by the active tab's counts (the story's
  *  `counts.by_account` on Story; the lists' own on People, Deals & risks and
  *  Files). The chips stay name plus count; account figures live on the
  *  Details tab's Accounts section. With an account chosen the row ends with
@@ -87,7 +88,8 @@ export function AccountChips({
           <>
             {chip('', 'All', total)}
             {shown.map((account) => chip(String(account.id), account.name, counts ? (counts[String(account.id)] ?? 0) : null))}
-            {orgCount > 0 || selected === 'none' ? chip('none', 'Organization', counts ? orgCount : null) : null}
+            {/* Always shown (0 where empty), so the row is the same on every tab. */}
+            {chip('none', 'Organization', counts ? orgCount : null)}
           </>
         ) : null}
       </div>

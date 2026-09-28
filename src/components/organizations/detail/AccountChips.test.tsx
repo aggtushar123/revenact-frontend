@@ -32,17 +32,17 @@ describe('AccountChips (spec §1.4)', () => {
 
   it('shows no numbers until the story has counted', () => {
     renderChips({ counts: null });
-    expect(chips().map((chip) => chip.textContent)).toEqual(['All', 'EMEA', 'North America']);
+    expect(chips().map((chip) => chip.textContent)).toEqual(['All', 'EMEA', 'North America', 'Organization']);
   });
 
-  it('leaves out an account the story does not count (outside this viewer\'s scope), and hides Organization when it has none', () => {
+  it('leaves out an account the story does not count (outside this viewer\'s scope), and keeps Organization at 0 when it has none', () => {
     renderChips({ counts: { all: 2, none: 0, '31': 2 } });
-    expect(chips().map((chip) => chip.textContent)).toEqual(['All 2', 'EMEA 2']);
+    expect(chips().map((chip) => chip.textContent)).toEqual(['All 2', 'EMEA 2', 'Organization 0']);
   });
 
   it('keeps an in-scope account with nothing matching as 0', () => {
     renderChips({ counts: { all: 2, none: 0, '31': 2, '32': 0 } });
-    expect(chips().map((chip) => chip.textContent)).toEqual(['All 2', 'EMEA 2', 'North America 0']);
+    expect(chips().map((chip) => chip.textContent)).toEqual(['All 2', 'EMEA 2', 'North America 0', 'Organization 0']);
   });
 
   it('chooses an account, and pressing it again goes back to All', async () => {
@@ -108,7 +108,7 @@ describe('AccountChips (spec §1.4)', () => {
       renderChips({ applies: false, selected: '31' });
       const note = screen.getByText(NOTE);
       expect(note.id).not.toBe('');
-      expect(chips().map((chip) => chip.textContent)).toEqual(['All', 'EMEA', 'North America']);
+      expect(chips().map((chip) => chip.textContent)).toEqual(['All', 'EMEA', 'North America', 'Organization']);
       for (const chip of chips()) {
         expect(chip).toHaveClass('text-ink-muted', 'min-h-11', 'sm:min-h-9');
         expect(chip).toHaveAttribute('aria-describedby', note.id);

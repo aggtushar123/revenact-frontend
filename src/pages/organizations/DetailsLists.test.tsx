@@ -74,14 +74,18 @@ describe('the organization page, delivery 2: the lists and the account chips', (
     await screen.findByRole('heading', { level: 1, name: 'Pizza Hut' });
     // One element across every switch, so nothing shifts.
     const row = chips();
+    // A chip's name is its first span; the count, where shown, follows it.
+    const names = () => within(row).getAllByRole('button').map((b) => b.firstElementChild?.textContent ?? '');
+    const namesByTab: string[][] = [];
     const note = () => screen.queryByText('Details and Knowledge cover the whole organization');
     for (const tab of ['Story', 'Details', 'People', 'Deals & risks', 'Knowledge', 'Files']) {
       await userEvent.click(screen.getByRole('tab', { name: tab }));
       expect(chips()).toBe(row);
+      namesByTab.push(names());
       const whole = tab === 'Details' || tab === 'Knowledge';
       if (whole) {
         expect(note()).toBeInTheDocument();
-        expect(within(row).getAllByRole('button').map((b) => b.textContent)).toEqual(['All', 'EMEA', 'North America']);
+        expect(within(row).getAllByRole('button').map((b) => b.textContent)).toEqual(['All', 'EMEA', 'North America', 'Organization']);
         for (const button of within(row).getAllByRole('button')) {
           expect(button).toHaveClass('text-ink-muted');
           expect(button).toHaveAttribute('aria-describedby', note()!.id);
@@ -94,6 +98,9 @@ describe('the organization page, delivery 2: the lists and the account chips', (
         for (const button of within(row).getAllByRole('button')) expect(button).not.toHaveAttribute('aria-describedby');
       }
     }
+    // The same chips, by name, on all six tabs: Organization never drops out.
+    expect(namesByTab).toHaveLength(6);
+    for (const tabNames of namesByTab) expect(tabNames).toEqual(['All', 'EMEA', 'North America', 'Organization']);
 
     // Choosing on Knowledge moves the remembered account; People filters by it.
     await userEvent.click(screen.getByRole('tab', { name: 'Knowledge' }));

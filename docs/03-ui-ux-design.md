@@ -469,10 +469,15 @@ Rules specific to it, enforced by `components/organizations/detail/houseRules.te
   ("AI n · CSM n", dots, "pulses disagree"). Each is a button; the last three
   jump to their Details panel. A grid of four from `sm`, a snapping strip below.
 - Account chips (All, each account, Organization) sit above the tabs on
-  Story, People, Deals & risks and Files, never on Details or Knowledge.
-  They carry only a name and the active tab's count (story items, people,
-  opportunities plus risks, files plus calls); the chosen one is
-  `bg-accent text-on-accent`, and "Edit <account>" ends the row.
+  every tab, so the row never jumps (owner, 2026-09-28). Organization is
+  always there, at 0 when nothing is on the organization itself. On Story,
+  People, Deals & risks and Files they carry only a name and the active
+  tab's count (story items, people, opportunities plus risks, files plus
+  calls); the chosen one is `bg-accent text-on-accent`. On Details and
+  Knowledge they filter nothing: names only, `text-ink-muted`, the chosen
+  one outlined, with "Details and Knowledge cover the whole organization"
+  tied to each chip by `aria-describedby`; a press still moves the kept
+  `?account=`. "Edit <account>" ends the row on every tab.
 - People, Deals & risks and Files are lists, never tables
   (`detail/ListParts.tsx`, `detail/listStyles.ts`): a one-line summary with
   its figures in DM Mono replaces the stat cards; each tab is one
