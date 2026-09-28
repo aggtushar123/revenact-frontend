@@ -437,6 +437,11 @@ export interface Contact {
   /** The account it is on; null on the organization itself (spec
    *  2026-09-27 §6). Optional: fixtures from before it read as null. */
   account_id?: number | null;
+  /** The first parent organisation the viewer may open, and the account,
+   *  as refs (the Contacts list, spec 2026-09-28 §2). Optional: older
+   *  fixtures and nested lists read them from `companies`/`account_*`. */
+  organisation?: CompanyRef | null;
+  account?: CompanyRef | null;
 }
 
 export interface ContactSentimentEvidence {

@@ -9,21 +9,10 @@ import {
 } from '../../features/customers/customersSlice';
 import type { Contact } from '../../features/customers/customersSlice';
 import { companyLabel } from '../../features/customers/formatters';
+import { CONTACT_ROLES } from '../../features/contacts/contactsParams';
 
-// Matches Contact.Role on the backend exactly (services/customers/
-// models.py) — the serializer already sends a `role_display` for
-// read-only rendering, but the form itself needs the value/label pairs
-// to build its own <select>.
-const ROLE_OPTIONS: { value: Contact['role']; label: string }[] = [
-  { value: 'executive_sponsor', label: 'Executive Sponsor' },
-  { value: 'champion', label: 'Champion' },
-  { value: 'economic_buyer', label: 'Economic Buyer' },
-  { value: 'technical_lead', label: 'Technical Lead' },
-  { value: 'decision_maker', label: 'Decision Maker' },
-  { value: 'influencer', label: 'Influencer' },
-  { value: 'finance_manager', label: 'Finance Manager' },
-  { value: 'other', label: 'Other' },
-];
+// Contact.Role on the backend, shared with the Contacts page's role filter.
+const ROLE_OPTIONS = CONTACT_ROLES;
 
 interface ContactFormModalProps {
   /** Present for Edit, omitted for Add. */
