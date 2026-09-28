@@ -148,6 +148,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
 
   // The chips' numbers follow the tab (spec 2026-09-27 §1).
   const chipCounts = useChipCounts(params.tab, story.data?.counts.by_account ?? null, accounts);
+  const showAll = useCallback(() => update({ account: '' }), [update]);
 
   const [editing, setEditing] = useState(false);
   const [churning, setChurning] = useState(false);
@@ -299,7 +300,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
                 <TabSkeleton label="Loading details" />
               )
             ) : key === 'people' ? (
-              <PeopleTab customerId={orgId} />
+              <PeopleTab customerId={orgId} account={params.account} accounts={accounts} isSm={isSm} onShowAll={showAll} />
             ) : key === 'deals' ? (
               <DealsTab customerId={orgId} />
             ) : key === 'knowledge' ? (
