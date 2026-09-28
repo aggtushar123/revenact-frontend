@@ -74,6 +74,18 @@ describe('ContactsToolbar (spec 2026-09-28 §3)', () => {
     expect(screen.getByLabelText('Search people')).toHaveValue('');
   });
 
+  it('shows a visible label above each filter select, tied to it (house rule §4.8, fix round 1)', () => {
+    stubContactsApi();
+    renderToolbar();
+    for (const name of ['Organisation', 'Account', 'Sentiment', 'Role']) {
+      const select = screen.getByLabelText(name);
+      const label = screen.getByText(name, { selector: 'label' });
+      expect(label).not.toHaveClass('sr-only');
+      expect(label).toHaveClass('uppercase', 'text-ink-muted');
+      expect(label).toHaveAttribute('for', select.id);
+    }
+  });
+
   it('+ Add opens the form; every control is a 44px target on phones', async () => {
     stubContactsApi();
     const { onAdd } = renderToolbar();

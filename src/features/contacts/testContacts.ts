@@ -86,7 +86,7 @@ export const LUKAS_HISTORY: ContactHistory = {
   sentiment: 'neutral',
   sentiment_source: 'computed',
   sentiment_evidence: LUKAS.sentiment_evidence,
-  counts: { calls: 3, emails: 2, tickets: 1 },
+  counts: { calls: 3, emails: 2, tickets: 2 },
   calls: [
     {
       id: 71,
@@ -174,6 +174,21 @@ export const LUKAS_HISTORY: ContactHistory = {
       organisation: KRAFT,
       account: null,
       link: { url: 'https://kraft.zendesk.example/t/1042' },
+    },
+    {
+      id: 8,
+      ticket_number: 'ZD-1050',
+      title: 'Invoice mismatch',
+      status: 'open',
+      status_display: 'Open',
+      department_display: 'Billing',
+      opened_at: '2026-09-08',
+      analysis: 'not_analysable',
+      sentiment: null,
+      classification: NO_CLASS,
+      organisation: KRAFT,
+      account: null,
+      link: { url: null },
     },
   ],
 };

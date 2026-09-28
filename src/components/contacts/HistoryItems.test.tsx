@@ -72,4 +72,12 @@ describe('HistoryEmailItem and HistoryTicketItem', () => {
     for (const text of ['Open', '10 Sep 2026', 'Kraft Heinz']) expect(within(item).getByText(text)).toBeInTheDocument();
     expect(within(item).getByRole('link', { name: 'Open ticket' })).toHaveAttribute('href', 'https://kraft.zendesk.example/t/1042');
   });
+
+  it("a ticket with a department: shows \"Department · Status\" (fix round 1)", () => {
+    const withDept = LUKAS_HISTORY.tickets.find((t) => t.department_display);
+    expect(withDept).toBeDefined();
+    const item = inList(<HistoryTicketItem ticket={withDept!} />);
+    expect(within(item).getByText('Billing · Open')).toBeInTheDocument();
+    expect(within(item).queryByText('Open', { exact: true })).toBeNull();
+  });
 });

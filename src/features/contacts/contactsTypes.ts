@@ -69,6 +69,9 @@ export interface HistoryTicket extends HistoryRow {
   title: string;
   status: string;
   status_display: string;
+  /** Optional: a response from before the ticket connectors carried a
+   *  department reads as null/undefined, and the row shows status alone. */
+  department_display?: string | null;
   opened_at: string;
   link: { url: string | null };
 }

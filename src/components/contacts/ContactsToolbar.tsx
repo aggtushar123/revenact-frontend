@@ -26,8 +26,8 @@ function Select({
 }) {
   const id = useId();
   return (
-    <div className="min-w-0">
-      <label htmlFor={id} className="sr-only">
+    <div className="flex min-w-0 flex-col gap-1">
+      <label htmlFor={id} className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
         {label}
       </label>
       <select id={id} value={value} disabled={disabled} onChange={(event) => onChange(event.target.value)} className={SELECT}>

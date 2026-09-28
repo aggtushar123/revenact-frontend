@@ -142,7 +142,7 @@ export function HistoryTicketItem({ ticket }: { ticket: HistoryTicket }) {
           <When iso={ticket.opened_at} />
         </div>
         <p className={META}>
-          <span>{ticket.status_display}</span>
+          <span>{ticket.department_display ? `${ticket.department_display} · ${ticket.status_display}` : ticket.status_display}</span>
           <Reading record={ticket} />
           <Place organisation={ticket.organisation} account={ticket.account} />
           <Classified classification={ticket.classification} />
