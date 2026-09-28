@@ -9,20 +9,27 @@ export function CountChip({
   count,
   pressed,
   onClick,
+  dimmed = false,
+  describedBy,
 }: {
   label: string;
   /** Null until the story has counted: the chip shows no number. */
   count: number | null;
   pressed: boolean;
   onClick: () => void;
+  /** Muted ink, and the chosen one outlined rather than filled: the chip
+   *  still works but filters nothing here. */
+  dimmed?: boolean;
+  /** The id of a note that says why the chip is dimmed. */
+  describedBy?: string;
 }) {
+  const look = dimmed
+    ? `${pressed ? 'border-accent' : 'border-line'} bg-surface text-ink-muted hover:bg-subtle active:bg-line-subtle`
+    : pressed
+      ? 'border-accent bg-accent text-on-accent'
+      : 'border-line bg-surface text-ink hover:bg-subtle active:bg-line-subtle';
   return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={`${CHIP} ${pressed ? 'border-accent bg-accent text-on-accent' : 'border-line bg-surface text-ink hover:bg-subtle active:bg-line-subtle'}`}
-    >
+    <button type="button" aria-pressed={pressed} aria-describedby={describedBy} onClick={onClick} className={`${CHIP} ${look}`}>
       <span className="max-w-[12rem] truncate">{label}</span>
       {count == null ? null : (
         <>

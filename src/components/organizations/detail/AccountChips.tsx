@@ -1,10 +1,12 @@
+import { useId } from 'react';
 import { Pencil } from 'lucide-react';
 import type { Account } from '../../../features/customers/customersSlice';
 import { QUIET } from '../portfolio/styles';
 import { CountChip } from './CountChip';
 
 /** The account chips (spec §1.4, and 2026-09-27 §1): All, each account and
- *  the organization itself, numbered by the active tab's counts (the story's
+ *  the organization itself (always, 0 where it has nothing, so the row is the
+ *  same on every tab; owner 2026-09-28), numbered by the active tab's counts (the story's
  *  `counts.by_account` on Story; the lists' own on People, Deals & risks and
  *  Files). The chips stay name plus count; account figures live on the
  *  Details tab's Accounts section. With an account chosen the row ends with
@@ -13,11 +15,12 @@ export function AccountChips({
   accounts,
   loading,
   error,
-  counts,
+  counts: allCounts,
   selected,
   onSelect,
   onRetry,
   onEdit,
+  applies = true,
 }: {
   accounts: Account[];
   loading: boolean;
@@ -30,7 +33,13 @@ export function AccountChips({
   onSelect: (value: string) => void;
   onRetry: () => void;
   onEdit: (account: Account) => void;
+  /** False on Details and Knowledge (owner, 2026-09-28): the row stays so
+   *  nothing jumps, dimmed and without numbers, with a note tied to each
+   *  chip. A press there still moves the remembered `?account=`. */
+  applies?: boolean;
 }) {
+  const noteId = useId();
+  const counts = applies ? allCounts : null;
   const total = counts ? (counts.all ?? 0) : null;
   const orgCount = counts?.none ?? 0;
   const current = accounts.find((account) => String(account.id) === selected) ?? null;
@@ -43,9 +52,18 @@ export function AccountChips({
   const chip = (value: string, label: string, n: number | null) => {
     const pressed = selected === value;
     return (
-      <CountChip key={value || 'all'} label={label} count={n} pressed={pressed} onClick={() => onSelect(pressed && value ? '' : value)} />
+      <CountChip
+        key={value || 'all'}
+        label={label}
+        count={n}
+        pressed={pressed}
+        onClick={() => onSelect(pressed && value ? '' : value)}
+        dimmed={!applies}
+        describedBy={applies ? undefined : noteId}
+      />
     );
   };
+  const hasChips = !error && accounts.length > 0;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -70,10 +88,16 @@ export function AccountChips({
           <>
             {chip('', 'All', total)}
             {shown.map((account) => chip(String(account.id), account.name, counts ? (counts[String(account.id)] ?? 0) : null))}
-            {orgCount > 0 || selected === 'none' ? chip('none', 'Organization', counts ? orgCount : null) : null}
+            {/* Always shown (0 where empty), so the row is the same on every tab. */}
+            {chip('none', 'Organization', counts ? orgCount : null)}
           </>
         ) : null}
       </div>
+      {!applies && hasChips ? (
+        <span id={noteId} className="text-[13px] text-ink-muted">
+          Details and Knowledge cover the whole organization
+        </span>
+      ) : null}
       {current ? (
         <button type="button" onClick={() => onEdit(current)} className={QUIET}>
           <Pencil className="h-4 w-4" aria-hidden="true" />

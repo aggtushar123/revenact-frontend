@@ -248,18 +248,19 @@ function OrganizationPage({ id }: { id: string | undefined }) {
           </div>
         ) : null}
 
-        {ACCOUNT_TABS.has(tab) ? (
-          <AccountChips
-            accounts={accounts}
-            loading={accountsBusy}
-            error={accountsFailure}
-            counts={chipCounts}
-            selected={params.account}
-            onSelect={(account) => update({ account })}
-            onRetry={() => setAccountsAttempt((n) => n + 1)}
-            onEdit={setEditingAccount}
-          />
-        ) : null}
+        {/* On every tab, so nothing jumps (owner, 2026-09-28); dimmed on
+            Details and Knowledge, which cover the whole organization. */}
+        <AccountChips
+          accounts={accounts}
+          loading={accountsBusy}
+          error={accountsFailure}
+          counts={chipCounts}
+          selected={params.account}
+          onSelect={(account) => update({ account })}
+          onRetry={() => setAccountsAttempt((n) => n + 1)}
+          onEdit={setEditingAccount}
+          applies={ACCOUNT_TABS.has(tab)}
+        />
 
         <DetailTabs idBase={idBase} active={tab} onChange={(next) => update({ tab: next })} />
 

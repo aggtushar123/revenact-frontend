@@ -145,7 +145,10 @@ describe('the organization page (/organizations/:id)', () => {
     expect(chips.compareDocumentPosition(screen.getByRole('tablist'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     for (const whole of ['Details', 'Knowledge']) {
       await userEvent.click(screen.getByRole('tab', { name: whole }));
-      expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+      // Still there, dimmed, the choice kept (owner 2026-09-28).
+      const kept = screen.getByRole('group', { name: 'Filter by account' });
+      expect(within(kept).getByRole('button', { name: 'EMEA' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByText('Details and Knowledge cover the whole organization')).toBeInTheDocument();
     }
     expect(where().searchParams.get('account')).toBe('31');
   });
@@ -160,7 +163,7 @@ describe('the organization page (/organizations/:id)', () => {
     const facts = within(panel).getByRole('region', { name: 'Contact and CSAT' });
     expect(await within(facts).findByText('No CSAT survey has been answered yet.')).toBeInTheDocument();
     expect(within(panel).getByRole('region', { name: 'AI attributes' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+    expect(screen.getByText('Details and Knowledge cover the whole organization')).toBeInTheDocument();
     expect(storyQueries(spy)).toHaveLength(0);
     await userEvent.click(screen.getByRole('tab', { name: 'Story' }));
     await waitFor(() => expect(storyQueries(spy)).toHaveLength(1));
@@ -311,7 +314,8 @@ describe('the organization page (/organizations/:id)', () => {
     await waitFor(() => expect(within(section).getAllByRole('listitem')).toHaveLength(2));
     expect(within(section).getByRole('link', { name: 'EMEA' })).toHaveAttribute('href', '/accounts/31');
     expect(within(section).getByText('Usage is steady and the renewal talks are friendly.')).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+    // The chips stay above the tabs, dimmed (owner 2026-09-28).
+    expect(screen.getByRole('group', { name: 'Filter by account' })).toBeInTheDocument();
     await userEvent.click(within(section).getByRole('button', { name: 'Edit EMEA' }));
     expect(screen.getByRole('heading', { name: 'Edit EMEA' })).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));

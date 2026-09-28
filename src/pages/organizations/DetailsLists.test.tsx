@@ -64,7 +64,54 @@ describe('the organization page, delivery 2: the lists and the account chips', (
     await userEvent.click(screen.getByRole('tab', { name: 'Story' }));
     expect(chip('EMEA 1')).toBeInTheDocument();
     await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
-    expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+    // Dimmed there (owner 2026-09-28): names only, no numbers.
+    expect(chip('EMEA')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('keeps the chip row on every tab, dimmed on Details and Knowledge, and filters People again after them (owner 2026-09-28)', async () => {
+    stubOrganizationPage({ lists: ORGANIZATION_LISTS });
+    renderOrganizationPage('/organizations/7?account=31');
+    await screen.findByRole('heading', { level: 1, name: 'Pizza Hut' });
+    // One element across every switch, so nothing shifts.
+    const row = chips();
+    // A chip's name is its first span; the count, where shown, follows it.
+    const names = () => within(row).getAllByRole('button').map((b) => b.firstElementChild?.textContent ?? '');
+    const namesByTab: string[][] = [];
+    const note = () => screen.queryByText('Details and Knowledge cover the whole organization');
+    for (const tab of ['Story', 'Details', 'People', 'Deals & risks', 'Knowledge', 'Files']) {
+      await userEvent.click(screen.getByRole('tab', { name: tab }));
+      expect(chips()).toBe(row);
+      namesByTab.push(names());
+      const whole = tab === 'Details' || tab === 'Knowledge';
+      if (whole) {
+        expect(note()).toBeInTheDocument();
+        expect(within(row).getAllByRole('button').map((b) => b.textContent)).toEqual(['All', 'EMEA', 'North America', 'Organization']);
+        for (const button of within(row).getAllByRole('button')) {
+          expect(button).toHaveClass('text-ink-muted');
+          expect(button).toHaveAttribute('aria-describedby', note()!.id);
+        }
+        expect(where().searchParams.get('account')).toBe('31');
+        // The row's own Edit (Details lists the accounts with theirs too).
+        expect(within(row.parentElement!).getByRole('button', { name: 'Edit EMEA' })).toBeEnabled();
+      } else {
+        expect(note()).not.toBeInTheDocument();
+        for (const button of within(row).getAllByRole('button')) expect(button).not.toHaveAttribute('aria-describedby');
+      }
+    }
+    // The same chips, by name, on all six tabs: Organization never drops out.
+    expect(namesByTab).toHaveLength(6);
+    for (const tabNames of namesByTab) expect(tabNames).toEqual(['All', 'EMEA', 'North America', 'Organization']);
+
+    // Choosing on Knowledge moves the remembered account; People filters by it.
+    await userEvent.click(screen.getByRole('tab', { name: 'Knowledge' }));
+    await userEvent.click(within(row).getByRole('button', { name: 'North America' }));
+    expect(where().searchParams.get('account')).toBe('32');
+    expect(within(row).getByRole('button', { name: 'North America' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }));
+    const people = screen.getByRole('tabpanel', { name: 'People' });
+    expect(await within(people).findByRole('heading', { name: 'Sam Admin' })).toBeInTheDocument();
+    expect(within(people).queryByRole('heading', { name: 'Dana Buyer' })).not.toBeInTheDocument();
+    await waitFor(() => expect(chip('North America 1')).toHaveAttribute('aria-pressed', 'true'));
   });
 
   it('adds, edits and deletes on People after Files was visited: both tabs stay right, and the chips count each change', async () => {
