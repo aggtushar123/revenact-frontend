@@ -1,19 +1,50 @@
+import { useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
-import { makeDetailStore } from '../../../pages/organizations/testDetail';
-import { DealsTab } from './DealsTab';
+import { fetchOpportunitiesForCustomer, fetchRisksForCustomer } from '../../features/customers/customersSlice';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { makeDetailStore } from '../../pages/organizations/testDetail';
+import { PipelinesTab } from './PipelinesTab';
 
-// These tests lived in the old organization page's test, under its Pipelines
-// tab. Deals & risks keeps that content in delivery 1 (spec §4), so they
-// render DealsTab directly; it reads opportunities and risks when opened.
+// These tests pinned the organization page's Deals & risks tab while it
+// rendered this shared tab (delivery 1). The account page still renders
+// PipelinesTab, so they stay here, on a harness that reads one
+// organization's opportunities and risks the way the old tab did.
+function Harness({ customerId }: { customerId: number }) {
+  const dispatch = useAppDispatch();
+  const {
+    pipelineOpportunities,
+    pipelineOpportunitiesLoading,
+    pipelineOpportunitiesError,
+    pipelineRisks,
+    pipelineRisksLoading,
+    pipelineRisksError,
+  } = useAppSelector((state) => state.customers);
+  useEffect(() => {
+    dispatch(fetchOpportunitiesForCustomer(customerId));
+    dispatch(fetchRisksForCustomer(customerId));
+  }, [dispatch, customerId]);
+  return (
+    <PipelinesTab
+      opportunities={pipelineOpportunities}
+      opportunitiesLoading={pipelineOpportunitiesLoading}
+      opportunitiesError={pipelineOpportunitiesError}
+      risks={pipelineRisks}
+      risksLoading={pipelineRisksLoading}
+      risksError={pipelineRisksError}
+      customerId={customerId}
+    />
+  );
+}
+
 function renderDeals() {
   render(
     <Provider store={makeDetailStore()}>
       <MemoryRouter>
-        <DealsTab customerId={10} />
+        <Harness customerId={10} />
       </MemoryRouter>
     </Provider>,
   );

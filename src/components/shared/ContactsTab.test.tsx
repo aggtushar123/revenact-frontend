@@ -1,19 +1,32 @@
+import { useEffect } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
-import { makeDetailStore } from '../../../pages/organizations/testDetail';
-import { PeopleTab } from './PeopleTab';
+import { fetchContactsForCustomer } from '../../features/customers/customersSlice';
+import { useAppDispatch, useAppSelector } from '../../hooks';
+import { makeDetailStore } from '../../pages/organizations/testDetail';
+import { ContactsTab } from './ContactsTab';
 
-// These tests lived in the old organization page's test, under its Contacts
-// tab. People keeps that content in delivery 1 (spec §4), so they render
-// PeopleTab directly; it reads the contacts itself when opened.
+// These tests pinned the organization page's People tab while it rendered
+// this shared tab (delivery 1). Delivery 2 gives that page its own list; the
+// account page still renders ContactsTab, so they stay here, on a harness
+// that reads one organization's contacts the way the old People tab did.
+function Harness({ customerId }: { customerId: number }) {
+  const dispatch = useAppDispatch();
+  const { contacts, contactsLoading, contactsError } = useAppSelector((state) => state.customers);
+  useEffect(() => {
+    dispatch(fetchContactsForCustomer(customerId));
+  }, [dispatch, customerId]);
+  return <ContactsTab contacts={contacts} isLoading={contactsLoading} error={contactsError} customerId={customerId} />;
+}
+
 function renderPeople() {
   render(
     <Provider store={makeDetailStore()}>
       <MemoryRouter>
-        <PeopleTab customerId={10} />
+        <Harness customerId={10} />
       </MemoryRouter>
     </Provider>,
   );
