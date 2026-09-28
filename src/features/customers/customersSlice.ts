@@ -4,6 +4,7 @@ import type { UserFunction } from '../auth/authSlice';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import { listScope } from '../../lib/listScope';
 import type { User, CurrencyCode } from '../auth/authSlice';
+import type { ContactHistory, ContactsPage, ContactsSummary } from '../contacts/contactsTypes';
 
 // Mirrors revenact-backend's CustomerSerializer field-for-field — see
 // revenact-backend/docs/API_CONTRACTS.md -> customers. One of a *tenant's*
@@ -869,6 +870,12 @@ interface CustomersState {
   allContactsPrevious: string | null;
   allContactsLoading: boolean;
   allContactsError: string | null;
+  /** Over the whole filtered set; null until a read lands. */
+  allContactsSummary: ContactsSummary | null;
+  /** The last list read asked for: a slower, earlier one never lands. */
+  allContactsRequestId?: string;
+  allContactsLoadingMore: boolean;
+  allContactsMoreError: string | null;
   /** Total/Active/Sentiment/Growth rollups for the standalone
    * /contacts/list page's MetricsPanel — null until the first fetch
    * resolves, same reasoning as `stats` (Customer's own). */
@@ -883,6 +890,12 @@ interface CustomersState {
   selectedContactError: string | null;
   selectedContactInteractions: ContactInteractions | null;
   selectedContactInteractionsLoading: boolean;
+  selectedContactRequestId?: string;
+  /** Their calls, emails and tickets (GET /contacts/<id>/history/). */
+  selectedContactHistory: ContactHistory | null;
+  selectedContactHistoryLoading: boolean;
+  selectedContactHistoryError: string | null;
+  selectedContactHistoryRequestId?: string;
   /** Every Opportunity the caller's organisation owns — the standalone
    * Pipelines board's own "Opportunities" tab, unpaginated (a Kanban
    * board needs every card in every column at once, see
@@ -1023,6 +1036,9 @@ const initialState: CustomersState = {
   allContactsPrevious: null,
   allContactsLoading: false,
   allContactsError: null,
+  allContactsSummary: null,
+  allContactsLoadingMore: false,
+  allContactsMoreError: null,
   contactStats: null,
   contactStatsLoading: false,
   contactStatsError: null,
@@ -1031,6 +1047,9 @@ const initialState: CustomersState = {
   selectedContactError: null,
   selectedContactInteractions: null,
   selectedContactInteractionsLoading: false,
+  selectedContactHistory: null,
+  selectedContactHistoryLoading: false,
+  selectedContactHistoryError: null,
   opportunities: [],
   opportunitiesLoading: false,
   opportunitiesError: null,
@@ -1520,19 +1539,10 @@ export const fetchContactsForAccount = createAsyncThunk<
   }
 );
 
-interface ContactsPage {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Contact[];
-}
-
-// Powers the standalone /contacts/list page — spans every Customer/
-// Account the tenant owns, unlike the two entity-scoped thunks above.
-// Same "raw path in, paginated page out" shape as fetchCustomers: pass
-// a full `/contacts/?search=...&company=...` path for a fresh
-// filtered fetch, or one of the response's own next/previous links to
-// page through it, same reasoning as fetchCustomers's own docstring.
+// Powers the Contacts page (/contacts) — spans every Customer/Account the
+// viewer may open, unlike the two entity-scoped thunks above. Pass a full
+// `/contacts/?search=...&customer=...` path (contactsApiPath) for a fresh
+// filtered read; loadMoreContacts appends the response's `next` page.
 export const fetchAllContacts = createAsyncThunk<ContactsPage, string | void, { rejectValue: string }>(
   'customers/fetchAllContacts',
   async (url, { rejectWithValue }) => {
@@ -1570,14 +1580,47 @@ export const fetchContactInteractions = createAsyncThunk<ContactInteractions, nu
   }
 );
 
+/** The next page of the Contacts list (a response's own `next` link), appended. */
+export const loadMoreContacts = createAsyncThunk<ContactsPage, string, { rejectValue: string }>(
+  'customers/loadMoreContacts',
+  async (next, { rejectWithValue }) => {
+    try {
+      return await apiFetch<ContactsPage>(next);
+    } catch (err) {
+      return rejectWithValue(err instanceof ApiError ? err.message : 'Could not load more people.');
+    }
+  }
+);
+
+/** What a 404 on a person means: they are gone, or on an account this
+ *  viewer cannot open (the backend answers both the same way). */
+export const CONTACT_NOT_FOUND = 'This person is not here. They may have been deleted, or they are on an account you cannot open.';
+
+function contactReadError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.status === 404) return CONTACT_NOT_FOUND;
+  return err instanceof ApiError ? err.message : fallback;
+}
+
+// Powers the Contacts page's profile (/contacts/:id).
 export const fetchContactById = createAsyncThunk<Contact, number, { rejectValue: string }>(
   'customers/fetchContactById',
   async (id, { rejectWithValue }) => {
     try {
       return await apiFetch<Contact>(`/contacts/${id}/`);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Could not load this contact.';
-      return rejectWithValue(message);
+      return rejectWithValue(contactReadError(err, 'Could not load this contact.'));
+    }
+  }
+);
+
+/** A person's calls, emails and tickets, each under its own record rule. */
+export const fetchContactHistory = createAsyncThunk<ContactHistory, number, { rejectValue: string }>(
+  'customers/fetchContactHistory',
+  async (id, { rejectWithValue }) => {
+    try {
+      return await apiFetch<ContactHistory>(`/contacts/${id}/history/`);
+    } catch (err) {
+      return rejectWithValue(contactReadError(err, 'Could not load their calls, emails and tickets.'));
     }
   }
 );
@@ -2710,20 +2753,45 @@ const customersSlice = createSlice({
         state.contactsLoading = false;
         state.contactsError = action.payload ?? 'Could not load contacts.';
       })
-      .addCase(fetchAllContacts.pending, (state) => {
+      .addCase(fetchAllContacts.pending, (state, action) => {
+        state.allContactsRequestId = action.meta.requestId;
         state.allContactsLoading = true;
         state.allContactsError = null;
+        state.allContactsLoadingMore = false;
+        state.allContactsMoreError = null;
       })
       .addCase(fetchAllContacts.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.allContactsRequestId) return;
         state.allContactsLoading = false;
         state.allContacts = action.payload.results;
         state.allContactsCount = action.payload.count;
         state.allContactsNext = action.payload.next;
         state.allContactsPrevious = action.payload.previous;
+        state.allContactsSummary = action.payload.summary ?? null;
       })
       .addCase(fetchAllContacts.rejected, (state, action) => {
+        if (action.meta.requestId !== state.allContactsRequestId) return;
         state.allContactsLoading = false;
         state.allContactsError = action.payload ?? 'Something went wrong.';
+      })
+      .addCase(loadMoreContacts.pending, (state) => {
+        state.allContactsLoadingMore = true;
+        state.allContactsMoreError = null;
+      })
+      // A page lands only on the list it continues: not while a fresh read
+      // is on its way, and not after one replaced the list.
+      .addCase(loadMoreContacts.fulfilled, (state, action) => {
+        if (state.allContactsLoading || state.allContactsNext !== action.meta.arg) return;
+        state.allContactsLoadingMore = false;
+        const seen = new Set(state.allContacts.map((c) => c.id));
+        state.allContacts.push(...action.payload.results.filter((c) => !seen.has(c.id)));
+        state.allContactsCount = action.payload.count;
+        state.allContactsNext = action.payload.next;
+      })
+      .addCase(loadMoreContacts.rejected, (state, action) => {
+        if (state.allContactsNext !== action.meta.arg) return;
+        state.allContactsLoadingMore = false;
+        state.allContactsMoreError = action.payload ?? 'Could not load more people.';
       })
       .addCase(fetchContactStats.pending, (state) => {
         state.contactStatsLoading = true;
@@ -2748,19 +2816,38 @@ const customersSlice = createSlice({
         state.selectedContactInteractionsLoading = false;
         state.selectedContactInteractions = null;
       })
-      .addCase(fetchContactById.pending, (state) => {
+      .addCase(fetchContactById.pending, (state, action) => {
+        state.selectedContactRequestId = action.meta.requestId;
         state.selectedContactLoading = true;
         state.selectedContactError = null;
         // Cleared, not left stale — same reasoning as fetchCustomerById.
         state.selectedContact = null;
       })
       .addCase(fetchContactById.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.selectedContactRequestId) return;
         state.selectedContactLoading = false;
         state.selectedContact = action.payload;
       })
       .addCase(fetchContactById.rejected, (state, action) => {
+        if (action.meta.requestId !== state.selectedContactRequestId) return;
         state.selectedContactLoading = false;
         state.selectedContactError = action.payload ?? 'Could not load this contact.';
+      })
+      .addCase(fetchContactHistory.pending, (state, action) => {
+        state.selectedContactHistoryRequestId = action.meta.requestId;
+        state.selectedContactHistoryLoading = true;
+        state.selectedContactHistoryError = null;
+        state.selectedContactHistory = null;
+      })
+      .addCase(fetchContactHistory.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.selectedContactHistoryRequestId) return;
+        state.selectedContactHistoryLoading = false;
+        state.selectedContactHistory = action.payload;
+      })
+      .addCase(fetchContactHistory.rejected, (state, action) => {
+        if (action.meta.requestId !== state.selectedContactHistoryRequestId) return;
+        state.selectedContactHistoryLoading = false;
+        state.selectedContactHistoryError = action.payload ?? 'Could not load their calls, emails and tickets.';
       })
       // updateContact/deleteContact patch every list a Contact could be
       // showing in (`contacts`, `allContacts`, `selectedContact`) rather

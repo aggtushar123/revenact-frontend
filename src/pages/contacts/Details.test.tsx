@@ -119,7 +119,8 @@ describe('Contact Details page (/contacts/:id)', () => {
 
     renderPage();
 
-    expect(await screen.findByText('Not found.')).toBeInTheDocument();
+    // A 404 now reads as "not here, or not yours to open" (CONTACT_NOT_FOUND).
+    expect(await screen.findByText(/This person is not here/)).toBeInTheDocument();
   });
 
   it('clicking the company opens that organization\'s page', async () => {
