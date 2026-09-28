@@ -155,7 +155,14 @@ export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: numb
       <section aria-label="Sentiment" className="flex items-start gap-2 text-[13px] text-ink">
         <span aria-hidden="true" className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${SENTIMENT_DOT[history.sentiment]}`} />
         <div className="flex min-w-0 flex-col gap-0.5">
-          <p>{sentimentWhy(history.sentiment, history.sentiment_source, history.sentiment_evidence)}</p>
+          <p>
+            {sentimentWhy(
+              history.sentiment,
+              history.sentiment_source,
+              history.sentiment_evidence,
+              history.calls.filter((call) => call.analysis === 'analysed').length,
+            )}
+          </p>
           <p className={META}>
             <span>{contact.last_contacted_at ? `Last contacted ${formatRelativeTime(contact.last_contacted_at)}` : 'Not contacted yet'}</span>
             {history.sentiment_source === 'computed' && contact.sentiment_computed_at ? (

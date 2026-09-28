@@ -15,7 +15,14 @@ import {
   toContactsSearch,
   type ContactsParams,
 } from '../../features/contacts/contactsParams';
-import { fetchAllContacts, fetchCustomers, loadMoreContacts, refreshContactsSummary } from '../../features/customers/customersSlice';
+import { ErrorState } from '../dashboard/shared/DataState';
+import {
+  CONTACT_NOT_FOUND,
+  fetchAllContacts,
+  fetchCustomers,
+  loadMoreContacts,
+  refreshContactsSummary,
+} from '../../features/customers/customersSlice';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { MD, SM, useMediaQuery } from '../../lib/useMediaQuery';
 import { ContactsFrame } from './ContactsFrame';
@@ -38,6 +45,8 @@ export function ContactsPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const selectedId = id && /^[1-9]\d*$/.test(id) ? Number(id) : null;
+  // /contacts/abc: an id no person can have reads as not found, not as "Choose a person".
+  const badId = id !== undefined && selectedId === null;
   const isMd = useMediaQuery(MD);
   const isSm = useMediaQuery(SM);
   const [search, setSearch] = useSearchParams();
@@ -108,23 +117,26 @@ export function ContactsPage() {
       }}
     />
   );
-  const profile =
-    selectedId !== null ? (
-      <ContactProfile
-        key={selectedId}
-        id={selectedId}
-        onDeleted={() => {
-          navigate(listPath);
-          setRefresh((n) => n + 1);
-        }}
-        onSaved={() => void dispatch(refreshContactsSummary(apiPath))}
-      />
-    ) : (
-      <EmptyState title="Choose a person" detail="Their sentiment and why, and their calls, emails and tickets, show here." action={null} />
-    );
+  const profile = badId ? (
+    <div className="rounded-xl bg-surface">
+      <ErrorState message="Could not open this person" detail={CONTACT_NOT_FOUND} />
+    </div>
+  ) : selectedId !== null ? (
+    <ContactProfile
+      key={selectedId}
+      id={selectedId}
+      onDeleted={() => {
+        navigate(listPath);
+        setRefresh((n) => n + 1);
+      }}
+      onSaved={() => void dispatch(refreshContactsSummary(apiPath))}
+    />
+  ) : (
+    <EmptyState title="Choose a person" detail="Their sentiment and why, and their calls, emails and tickets, show here." action={null} />
+  );
 
   let body;
-  if (!isMd && selectedId !== null) {
+  if (!isMd && (selectedId !== null || badId)) {
     body = (
       <div className="flex flex-col gap-2 pb-4">
         <Link to={listPath} className={BACK}>

@@ -233,6 +233,8 @@ export interface ContactsStub {
   failList?: number;
   /** How many history reads fail (500) before they succeed. */
   failHistory?: number;
+  /** Organisations past the first page of /customers/, found by id. */
+  moreCustomers?: { id: number; name: string }[];
   /** The summary's `growth_30d_pct`; left out of it when not given. */
   growth?: number | null;
 }
@@ -320,6 +322,12 @@ export function stubContactsApi(stub: ContactsStub = {}) {
 
     if (path === '/customers/') {
       return json(200, { count: CUSTOMERS.length, next: null, previous: null, results: CUSTOMERS });
+    }
+
+    const customer = /^\/customers\/(\d+)\/$/.exec(path);
+    if (customer) {
+      const found = [...CUSTOMERS, ...(stub.moreCustomers ?? [])].find((c) => c.id === Number(customer[1]));
+      return found ? json(200, found) : json(404, { detail: 'Not found.' });
     }
 
     const accounts = /^\/customers\/(\d+)\/accounts\/$/.exec(path);

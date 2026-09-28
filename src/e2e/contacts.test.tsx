@@ -40,8 +40,10 @@ describe('Contacts, end to end (spec 2026-09-28 §7)', () => {
     expect(within(calls[0]).getByText('Positive')).toBeInTheDocument();
     expect(within(calls[1]).getByText('Not enough to analyse')).toBeInTheDocument();
 
-    // 4. The account link opens the organisation page with that account's chip chosen.
-    await userEvent.click(within(profile).getByRole('link', { name: 'Kraft Heinz EMEA' }));
-    expect(where()).toBe('/organizations/6?account=31');
+    // 4. The account link opens the organisation page with that account's
+    //    chip chosen; following the organisation link opens its page.
+    expect(within(profile).getByRole('link', { name: 'Kraft Heinz EMEA' })).toHaveAttribute('href', '/organizations/6?account=31');
+    await userEvent.click(within(profile).getByRole('link', { name: 'Kraft Heinz' }));
+    expect(where()).toBe('/organizations/6');
   });
 });

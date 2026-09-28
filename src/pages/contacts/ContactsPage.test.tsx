@@ -168,6 +168,24 @@ describe('Contacts page (spec 2026-09-28 §3)', () => {
     expect(document.querySelector('[data-part="column"]')).toHaveClass('mx-auto', 'w-full', 'max-w-[1800px]');
   });
 
+  it('the old /contacts/list keeps its query string', async () => {
+    stubContactsApi();
+    renderContactsPage('/contacts/list?role=champion&q=luk');
+    await screen.findByRole('list', { name: 'People' });
+    expect(where()).toBe('/contacts?role=champion&q=luk');
+  });
+
+  it('/contacts/abc is not a person: the designed not-found state, and nothing is asked for it', async () => {
+    const spy = stubContactsApi();
+    renderContactsPage('/contacts/abc');
+    await screen.findByRole('list', { name: 'People' });
+    const profile = within(screen.getByRole('region', { name: 'Profile' }));
+    expect(profile.getByRole('alert')).toHaveTextContent('Could not open this person');
+    expect(profile.getByRole('alert')).toHaveTextContent('This person is not here.');
+    expect(profile.queryByText('Choose a person')).toBeNull();
+    expect(requested(spy).some((path) => path.startsWith('/contacts/abc'))).toBe(false);
+  });
+
   it('the old /contacts/list lands on /contacts', async () => {
     stubContactsApi();
     renderContactsPage('/contacts/list');
@@ -188,6 +206,14 @@ describe('Contacts page on phones (spec 2026-09-28 §3)', () => {
     await screen.findByRole('list', { name: 'People' });
     expect(screen.queryByRole('region', { name: 'Profile' })).toBeNull();
     expect(screen.queryByText('Choose a person')).toBeNull();
+  });
+
+  it('/contacts/abc on a phone is the not-found screen with the back link', async () => {
+    stubContactsApi();
+    renderContactsPage('/contacts/abc', { width: 375 });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not open this person');
+    expect(screen.getByRole('link', { name: 'Contacts' })).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'People' })).toBeNull();
   });
 
   it('a person opens as their own screen, with a back link that keeps the filters', async () => {

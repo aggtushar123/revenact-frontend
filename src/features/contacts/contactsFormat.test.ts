@@ -70,9 +70,14 @@ describe('contactsFormat (spec 2026-09-28 §3, §5)', () => {
     expect(sentimentWhy('positive', 'computed', { ...EVIDENCE, calls: 1, emails: 1, tickets: 1, latest_at: null })).toBe(
       'Positive: 3 positive · 2 neutral · 1 negative across 1 call, 1 email and 1 ticket',
     );
-    expect(sentimentWhy('negative', 'manual', {})).toBe('Negative, set by hand. Nothing of theirs has been analysed yet.');
+    // Set by hand: it never claims nothing was analysed, and says their
+    // analysed calls are read again tonight.
+    expect(sentimentWhy('negative', 'manual', {})).toBe('Negative. Set by hand.');
+    expect(sentimentWhy('negative', 'manual', {}, 2)).toBe('Negative. Set by hand; their calls will be read again tonight.');
+    expect(sentimentWhy('negative', 'manual', EVIDENCE, 1)).not.toMatch(/nothing/i);
+    // Computed, but from nothing: not "set by hand".
     expect(sentimentWhy('neutral', 'computed', { ...EVIDENCE, calls: 0, emails: 0 })).toBe(
-      'Neutral, set by hand. Nothing of theirs has been analysed yet.',
+      'Neutral. Nothing of theirs has been analysed yet.',
     );
   });
 

@@ -846,6 +846,9 @@ interface CustomersState {
   allContactsPath?: string;
   allContactsLoadingMore: boolean;
   allContactsMoreError: string | null;
+  /** The Load more in flight for the list on screen; cleared when the list
+   *  is read again or someone is deleted, so its late page never lands. */
+  allContactsMoreRequestId?: string;
   /** The person the Contacts page's profile shows (/contacts/:id). */
   selectedContact: Contact | null;
   selectedContactLoading: boolean;
@@ -2700,6 +2703,7 @@ const customersSlice = createSlice({
       .addCase(fetchAllContacts.pending, (state, action) => {
         state.allContactsRequestId = action.meta.requestId;
         state.allContactsPath = action.meta.arg || '/contacts/';
+        state.allContactsMoreRequestId = undefined;
         state.allContactsLoading = true;
         state.allContactsError = null;
         state.allContactsLoadingMore = false;
@@ -2724,13 +2728,16 @@ const customersSlice = createSlice({
         if (state.allContactsLoading || action.meta.arg !== state.allContactsPath || !action.payload) return;
         state.allContactsSummary = action.payload;
       })
-      .addCase(loadMoreContacts.pending, (state) => {
+      .addCase(loadMoreContacts.pending, (state, action) => {
+        state.allContactsMoreRequestId = action.meta.requestId;
         state.allContactsLoadingMore = true;
         state.allContactsMoreError = null;
       })
       // A page lands only on the list it continues: not while a fresh read
-      // is on its way, and not after one replaced the list.
+      // is on its way, and not after one replaced the list or a delete
+      // shifted it (the request id; the new list's `next` can be the same URL).
       .addCase(loadMoreContacts.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.allContactsMoreRequestId) return;
         if (state.allContactsLoading || state.allContactsNext !== action.meta.arg) return;
         state.allContactsLoadingMore = false;
         const seen = new Set(state.allContacts.map((c) => c.id));
@@ -2739,6 +2746,7 @@ const customersSlice = createSlice({
         state.allContactsNext = action.payload.next;
       })
       .addCase(loadMoreContacts.rejected, (state, action) => {
+        if (action.meta.requestId !== state.allContactsMoreRequestId) return;
         if (state.allContactsNext !== action.meta.arg) return;
         state.allContactsLoadingMore = false;
         state.allContactsMoreError = action.payload ?? 'Could not load more people.';
@@ -2797,6 +2805,9 @@ const customersSlice = createSlice({
         state.contacts = state.contacts.filter((c) => c.id !== id);
         state.allContacts = state.allContacts.filter((c) => c.id !== id);
         state.allContactsCount = Math.max(0, state.allContactsCount - 1);
+        // A page read before the delete is offset against the old list.
+        state.allContactsMoreRequestId = undefined;
+        state.allContactsLoadingMore = false;
       })
       .addCase(fetchOpportunities.pending, (state) => {
         state.opportunitiesLoading = true;

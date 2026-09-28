@@ -4,9 +4,10 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { MemoryRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import customersReducer from '../../features/customers/customersSlice';
 import { setViewport } from '../../test/viewport';
+import { ContactsListRedirect } from './ContactsListRedirect';
 import { ContactsPage } from './ContactsPage';
 
 function Where() {
@@ -21,7 +22,7 @@ export function renderContactsPage(url = '/contacts', { width = 1440 }: { width?
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
         <Routes>
-          <Route path="/contacts/list" element={<Navigate to="/contacts" replace />} />
+          <Route path="/contacts/list" element={<ContactsListRedirect />} />
           <Route
             path="/contacts/:id?"
             element={

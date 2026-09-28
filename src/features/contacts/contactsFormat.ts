@@ -76,16 +76,20 @@ function hasEvidence(e: ContactSentimentEvidence | Record<string, never>): e is 
 }
 
 /** Why a person reads as they do: "Neutral: 3 positive · 2 neutral · 1
- *  negative across 6 calls and 2 emails, latest 12 Sep". */
+ *  negative across 6 calls and 2 emails, latest 12 Sep". A hand-set one
+ *  says so, and, when `analysedCalls` of theirs have been read, that the
+ *  nightly run reads their calls again (never that nothing was analysed). */
 export function sentimentWhy(
   sentiment: Reading,
   source: Contact['sentiment_source'],
   evidence: ContactSentimentEvidence | Record<string, never>,
+  analysedCalls = 0,
 ): string {
   const label = SENTIMENT_LABEL[sentiment];
-  if (source !== 'computed' || !hasEvidence(evidence)) {
-    return `${label}, set by hand. Nothing of theirs has been analysed yet.`;
+  if (source === 'manual') {
+    return analysedCalls > 0 ? `${label}. Set by hand; their calls will be read again tonight.` : `${label}. Set by hand.`;
   }
+  if (!hasEvidence(evidence)) return `${label}. Nothing of theirs has been analysed yet.`;
   const kinds = listJoin(
     [
       evidence.calls ? `${evidence.calls} ${plural(evidence.calls, 'call', 'calls')}` : '',

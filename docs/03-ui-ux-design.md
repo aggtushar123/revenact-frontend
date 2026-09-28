@@ -529,7 +529,8 @@ fills).
   filtered set; "n active" and the growth only when the backend serves
   `summary.active` / `summary.growth_30d_pct`, and growth left out when it is
   null), then search and the
-  organisation, account (waits for an organisation), sentiment and role
+  organisation (one a deep link names past the first page of options is
+  read by id for its name), account (waits for an organisation), sentiment and role
   filters — each with its own visible label, not a placeholder standing in
   for one — all in the URL (`q`, `customer`, `account`, `sentiment`, `role`),
   and + Add (the existing `ContactFormModal`).
@@ -549,7 +550,11 @@ fills).
   computed sentiment, "Sentiment read 2 weeks ago" (`sentiment_computed_at`).
   An edit sends the sentiment only when it was changed (a sent one becomes
   hand-set and drops its evidence), then reads the person, their history and
-  the summary line again. Calls newest first:
+  the summary line again. A hand-set sentiment reads "Negative. Set by
+  hand." and, when some of their calls have been analysed, "…; their calls
+  will be read again tonight" — never that nothing was analysed.
+  `/contacts/abc` (no person can have that id) shows the same not-found
+  state as a person the viewer cannot open. Calls newest first:
   date, title, sentiment or "Not enough to analyse" (nothing while pending —
   `readingOf()`: `not_analysable` → "Not enough to analyse", `pending` →
   nothing, otherwise the sentiment), the summary its title opens, the

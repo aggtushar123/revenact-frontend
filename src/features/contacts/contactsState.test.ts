@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { configureStore } from '@reduxjs/toolkit';
 import customersReducer, {
   CONTACT_NOT_FOUND,
+  deleteContact,
   fetchAllContacts,
   fetchContactById,
   fetchContactHistory,
@@ -54,6 +55,31 @@ describe('the Contacts page state (spec 2026-09-28 §3)', () => {
     await store.dispatch(fetchAllContacts('/contacts/?role=other'));
     await store.dispatch(loadMoreContacts(next));
     expect(store.getState().customers.allContacts).toEqual([]);
+  });
+
+  it('a Load more still in flight when someone is deleted never lands on the list read after it', async () => {
+    let release: (value: unknown) => void = () => {};
+    const held = new Promise((resolve) => (release = resolve));
+    const spy = stubContactsApi({ pageSize: 1 });
+    const store = makeStore();
+    await store.dispatch(fetchAllContacts('/contacts/'));
+    const next = store.getState().customers.allContactsNext!;
+    const fast = spy.getMockImplementation()!;
+    // The old page 2 (Mira) is read now, and answers late.
+    spy.mockImplementationOnce(async (...args) => {
+      const reply = await fast(...args);
+      await held;
+      return reply;
+    });
+    const more = store.dispatch(loadMoreContacts(next));
+    await store.dispatch(deleteContact(42));
+    expect(store.getState().customers.allContactsLoadingMore).toBe(false);
+    await store.dispatch(fetchAllContacts('/contacts/'));
+    // The new list continues at the same URL, so only the request id tells them apart.
+    expect(store.getState().customers.allContactsNext).toBe(next);
+    release(null);
+    await more;
+    expect(store.getState().customers.allContacts.map((c) => c.name)).toEqual(['Lukas Vermeer']);
   });
 
   it('reads a person and their history; a 404 says they cannot be opened', async () => {

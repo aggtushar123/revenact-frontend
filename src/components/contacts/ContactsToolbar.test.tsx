@@ -50,6 +50,30 @@ describe('ContactsToolbar (spec 2026-09-28 §3)', () => {
     expect(screen.getByLabelText('Organisation')).toHaveDisplayValue('Globex');
   });
 
+  it('names a deep-linked organisation that is not on the first page by reading it, never "Organisation 99"', async () => {
+    const spy = stubContactsApi({ moreCustomers: [{ id: 99, name: 'Globex' }] });
+    renderToolbar({ ...NO_FILTERS, customer: '99' });
+    await waitFor(() => expect(screen.getByLabelText('Organisation')).toHaveDisplayValue('Globex'));
+    expect(spy.mock.calls.map(([input]) => new URL(String(input)).pathname)).toContain('/api/v1/customers/99/');
+    expect(screen.queryByText('Organisation 99')).toBeNull();
+  });
+
+  it('an organisation or account that cannot be found says so', async () => {
+    stubContactsApi();
+    renderToolbar({ ...NO_FILTERS, customer: '98', account: '97' });
+    await waitFor(() => expect(screen.getByLabelText('Organisation')).toHaveDisplayValue('Organisation not found'));
+    await waitFor(() => expect(screen.getByLabelText('Account')).toHaveDisplayValue('Account not found'));
+    expect(screen.queryByText(/^(Organisation|Account) 9\d$/)).toBeNull();
+  });
+
+  it('a deep-linked account takes its name from the account list', async () => {
+    const spy = stubContactsApi();
+    renderToolbar({ ...NO_FILTERS, customer: '6', account: '32' });
+    await waitFor(() => expect(screen.getByLabelText('Account')).toHaveDisplayValue('Kraft Heinz NA'));
+    // The organisation is on the first page: it is not read again.
+    expect(spy.mock.calls.map(([input]) => new URL(String(input)).pathname)).not.toContain('/api/v1/customers/6/');
+  });
+
   it('filters by sentiment and role', async () => {
     stubContactsApi();
     const { onChange } = renderToolbar();

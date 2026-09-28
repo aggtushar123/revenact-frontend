@@ -80,10 +80,17 @@ describe('ContactProfile (spec 2026-09-28 §3)', () => {
   it('says when there is nothing yet, and when a hand-set sentiment rests on nothing', async () => {
     renderProfile(MIRA.id);
     await screen.findByRole('article', { name: 'Mira Patel' });
-    expect(screen.getByText('Positive, set by hand. Nothing of theirs has been analysed yet.')).toBeInTheDocument();
+    expect(screen.getByText('Positive. Set by hand.')).toBeInTheDocument();
     for (const text of ['No calls with them yet.', 'No emails from them you can see.', 'No tickets from them you can see.']) {
       expect(screen.getByText(text)).toBeInTheDocument();
     }
+  });
+
+  it('a hand-set sentiment over analysed calls says they will be read again tonight', async () => {
+    renderProfile(41, { people: [{ ...LUKAS, sentiment: 'negative', sentiment_source: 'manual', sentiment_evidence: {}, sentiment_computed_at: null }] });
+    const sentiment = await screen.findByRole('region', { name: 'Sentiment' });
+    expect(sentiment).toHaveTextContent('Negative. Set by hand; their calls will be read again tonight.');
+    expect(sentiment).not.toHaveTextContent(/nothing of theirs/i);
   });
 
   it('a person the viewer cannot open reads as not here', async () => {

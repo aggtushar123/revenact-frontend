@@ -37,9 +37,33 @@ function Select({
   );
 }
 
-/** The accounts of the chosen organisation, read when it changes. A failed
- *  read leaves only "All accounts". */
-function useAccounts(customer: string): Option[] {
+type Loaded<T> = { for: string; value: T };
+
+/** The name of an organisation a deep link chose that is not on the first
+ *  page of options, read by id (GET /customers/<id>/); null when it cannot
+ *  be read, undefined while it is being read or not needed. */
+function useOrganisationName(customer: string, needed: boolean): string | null | undefined {
+  const [loaded, setLoaded] = useState<Loaded<string | null>>({ for: '', value: null });
+  useEffect(() => {
+    if (!needed) return;
+    let cancelled = false;
+    apiFetch<Option>(`/customers/${customer}/`)
+      .then((row) => {
+        if (!cancelled) setLoaded({ for: customer, value: row?.name ?? null });
+      })
+      .catch(() => {
+        if (!cancelled) setLoaded({ for: customer, value: null });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [customer, needed]);
+  return needed && loaded.for === customer ? loaded.value : undefined;
+}
+
+/** The accounts of the chosen organisation, read when it changes (null
+ *  until then). A failed read leaves only "All accounts". */
+function useAccounts(customer: string): Option[] | null {
   const [loaded, setLoaded] = useState<{ for: string; rows: Option[] }>({ for: '', rows: [] });
   useEffect(() => {
     if (!customer) return;
@@ -55,7 +79,8 @@ function useAccounts(customer: string): Option[] {
       cancelled = true;
     };
   }, [customer]);
-  return loaded.for === customer ? loaded.rows : [];
+  if (!customer) return [];
+  return loaded.for === customer ? loaded.rows : null;
 }
 
 /** The Contacts page's header (spec 2026-09-28 §3): the summary line, then
@@ -75,7 +100,8 @@ export function ContactsToolbar({
   summary: ContactsSummary | null;
   /** The first page of /customers/ (fetchCustomers). */
   organisations: Option[];
-  /** The chosen organisation's name when it is not on that page. */
+  /** The chosen organisation's name when it is not on that page, from the
+   *  list's rows; otherwise the toolbar reads it by id. */
   organisationName: string | null;
   isSm: boolean;
   /** `replace` for typing, so every key is not a history entry. */
@@ -95,9 +121,16 @@ export function ContactsToolbar({
     return () => clearTimeout(timer);
   }, [text, params, onChange]);
 
-  const accounts = useAccounts(params.customer);
+  const accountRows = useAccounts(params.customer);
+  const accounts = accountRows ?? [];
   const customerId = Number(params.customer);
   const accountId = Number(params.account);
+  // A deep link can name an organisation past the first page of options,
+  // or one that is gone; its option is named by reading it, never "Organisation 12".
+  const orgMissing = !!params.customer && !organisations.some((o) => o.id === customerId);
+  const fetchedName = useOrganisationName(params.customer, orgMissing && !organisationName);
+  const orgLabel = organisationName ?? fetchedName ?? (fetchedName === null ? 'Organisation not found' : 'Loading…');
+  const accountLabel = accountRows === null ? 'Loading…' : 'Account not found';
   const set = <K extends keyof ContactsParams>(key: K, value: ContactsParams[K]) => onChange(withFilter(params, key, value));
 
   return (
@@ -113,9 +146,7 @@ export function ContactsToolbar({
                 {o.name}
               </option>
             ))}
-            {params.customer && !organisations.some((o) => o.id === customerId) ? (
-              <option value={params.customer}>{organisationName ?? `Organisation ${params.customer}`}</option>
-            ) : null}
+            {orgMissing ? <option value={params.customer}>{orgLabel}</option> : null}
           </Select>
           <Select label="Account" value={params.account} disabled={!params.customer} onChange={(value) => set('account', value)}>
             <option value="">All accounts</option>
@@ -125,7 +156,7 @@ export function ContactsToolbar({
               </option>
             ))}
             {params.account && !accounts.some((a) => a.id === accountId) ? (
-              <option value={params.account}>{`Account ${params.account}`}</option>
+              <option value={params.account}>{accountLabel}</option>
             ) : null}
           </Select>
           <Select label="Sentiment" value={params.sentiment} onChange={(value) => set('sentiment', value as ContactsParams['sentiment'])}>
