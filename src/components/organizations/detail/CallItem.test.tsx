@@ -36,10 +36,41 @@ describe('CallItem (spec 2026-09-27 §4)', () => {
 
   it('names who was on it, and links the recording in a new tab', () => {
     const item = renderItem({ ...CALLS[1], participants: CALLS[0].participants });
-    expect(within(item).getByText('With Pat Finance')).toBeInTheDocument();
+    expect(within(item).getByText('With Pat Finance · Finance Manager')).toBeInTheDocument();
     const recording = within(item).getByRole('link', { name: 'Recording' });
     expect(recording).toHaveAttribute('href', 'https://recordings.example/13');
     expect(recording).toHaveAttribute('target', '_blank');
+  });
+
+  it("names each person's role in visible text, and leaves out a role it does not have", () => {
+    const item = renderItem({
+      ...CALLS[1],
+      participants: [
+        { id: 51, name: 'Dana Buyer', role_display: 'Decision Maker', sentiment: 'positive' },
+        { id: 54, name: 'Lee Guest', role_display: '', sentiment: '' },
+      ],
+    });
+    expect(within(item).getByText('With Dana Buyer · Decision Maker, Lee Guest')).not.toHaveClass('truncate');
+  });
+
+  it('says who logged a call by hand, and which recorder brought one in', () => {
+    const logged = renderItem({ ...CALLS[1], logged_by: { id: 3, name: 'Rita Rep' } });
+    expect(within(logged).getByText('logged by Rita Rep')).toBeInTheDocument();
+    document.body.innerHTML = '';
+    const synced = renderItem({ ...CALLS[1], connector_name: 'Gong', connector_provider: 'gong', logged_by: null });
+    expect(within(synced).getByText('via Gong')).toBeInTheDocument();
+    expect(within(synced).queryByText(/logged by/)).not.toBeInTheDocument();
+  });
+
+  it("shows the AI's classification with its mark, the category before the area", () => {
+    const item = renderItem({ ...CALLS[1], ai_area: 'Adoption', ai_category: 'Training gap' });
+    const label = within(item).getByText('Training gap');
+    expect(label.closest('[data-ai]')?.querySelector('svg')).not.toBeNull();
+    expect(label.closest('[data-ai]')).toHaveTextContent('AI classification: Training gap');
+    document.body.innerHTML = '';
+    expect(within(renderItem({ ...CALLS[1], ai_area: 'Adoption' })).getByText('Adoption')).toBeInTheDocument();
+    document.body.innerHTML = '';
+    expect(renderItem(CALLS[1]).querySelector('[data-ai]')).toBeNull();
   });
 
   it('never links a recording that is not http(s), and says when there is no summary', () => {

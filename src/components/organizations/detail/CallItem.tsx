@@ -1,5 +1,5 @@
 import { useId, useState } from 'react';
-import { ExternalLink, FileText, Phone } from 'lucide-react';
+import { ExternalLink, FileText, Phone, Sparkles } from 'lucide-react';
 import { durationLabel } from '../../../features/calls/callFormat';
 import type { Call } from '../../../features/calls/callsSlice';
 import { downloadAttachment } from '../../../features/files/filesSlice';
@@ -16,8 +16,9 @@ const SENTIMENT: Record<Exclude<Call['sentiment'], ''>, { label: string; tone: s
 
 /** One call as a plain row, like a Story item (spec 2026-09-27 §4): title
  *  and time, a one-line summary its title opens in place, then the account
- *  tag, host, duration and sentiment, who was on it, and the transcript and
- *  recording. */
+ *  tag, host, duration, where it came from (a recorder, or who logged it),
+ *  sentiment and the AI's classification, who was on it with their roles,
+ *  and the transcript and recording. */
 export function CallItem({ call }: { call: Call }) {
   const [expanded, setExpanded] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -25,8 +26,12 @@ export function CallItem({ call }: { call: Call }) {
   const sentiment = call.sentiment ? SENTIMENT[call.sentiment] : null;
   // The value lands in an href: only http(s) is linked.
   const recording = /^https?:\/\//i.test(call.recording_url) ? call.recording_url : null;
-  const via = call.connector_name ? `via ${call.connector_name}` : null;
-  const who = [call.host_name, durationLabel(call.duration_minutes) || null, via].filter(Boolean).join(' · ');
+  const who = [call.host_name, durationLabel(call.duration_minutes) || null].filter(Boolean).join(' · ');
+  const source = call.connector_name ? `via ${call.connector_name}` : call.logged_by ? `logged by ${call.logged_by.name}` : null;
+  const classification = call.ai_category || call.ai_area;
+  const participants = call.participants
+    .map((person) => (person.role_display ? `${person.name} · ${person.role_display}` : person.name))
+    .join(', ');
   const transcript = call.transcript;
 
   async function openTranscript() {
@@ -77,11 +82,17 @@ export function CallItem({ call }: { call: Call }) {
         <p className={META}>
           <AccountTag name={accountTag(call)} />
           <span className="min-w-0 truncate">{who}</span>
+          {source ? <span className="min-w-0 truncate">{source}</span> : null}
           {sentiment ? <span className={`rounded-full px-2 py-0.5 ${sentiment.tone}`}>{sentiment.label}</span> : null}
+          {classification ? (
+            <span data-ai="" className="inline-flex min-w-0 items-center gap-1">
+              <Sparkles className="h-3 w-3 shrink-0" aria-hidden="true" />
+              <span className="sr-only">AI classification: </span>
+              <span className="truncate">{classification}</span>
+            </span>
+          ) : null}
         </p>
-        {call.participants.length ? (
-          <p className="mt-0.5 truncate text-[11px] text-ink-muted">With {call.participants.map((person) => person.name).join(', ')}</p>
-        ) : null}
+        {participants ? <p className="mt-0.5 break-words text-[11px] text-ink-muted">With {participants}</p> : null}
         {transcript || recording ? (
           <p className="mt-0.5 flex flex-wrap gap-x-3 text-[13px] font-semibold">
             {transcript ? (
