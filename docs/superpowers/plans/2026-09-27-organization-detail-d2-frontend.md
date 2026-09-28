@@ -46,7 +46,7 @@
 | `src/features/organizations/listSummaries.ts` (new) | The one-line summaries' figures (people, opportunities, risks, calls) |
 | `src/features/organizations/detailParams.ts` | + `ACCOUNT_TABS` |
 | `src/features/organizations/testStory.ts` | + list fixtures; stub serves, saves, edits and deletes contacts, opportunities, risks, files and calls |
-| `src/features/files/fileFormat.ts` (new) | `FILE_ACCEPT`, `formatSize`, `canDeleteFile` (moved out of `FilesTab`) |
+| `src/features/files/fileFormat.ts` (new) | `FILE_ACCEPT`, `formatSize` (moved out of `FilesTab`); `canDeleteFile` (new, the same rule as `FilesTab`'s inline `canDelete`, which stays) |
 | `src/features/calls/callFormat.ts` (new) | `durationLabel` (moved out of `CallSenseTab`) |
 | `src/lib/contactLinks.ts` (new) | `mailtoHref`, `telHref` (moved out of `CustomerFacts`) |
 | `src/features/customers/customersSlice.ts` | `account_id` on Contact/Opportunity/Risk; `fetchSurveys(customerId?)` with a latest-request guard |
@@ -474,8 +474,10 @@ Expected: PASS (every test that passed at its old path passes here).
 
 - [ ] **Step 5: Commit**
 
+(`git mv` already staged the removal of the old paths; naming them in `git add` fails with "pathspec did not match".)
+
 ```bash
-git add src/components/shared/ContactsTab.test.tsx src/components/shared/PipelinesTab.test.tsx src/components/organizations/detail/PeopleTab.test.tsx src/components/organizations/detail/DealsTab.test.tsx
+git add src/components/shared/ContactsTab.test.tsx src/components/shared/PipelinesTab.test.tsx
 git commit -m "test(shared): pin ContactsTab and PipelinesTab where other routes use them
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
@@ -910,6 +912,7 @@ Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
 **Files:**
 - Modify: `src/components/organizations/detail/OrganizationHeader.tsx`
 - Modify: `src/components/organizations/detail/OrganizationHeader.test.tsx`
+- Modify: `src/components/organizations/detail/fieldCoverage.test.tsx` (renders the header: the new required prop)
 - Modify: `src/components/organizations/detail/AccountChips.tsx`
 - Modify: `src/components/organizations/detail/AccountChips.test.tsx`
 - Modify: `src/pages/organizations/Details.tsx`
@@ -925,6 +928,8 @@ In `OrganizationHeader.test.tsx`, change the handlers in `renderHeader` to:
 ```ts
   const handlers = { onEdit: vi.fn(), onArchive: vi.fn(), onChurn: vi.fn(), onAddAccount: vi.fn() };
 ```
+
+in the test "says why Edit is off when the record could not load, and tries again", add `onAddAccount={vi.fn()}` after `onChurn={vi.fn()}` in its own `<OrganizationHeader …>` render (the prop is required, so `tsc -b` fails without it),
 
 and add, after the "Edit opens the edit form once the record is there" test:
 
@@ -943,6 +948,8 @@ and add, after the "Edit opens the edit form once the record is there" test:
     expect(screen.getByRole('button', { name: 'Add account' })).toBeEnabled();
   });
 ```
+
+In `fieldCoverage.test.tsx`, in `renderPage`, change `onChurn={() => {}} />` on the `<OrganizationHeader …>` line to `onChurn={() => {}} onAddAccount={() => {}} />`.
 
 In `AccountChips.test.tsx`:
 - In `renderChips`, change the handlers to `const handlers = { onSelect: vi.fn(), onRetry: vi.fn(), onEdit: vi.fn() };`.
@@ -1056,7 +1063,7 @@ Expected: PASS; tsc exits 0.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/components/organizations/detail/OrganizationHeader.tsx src/components/organizations/detail/OrganizationHeader.test.tsx src/components/organizations/detail/AccountChips.tsx src/components/organizations/detail/AccountChips.test.tsx src/pages/organizations/Details.tsx src/pages/organizations/Details.test.tsx
+git add src/components/organizations/detail/OrganizationHeader.tsx src/components/organizations/detail/OrganizationHeader.test.tsx src/components/organizations/detail/fieldCoverage.test.tsx src/components/organizations/detail/AccountChips.tsx src/components/organizations/detail/AccountChips.test.tsx src/pages/organizations/Details.tsx src/pages/organizations/Details.test.tsx
 git commit -m "feat(organizations): Add account moves into the name row
 
 Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>"
@@ -2110,6 +2117,7 @@ describe('People (spec 2026-09-27 §2)', () => {
     await waitFor(() => expect(people()).toEqual(['51']));
     await userEvent.click(screen.getByRole('button', { name: 'Add contact to EMEA' }));
     await userEvent.type(screen.getByLabelText(/^Name/), 'Robin Ops');
+    await userEvent.type(screen.getByLabelText(/^Email/), 'robin@pizzahut.example');
     await userEvent.click(screen.getAllByRole('button', { name: 'Add Contact' }).find((button) => button.closest('form'))!);
     expect(await screen.findByRole('heading', { name: 'Robin Ops' })).toBeInTheDocument();
     expect(postBodies(spy, '/customers/7/accounts/31/contacts/')).toEqual([expect.objectContaining({ name: 'Robin Ops' })]);
@@ -2121,6 +2129,7 @@ describe('People (spec 2026-09-27 §2)', () => {
     await waitFor(() => expect(people()).toHaveLength(3));
     await userEvent.click(screen.getByRole('button', { name: 'Add contact' }));
     await userEvent.type(screen.getByLabelText(/^Name/), 'Robin Ops');
+    await userEvent.type(screen.getByLabelText(/^Email/), 'robin@pizzahut.example');
     await userEvent.click(screen.getAllByRole('button', { name: 'Add Contact' }).find((button) => button.closest('form'))!);
     await waitFor(() => expect(postBodies(spy, '/customers/7/contacts/')).toHaveLength(1));
   });
@@ -2133,6 +2142,8 @@ describe('People (spec 2026-09-27 §2)', () => {
     const name = screen.getByLabelText(/^Name/);
     await userEvent.clear(name);
     await userEvent.type(name, 'Pat Treasurer');
+    // Email is required on the form, and Pat has none yet.
+    await userEvent.type(screen.getByLabelText(/^Email/), 'pat@pizzahut.example');
     await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
     expect(await screen.findByRole('heading', { name: 'Pat Treasurer' })).toBeInTheDocument();
     expect(requestPaths(spy)).toContain('PATCH /contacts/53/');
@@ -4406,7 +4417,7 @@ Replace
 ```
    Story is read only once Story has been opened. The account chips
    (`?account=`, an id or `none`) filter the Story, whose filters (`group`,
-   `source`, `q`) live in the URL too.
+   `source`, `q`) live in the URL too. "+ Add" offers Log a call, New task, New
 ```
 
 with
@@ -4418,7 +4429,7 @@ with
    a chip counts the active tab: story items, people, opportunities plus
    risks, or files plus calls. New contacts, opportunities, risks, files and
    calls go on the chosen account. The Story's filters (`group`, `source`,
-   `q`) live in the URL too.
+   `q`) live in the URL too. "+ Add" offers Log a call, New task, New
 ```
 
 Replace
@@ -4473,7 +4484,20 @@ with
   own line and drop the board.
 ```
 
-In the "below `sm`" paragraph for the organization page, after "the account chips and the tabs each scroll sideways in their own row," add "Add account is icon-only, a person's email and phone take their own line, Deals & risks has no board,".
+In the "below `sm`" paragraph for the organization page, replace
+
+```
+snaps sideways, the account chips and the tabs each scroll sideways in their
+own row, and the content is full width. "+ Add" and an email's thread open as
+```
+
+with
+
+```
+snaps sideways, the account chips and the tabs each scroll sideways in their
+own row, Add account is icon-only, a person's email and phone take their own
+line, Deals & risks has no board, and the content is full width. "+ Add" and an email's thread open as
+```
 
 - [ ] **Step 3: Commit**
 
@@ -4559,6 +4583,8 @@ Run by the controller (not a subagent), after the backend delivery-2 PR is merge
 - §7 States, phones, tests: skeleton/error/empty on every list (Tasks 7, 9, 11–13); 44px targets and conditional phone layouts (Tasks 8, 11, 12, 16); tokens and sizes by the house-rules suite (Task 7 extends it); unit per item, integration, jsdom e2e (Task 16); browser check (Task 19).
 - §8 Delivery: frontend PR after the backend's; Task 19 assumes the backend is merged.
 
-**Placeholder scan.** No TBD/TODO or "similar to Task N"; every code step carries its code, and every form label the tests use ("Add Contact", "Add Opportunity", "Add Risk", "Name *", "Title *", "Save changes") was checked against the modals.
+**Placeholder scan.** No TBD/TODO or "similar to Task N"; every code step carries its code, and every form label the tests use ("Add Contact", "Add Opportunity", "Add Risk", "Name *", "Email *", "Title *", "Save changes") was checked against the modals; ContactFormModal's Email is required, so every People add or edit test types one.
+
+**Pre-flight (2026-09-28).** Tasks 1–17 were applied verbatim to a throwaway copy of `feat/organization-detail-d2` and checked with `npx tsc -b --noEmit`, `npx vitest run --maxWorkers=2`, `npm run lint` and `npm run build`; the findings and their fixes are in `.superpowers/sdd/2026-09-27-organization-detail-d2-frontend/progress.md`.
 
 **Type consistency.** `account: string`, `accounts: Account[]`, `isSm: boolean`, `onShowAll: () => void` are the same on PeopleTab, DealsTab, FilesSection, CallsSection and FilesCallsTab. `CallsSection` takes `version`/`onLogged`; `FilesCallsTab` maps `callsVersion`/`onCallLogged` onto them. `SummaryPart` is defined once (`listSummaries.ts`) and imported by `ListParts.tsx`. `useChipCounts(tab, storyCounts, accounts)` matches its call in Details. `chosenAccount`, `scopeLabel`, `byAccount`, `accountTag` names match across Tasks 1, 8–15. `fetchSurveys` takes `number | void` and is called as `fetchSurveys(customerId ?? undefined)`.
