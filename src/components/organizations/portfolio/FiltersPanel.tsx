@@ -1,8 +1,3 @@
-// This module intentionally exports both GROUP_OPTIONS and the components
-// that share it (GroupSortControls, FiltersPanel), per the brief's interface
-// (Task 10). Fast refresh doesn't apply to this shared, mostly-presentational
-// module (same precedent as rowParts.tsx, Task 4).
-/* eslint-disable react-refresh/only-export-components */
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
 import { ArrowDown, ArrowUp, Download, Plus, X } from 'lucide-react';
 import { trapTab } from '../../../lib/focusTrap';
@@ -10,26 +5,13 @@ import { SORT_OPTIONS } from '../../../features/organizations/portfolioFields';
 import { HEALTH_BANDS, toggleIn, type PortfolioParams } from '../../../features/organizations/portfolioParams';
 import { HEALTH_LABEL, NPS_BANDS, NPS_LABEL, RENEWAL_WINDOWS, windowLabel } from '../../../features/organizations/portfolioLabels';
 import type { GroupKey, LifecycleValue, NpsBand, PortfolioResponse } from '../../../features/organizations/portfolioTypes';
+import { GROUP_OPTIONS, type GroupOption } from '../../../features/organizations/portfolioGroups';
 import { FOCUS } from './styles';
 
 const SELECT = `min-h-11 sm:min-h-9 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink hover:border-line-strong disabled:opacity-50 ${FOCUS}`;
 
-export interface GroupOption {
-  value: GroupKey | 'none';
-  label: string;
-}
-
-export const GROUP_OPTIONS: GroupOption[] = [
-  { value: 'none', label: 'None' },
-  { value: 'health', label: 'Health' },
-  { value: 'owner', label: 'Owner' },
-  { value: 'lifecycle', label: 'Lifecycle' },
-  { value: 'product', label: 'Product' },
-  { value: 'renewal', label: 'Renewal window' },
-];
-
-/** The Board always has columns, so it offers no "None". */
-export const BOARD_GROUP_OPTIONS: GroupOption[] = GROUP_OPTIONS.filter((option) => option.value !== 'none');
+// Kept importable from here, where the pages and tests already find them.
+export { BOARD_GROUP_OPTIONS, GROUP_OPTIONS, type GroupOption } from '../../../features/organizations/portfolioGroups';
 
 /** Group and sort: in the toolbar from `sm`, inside the Filters sheet below. */
 export function GroupSortControls({
