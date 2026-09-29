@@ -3,28 +3,28 @@ import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
-import { PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
-import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
+import type { PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
 import { trapTab } from '../../../lib/focusTrap';
-import { AccountDetails } from './AccountDetails';
-import { HealthRing, PulsePair, RenewalRunway, SignalTag, TrendLine, touchText } from './rowParts';
+import { subtitleText, usePortfolioKind } from './portfolioKind';
+import { HealthRing, PulsePair, RenewalRunway, SignalTag, TrendLine } from './rowParts';
 import { FOCUS } from './styles';
 
-
 /** The opened row on phones (spec §1 "Phones"): a modal bottom sheet with
- *  the row's signals on top and the six panels below. Focus moves in, Tab
- *  is trapped, and Escape or Close returns focus to whatever opened it. */
-export function AccountSheet({
+ *  the row's signals on top and the kind's panels below (Organizations' six,
+ *  Accounts' four). Focus moves in, Tab is trapped, and Escape or Close
+ *  returns focus to whatever opened it. */
+export function AccountSheet<R extends PortfolioRowBase>({
   row,
   currency,
   onClose,
   onEdit,
 }: {
-  row: PortfolioRow;
+  row: R;
   currency: CurrencyCode;
   onClose: () => void;
   onEdit?: (id: number) => void;
 }) {
+  const kind = usePortfolioKind();
   const ref = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
@@ -79,9 +79,7 @@ export function AccountSheet({
             <h2 id={titleId} className="truncate text-[15px] font-semibold text-ink">
               {row.name}
             </h2>
-            <p className="truncate text-[11px] text-ink-muted">
-              {PORTFOLIO_FIELDS.owner.value(row)} · {row.lifecycle.label} · {touchText(row.last_touch_days)}
-            </p>
+            <p className="truncate text-[11px] text-ink-muted">{subtitleText(kind.subtitle(row))}</p>
           </div>
           <button
             type="button"
@@ -101,13 +99,14 @@ export function AccountSheet({
           <RenewalRunway renewal={row.renewal} className="flex" />
           <PulsePair pulse={row.pulse} className="flex" />
         </div>
-        <AccountDetails row={row} onEdit={onEdit} />
+        {kind.renderDetails({ row, currency, onEdit: kind.editable(row) ? onEdit : undefined })}
         <div className="px-3 pb-4">
           <Link
-            to={`/organizations/${row.id}`}
+            to={kind.href(row)}
+            state={kind.linkState(row)}
             className={`flex min-h-11 items-center justify-center rounded-lg bg-accent text-[13px] font-semibold text-on-accent hover:bg-accent-hover ${FOCUS}`}
           >
-            Open organization page
+            {`Open ${kind.noun.one} page`}
           </Link>
         </div>
       </div>

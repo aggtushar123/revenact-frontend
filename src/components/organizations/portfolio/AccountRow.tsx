@@ -5,14 +5,15 @@ import type { ColumnId } from '../tableData';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 import { PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
-import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
-import { HealthRing, PulsePair, RenewalRunway, SignalTag, TrendLine, touchText } from './rowParts';
+import type { PortfolioRow, PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
+import { usePortfolioKind } from './portfolioKind';
+import { HealthRing, PulsePair, RenewalRunway, SignalTag, SubtitleLine, TrendLine } from './rowParts';
 import { FOCUS } from './styles';
 
 export const LONG_PRESS_MS = 500;
 
-export interface AccountRowProps {
-  row: PortfolioRow;
+export interface AccountRowProps<R extends PortfolioRowBase = PortfolioRow> {
+  row: R;
   currency: CurrencyCode;
   pins: ColumnId[];
   /** From `sm` (the page's own media query, passed down so each row does
@@ -31,7 +32,7 @@ export interface AccountRowProps {
   open: boolean;
   onToggleSelect: (id: number) => void;
   onLongPress: (id: number) => void;
-  onToggleOpen: (row: PortfolioRow) => void;
+  onToggleOpen: (row: R) => void;
   /** The opened row, inline (desktop). Phones open a sheet instead. */
   children?: ReactNode;
 }
@@ -40,7 +41,7 @@ export interface AccountRowProps {
  *  From `sm` it is a single line. Below `sm` the same elements wrap into a
  *  two-line card: ring, name and owner on top, then ARR, signal and trend
  *  (an `order-*` break element does the wrapping, so nothing renders twice). */
-export function AccountRow({
+export function AccountRow<R extends PortfolioRowBase>({
   row,
   currency,
   pins,
@@ -54,14 +55,15 @@ export function AccountRow({
   onLongPress,
   onToggleOpen,
   children,
-}: AccountRowProps) {
+}: AccountRowProps<R>) {
+  const kind = usePortfolioKind();
   const timer = useRef<number | null>(null);
   const longPressed = useRef(false);
   const detailsId = `account-${row.id}-details`;
   const arr = row.arr == null ? '—' : formatCompactMoney(row.arr, currency);
   const checkboxDisabled = selectDisabled || (atLimit && !selected);
   const limitHint = atLimit && !selected ? '500 is the most you can select at once' : undefined;
-  const status = row.is_archived ? 'Archived' : row.churned ? 'Churned' : null;
+  const status = kind.status(row);
 
   const cancelPress = () => {
     if (timer.current !== null) {
@@ -131,9 +133,10 @@ export function AccountRow({
         <div className="min-w-0 flex-1 sm:min-w-40 sm:basis-56">
           <span className="flex min-w-0 items-center gap-1.5">
             <Link
-              to={`/organizations/${row.id}`}
+              to={kind.href(row)}
+              state={kind.linkState(row)}
               onClick={(event) => event.stopPropagation()}
-              data-field="organization"
+              data-field={kind.nameField}
               className={`flex min-h-11 min-w-0 items-center sm:block sm:min-h-0 truncate rounded-sm text-[13px] font-semibold text-ink hover:underline ${FOCUS}`}
             >
               <span className="truncate">{row.name}</span>
@@ -143,8 +146,7 @@ export function AccountRow({
             ) : null}
           </span>
           <p className="truncate text-[11px] text-ink-muted">
-            <span data-field="owner">{PORTFOLIO_FIELDS.owner.value(row)}</span> ·{' '}
-            <span data-field="lifecycleStage">{row.lifecycle.label}</span> · {touchText(row.last_touch_days)}
+            <SubtitleLine parts={kind.subtitle(row)} />
           </p>
         </div>
 
@@ -154,10 +156,12 @@ export function AccountRow({
         {isSm ? (
           <span className="flex min-w-0 flex-wrap gap-1">
             {pins.map((id) => {
+              // Pins are Organizations' own (the Accounts pages pass none),
+              // so a pinned row is an organisation.
               const field = PORTFOLIO_FIELDS[id];
               return (
                 <span key={id} data-pin={id} className="inline-flex items-center gap-1 rounded-full bg-subtle px-2 py-0.5 text-[11px] text-ink-muted">
-                  {field.short} <span className="font-mono-brand tabular-nums text-ink">{field.value(row)}</span>
+                  {field.short} <span className="font-mono-brand tabular-nums text-ink">{field.value(row as unknown as PortfolioRow)}</span>
                 </span>
               );
             })}
@@ -168,7 +172,7 @@ export function AccountRow({
           {arr}
         </span>
 
-        {isSm ? <PulsePair pulse={row.pulse} /> : null}
+        {isSm ? <PulsePair pulse={row.pulse} valueField={kind.pulseValueField} /> : null}
 
         <span className="order-3 sm:order-none sm:w-36 flex sm:justify-end min-w-0">
           <SignalTag signal={row.signal} />

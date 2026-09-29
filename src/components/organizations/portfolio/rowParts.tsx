@@ -3,10 +3,11 @@
 // share, per the brief's interface (Task 4). Fast refresh doesn't apply to
 // this shared, mostly-presentational module.
 /* eslint-disable react-refresh/only-export-components */
+import { Fragment } from 'react';
 import { HEALTH_COLORS } from '../../../pages/dashboard/shared/chartPalette';
 import { pulseWords } from '../../../features/organizations/portfolioFields';
 import { HEALTH_LABEL } from '../../../features/organizations/portfolioLabels';
-import type { HealthBand, PortfolioRow } from '../../../features/organizations/portfolioTypes';
+import type { HealthBand, PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
 
 export function trendLabel(trend: number[]): string {
   if (trend.length < 2) return 'Not enough health history for a trend';
@@ -88,7 +89,7 @@ export function TrendLine({ trend, category, className = '' }: { trend: number[]
 }
 
 /** A bar filling toward the renewal date over a year's runway. */
-export function RenewalRunway({ renewal, className = '' }: { renewal: PortfolioRow['renewal']; className?: string }) {
+export function RenewalRunway({ renewal, className = '' }: { renewal: PortfolioRowBase['renewal']; className?: string }) {
   const overdue = renewal.days != null && renewal.days < 0;
   const fill = renewal.days == null ? 0 : overdue ? 1 : Math.max(0, 1 - renewal.days / 365);
   return (
@@ -119,11 +120,21 @@ export function PulseDots({ history, field }: { history: number[]; field?: strin
 /** "AI n · CSM n", the stored pulse dots (the old Pulse column), the AI
  *  label (the old AI Pulse Score column) and, when the server says the two
  *  pulses differ by 2 or more, a marker in words. */
-export function PulsePair({ pulse, className = '' }: { pulse: PortfolioRow['pulse']; className?: string }) {
+export function PulsePair({
+  pulse,
+  className = '',
+  valueField,
+}: {
+  pulse: PortfolioRowBase['pulse'];
+  className?: string;
+  /** Marks "AI n · CSM n" for a kind whose registry names those two values
+   *  (Accounts: "aiPulseValue csmPulseScore"). */
+  valueField?: string;
+}) {
   const show = (n: number | null) => (n == null ? '—' : String(n));
   return (
     <span className={`flex-col w-36 shrink-0 ${className}`}>
-      <span className="font-mono-brand tabular-nums text-[13px] text-ink">
+      <span data-field={valueField} className="font-mono-brand tabular-nums text-[13px] text-ink">
         AI {show(pulse.ai)} · CSM {show(pulse.csm)}
       </span>
       <span className="flex min-w-0 items-center gap-1.5 text-[11px]">
@@ -141,11 +152,26 @@ const SIGNAL_TONE = {
   tickets: 'bg-warning-dim text-warning',
 } as const;
 
-export function SignalTag({ signal }: { signal: PortfolioRow['signal'] }) {
+export function SignalTag({ signal }: { signal: PortfolioRowBase['signal'] }) {
   if (!signal) return null;
   return (
     <span className={`inline-flex max-w-[9rem] truncate rounded-full px-2 py-0.5 text-[11px] font-semibold ${SIGNAL_TONE[signal.kind]}`}>
       {signal.label}
     </span>
+  );
+}
+
+/** The line under a name: the kind's parts joined by " · ", each part that
+ *  names a field marked for the kind's field-coverage test. */
+export function SubtitleLine({ parts }: { parts: { text: string; field?: string }[] }) {
+  return (
+    <>
+      {parts.map((part, index) => (
+        <Fragment key={index}>
+          {index > 0 ? ' · ' : null}
+          {part.field ? <span data-field={part.field}>{part.text}</span> : part.text}
+        </Fragment>
+      ))}
+    </>
   );
 }

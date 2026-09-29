@@ -7,9 +7,11 @@ import { useId, useState, type ReactNode } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
+import { capitalise } from '../../../features/organizations/portfolioLabels';
 import { toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
-import type { PortfolioGroup, PortfolioRow } from '../../../features/organizations/portfolioTypes';
+import type { FilterOptions, PortfolioGroup, PortfolioRow, PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
 import { ErrorState } from '../../../pages/dashboard/shared/DataState';
+import { usePortfolioKind } from './portfolioKind';
 import { SECTION_PAGE_SIZE, usePagedPortfolio, type PortfolioState } from './usePortfolio';
 import { FOCUS, QUIET } from './styles';
 
@@ -20,11 +22,12 @@ export function sectionStartsOpen(index: number, total: number): boolean {
 /** A row renderer that also gets its own section's (or the flat list's)
  *  `loading`, so it can disable that row's checkbox while a fetch for it is
  *  in flight (spec §1's "disabled while loading" rule). */
-export type PortfolioRowRenderer = (row: PortfolioRow, state: { loading: boolean }) => ReactNode;
+export type PortfolioRowRenderer<R extends PortfolioRowBase = PortfolioRow> = (row: R, state: { loading: boolean }) => ReactNode;
 
 export function RowSkeleton({ count }: { count: number }) {
+  const kind = usePortfolioKind();
   return (
-    <div role="status" aria-label="Loading organizations">
+    <div role="status" aria-label={`Loading ${kind.noun.many}`}>
       <ul aria-hidden="true" className="flex flex-col gap-1.5">
         {Array.from({ length: Math.max(1, count) }, (_, i) => (
           <li key={i} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2.5">
@@ -89,7 +92,7 @@ export function MoreButton({
   );
 }
 
-function Section({
+function Section<R extends PortfolioRowBase>({
   group,
   groupsKey,
   params,
@@ -111,8 +114,8 @@ function Section({
   version: number;
   currency: CurrencyCode;
   defaultOpen: boolean;
-  renderRow: PortfolioRowRenderer;
-  onRowsLoaded: (rows: PortfolioRow[]) => void;
+  renderRow: PortfolioRowRenderer<R>;
+  onRowsLoaded: (rows: R[]) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   // Re-applies the start-open rule whenever the group set changes, adjusted
@@ -125,7 +128,7 @@ function Section({
     setOpen(defaultOpen);
   }
   const bodyId = useId();
-  const page = usePagedPortfolio(
+  const page = usePagedPortfolio<R, FilterOptions>(
     toApiQuery(params, { group_value: group.key, limit: String(SECTION_PAGE_SIZE) }),
     open,
     version,
@@ -185,7 +188,7 @@ function Section({
 
 /** The list body: grouped sections (each with its own pages) or one flat
  *  list, plus the loading, empty and error states spec §1 asks for. */
-export function PortfolioSections({
+export function PortfolioSections<R extends PortfolioRowBase>({
   params,
   version,
   portfolio,
@@ -198,20 +201,21 @@ export function PortfolioSections({
 }: {
   params: PortfolioParams;
   version: number;
-  portfolio: PortfolioState;
+  portfolio: PortfolioState<R, FilterOptions>;
   currency: CurrencyCode;
   filtered: boolean;
-  renderRow: PortfolioRowRenderer;
+  renderRow: PortfolioRowRenderer<R>;
   /** Rows that just landed (a page one or a `loadMore` append), for a
    *  pinned-fields cache or the like. It only ever *adds* — it must never be
    *  used to prune the selection against these rows (grouped mode has no one
    *  full row set to prune against, and flat mode prunes only when
    *  `portfolio.loadedQuery` changes, not on every append this callback
    *  also sees). */
-  onRowsLoaded: (rows: PortfolioRow[]) => void;
+  onRowsLoaded: (rows: R[]) => void;
   onClearFilters: () => void;
   onAdd: () => void;
 }) {
+  const kind = usePortfolioKind();
   const { data, error } = portfolio;
   if (!data && error) return <ErrorBlock message={error} onRetry={portfolio.retry} />;
   if (!data) return <RowSkeleton count={6} />;
@@ -219,7 +223,7 @@ export function PortfolioSections({
   if (data.count === 0) {
     return filtered ? (
       <EmptyState
-        title="No organizations match these filters"
+        title={`No ${kind.noun.many} match these filters`}
         detail="Remove a filter, or clear them all."
         action={
           <button type="button" onClick={onClearFilters} className={`${QUIET} border border-line`}>
@@ -229,12 +233,12 @@ export function PortfolioSections({
       />
     ) : (
       <EmptyState
-        title="No organizations yet"
-        detail="Add an organization to start your portfolio."
+        title={`No ${kind.noun.many} yet`}
+        detail={`Add an ${kind.noun.one} to start your portfolio.`}
         action={
           <button type="button" onClick={onAdd} className={`${QUIET} bg-accent text-on-accent hover:bg-accent-hover`}>
             <Plus className="w-4 h-4" aria-hidden="true" />
-            Add organization
+            {`Add ${kind.noun.one}`}
           </button>
         }
       />
@@ -259,7 +263,7 @@ export function PortfolioSections({
       <div aria-busy={portfolio.loading}>
         {/* The flat list's own heading, so an opened row's panels (h3) sit
             under it rather than under the last summary tile's. */}
-        <h2 className="sr-only">Organizations list</h2>
+        <h2 className="sr-only">{`${capitalise(kind.noun.many)} list`}</h2>
         {staleError}
         <ul className="flex flex-col gap-1.5">
           {portfolio.rows.map((row) => renderRow(row, { loading: portfolio.loading }))}
@@ -268,7 +272,7 @@ export function PortfolioSections({
           next={portfolio.next}
           loading={portfolio.loadingMore}
           error={portfolio.moreError}
-          label="Show more organizations"
+          label={`Show more ${kind.noun.many}`}
           onClick={() => void portfolio.loadMore()}
         />
       </div>

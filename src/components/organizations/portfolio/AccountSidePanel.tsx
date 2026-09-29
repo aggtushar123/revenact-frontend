@@ -3,29 +3,29 @@ import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
-import { PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
-import type { PortfolioRow } from '../../../features/organizations/portfolioTypes';
-import { AccountDetails } from './AccountDetails';
+import type { PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
 import { DETAILS_PANEL_ID } from './BoardCard';
-import { HealthRing, PulsePair, RenewalRunway, SignalTag, TrendLine, touchText } from './rowParts';
+import { subtitleText, usePortfolioKind } from './portfolioKind';
+import { HealthRing, PulsePair, RenewalRunway, SignalTag, TrendLine } from './rowParts';
 import { FOCUS } from './styles';
 
 /** The Board's opened card from `sm` (owner decision 2026-09-26): the
- *  row's signals and the six panels in a column beside the board, which
+ *  row's signals and the kind's panels in a column beside the board, which
  *  stays in place and usable. It is not modal. Focus moves to Close on open
  *  and back to the opener on close, and Escape inside the panel closes it.
  *  A `bg-surface` item on the canvas, beside the columns, never inside one. */
-export function AccountSidePanel({
+export function AccountSidePanel<R extends PortfolioRowBase>({
   row,
   currency,
   onClose,
   onEdit,
 }: {
-  row: PortfolioRow;
+  row: R;
   currency: CurrencyCode;
   onClose: () => void;
   onEdit?: (id: number) => void;
 }) {
+  const kind = usePortfolioKind();
   const titleId = useId();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -62,9 +62,7 @@ export function AccountSidePanel({
           <h2 id={titleId} className="truncate text-[15px] font-semibold text-ink">
             {row.name}
           </h2>
-          <p className="truncate text-[11px] text-ink-muted">
-            {`${PORTFOLIO_FIELDS.owner.value(row)} · ${row.lifecycle.label} · ${touchText(row.last_touch_days)}`}
-          </p>
+          <p className="truncate text-[11px] text-ink-muted">{subtitleText(kind.subtitle(row))}</p>
         </div>
         <button
           ref={closeRef}
@@ -85,13 +83,14 @@ export function AccountSidePanel({
         <RenewalRunway renewal={row.renewal} className="flex" />
         <PulsePair pulse={row.pulse} className="flex" />
       </div>
-      <AccountDetails row={row} onEdit={onEdit} stacked />
+      {kind.renderDetails({ row, currency, onEdit: kind.editable(row) ? onEdit : undefined, stacked: true })}
       <div className="px-3 pb-4">
         <Link
-          to={`/organizations/${row.id}`}
+          to={kind.href(row)}
+          state={kind.linkState(row)}
           className={`flex min-h-9 items-center justify-center rounded-lg bg-accent text-[13px] font-semibold text-on-accent hover:bg-accent-hover ${FOCUS}`}
         >
-          Open organization page
+          {`Open ${kind.noun.one} page`}
         </Link>
       </div>
     </aside>
