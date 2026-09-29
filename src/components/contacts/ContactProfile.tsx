@@ -3,7 +3,7 @@ import { Mail, Pencil, Phone, Sparkles, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { whyQuestion } from '../../features/contacts/askContext';
-import { SENTIMENT_DOT, placeOf, sentimentWhy } from '../../features/contacts/contactsFormat';
+import { SENTIMENT_DOT, placeOf, readableEvidenceOf, sentimentWhy } from '../../features/contacts/contactsFormat';
 import { deleteContact, fetchContactById, fetchContactHistory } from '../../features/customers/customersSlice';
 import { formatRelativeTime, initials } from '../../features/customers/formatters';
 import { mailtoHref, telHref } from '../../lib/contactLinks';
@@ -163,7 +163,7 @@ export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: numb
             {sentimentWhy(
               history.sentiment,
               history.sentiment_source,
-              history.sentiment_evidence,
+              readableEvidenceOf(history),
               history.calls.filter((call) => call.analysis === 'analysed').length,
             )}
           </p>

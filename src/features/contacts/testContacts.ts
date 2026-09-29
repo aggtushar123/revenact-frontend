@@ -1,6 +1,11 @@
 // Test-only fixtures and a fetch stub for the Contacts page, in the backend's
 // contract shapes (revenact-backend docs/API_CONTRACTS.md: GET /contacts/,
-// GET /contacts/<id>/, GET /contacts/<id>/history/).
+// GET /contacts/<id>/, GET /contacts/<id>/history/). These serve the new
+// readable-evidence shape (PR fix/contacts-readable-evidence, not merged
+// there yet): rows carry `calls`, history carries `sentiment_readable`,
+// neither carries `sentiment_evidence`. A dedicated old-shape test proves
+// the frontend's fallback for the old backend, which this frontend deploys
+// ahead of (ContactsPage.test.tsx).
 import { vi } from 'vitest';
 import type { Contact } from '../customers/customersSlice';
 import type { ContactHistory, ContactsSummary } from './contactsTypes';
@@ -20,7 +25,6 @@ function person(id: number, name: string, extra: Partial<Contact>): Contact {
     status: 'active',
     sentiment: 'neutral',
     sentiment_source: 'manual',
-    sentiment_evidence: {},
     sentiment_computed_at: null,
     last_contacted_at: null,
     companies: [PIZZA],
@@ -28,6 +32,7 @@ function person(id: number, name: string, extra: Partial<Contact>): Contact {
     account_id: null,
     account_name: null,
     account: null,
+    calls: 0,
     ...extra,
   };
 }
@@ -40,7 +45,6 @@ export const LUKAS: Contact = person(41, 'Lukas Vermeer', {
   phone: '+44 20 7946 0001',
   sentiment: 'neutral',
   sentiment_source: 'computed',
-  sentiment_evidence: { score: 0.1, calls: 6, emails: 2, tickets: 0, positive: 3, neutral: 2, negative: 1, latest_at: '2026-09-12T10:00:00Z' },
   sentiment_computed_at: '2026-09-12T11:00:00Z',
   last_contacted_at: '2026-09-12T10:00:00Z',
   companies: [KRAFT],
@@ -48,6 +52,7 @@ export const LUKAS: Contact = person(41, 'Lukas Vermeer', {
   account_id: 31,
   account_name: 'Kraft Heinz EMEA',
   account: KRAFT_EMEA,
+  calls: 6,
 });
 
 /** On Pizza Hut itself; positive, set by hand. */
@@ -86,7 +91,7 @@ export const LUKAS_HISTORY: ContactHistory = {
   contact_id: 41,
   sentiment: 'neutral',
   sentiment_source: 'computed',
-  sentiment_evidence: LUKAS.sentiment_evidence,
+  sentiment_readable: { calls: 6, emails: 2, tickets: 0, positive: 3, neutral: 2, negative: 1, latest_at: '2026-09-12T10:00:00Z', others: false },
   counts: { calls: 3, emails: 2, tickets: 2 },
   calls: [
     {
@@ -199,7 +204,7 @@ export function emptyHistory(contact: Contact): ContactHistory {
     contact_id: contact.id,
     sentiment: contact.sentiment,
     sentiment_source: contact.sentiment_source,
-    sentiment_evidence: contact.sentiment_evidence,
+    sentiment_readable: null,
     counts: { calls: 0, emails: 0, tickets: 0 },
     calls: [],
     emails: [],
@@ -293,7 +298,7 @@ export function stubContactsApi(stub: ContactsStub = {}) {
       if (method === 'PATCH') {
         const patch = JSON.parse(String(init?.body ?? '{}')) as Partial<Contact>;
         // As ContactSerializer does: a sent sentiment is a hand-set one.
-        const manual = 'sentiment' in patch ? { sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null } : {};
+        const manual = 'sentiment' in patch ? { sentiment_source: 'manual' as const, sentiment_computed_at: null } : {};
         const updated = { ...found, ...patch, ...manual };
         people = people.map((p) => (p.id === id ? updated : p));
         return json(200, updated);
@@ -310,13 +315,15 @@ export function stubContactsApi(stub: ContactsStub = {}) {
         historyFailures -= 1;
         return json(500, { detail: 'Try later.' });
       }
-      // The sentiment is the person's own, as it stands now.
+      // The sentiment is the person's own, as it stands now; a hand-set one
+      // rests on nothing the viewer can point to (sentiment_readable is
+      // null for it).
       const base = histories[id] ?? emptyHistory(found);
       return json(200, {
         ...base,
         sentiment: found.sentiment,
         sentiment_source: found.sentiment_source,
-        sentiment_evidence: found.sentiment_evidence,
+        sentiment_readable: found.sentiment_source === 'manual' ? null : base.sentiment_readable,
       });
     }
 

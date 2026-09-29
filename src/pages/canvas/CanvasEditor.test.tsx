@@ -31,7 +31,7 @@ const jamesContact = {
   last_contacted_at: null,
   companies: [{ id: 6, name: 'Apple Inc' }],
   account_name: null,
-  sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null,
+  sentiment_source: 'manual' as const, sentiment_computed_at: null,
 };
 
 function canvasFixture(overrides: Partial<Canvas> = {}): Canvas {

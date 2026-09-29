@@ -82,12 +82,36 @@ export interface HistoryTicket extends HistoryRow {
   link: { url: string | null };
 }
 
+/** Sentiment counted only over the viewer's readable, analysed calls,
+ *  emails and tickets (revenact-backend PR fix/contacts-readable-evidence).
+ *  `others` is true when the stored sentiment also rests on records the
+ *  viewer cannot open. */
+export interface ReadableEvidence {
+  calls: number;
+  emails: number;
+  tickets: number;
+  positive: number;
+  neutral: number;
+  negative: number;
+  latest_at: string | null;
+  others: boolean;
+}
+
 /** Newest first, the newest 100 of each kind; `counts` are the visible totals. */
 export interface ContactHistory {
   contact_id: number;
   sentiment: Reading;
   sentiment_source: Contact['sentiment_source'];
-  sentiment_evidence: ContactSentimentEvidence | Record<string, never>;
+  /** Old shape: revenact-backend PR fix/contacts-readable-evidence removes
+   *  this field in favour of `sentiment_readable` below. Kept optional
+   *  only until that backend change is live (this frontend deploys
+   *  first); do not add new reads of it beyond `readableEvidenceOf`'s
+   *  fallback in contactsFormat.ts. */
+  sentiment_evidence?: ContactSentimentEvidence | Record<string, never>;
+  /** New shape: counted only over the viewer's readable analysed records;
+   *  `null` for a hand-set sentiment. Absent (`undefined`) only when
+   *  served by the old backend shape, which has no equivalent key. */
+  sentiment_readable?: ReadableEvidence | null;
   counts: { calls: number; emails: number; tickets: number };
   calls: HistoryCall[];
   emails: HistoryEmail[];

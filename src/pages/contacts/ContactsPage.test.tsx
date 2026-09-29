@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { requested, stubContactsApi } from '../../features/contacts/testContacts';
+import { LUKAS, LUKAS_HISTORY, requested, stubContactsApi } from '../../features/contacts/testContacts';
 import { resetViewport } from '../../test/viewport';
 import { renderContactsPage } from './testPage';
 
@@ -191,6 +191,29 @@ describe('Contacts page (spec 2026-09-28 §3)', () => {
     renderContactsPage('/contacts/list');
     await screen.findByRole('list', { name: 'People' });
     expect(where()).toBe('/contacts');
+  });
+
+  it('the old backend shape (sentiment_evidence, no calls or sentiment_readable) still renders the list and the profile (this frontend deploys before that backend change)', async () => {
+    // The old shape, revenact-backend before PR fix/contacts-readable-evidence:
+    // rows carry `sentiment_evidence`, never `calls`; history carries
+    // `sentiment_evidence`, never `sentiment_readable`.
+    const oldEvidence = { score: 0.1, calls: 6, emails: 2, tickets: 0, positive: 3, neutral: 2, negative: 1, latest_at: '2026-09-12T10:00:00Z' };
+    const oldLukas = { ...LUKAS, calls: undefined, sentiment_evidence: oldEvidence };
+    const oldHistory = { ...LUKAS_HISTORY, sentiment_readable: undefined, sentiment_evidence: oldEvidence };
+    const spy = vi.fn(async (input: RequestInfo | URL) => {
+      const path = new URL(String(input)).pathname.replace(/^\/api\/v1/, '');
+      const ok = (body: unknown) => ({ ok: true, status: 200, json: async () => body });
+      if (path === '/contacts/') return ok({ count: 1, next: null, previous: null, results: [oldLukas] });
+      if (path === '/contacts/41/') return ok(oldLukas);
+      if (path === '/contacts/41/history/') return ok(oldHistory);
+      if (path === '/customers/') return ok({ count: 0, next: null, previous: null, results: [] });
+      return { ok: false, status: 404, json: async () => ({ detail: 'Not found.' }) };
+    });
+    vi.stubGlobal('fetch', spy);
+    renderContactsPage('/contacts/41');
+    expect(await screen.findByText('6 calls')).toBeInTheDocument();
+    const sentiment = await screen.findByRole('region', { name: 'Sentiment' });
+    expect(sentiment).toHaveTextContent('Neutral: 3 positive · 2 neutral · 1 negative across 6 calls and 2 emails, latest 12 Sep');
   });
 });
 

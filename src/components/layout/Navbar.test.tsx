@@ -102,7 +102,7 @@ const sarahChen = {
   last_contacted_at: '2026-08-31T00:00:00Z',
   companies: [{ id: 10, name: 'Globex Corp' }],
   account_name: null,
-  sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null,
+  sentiment_source: 'manual' as const, sentiment_computed_at: null,
 };
 
 function renderNavbar(
