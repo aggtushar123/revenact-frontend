@@ -1,138 +1,274 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { ActionBar } from '../../components/accounts/ActionBar';
-import { AccountsTable } from '../../components/accounts/AccountsTable';
-import { MetricsPanel } from '../../components/accounts/MetricsPanel';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useOrgCurrency } from '../../hooks';
+import { SM, useMediaQuery } from '../../lib/useMediaQuery';
+import { ACCOUNT_LIFECYCLE_TARGETS } from '../../features/accounts/accountFields';
+import { bulkUpdateAccounts, exportAccountPortfolio } from '../../features/accounts/portfolioApi';
+import type { AccountBulkAction, AccountFilterOptions, AccountPortfolioRow } from '../../features/accounts/portfolioTypes';
+import { useMembers } from '../../features/knowledge/useMembers';
+import { ownerTargets } from '../../features/organizations/bulkTargets';
+import { hasFilters, toApiQuery, type PortfolioParams } from '../../features/organizations/portfolioParams';
+import { AccountPanels } from '../../components/accounts/portfolio/AccountPanels';
+import { ACCOUNT_KIND } from '../../components/accounts/portfolio/accountKind';
+import { AccountRow } from '../../components/organizations/portfolio/AccountRow';
+import { AccountSheet } from '../../components/organizations/portfolio/AccountSheet';
+import { FilterChips } from '../../components/organizations/portfolio/FilterChips';
+import { PortfolioKindContext } from '../../components/organizations/portfolio/portfolioKind';
+import { PortfolioSections, type PortfolioRowRenderer } from '../../components/organizations/portfolio/PortfolioSections';
+import { PortfolioToolbar } from '../../components/organizations/portfolio/PortfolioToolbar';
+import { SelectionBar, type BulkReport } from '../../components/organizations/portfolio/SelectionBar';
+import { SummaryTiles } from '../../components/organizations/portfolio/SummaryTiles';
+import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
+import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
+import { useSelection } from '../../components/organizations/portfolio/useSelection';
 import { AccountFormModal } from '../organizations/AccountFormModal';
-import { fetchAllAccounts, fetchCustomers } from '../../features/customers/customersSlice';
-import type { Account } from '../../features/customers/customersSlice';
-import type { AppDispatch, RootState } from '../../store';
+import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
+import { useAccountEditing } from './useAccountEditing';
 
-// Same "raw path in, paginated page out" pattern as the standalone
-// Contacts page's own List.tsx (fetchAllContacts) — see that page for
-// the debounced-search/offset-tracking reasoning this mirrors exactly.
-// No checkbox bulk-select here — Account has no Delete capability yet
-// (see AccountListView's own docstring on the backend), so there's
-// nothing real to back one.
+/** /accounts/list: the Accounts portfolio (spec 2026-09-29 §1), the
+ *  Organizations list's components with ACCOUNT_KIND. Rows, groups, tiles
+ *  and totals come from GET /accounts/portfolio/; every filter, sort and
+ *  group is URL state; bulk owner and lifecycle go to POST /accounts/bulk/.
+ *  No archive or churn: Churn is an ordinary stage. */
 export function List() {
-  const dispatch = useDispatch<AppDispatch>();
-  const { customers, allAccounts, allAccountsCount, allAccountsNext, allAccountsPrevious, allAccountsLoading, allAccountsError } =
-    useSelector((state: RootState) => state.customers);
+  return (
+    <PortfolioKindContext.Provider value={ACCOUNT_KIND}>
+      <AccountsList />
+    </PortfolioKindContext.Provider>
+  );
+}
 
-  const [offset, setOffset] = useState(0);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  // A Customer id as a string, or '' for "All Organizations".
-  const [companyFilter, setCompanyFilter] = useState('');
-  // Bumped after a successful Add/Edit to re-run the fetch effect below
-  // with the current search/company filters still applied — same
-  // reasoning as the Contacts page's own refreshKey.
-  const [refreshKey, setRefreshKey] = useState(0);
-  const refetch = () => setRefreshKey((k) => k + 1);
+function AccountsList() {
+  const { params, update, clearFilters } = usePortfolioParams();
+  const isSm = useMediaQuery(SM);
+  const orgCurrency = useOrgCurrency();
 
-  useEffect(() => {
-    const timeout = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
-    return () => clearTimeout(timeout);
-  }, [searchQuery]);
+  const [version, setVersion] = useState(0);
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
+  const [notice, setNotice] = useState<string | null>(null);
+  const forms = useAccountEditing(setNotice);
+  const { remember, nameOf } = forms;
 
-  // Organization filter dropdown's own options — also what "Add
-  // Account" picks an organization from.
-  useEffect(() => {
-    dispatch(fetchCustomers());
-  }, [dispatch]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const params = new URLSearchParams();
-    if (debouncedSearch) params.set('search', debouncedSearch);
-    if (companyFilter) params.set('company', companyFilter);
-    const query = params.toString();
-    dispatch(fetchAllAccounts(query ? `/accounts/?${query}` : undefined))
-      .unwrap()
-      .then(() => {
-        if (!cancelled) setOffset(0);
-      })
-      .catch(() => {
-        // Failure is already surfaced via redux `error` state into the table.
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [dispatch, debouncedSearch, companyFilter, refreshKey]);
-
-  const companies = useMemo(
-    () => customers.map((c) => ({ id: c.id, name: c.name })),
-    [customers]
+  const [openRow, setOpenRow] = useState<AccountPortfolioRow | null>(null);
+  // Every page that lands (the flat list's, or any section's): remember the
+  // rows, and swap the opened row for its fresh copy.
+  const onRowsLoaded = useCallback(
+    (rows: AccountPortfolioRow[]) => {
+      remember(rows);
+      setOpenRow((current) => (current && rows.find((row) => row.id === current.id)) || current);
+    },
+    [remember],
   );
 
-  const handleNext = async () => {
-    if (!allAccountsNext) return;
-    const currentPageSize = allAccounts.length;
+  const portfolio = usePortfolio<AccountPortfolioRow, AccountFilterOptions>(params, version, onRowsLoaded);
+  const members = useMembers();
+  const selection = useSelection();
+  const { prune, clear: clearSelection } = selection;
+  const searchRef = useRef<HTMLInputElement>(null);
+  const grouped = params.group !== '';
+
+  // The Organizations list's selection rule: a different list landing
+  // (`loadedQuery` changed) clears it when grouped and prunes it to page one
+  // when flat; a reload of the same query keeps it, so failed ids stay
+  // selected for a retry. Adjusted during render, not in an effect.
+  const { loadedQuery } = portfolio;
+  const [seenQuery, setSeenQuery] = useState(loadedQuery);
+  const [report, setReport] = useState<BulkReport | null>(null);
+  if (seenQuery !== loadedQuery) {
+    setSeenQuery(loadedQuery);
+    if (grouped) clearSelection();
+    else prune(portfolio.rows.map((row) => row.id));
+    setReport(null);
+  }
+  // Read by runBulk after its await: the query that is loaded by then.
+  const loadedQueryRef = useRef(loadedQuery);
+  useLayoutEffect(() => {
+    loadedQueryRef.current = loadedQuery;
+  });
+
+  const [exporting, setExporting] = useState(false);
+  const [actionRunning, setActionRunning] = useState(false);
+  // Phones: the toolbar's Select toggle shows the checkboxes without a long press.
+  const [selectMode, setSelectMode] = useState(false);
+  const selecting = selection.selecting || (selectMode && !isSm);
+  const endSelection = () => {
+    selection.clear();
+    setReport(null);
+    setSelectMode(false);
+  };
+  const toggleSelectMode = () => {
+    if (selecting) endSelection();
+    else setSelectMode(true);
+  };
+
+  const currency = portfolio.data?.currency ?? orgCurrency;
+  const options = portfolio.data?.filters ?? null;
+  const failed = !portfolio.data && portfolio.error !== null;
+
+  const toggleOpen = useCallback(
+    (row: AccountPortfolioRow) => setOpenRow((current) => (current?.id === row.id ? null : row)),
+    [],
+  );
+  const closeSheet = useCallback(() => setOpenRow(null), []);
+
+  const runExport = async (query: string) => {
+    setExporting(true);
+    setNotice(null);
     try {
-      await dispatch(fetchAllAccounts(allAccountsNext)).unwrap();
-      setOffset((o) => o + currentPageSize);
-    } catch {
-      // Failure is already surfaced via redux `error` state into the table.
+      await exportAccountPortfolio(query);
+    } catch (err) {
+      setNotice(errorMessage(err, 'Could not export accounts.'));
+    } finally {
+      setExporting(false);
     }
   };
 
-  const handlePrevious = async () => {
-    if (!allAccountsPrevious) return;
+  const runBulk = async (action: AccountBulkAction, value: number | string | null) => {
+    const ids = [...selection.selected];
+    const startQuery = loadedQueryRef.current;
+    setActionRunning(true);
+    setReport(null);
     try {
-      const result = await dispatch(fetchAllAccounts(allAccountsPrevious)).unwrap();
-      setOffset((o) => o - result.results.length);
-    } catch {
-      // Failure is already surfaced via redux `error` state into the table.
+      const result = await bulkUpdateAccounts({ ids, action, value });
+      setReport({
+        updated: result.updated.length,
+        failed: result.failed.map((failure) => ({ ...failure, name: nameOf(failure.id) })),
+      });
+      // Failures stay selected for a retry, unless a different list landed meanwhile.
+      if (loadedQueryRef.current === startQuery) selection.replace(result.failed.map((failure) => failure.id));
+      else selection.clear();
+    } catch (err) {
+      setReport({ updated: 0, failed: [], error: errorMessage(err, 'Could not update these accounts.') });
+    } finally {
+      setActionRunning(false);
+      reload();
     }
   };
 
-  const [isAddingAccount, setIsAddingAccount] = useState(false);
-  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const applyFilter = (patch: Partial<PortfolioParams>) => {
+    update(patch);
+    searchRef.current?.focus();
+  };
+
+  const renderRow: PortfolioRowRenderer<AccountPortfolioRow> = (row, { loading }) => {
+    const open = openRow?.id === row.id;
+    return (
+      <AccountRow
+        key={row.id}
+        row={row}
+        currency={currency}
+        pins={[]}
+        isSm={isSm}
+        selecting={selecting}
+        selected={selection.selected.has(row.id)}
+        selectDisabled={loading || portfolio.loading || actionRunning}
+        atLimit={selection.atLimit}
+        open={open}
+        onToggleSelect={selection.toggle}
+        onLongPress={selection.toggle}
+        onToggleOpen={toggleOpen}
+      >
+        {open && isSm ? (
+          <AccountPanels
+            id={`account-${row.id}-details`}
+            row={row}
+            currency={currency}
+            onEdit={ACCOUNT_KIND.editable(row) ? forms.openEdit : undefined}
+          />
+        ) : null}
+      </AccountRow>
+    );
+  };
 
   return (
-    <div className="flex flex-col h-full w-full bg-surface text-ink">
-      <div className="flex flex-col flex-1 overflow-hidden p-6">
-        <MetricsPanel />
-
-        <ActionBar
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          companyFilter={companyFilter}
-          setCompanyFilter={setCompanyFilter}
-          companies={companies}
-          onAddAccount={() => setIsAddingAccount(true)}
-        />
-
-        <div className="flex-1 overflow-hidden bg-surface/50 relative">
-          <AccountsTable
-            accounts={allAccounts}
-            isLoading={allAccountsLoading}
-            error={allAccountsError}
-            offset={offset}
-            count={allAccountsCount}
-            hasNext={!!allAccountsNext}
-            hasPrevious={!!allAccountsPrevious}
-            onNext={handleNext}
-            onPrevious={handlePrevious}
-            onEditRequest={setEditingAccount}
+    <OrganizationsFrame>
+      <div className="flex flex-col gap-4 pb-6">
+        {/* Containers: the tiles and rows follow this column, which the Ask
+            rail (delivery 3) will narrow, not the window. */}
+        <div className="@container">
+          <SummaryTiles
+            summary={portfolio.data?.summary ?? null}
+            failed={failed}
+            currency={currency}
+            params={params}
+            onFilter={update}
           />
         </div>
+        <PortfolioToolbar
+          params={params}
+          update={update}
+          options={options}
+          isSm={isSm}
+          onExport={() => void runExport(toApiQuery(params))}
+          exporting={exporting}
+          onAdd={() => forms.openAdd()}
+          searchRef={searchRef}
+          selectMode={selecting}
+          onToggleSelectMode={toggleSelectMode}
+        />
+        <FilterChips
+          params={params}
+          options={options}
+          count={portfolio.data?.count ?? null}
+          total={portfolio.total}
+          failed={failed}
+          onChange={applyFilter}
+          onClearAll={() => {
+            clearFilters();
+            searchRef.current?.focus();
+          }}
+        />
+        {notice ? (
+          <p role="alert" className="text-[13px] text-danger">
+            {notice}
+          </p>
+        ) : null}
+        <div className="@container">
+          <PortfolioSections
+            params={params}
+            version={version}
+            portfolio={portfolio}
+            currency={currency}
+            filtered={hasFilters(params)}
+            renderRow={renderRow}
+            onRowsLoaded={onRowsLoaded}
+            onClearFilters={clearFilters}
+            onAdd={() => forms.openAdd()}
+          />
+        </div>
+        <SelectionBar
+          count={selection.selected.size}
+          owners={ownerTargets(members)}
+          lifecycles={ACCOUNT_LIFECYCLE_TARGETS}
+          keepChurn
+          activity={actionRunning ? 'applying' : exporting ? 'exporting' : null}
+          loading={portfolio.loading}
+          report={report}
+          onSetOwner={(id) => void runBulk('set_owner', id)}
+          onSetLifecycle={(stage) => void runBulk('set_lifecycle', stage)}
+          onExport={() => void runExport(new URLSearchParams({ ids: [...selection.selected].join(',') }).toString())}
+          onClose={endSelection}
+        />
       </div>
 
-      {isAddingAccount && (
-        <AccountFormModal
-          companies={companies}
-          onClose={() => setIsAddingAccount(false)}
-          onSaved={refetch}
-        />
-      )}
+      {!isSm && openRow ? <AccountSheet row={openRow} currency={currency} onClose={closeSheet} onEdit={forms.openEdit} /> : null}
 
-      {editingAccount && (
+      {forms.adding ? (
         <AccountFormModal
-          account={editingAccount}
-          onClose={() => setEditingAccount(null)}
+          companies={forms.companies}
+          defaultLifecycleStage={forms.adding.stage}
+          onSaved={reload}
+          onClose={forms.closeAdd}
         />
-      )}
-    </div>
+      ) : null}
+      {forms.editing ? (
+        <AccountFormModal
+          account={forms.editing}
+          onClose={() => {
+            forms.closeEdit();
+            reload();
+          }}
+        />
+      ) : null}
+    </OrganizationsFrame>
   );
 }

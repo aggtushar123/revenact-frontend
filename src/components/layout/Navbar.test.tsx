@@ -622,3 +622,29 @@ describe('Navbar on the Organizations list', () => {
     expect(board).toHaveAttribute('aria-current', 'page');
   });
 });
+
+describe('Navbar on the Accounts list and board (accounts spec 2026-09-29 §1)', () => {
+  it('wears the framed bar on /accounts/list: "Accounts", List | Board, the actions slot, no avatar', () => {
+    const setSlot = vi.fn();
+    renderNavbar('/accounts/list', null, null, [], setSlot);
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('h-16', 'shrink-0', 'flex', 'items-center', 'gap-3', 'px-4');
+    for (const cls of ['bg-surface', 'border-b', 'shadow-sm']) expect(header).not.toHaveClass(cls);
+    expect(screen.getByRole('heading', { name: 'Accounts' })).toBeInTheDocument();
+    const views = screen.getByRole('navigation', { name: 'Accounts views' });
+    expect(within(views).getByRole('link', { name: 'List' })).toHaveAttribute('href', '/accounts/list');
+    expect(within(views).getByRole('link', { name: 'Board' })).toHaveAttribute('href', '/accounts/board');
+    expect(setSlot).toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(header!.querySelector('[data-nav-actions-slot]')).not.toBeNull();
+    expect(screen.queryByAltText('Alice Admin')).not.toBeInTheDocument();
+  });
+
+  it('carries the query across List and Board on /accounts/board', () => {
+    renderNavbar('/accounts/board?organisation=7&health=poor', null, null, [], vi.fn());
+    const views = screen.getByRole('navigation', { name: 'Accounts views' });
+    expect(within(views).getByRole('link', { name: 'List' })).toHaveAttribute('href', '/accounts/list?organisation=7&health=poor');
+    const board = within(views).getByRole('link', { name: 'Board' });
+    expect(board).toHaveAttribute('href', '/accounts/board?organisation=7&health=poor');
+    expect(board).toHaveAttribute('aria-current', 'page');
+  });
+});

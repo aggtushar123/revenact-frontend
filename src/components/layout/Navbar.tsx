@@ -92,11 +92,11 @@ export function Navbar() {
     : null;
 
   const isOrganizations = location.pathname.startsWith('/organizations');
-  // Only /accounts/list and /accounts/board — never /accounts/:id,
-  // which the `account` branch above already claims first (checked
-  // earlier in the render chain below), same "detail page own header
-  // wins" ordering as isOrganizations vs. the `organization` branch.
-  const isAccountsList = location.pathname.startsWith('/accounts');
+  // The Accounts list and board wear the Organizations frame (accounts spec
+  // 2026-09-29 §1): the transparent bar, "Accounts", List | Board carrying
+  // the query, the actions slot (the Ask pill lands there in delivery 3),
+  // no avatar. /accounts/:id is claimed by the `account` branch first.
+  const isAccountsView = /^\/accounts\/(list|board)\/?$/.test(location.pathname);
   const isSettings = location.pathname.startsWith('/settings');
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
@@ -113,7 +113,7 @@ export function Navbar() {
   // person open on it share one page, titled here; the page draws the rest.
   // A trailing slash still reads as the same route (fix round 1, 2026-09-28).
   const isContacts = /^\/contacts(\/\d+)?\/?$/.test(location.pathname);
-  const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts;
+  const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts || isAccountsView;
   const dashboardSharedSearch = sharedSearch(location.search);
 
 
@@ -291,28 +291,30 @@ export function Navbar() {
               </NavLink>
             </nav>
           </>
-        ) : isAccountsList ? (
-          <>
-            <div className="flex items-center gap-1.5 cursor-pointer hover:bg-subtle py-1.5 px-2 -ml-2 rounded-md transition-colors">
-              <h1 className="text-[17px] font-bold text-ink tracking-tight">Accounts</h1>
-              <ChevronDown className="w-3.5 h-3.5 text-ink-muted stroke-[2.5px] mt-[1px]" />
-            </div>
-
-            <nav className="flex items-center gap-8 h-full mt-0.5 ml-2">
-              <NavLink
-                to="/accounts/list"
-                className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-accent text-accent opacity-90' : 'border-transparent text-ink-muted hover:text-ink'}`}
-              >
-                List
-              </NavLink>
-              <NavLink
-                to="/accounts/board"
-                className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-accent text-accent opacity-90' : 'border-transparent text-ink-muted hover:text-ink'}`}
-              >
-                Board
-              </NavLink>
+        ) : isAccountsView ? (
+          <div className="flex items-center gap-4 h-full">
+            <h1 className="text-[17px] font-bold text-ink tracking-tight">Accounts</h1>
+            <nav aria-label="Accounts views" className="flex items-center gap-4 h-full">
+              {[
+                { to: '/accounts/list', label: 'List' },
+                { to: '/accounts/board', label: 'Board' },
+              ].map((view) => (
+                <NavLink
+                  key={view.to}
+                  // The two views share their URL state (filters, sort,
+                  // group), so switching tabs keeps it.
+                  to={{ pathname: view.to, search: location.search }}
+                  className={({ isActive }) =>
+                    `h-full inline-flex items-center text-[13px] font-semibold border-b-2 transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                      isActive ? 'border-accent text-ink' : 'border-transparent text-ink-muted hover:text-ink'
+                    }`
+                  }
+                >
+                  {view.label}
+                </NavLink>
+              ))}
             </nav>
-          </>
+          </div>
         ) : isPipelines ? (
           <>
             <div className="flex items-center gap-1.5 cursor-pointer hover:bg-subtle py-1.5 px-2 -ml-2 rounded-md transition-colors">
