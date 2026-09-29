@@ -88,8 +88,13 @@ export function ContactsPage() {
   }, [dispatch, apiPath, refresh]);
 
   const organisations = useMemo(() => customers.map((c) => ({ id: c.id, name: c.name })), [customers]);
+  // A filter can match nobody on the page (a sentiment nobody there has), so
+  // the name falls back to the loaded organisations list rather than reading
+  // "Organisation" (fix round 2, controller review).
   const organisationName =
-    allContacts.find((c) => c.organisation && String(c.organisation.id) === params.customer)?.organisation?.name ?? null;
+    allContacts.find((c) => c.organisation && String(c.organisation.id) === params.customer)?.organisation?.name ??
+    organisations.find((o) => String(o.id) === params.customer)?.name ??
+    null;
   const accountName =
     allContacts.find((c) => c.account && String(c.account.id) === params.account)?.account?.name ?? null;
 

@@ -63,7 +63,7 @@ The client sends ids and filter values only, never a name or any text.
 - **Person view:** `{surface: "contacts", view: "person", contact: <id>, focus?: "sentiment"}`. The contact is read again through `visible_children_q(asker)`. One the asker cannot open is a 400, worded the same whether it exists or not.
 - **The chip** is always built by the server:
   - "Lukas Vermeer · Kraft Heinz" for a person (the organisation, or "Organisation › Account").
-  - "Contacts" for the list, followed by each active filter's label ("Contacts · Negative · Decision makers").
+  - "Contacts" for the list, followed by each active filter's label ("Contacts · Negative · Decision Maker").
   - The same label tags the conversation in History.
 
 ### 4.2 Grounding
@@ -95,8 +95,8 @@ The client sends ids and filter values only, never a name or any text.
 - **Layout:**
   - `ContactsAskLayout` wraps the page in one `AskProvider` (`surface: contacts`) and fills `ContactsFrame`'s `rail` slot. The conversation survives opening people, filtering and going back.
   - The top bar gets the same pills as Organizations: New chat, History and ✦.
-  - From `lg` up, the rail sits beside the page: the list narrows and the profile stays.
-  - Below `lg`, it opens as the existing `AskSheet`.
+  - From `sm` up, the rail sits beside the page. It opens by default from `xl`; below that the person's own open or closed choice wins. With it open, two panes still fit beside it — the list narrowed to 18rem, and the profile — only from `xl`; between `md` and `xl` it collapses to one pane while the rail stays open.
+  - Below `sm`, it opens as the existing `AskSheet`.
 - **What the rail asks about** comes from the route:
   - `/contacts/:id` is the person view.
   - Otherwise it is the list view with the URL filters.
@@ -158,7 +158,7 @@ Each goes through subagent-driven development with a review per task, a final re
   - A jsdom end-to-end test: filter by organisation, open a person, see their calls with sentiment, follow the link to the organisation.
   - The house-rules suite over the new files.
   - Ask on Contacts (delivery 2):
-    - The layout at `md` and at `lg` and up, and the sheet on phones.
+    - The layout below `sm` (the sheet), between `md` and `xl` (one pane while the rail is open), and at `xl` and up (two panes, the list narrowed to 18rem).
     - The context follows the route, between the list and a person.
     - "Why this sentiment?" types the question in without sending it.
     - History handover.

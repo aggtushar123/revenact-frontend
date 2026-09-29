@@ -59,6 +59,11 @@ describe('contactsLabel', () => {
     );
   });
 
+  it('names a person with no organisation "No organisation", matching the server', () => {
+    const noOrg: ContactsNames = { ...NAMES, person: { id: 41, name: 'Sam Pizza', place: '' } };
+    expect(contactsLabel({ surface: 'contacts', view: 'person', contact: 41, focus: null }, noOrg)).toBe('Sam Pizza · No organisation');
+  });
+
   it('names the list and each filter', () => {
     expect(contactsLabel({ surface: 'contacts', view: 'list', filters: {} }, null)).toBe('Contacts');
     expect(

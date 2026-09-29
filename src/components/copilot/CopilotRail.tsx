@@ -1,12 +1,12 @@
 // The Copilot in a rail: shared by Communications (beside the inbox), the
-// Dashboard (beside the figures) and Organizations (beside the list and the
-// board).
+// Dashboard (beside the figures), Organizations (beside the list and the
+// board) and Contacts (beside the list and the profile).
 //
 // A conversation is real (`sendMessage` to /copilot/messages/); the rail holds
 // one at a time. The context says what a question is about: Communications
-// sends its picked source as a text prefix, the Dashboard and Organizations
-// send where the person is as a structured `context` the server grounds the
-// answer in.
+// sends its picked source as a text prefix, the Dashboard, Organizations and
+// Contacts send where the person is as a structured `context` the server
+// grounds the answer in.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronDown, Clock, LayoutDashboard, MessageSquare, Network, Plus, Search, Users, X } from 'lucide-react';

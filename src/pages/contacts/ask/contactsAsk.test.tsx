@@ -40,6 +40,13 @@ describe('Ask Revenact on Contacts', () => {
     expect(postedBodies(copilot)[0].context).toEqual({ surface: 'contacts', view: 'list', filters: { sentiment: 'negative' } });
   });
 
+  it('names the organisation in the chip even when the filter matches nobody there', async () => {
+    stubContactsAsk();
+    renderContactsPage('/contacts?customer=7&sentiment=neutral', { ask: true });
+    await screen.findByText('Nobody matches');
+    expect(await within(rail()!).findByText('Contacts · Pizza Hut · Neutral')).toBeInTheDocument();
+  });
+
   it('asks about the open person, named from the page before the server labels it', async () => {
     const { copilot } = stubContactsAsk();
     renderContactsPage('/contacts/41', { ask: true });
@@ -129,7 +136,6 @@ describe('layout beside the rail', () => {
     await userEvent.click(within(screen.getByTestId('nav-actions')).getByRole('button', { name: 'Hide Copilot' }));
     await waitFor(() => expect(pane('list')).toHaveClass('w-[22rem]'));
     expect(pane('profile')).toBeInTheDocument();
-    localStorage.clear();
   });
 
   it('keeps the delivery 1 layout with no Ask provider', async () => {

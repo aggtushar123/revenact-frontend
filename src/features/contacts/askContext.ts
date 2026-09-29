@@ -59,7 +59,7 @@ function listParts(filters: ContactsFilters, names: ContactsNames | null): strin
 export function contactsLabel(context: ContactsListContext | ContactsPersonContext, names: ContactsNames | null = null): string {
   if (context.view === 'list') return context.label ?? listParts(context.filters, names).join(SEPARATOR);
   const person = names?.person?.id === context.contact ? names.person : null;
-  const base = context.label ?? (person ? `${person.name}${SEPARATOR}${person.place}` : 'This person');
+  const base = context.label ?? (person ? `${person.name}${SEPARATOR}${person.place || 'No organisation'}` : 'This person');
   return context.focus === 'sentiment' ? `${base}${SEPARATOR}Sentiment` : base;
 }
 

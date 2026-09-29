@@ -25,7 +25,7 @@ const ON_LUKAS_SENTIMENT = {
   origin: { surface: 'contacts', view: 'person', contact: 41, label: 'Lukas Vermeer · Kraft Heinz' },
 };
 
-describe('Ask Revenact on Contacts, end to end (spec 2026-09-29)', () => {
+describe('Ask Revenact on Contacts, end to end (spec 2026-09-28)', () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     resetViewport();
