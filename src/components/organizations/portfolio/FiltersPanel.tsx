@@ -1,11 +1,11 @@
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
 import { ArrowDown, ArrowUp, Download, Plus, X } from 'lucide-react';
 import { trapTab } from '../../../lib/focusTrap';
-import { SORT_OPTIONS } from '../../../features/organizations/portfolioFields';
 import { HEALTH_BANDS, toggleIn, type PortfolioParams } from '../../../features/organizations/portfolioParams';
 import { HEALTH_LABEL, NPS_BANDS, NPS_LABEL, RENEWAL_WINDOWS, windowLabel } from '../../../features/organizations/portfolioLabels';
-import type { GroupKey, LifecycleValue, NpsBand, PortfolioResponse } from '../../../features/organizations/portfolioTypes';
-import { GROUP_OPTIONS, type GroupOption } from '../../../features/organizations/portfolioGroups';
+import type { FilterOptions, GroupKey, LifecycleValue, NpsBand } from '../../../features/organizations/portfolioTypes';
+import type { GroupOption } from '../../../features/organizations/portfolioGroups';
+import { usePortfolioKind } from './portfolioKind';
 import { FOCUS } from './styles';
 
 const SELECT = `min-h-11 sm:min-h-9 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink hover:border-line-strong disabled:opacity-50 ${FOCUS}`;
@@ -17,13 +17,15 @@ export { BOARD_GROUP_OPTIONS, GROUP_OPTIONS, type GroupOption } from '../../../f
 export function GroupSortControls({
   params,
   update,
-  groupOptions = GROUP_OPTIONS,
+  groupOptions,
 }: {
   params: PortfolioParams;
   update: (patch: Partial<PortfolioParams>) => void;
-  /** The Board passes BOARD_GROUP_OPTIONS. */
+  /** The Board passes its kind's board options; absent, the kind's List options. */
   groupOptions?: GroupOption[];
 }) {
+  const kind = usePortfolioKind();
+  const groups = groupOptions ?? kind.groupOptions;
   const descending = params.sort.startsWith('-');
   const field = params.sort.replace(/^-/, '');
   const groupId = useId();
@@ -42,7 +44,7 @@ export function GroupSortControls({
           value={params.group || 'none'}
           onChange={(event) => update({ group: event.target.value === 'none' ? '' : (event.target.value as GroupKey) })}
         >
-          {groupOptions.map((option) => (
+          {groups.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -59,7 +61,7 @@ export function GroupSortControls({
           value={field}
           onChange={(event) => update({ sort: `${descending ? '-' : ''}${event.target.value}` })}
         >
-          {SORT_OPTIONS.map((option) => (
+          {kind.sortOptions.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
@@ -134,7 +136,7 @@ export function FiltersPanel({
 }: {
   params: PortfolioParams;
   update: (patch: Partial<PortfolioParams>) => void;
-  options: PortfolioResponse['filters'] | null;
+  options: FilterOptions | null;
   isSm: boolean;
   onClose: () => void;
   onExport: () => void;
@@ -149,6 +151,7 @@ export function FiltersPanel({
   /** The phone sheet's Group choices (the Board passes BOARD_GROUP_OPTIONS). */
   groupOptions?: GroupOption[];
 }) {
+  const kind = usePortfolioKind();
   const ref = useRef<HTMLDivElement>(null);
   const ownerRef = useRef<HTMLSelectElement>(null);
   const ownerId = useId();
@@ -219,6 +222,23 @@ export function FiltersPanel({
         </select>
       </div>
 
+      {kind.filters.organisation ? (
+        <Group legend="Organization">
+          {options?.organisations?.length ? (
+            options.organisations.map((organisation) => (
+              <Check
+                key={organisation.value}
+                label={organisation.name}
+                checked={(params.organisation ?? []).includes(organisation.value)}
+                onChange={() => update({ organisation: toggleIn(params.organisation ?? [], organisation.value) })}
+              />
+            ))
+          ) : (
+            <p className="text-[13px] text-ink-muted">No organizations to filter by yet.</p>
+          )}
+        </Group>
+      ) : null}
+
       <Group legend="Health">
         {HEALTH_BANDS.map((band) => (
           <Check key={band} label={HEALTH_LABEL[band]} checked={params.health.includes(band)} onChange={() => update({ health: toggleIn(params.health, band) })} />
@@ -236,15 +256,17 @@ export function FiltersPanel({
         ))}
       </Group>
 
-      <Group legend="Product">
-        {options?.products.length ? (
-          options.products.map((product) => (
-            <Check key={product.value} label={product.name} checked={params.product.includes(product.value)} onChange={() => update({ product: toggleIn(params.product, product.value) })} />
-          ))
-        ) : (
-          <p className="text-[13px] text-ink-muted">No products in the catalogue yet.</p>
-        )}
-      </Group>
+      {kind.filters.product ? (
+        <Group legend="Product">
+          {options?.products?.length ? (
+            options.products.map((product) => (
+              <Check key={product.value} label={product.name} checked={params.product.includes(product.value)} onChange={() => update({ product: toggleIn(params.product, product.value) })} />
+            ))
+          ) : (
+            <p className="text-[13px] text-ink-muted">No products in the catalogue yet.</p>
+          )}
+        </Group>
+      ) : null}
 
       <Group legend="Renews within">
         {WINDOWS.map((w) => (
@@ -258,9 +280,11 @@ export function FiltersPanel({
         ))}
       </Group>
 
-      <Group legend="Churned">
-        <Check label="Include churned" checked={params.include_churned} onChange={() => update({ include_churned: !params.include_churned })} />
-      </Group>
+      {kind.filters.churned ? (
+        <Group legend="Churned">
+          <Check label="Include churned" checked={params.include_churned} onChange={() => update({ include_churned: !params.include_churned })} />
+        </Group>
+      ) : null}
 
       {!isSm ? (
         <div className="flex flex-col gap-2 border-t border-line-subtle pt-4">
@@ -279,7 +303,7 @@ export function FiltersPanel({
             className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent text-[13px] font-semibold text-on-accent hover:bg-accent-hover ${FOCUS}`}
           >
             <Plus className="w-4 h-4" aria-hidden="true" />
-            Add organization
+            {`Add ${kind.noun.one}`}
           </button>
         </div>
       ) : null}

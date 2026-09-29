@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { CheckSquare, Download, Pin, Plus, Search, SlidersHorizontal } from 'lucide-react';
 import type { ColumnId } from '../tableData';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
-import type { PortfolioResponse } from '../../../features/organizations/portfolioTypes';
+import type { FilterOptions } from '../../../features/organizations/portfolioTypes';
 import { FiltersPanel, GroupSortControls, type GroupOption } from './FiltersPanel';
 import { PinFieldsMenu } from './PinFieldsMenu';
+import { usePortfolioKind } from './portfolioKind';
 import { BUTTON, FOCUS } from './styles';
 
 const LABEL = 'Search by name or Revenact ID';
@@ -14,7 +15,8 @@ function activeFilters(p: PortfolioParams): number {
     [p.owner !== '', p.renews_within !== '', p.nps !== '', p.include_churned, p.ids.length > 0].filter(Boolean).length +
     p.lifecycle.length +
     p.health.length +
-    p.product.length
+    p.product.length +
+    (p.organisation?.length ?? 0)
   );
 }
 
@@ -35,7 +37,7 @@ export function PortfolioToolbar({
 }: {
   params: PortfolioParams;
   update: (patch: Partial<PortfolioParams>) => void;
-  options: PortfolioResponse['filters'] | null;
+  options: FilterOptions | null;
   isSm: boolean;
   /** Omitted on the Board, whose cards show no pinned chips: no Pin fields then. */
   pins?: ColumnId[];
@@ -50,6 +52,7 @@ export function PortfolioToolbar({
   /** The Group choices; the Board passes BOARD_GROUP_OPTIONS (no "None"). */
   groupOptions?: GroupOption[];
 }) {
+  const kind = usePortfolioKind();
   // The box shows what is typed; the URL gets it 300ms after typing stops.
   // A chip or "Clear all" changing the URL resets the box (adjusted during
   // render, not in an effect).
@@ -133,7 +136,7 @@ export function PortfolioToolbar({
             className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-semibold text-on-accent hover:bg-accent-hover active:opacity-90 ${FOCUS}`}
           >
             <Plus className="w-4 h-4" aria-hidden="true" />
-            Add organization
+            {`Add ${kind.noun.one}`}
           </button>
         </>
       ) : null}

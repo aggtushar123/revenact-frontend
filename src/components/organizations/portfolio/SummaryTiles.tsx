@@ -5,6 +5,7 @@ import { signed } from '../../../features/organizations/portfolioFields';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { HealthBand, NpsBand, PortfolioSummary } from '../../../features/organizations/portfolioTypes';
 import { HEALTH_LABEL, NPS_BANDS, NPS_LABEL, RENEWAL_WINDOWS, type RenewalWindow } from '../../../features/organizations/portfolioLabels';
+import { usePortfolioKind } from './portfolioKind';
 import { FOCUS } from './styles';
 
 const BANDS: HealthBand[] = ['good', 'average', 'poor'];
@@ -117,16 +118,17 @@ export function SummaryTiles({
   params: PortfolioParams;
   onFilter: (patch: Partial<PortfolioParams>) => void;
 }) {
+  const kind = usePortfolioKind();
   const [mode, setMode] = useState<'count' | 'mrr' | 'arr'>('count');
   // The Renewing tile's window. The summary counts 30 and 90 days; a
   // 180-day filter (set from the Filters panel) shows as a third, pressed
   // option, whose count is the whole filtered book. Synced during render.
-  const [span, setSpan] = useState<RenewalWindow>(params.renews_within || '30');
+  const [span, setSpan] = useState<RenewalWindow>(params.renews_within || kind.renewalWindow);
   const [seenWindow, setSeenWindow] = useState(params.renews_within);
   if (seenWindow !== params.renews_within) {
     setSeenWindow(params.renews_within);
     if (params.renews_within) setSpan(params.renews_within);
-    else if (span === '180') setSpan('30');
+    else if (span === '180') setSpan(kind.renewalWindow);
   }
   if (!summary) {
     if (!failed) return <Skeleton />;
