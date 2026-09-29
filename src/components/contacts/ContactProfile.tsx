@@ -1,11 +1,13 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { Mail, Pencil, Phone, Trash2 } from 'lucide-react';
+import { useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Mail, Pencil, Phone, Sparkles, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks';
+import { whyQuestion } from '../../features/contacts/askContext';
 import { SENTIMENT_DOT, placeOf, sentimentWhy } from '../../features/contacts/contactsFormat';
 import { deleteContact, fetchContactById, fetchContactHistory } from '../../features/customers/customersSlice';
 import { formatRelativeTime, initials } from '../../features/customers/formatters';
 import { mailtoHref, telHref } from '../../lib/contactLinks';
+import { AskDraftContext } from '../../pages/dashboard/ask/context';
 import { ErrorState } from '../../pages/dashboard/shared/DataState';
 import { ConfirmDialog } from '../organizations/ConfirmDialog';
 import { ListSkeleton } from '../organizations/detail/ListParts';
@@ -37,10 +39,10 @@ function Section({ title, count, shown, empty, children }: { title: string; coun
 /** The selected person (spec 2026-09-28 §3): who they are and how to reach
  *  them, where they sit (each linking to the organisation page, the account
  *  with its chip chosen), their sentiment and why, then their calls newest
- *  first, emails and tickets. Edit and Delete are the existing flows.
- *  "Why this sentiment?" arrives with Ask on Contacts (delivery 2, §4). */
+ *  first, emails and tickets. Edit and Delete are the existing flows. */
 export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: number; onDeleted: () => void; onSaved?: () => void }) {
   const dispatch = useAppDispatch();
+  const draft = useContext(AskDraftContext);
   const { selectedContact, selectedContactHistory } = useAppSelector((state) => state.customers);
   const [attempt, setAttempt] = useState(0);
   const [editing, setEditing] = useState(false);
@@ -171,6 +173,16 @@ export function ContactProfile({ id, onDeleted, onSaved = () => {} }: { id: numb
               <span>{`Sentiment read ${formatRelativeTime(contact.sentiment_computed_at)}`}</span>
             ) : null}
           </p>
+          {draft ? (
+            <button
+              type="button"
+              onClick={() => draft(whyQuestion(contact.name, history.sentiment), { kind: 'sentiment' })}
+              className={`${QUIET} -ml-2 w-fit`}
+            >
+              <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+              Why this sentiment?
+            </button>
+          ) : null}
         </div>
       </section>
 

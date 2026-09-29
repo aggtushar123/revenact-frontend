@@ -77,6 +77,31 @@ describe('Ask Revenact on Contacts', () => {
     await userEvent.click(pill().getByRole('button', { name: 'Show Copilot' }));
     expect(await screen.findByRole('dialog', { name: 'Ask Revenact' })).toBeInTheDocument();
   });
+
+  it('"Why this sentiment?" types the question in, names the focus, and sends nothing until asked', async () => {
+    const { copilot } = stubContactsAsk();
+    renderContactsPage('/contacts/41', { ask: true });
+    await screen.findByRole('heading', { name: 'Lukas Vermeer' });
+    await userEvent.click(screen.getByRole('button', { name: 'Why this sentiment?' }));
+    expect(composer()).toHaveValue("Why is Lukas's sentiment neutral?");
+    expect(within(rail()!).getByText('Lukas Vermeer · Kraft Heinz › Kraft Heinz EMEA · Sentiment')).toBeInTheDocument();
+    expect(postedBodies(copilot)).toHaveLength(0);
+    await userEvent.type(composer(), '{Enter}');
+    await waitFor(() => expect(postedBodies(copilot)).toHaveLength(1));
+    expect(postedBodies(copilot)[0]).toMatchObject({
+      content: "Why is Lukas's sentiment neutral?",
+      context: { surface: 'contacts', view: 'person', contact: 41, focus: 'sentiment' },
+    });
+  });
+
+  it('opens the sheet with the question on phones', async () => {
+    stubContactsAsk();
+    renderContactsPage('/contacts/41', { ask: true, width: 375 });
+    await screen.findByRole('heading', { name: 'Lukas Vermeer' });
+    await userEvent.click(screen.getByRole('button', { name: 'Why this sentiment?' }));
+    const sheet = await screen.findByRole('dialog', { name: 'Ask Revenact' });
+    expect(within(sheet).getByPlaceholderText('Ask Revenact')).toHaveValue("Why is Lukas's sentiment neutral?");
+  });
 });
 
 describe('layout beside the rail', () => {

@@ -171,6 +171,12 @@ describe('ContactProfile (spec 2026-09-28 §3)', () => {
     expect(screen.getByRole('link', { name: 'Kraft Heinz' })).toHaveClass('min-h-11');
   });
 
+  it('has no "Why this sentiment?" outside an Ask provider', async () => {
+    renderProfile();
+    await screen.findByRole('article', { name: 'Lukas Vermeer' });
+    expect(screen.queryByRole('button', { name: 'Why this sentiment?' })).toBeNull();
+  });
+
   it('a phone telHref cannot use shows as plain text, like the email fallback (fix round 1, 2026-09-28)', async () => {
     renderProfile(41, { people: [{ ...LUKAS, phone: 'Ask reception' }] });
     const profile = await screen.findByRole('article', { name: 'Lukas Vermeer' });
