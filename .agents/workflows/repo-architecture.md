@@ -389,7 +389,7 @@ delivery 1). It draws itself in `OrganizationsFrame` (no rail until delivery 3).
 
 Account-level detail page linked from Org Details.
 - Same layout as Organizations Details but scoped to a single account
-- Uses `AccountMetricsPanel` for stakeholder diagnostics (Health, NPS, CSAT, Renewal)
+- Renders its own `AccountMetricsBanner` (defined in the same file) for stakeholder diagnostics (Health, Account Pulse, NPS, CSAT, ARR)
 - Recycles `PinnedAttributes` and `ActivityFeed` from `shared/`
 - Injects `ACCOUNT_ID_MAP` and `accountActivityData` at runtime for account-scoped feed data
 

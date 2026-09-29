@@ -177,4 +177,21 @@ describe('Accounts list (portfolio)', () => {
     expect(screen.getByText('Summary unavailable')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'Try again' }).length).toBeGreaterThan(0);
   });
+
+  it('dismisses the export-failure notice', async () => {
+    const spy = stubAccountsPortfolio();
+    vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit) =>
+      String(input).includes('export.csv')
+        ? { ok: false, status: 500, json: async () => ({ detail: 'Export broke' }) }
+        : spy(input, init),
+    );
+    renderAccounts('/accounts/list');
+    await screen.findByRole('link', { name: 'Pizza EMEA' });
+    await userEvent.click(screen.getByRole('button', { name: 'Export' }));
+    expect(await screen.findByText('Export broke')).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    expect(screen.queryByText('Export broke')).not.toBeInTheDocument();
+  });
 });

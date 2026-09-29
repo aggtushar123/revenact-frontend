@@ -1,4 +1,5 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { useOrgCurrency } from '../../hooks';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
 import { ACCOUNT_LIFECYCLE_TARGETS } from '../../features/accounts/accountFields';
@@ -17,12 +18,15 @@ import { PortfolioSections, type PortfolioRowRenderer } from '../../components/o
 import { PortfolioToolbar } from '../../components/organizations/portfolio/PortfolioToolbar';
 import { SelectionBar, type BulkReport } from '../../components/organizations/portfolio/SelectionBar';
 import { SummaryTiles } from '../../components/organizations/portfolio/SummaryTiles';
+import { FOCUS } from '../../components/organizations/portfolio/styles';
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
 import { useSelection } from '../../components/organizations/portfolio/useSelection';
 import { AccountFormModal } from '../organizations/AccountFormModal';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
 import { useAccountEditing } from './useAccountEditing';
+
+const DISMISS = `inline-flex w-11 h-11 sm:w-8 sm:h-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-subtle active:bg-line-subtle ${FOCUS}`;
 
 /** /accounts/list: the Accounts portfolio (spec 2026-09-29 §1), the
  *  Organizations list's components with ACCOUNT_KIND. Rows, groups, tiles
@@ -218,8 +222,11 @@ function AccountsList() {
           }}
         />
         {notice ? (
-          <p role="alert" className="text-[13px] text-danger">
+          <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
             {notice}
+            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className={DISMISS}>
+              <X className="w-4 h-4" aria-hidden="true" />
+            </button>
           </p>
         ) : null}
         <div className="@container">

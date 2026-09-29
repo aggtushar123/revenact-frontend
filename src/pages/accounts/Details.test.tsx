@@ -993,6 +993,113 @@ describe('AccountDetails page (/accounts/:id)', () => {
   });
 });
 
+describe('AccountDetails reads the account endpoint to fill in nav-state gaps (pulse + owner function)', () => {
+  const detailPath = (row: AccountRow) => `/customers/${row.orgId}/accounts/${row.revenactId}/`;
+  const detailBody = (row: AccountRow) => ({
+    id: row.revenactId,
+    customers: [{ id: row.orgId, name: row.orgName }],
+    name: row.name,
+    domain: '',
+    industry: '',
+    address: '',
+    email: '',
+    phone: '',
+    owner: { id: 7, name: 'Mei Tanaka', function: 'analytics', function_display: 'Analytics' },
+    created_at: '',
+    updated_at: '',
+    lifecycle_stage: 'onboarding',
+    health_score: '6.2',
+    health_category: 'average',
+    pulse: [],
+    ai_pulse_score: '',
+    ai_pulse_reason: '',
+    account_pulse: { value: '3.2', label: 'Watch', category: 3, breakdown: [] },
+    nps_score: null,
+    csat_score: null,
+    renewal_date: null,
+    arr: '0',
+  });
+
+  it('shows the nav-state row (no signal, no function) until the read lands, then merges account_pulse and owner.function in', async () => {
+    const rowWithGaps: AccountRow = { ...apacDivision, accountPulse: null, ownerFunction: null, ownerId: 7, owner: 'Mei Tanaka' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        String(url).endsWith(detailPath(rowWithGaps))
+          ? Promise.resolve({ ok: true, status: 200, json: async () => detailBody(rowWithGaps) })
+          : Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      )
+    );
+
+    renderAccountDetails({ account: rowWithGaps });
+
+    // Meanwhile: the nav-state row's null pulse/function still show (the
+    // owner's bare name, with no function, appears in both the owner tile
+    // and the pinned attributes).
+    expect(screen.getByText('No signal')).toBeInTheDocument();
+    expect(screen.getAllByText('Mei Tanaka').length).toBeGreaterThan(0);
+
+    // Once the read lands: the real pulse and function show.
+    expect(await screen.findByText('Watch')).toBeInTheDocument();
+    expect(await screen.findByText('Mei Tanaka · Analytics')).toBeInTheDocument();
+  });
+
+  it('leaves the nav-state row as it was when the read fails', async () => {
+    const rowWithGaps: AccountRow = { ...apacDivision, accountPulse: null, ownerFunction: null, ownerId: 7, owner: 'Mei Tanaka' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string) =>
+        String(url).endsWith(detailPath(rowWithGaps))
+          ? Promise.resolve({ ok: false, status: 500, json: async () => ({ detail: 'Server error.' }) })
+          : Promise.resolve({ ok: true, status: 200, json: async () => [] })
+      )
+    );
+
+    renderAccountDetails({ account: rowWithGaps });
+
+    await screen.findByText('APAC Division');
+    expect(screen.getByText('No signal')).toBeInTheDocument();
+    expect(screen.getAllByText('Mei Tanaka').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Mei Tanaka · Analytics')).not.toBeInTheDocument();
+  });
+
+  it('does not read the account endpoint, and keeps the nav-state row, when reached without navigation state', async () => {
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderAccountDetails();
+    await screen.findByText('9.5');
+
+    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringMatching(/\/customers\/\d+\/accounts\/\d+\/$/), expect.anything());
+  });
+});
+
+describe('AccountDetails with no openable organisation (orgId 0)', () => {
+  it('does not fire the contacts/opportunities/risks/canvases reads against /customers/0/…, and shows their empty state', async () => {
+    const noOrgAccount: AccountRow = { ...apacDivision, orgId: 0 };
+    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    renderAccountDetails({ account: noOrgAccount });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
+    expect(await screen.findByText('No contacts found.')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
+    expect(await screen.findByText('No opportunities found.')).toBeInTheDocument();
+
+    await user.click(await screen.findByRole('button', { name: /^Canvas List/ }));
+
+    // The four reads Details.tsx itself fires on mount (contacts,
+    // opportunities, risks, canvases) never went out against orgId 0 — unlike
+    // ActivityFeed's own per-tab reads (activities, emails, ...), which are
+    // its own concern, not this page's, and out of this fix's scope.
+    for (const endpoint of ['/contacts/', '/opportunities/', '/risks/', '/canvases/']) {
+      expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining(`/customers/0/accounts/17${endpoint}`), expect.anything());
+    }
+  });
+});
+
 describe('AccountDetails owner tile', () => {
   it('assigns an owner with a handover note, like an organisation', async () => {
     resetMembersCache();
@@ -1053,6 +1160,10 @@ describe('AccountDetails Company View', () => {
         if (u.includes('/customers/9/contributions/')) {
           return ok([{ id: 1, customer_id: 9, customer_name: 'Kraft Heinz', author: { id: 5, name: 'Priya Nair' }, function: 'engineering', function_display: 'Engineering', body: 'SSO drops sessions on token refresh.', created_at: '2026-09-13T08:00:00Z', updated_at: '2026-09-13T08:00:00Z' }]);
         }
+        // Not stubbed here: the page's own read of this endpoint (to fill
+        // in pulse/owner-function gaps) fails, leaving the nav-state row's
+        // own owner/function — exactly this test's own point.
+        if (/\/customers\/9\/accounts\/17\/$/.test(u)) return Promise.resolve({ ok: false, status: 404, json: async () => ({ detail: 'Not found.' }) });
         return ok([]);
       }),
     );

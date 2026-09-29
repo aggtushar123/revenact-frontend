@@ -185,7 +185,8 @@ function MoveToMenu<R extends PortfolioRowBase>({
 /** One account on the Board (spec §1 "Board"): AccountRow's phone-card
  *  content (ring, name, owner, then ARR, signal and trend) as a compact
  *  card. A click opens its details beside the board. The name links to the
- *  organization page. The header's Move to… icon button is the keyboard and
+ *  card's kind (Organizations: the organization page; Accounts: its own
+ *  page). The header's Move to… icon button is the keyboard and
  *  touch path for a move; after one, the board keeps focus on this card's
  *  Open button (`data-part="open"`) in its new column. Memoised: dragging re-renders the board, and only
  *  the cards whose props change should follow. */

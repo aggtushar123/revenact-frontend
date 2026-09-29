@@ -40,8 +40,9 @@ export interface PortfolioBoardProps<R extends PortfolioRowBase = PortfolioRow> 
   onMove: (row: R, to: LifecycleValue) => void;
   onRowsLoaded: (rows: R[]) => void;
   onClearFilters: () => void;
-  /** Add an organization: from the empty state with no stage, or from a
-   *  lifecycle column's "+" with that stage (ruling R2). */
+  /** Add a row (an organization or an account, by kind): from the empty
+   *  state with no stage, or from a lifecycle column's "+" with that
+   *  stage (ruling R2). */
   onAdd: (stage?: LifecycleValue) => void;
   /** The drop-only Churn column's "Show churned" (Organizations only). */
   onShowChurned?: () => void;

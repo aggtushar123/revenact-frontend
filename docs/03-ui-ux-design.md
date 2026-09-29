@@ -497,7 +497,7 @@ Everything in the section above holds, with these differences:
 - The line under a name reads "Organisation · owner · lifecycle · touched Nd
   ago". The organisation is the first linked one the viewer may open, then
   "+N" for the rest; a hidden one is never named or counted. A Board card's
-  line is the organisation.
+  line is the organisation (else the owner).
 - The opened row is `AccountPanels`:
   - Commercial: ARR in the workspace's currency, and the renewal date on a
     line with today marked, danger when overdue.
