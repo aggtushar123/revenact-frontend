@@ -40,6 +40,24 @@ describe('HistoryPopover', () => {
     expect(tagged).toHaveAccessibleName(/Who renews first\?\s*Started on Organizations · Owner: Carl CSM/);
   });
 
+  it("tags a conversation started on Contacts with the server's label", async () => {
+    stubCopilot({
+      conversations: [
+        {
+          id: 5,
+          title: "Why is Lukas's sentiment negative?",
+          created_at: '',
+          updated_at: '',
+          origin: { surface: 'contacts', view: 'person', contact: 41, label: 'Lukas Vermeer · Kraft Heinz' },
+        },
+      ],
+    });
+    render(<HistoryPopover onClose={() => {}} onOpen={() => {}} />);
+    const tagged = await screen.findByRole('button', { name: /Why is Lukas's sentiment negative\?/ });
+    expect(within(tagged).getByText('Lukas Vermeer · Kraft Heinz')).toBeInTheDocument();
+    expect(tagged).toHaveAccessibleName(/Why is Lukas's sentiment negative\?\s*Started on Lukas Vermeer · Kraft Heinz/);
+  });
+
   it('lets the title win over its origin tag, and keeps the full tag text available', async () => {
     stubCopilot({
       conversations: [

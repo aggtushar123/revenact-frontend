@@ -20,4 +20,13 @@ describe('withFocus', () => {
     expect(withFocus(PAGE, companies)).toEqual(PAGE);
     expect(withFocus(PAGE, null)).toEqual(PAGE);
   });
+
+  it('turns the sentiment focus into the person context, and ignores it everywhere else', () => {
+    const person = { surface: 'contacts', view: 'person', contact: 41, focus: null } as const;
+    const list = { surface: 'contacts', view: 'list', filters: {} } as const;
+    expect(withFocus(person, { kind: 'sentiment' })).toEqual({ ...person, focus: 'sentiment' });
+    expect(withFocus(person, { kind: 'companies', ids: [1] })).toEqual(person);
+    expect(withFocus(list, { kind: 'sentiment' })).toEqual(list);
+    expect(withFocus(DASH, { kind: 'sentiment' })).toMatchObject({ focus: null });
+  });
 });

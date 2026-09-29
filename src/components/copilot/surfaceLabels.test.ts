@@ -36,4 +36,16 @@ describe('surface labels', () => {
     expect(originTag({ origin })).toBe('Pizza Hut');
     expect(originTag({ origin: { ...origin, account: 31, label: 'Pizza Hut · EMEA' } })).toBe('Pizza Hut · EMEA');
   });
+
+  it('labels a Contacts question and tags a Contacts conversation with the server label', () => {
+    const names = { person: { id: 41, name: 'Lukas Vermeer', place: 'Kraft Heinz' }, organisation: null, account: null };
+    expect(surfaceLabel({ surface: 'contacts', view: 'person', contact: 41, focus: 'sentiment' }, { contacts: names })).toBe(
+      'Lukas Vermeer · Kraft Heinz · Sentiment',
+    );
+    expect(surfaceLabel({ surface: 'contacts', view: 'list', filters: { sentiment: 'negative' } })).toBe('Contacts · Negative');
+    expect(originTag({ origin: { surface: 'contacts', view: 'person', contact: 41, label: 'Lukas Vermeer · Kraft Heinz' } })).toBe(
+      'Lukas Vermeer · Kraft Heinz',
+    );
+    expect(originTag({ origin: { surface: 'contacts', view: 'list', filters: {}, label: 'Contacts' } })).toBe('Contacts');
+  });
 });

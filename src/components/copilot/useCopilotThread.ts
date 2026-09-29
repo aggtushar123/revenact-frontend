@@ -30,13 +30,15 @@ export interface CopilotThread {
 
 export const BUDGET_MESSAGE = "This month's AI budget is used up.";
 
-/** What a `400 {"context": {"organization" | "account": [...]}}` means to the
- *  asker (backend delivery 3): the page is no longer theirs to ask about.
- *  Null for any other failure. */
+/** What a `400 {"context": {"organization" | "account" | "contact" |
+ *  "filters": [...]}}` means to the asker (backend delivery 3, backend #72):
+ *  the page is no longer theirs to ask about. Null for any other failure. */
 export function refusalMessage(err: unknown): string | null {
   if (!(err instanceof ApiError) || err.status !== 400) return null;
   const context = (err.body as { context?: unknown } | null)?.context;
   if (!context || typeof context !== 'object') return null;
+  if ('contact' in context) return "You can't ask about this person here.";
+  if ('filters' in context) return "You can't ask about this list. Clear the filters and ask again.";
   if ('organization' in context) return 'You can no longer ask about this organization.';
   if ('account' in context) return 'You can no longer ask about this account. Choose All and ask again.';
   return null;

@@ -9,7 +9,7 @@
 // answer in.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, Clock, LayoutDashboard, MessageSquare, Network, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, Clock, LayoutDashboard, MessageSquare, Network, Plus, Search, Users, X } from 'lucide-react';
 import { AskRevenactBox } from '../shared/AskRevenactBox';
 import { fetchConversation, fetchConversations } from '../../pages/copilot/copilotApi';
 import { MessageSources } from '../../pages/copilot/MessageSources';
@@ -111,8 +111,10 @@ export function CopilotRail({
     if (!active || active === document.body || railRef.current?.contains(active)) inputRef.current?.focus();
   }
 
-  // A label context can be dropped; on the dashboard only a focus can, never the screen.
-  const removable = context !== null && (context.kind === 'label' || context.context.focus !== null);
+  // A label context can be dropped; on a surface only a focus can, never the
+  // screen — and the Contacts list carries no focus at all, so it is never
+  // removable either.
+  const removable = context !== null && (context.kind === 'label' || ('focus' in context.context && context.context.focus !== null));
   const glass = variant === 'glass';
 
   return (
@@ -315,10 +317,16 @@ export function HistoryPopover({ onClose, onOpen }: { onClose: () => void; onOpe
                       >
                         {c.origin.surface === 'organizations' ? (
                           <Network className="w-3 h-3 shrink-0" aria-hidden="true" />
+                        ) : c.origin.surface === 'contacts' ? (
+                          <Users className="w-3 h-3 shrink-0" aria-hidden="true" />
                         ) : (
                           <LayoutDashboard className="w-3 h-3 shrink-0" aria-hidden="true" />
                         )}
-                        <span className="sr-only">{c.origin.surface === 'organizations' ? 'Started on ' : 'Started on the dashboard: '}</span>
+                        <span className="sr-only">
+                          {c.origin.surface === 'organizations' || c.origin.surface === 'contacts'
+                            ? 'Started on '
+                            : 'Started on the dashboard: '}
+                        </span>
                         {' '}
                         <span className="truncate">{originTag(c)}</span>
                       </span>

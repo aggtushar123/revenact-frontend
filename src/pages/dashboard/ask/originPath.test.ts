@@ -23,4 +23,11 @@ describe('originPath', () => {
     expect(originPath(page)).toBe('/organizations/7');
     expect(originPath({ ...page, account: 31, label: 'Pizza Hut · EMEA' })).toBe('/organizations/7?account=31');
   });
+
+  it('reopens a Contacts conversation on its person or its filtered list', () => {
+    expect(originPath({ surface: 'contacts', view: 'person', contact: 41, label: 'x' })).toBe('/contacts/41');
+    expect(originPath({ surface: 'contacts', view: 'list', filters: { sentiment: 'negative' }, label: 'x' })).toBe(
+      '/contacts?sentiment=negative',
+    );
+  });
 });

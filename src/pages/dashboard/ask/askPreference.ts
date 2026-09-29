@@ -2,6 +2,8 @@ export const ASK_PREFERENCE_KEY = 'revenact_dashboard_ask';
 /** Organizations' rail keeps its own choice: hiding it there says nothing
  *  about the Dashboard, and the reverse. */
 export const ORGANIZATIONS_ASK_KEY = 'revenact_organizations_ask';
+/** Contacts' rail keeps its own choice too. */
+export const CONTACTS_ASK_KEY = 'revenact_contacts_ask';
 
 /** The person's own open/closed choice for a rail, or null before one. A
  *  private window or blocked storage reads as "no choice", so the default

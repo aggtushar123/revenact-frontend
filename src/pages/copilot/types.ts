@@ -98,10 +98,18 @@ export interface StoryFocus {
   id: number;
 }
 
+/** "Why this sentiment?" (spec 2026-09-28 §4.4): the next question is about
+ *  the open person's sentiment. Sent as the person context's
+ *  `focus: "sentiment"`; every other surface ignores it. */
+export interface SentimentFocus {
+  kind: 'sentiment';
+}
+
 /** Whatever the shared Ask slot narrows the next question to: a dashboard
- *  drill or attention item, an Organizations row, or a story item. The kinds
- *  never overlap, so `kind` tells them apart. */
-export type AskFocus = DashboardFocus | StoryFocus;
+ *  drill or attention item, an Organizations row, a story item, or a
+ *  Contacts person's sentiment. The kinds never overlap, so `kind` tells
+ *  them apart. */
+export type AskFocus = DashboardFocus | StoryFocus | SentimentFocus;
 
 /** Where a question on one organisation's page was asked (spec 2026-09-26
  *  §3, backend delivery 3). `account` is the account chip, null for every
@@ -126,10 +134,54 @@ export interface OrganizationDetailOrigin {
   label: string;
 }
 
+/** The Contacts page's URL filters, only the set keys (as the page's own URL
+ *  carries them), sent as they are: the server parses them with the list's
+ *  own code. */
+export interface ContactsFilters {
+  q?: string;
+  customer?: string;
+  account?: string;
+  sentiment?: string;
+  role?: string;
+}
+
+/** A question asked on the Contacts list (backend #72). The server builds
+ *  `label` ("Contacts · Negative · Decision Maker") and echoes it. */
+export interface ContactsListContext {
+  surface: 'contacts';
+  view: 'list';
+  filters: ContactsFilters;
+  label?: string;
+}
+
+/** A question asked with one person open. `focus` is "sentiment" for
+ *  "Why this sentiment?". The server builds `label` ("Sam Pizza · Pizza Hut"). */
+export interface ContactsPersonContext {
+  surface: 'contacts';
+  view: 'person';
+  contact: number;
+  focus: 'sentiment' | null;
+  label?: string;
+}
+
+export interface ContactsListOrigin {
+  surface: 'contacts';
+  view: 'list';
+  filters: ContactsFilters;
+  label: string;
+}
+
+export interface ContactsPersonOrigin {
+  surface: 'contacts';
+  view: 'person';
+  contact: number;
+  label: string;
+}
+
 /** Every structured context a question can carry, told apart by `surface`
- *  (and, on Organizations, by `view`). */
-export type SurfaceContext = DashboardContext | OrganizationsContext | OrganizationDetailContext;
-export type SurfaceOrigin = DashboardOrigin | OrganizationsOrigin | OrganizationDetailOrigin;
+ *  (and, on Organizations and Contacts, by `view`). */
+export type SurfaceContext = DashboardContext | OrganizationsContext | OrganizationDetailContext | ContactsListContext | ContactsPersonContext;
+export type SurfaceOrigin = DashboardOrigin | OrganizationsOrigin | OrganizationDetailOrigin | ContactsListOrigin | ContactsPersonOrigin;
 export type SurfaceName = SurfaceContext['surface'];
 
 /** A record an answer was built from. A snapshot taken when the
