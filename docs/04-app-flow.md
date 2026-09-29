@@ -65,7 +65,7 @@ closing it on unmount or token change.
 | `/dashboard/support/{tickets,topics}` | `AreaLayout` (area: support) wrapping `TicketOverviewContainer`, `AITrendingTopics` | auth |
 | `/health`, `/dashboard/advance/*` | `Keep`/`LegacyRedirect` → the equivalent `/dashboard/...` route, query string preserved (`src/pages/dashboard/redirects.tsx`, mapping in `areas.ts`'s `LEGACY`) | auth |
 | `/organizations/{list,board,:id}` | `List`, `Board`, `OrganizationDetails` | auth |
-| `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard`, `AccountDetails` | auth |
+| `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard` (the Accounts portfolio), `AccountDetails` | auth |
 | `/contacts`, `/contacts/:id` | `ContactsPage`: the list with its summary line and filters (`q`, `customer`, `account`, `sentiment`, `role` in the URL), and the chosen person's profile beside it (`GET /contacts/`, `GET /contacts/<id>/`, `GET /contacts/<id>/history/`); on phones the person is its own screen with a back link. `/contacts/list` redirects to `/contacts`, keeping its query string; `/contacts/<non-numeric>` shows the not-found state. `ContactsAskLayout` wraps this route in one `AskProvider` (surface `contacts`, delivery 2 of the Ask spec, own preference key `revenact_contacts_ask`): a question posts `context: {surface:'contacts', view:'list', filters}` or `{view:'person', contact, focus}`; the chip names the filtered organisation/account, sentiment and role (or a quoted search term), or the open person's name and place, with "Sentiment" appended while `focus:'sentiment'`. "Why this sentiment?" under a person's sentiment line drafts "Why is <first name>'s sentiment <word>?" with that focus and opens the rail without sending. A `400` under `context.contact` reads "You can't ask about this person here."; under `context.filters`, "You can't ask about this list. Clear the filters and ask again." History reopens a Contacts conversation on `/contacts/:id` (a person) or `/contacts?<filters>` (a list) | auth |
 | `/pipelines/{list,board}` | `PipelinesPage` | auth |
 | `/communications` | `CommunicationsPage`, arranged as an inbox with its own top bar (no Navbar): the inbox card (folders for the four kinds of waiting with counts, Needs-you and Mine-only switches, a list grouped by month, the open item in place, with a `ReplyBox` under it: Draft with Copilot fills it from the thread and the account's history and lists the sources used; Send reply on an email row sends from the person's mailbox via `POST /communications/emails/<id>/reply/`); on `?source=mailbox:<provider>` the card is `MailboxView` instead, the person's own mail whole (Inbox/Drafts/Sent/Done/Muted with counts, Priority and Unread switches, Starred/Important/Spam/Trash and the categories, a Categories block of what is waiting, the list by month, the open message with star/done/mute and a reply that sends from the mailbox); and the shared Copilot rail (`components/copilot/CopilotRail`, with Next event above it and the picked source as context; New chat, History and a hide switch live in the top bar) | auth |
@@ -398,9 +398,31 @@ readers by the same write-time snapshot rule as the Dashboard's; see
 
 ### 4.3 Accounts
 
-Reached from the Accounts tab of an organisation or from `/accounts/list`, in
-both cases passing the mapped row through `location.state.account`. Tabs mirror
-the organisation page and add Organizations.
+1. `/accounts/list` works like the Organizations list, on
+   `GET /accounts/portfolio/`:
+   - Its state is in the URL: `search, organisation, owner, lifecycle,
+     health, renews_within, nps, ids, sort, group`. `group` defaults to
+     health, and `group=none` turns grouping off.
+   - A `limit=1` frame read gives the tiles, groups, filter options and count.
+   - Each open section reads its own rows with `group_value`.
+   - With a filter active, a `limit=1` probe gives M for "N of M accounts".
+   - Nothing is hidden for churn.
+2. Selecting rows offers Change owner and Set lifecycle (Churn included).
+   - Each is applied with "Apply to N" through `POST /accounts/bulk/`, and a
+     failure is named per account.
+   - Export selected sends `ids`. Export CSV sends the view's query to
+     `GET /accounts/portfolio/export.csv`.
+3. `/accounts/board` uses the same state, with `group` defaulting to
+   lifecycle, and every stage is a column.
+   - A move saves through `PATCH /customers/<organisation>/accounts/<id>/`, on
+     the first linked organisation the viewer may open.
+   - It then reloads the frame and the two columns it touched.
+4. Edit details reads `GET /customers/<organisation>/accounts/<id>/` and opens
+   `AccountFormModal`. Add reads `GET /customers/` for its organisation picker.
+   The page reloads after either.
+5. An account's name opens `/accounts/:id` and passes the row (`accountNavRow`)
+   through `location.state.account`. The account page's tabs mirror the
+   organisation page and add Organizations.
 
 > **Known flaw.** A direct visit or a page refresh on `/accounts/:id` has no
 > navigation state, and the page falls back to the `ACCOUNTS_DATA` mock, showing

@@ -178,12 +178,10 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 
 | Component | Where |
 |---|---|
-| Portfolio rows and board (`components/organizations/portfolio/`) | `/organizations/list`: `AccountRow` (a rounded item, not a table row; a two-line card below `sm`), `AccountDetails` (six panels, part of the row), `SummaryTiles`, `PortfolioToolbar`/`FiltersPanel`/`PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `AccountSheet`. `/organizations/board`: `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`. See "Portfolio rows and board" below |
-| `AccountsTable` | Same shape, no bulk actions |
+| Portfolio rows and board (`components/organizations/portfolio/`) | `/organizations/list`: `AccountRow` (a rounded item, not a table row; a two-line card below `sm`), `AccountDetails` (six panels, part of the row), `SummaryTiles`, `PortfolioToolbar`/`FiltersPanel`/`PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `AccountSheet`. `/organizations/board`: `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`. They read a portfolio kind (`PortfolioKindContext`, Organizations by default), so `/accounts/list` and `/accounts/board` use them too, with `ACCOUNT_KIND` and `components/accounts/portfolio/AccountPanels`. See "Portfolio rows and board" below |
 | Contacts list and profile (`components/contacts/`) | `/contacts`: `ContactsToolbar` (summary line, search, organisation, account, sentiment and role filters in the URL, + Add), `ContactList` of `ContactListItem`s (never a table row; Load more), `ContactProfile` (sentiment and why, then `HistoryItems`: calls newest first, emails, tickets). See "Contacts" below |
-| `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by Pipelines and the Accounts board |
+| `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by Pipelines |
 | Dashboard tables | `AccountHealthDetailTable`, `RenewalQueueTable`, `ActivityDetailedTable`, `GoingDarkTable`, `SwingTable` |
-| `MetricsPanel` | Accounts: count, health donut with COUNT/MRR/ARR toggle, NPS, lifecycle donut, renewal window |
 | `PinnedAttributes` | Label and value pairs typed as text, truncated, dot, owner or pulse |
 | `EntityAvatar` | Company logo, else deterministic initials in one of five semantic hues |
 | `PresenceStrip` | Session participants, maximum five |
@@ -488,6 +486,46 @@ ARR. Rules specific to it, enforced by
   non-modal `bg-surface` column beside the board, not over it — the board
   stays usable while it is open. Skeletons are card-shaped; a column with
   nothing says so in words.
+
+### Portfolio rows and board (Accounts)
+
+`/accounts/list` and `/accounts/board` are the Organizations portfolio with
+the account kind (`ACCOUNT_KIND`, `components/accounts/portfolio/accountKind.ts`),
+which each page provides around itself through `PortfolioKindContext`.
+Everything in the section above holds, with these differences:
+
+- The line under a name reads "Organisation · owner · lifecycle · touched Nd
+  ago". The organisation is the first linked one the viewer may open, then
+  "+N" for the rest; a hidden one is never named or counted. A Board card's
+  line is the organisation.
+- The opened row is `AccountPanels`:
+  - Commercial: ARR in the workspace's currency, and the renewal date on a
+    line with today marked, danger when overdue.
+  - Voice of the customer: the NPS bar and band, CSAT, and the AI pulse
+    reason as a quote.
+  - Profile: the Revenact ID, each organisation as a link to
+    `/organizations/:id?account=<id>`, then domain, industry, email, phone and
+    address.
+  - History: created, updated, pulse recorded on, and CSM pulse set.
+
+  Every one of the 24 Account fields shows exactly once
+  (`components/accounts/portfolio/fieldCoverage.test.tsx`).
+- No archive and no churn: there is no Archive or Churn button and no
+  "Include churned". Churn is an ordinary Board column with a "+", and a move
+  there saves like any other. The bulk Set lifecycle offers Churn.
+- The filters are organisation (checkboxes, after Owner), owner, lifecycle,
+  health, renews within and NPS. The sorts are risk, ARR, renewal, health and
+  name. There are no Pin fields.
+- The Renewing tile opens on 90 days.
+- An account none of whose organisations the viewer may open shows no Edit
+  details and no Move to…, since both need its organisation's id. Bulk edits
+  still reach it.
+- The name, and the sheet's and side panel's "Open account page", pass the
+  row to `/accounts/:id` in `location.state`, where the account page (to be
+  redesigned in delivery 2) reads it.
+- The top bar is the framed one: "Accounts", List | Board keeping the query,
+  the actions slot, and no avatar. The rail slot stays empty until Ask
+  (delivery 3).
 
 ### Organization page (`/organizations/:id`)
 
