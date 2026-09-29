@@ -44,6 +44,15 @@ describe('ContactListItem (spec 2026-09-28 §3)', () => {
     expect(within(renderItem(OWEN)).getByText('Negative')).toHaveClass('text-danger');
   });
 
+  it('falls back to the old sentiment_evidence shape for the calls count, and never throws with neither', () => {
+    const old = { ...LUKAS, calls: undefined, sentiment_evidence: { score: 0.1, calls: 4, emails: 2, tickets: 0, positive: 2, neutral: 1, negative: 1, latest_at: null } };
+    expect(within(renderItem(old)).getByText('4 calls')).toBeInTheDocument();
+    document.body.innerHTML = '';
+    const bare = { ...LUKAS, calls: undefined, sentiment_evidence: undefined };
+    expect(() => renderItem(bare)).not.toThrow();
+    expect(within(screen.getByRole('listitem')).getByText('no calls')).toBeInTheDocument();
+  });
+
   it('opens their profile, keeping the filters, and marks the one open', () => {
     const item = renderItem(LUKAS, true);
     const link = within(item).getByRole('link');

@@ -13,7 +13,11 @@ import {
   sentimentWhy,
 } from './contactsFormat';
 
-const EVIDENCE = { score: 0.1, calls: 6, emails: 2, tickets: 0, positive: 3, neutral: 2, negative: 1, latest_at: '2026-09-12T10:00:00Z' };
+// The readable shape (revenact-backend PR fix/contacts-readable-evidence):
+// counted only over the viewer's readable analysed records.
+const READABLE = { calls: 6, emails: 2, tickets: 0, positive: 3, neutral: 2, negative: 1, latest_at: '2026-09-12T10:00:00Z', others: false };
+// The old shape, kept only to prove callsLabel's fallback.
+const OLD_EVIDENCE = { score: 0.1, calls: 4, emails: 2, tickets: 0, positive: 2, neutral: 1, negative: 1, latest_at: '2026-09-01T00:00:00Z' };
 
 describe('contactsFormat (spec 2026-09-28 §3, §5)', () => {
   it('words the summary line', () => {
@@ -64,28 +68,48 @@ describe('contactsFormat (spec 2026-09-28 §3, §5)', () => {
   });
 
   it('says why a person reads as they do', () => {
-    expect(sentimentWhy('neutral', 'computed', EVIDENCE)).toBe(
+    expect(sentimentWhy('neutral', 'computed', READABLE)).toBe(
       'Neutral: 3 positive · 2 neutral · 1 negative across 6 calls and 2 emails, latest 12 Sep',
     );
-    expect(sentimentWhy('positive', 'computed', { ...EVIDENCE, calls: 1, emails: 1, tickets: 1, latest_at: null })).toBe(
+    expect(sentimentWhy('positive', 'computed', { ...READABLE, calls: 1, emails: 1, tickets: 1, latest_at: null })).toBe(
       'Positive: 3 positive · 2 neutral · 1 negative across 1 call, 1 email and 1 ticket',
     );
     // Set by hand: it never claims nothing was analysed, and says their
-    // analysed calls are read again tonight.
-    expect(sentimentWhy('negative', 'manual', {})).toBe('Negative. Set by hand.');
-    expect(sentimentWhy('negative', 'manual', {}, 2)).toBe('Negative. Set by hand; their calls will be read again tonight.');
-    expect(sentimentWhy('negative', 'manual', EVIDENCE, 1)).not.toMatch(/nothing/i);
-    // Computed, but from nothing: not "set by hand".
-    expect(sentimentWhy('neutral', 'computed', { ...EVIDENCE, calls: 0, emails: 0 })).toBe(
+    // analysed calls are read again tonight. A hand-set sentiment's
+    // evidence is null (spec: sentiment_readable is null for it).
+    expect(sentimentWhy('negative', 'manual', null)).toBe('Negative. Set by hand.');
+    expect(sentimentWhy('negative', 'manual', null, 2)).toBe('Negative. Set by hand; their calls will be read again tonight.');
+    expect(sentimentWhy('negative', 'manual', READABLE, 1)).not.toMatch(/nothing/i);
+    // Computed, but from nothing readable and nothing hidden either: not
+    // "set by hand".
+    expect(sentimentWhy('neutral', 'computed', { ...READABLE, calls: 0, emails: 0 })).toBe(
       'Neutral. Nothing of theirs has been analysed yet.',
+    );
+    expect(sentimentWhy('neutral', 'computed', null)).toBe('Neutral. Nothing of theirs has been analysed yet.');
+    // The stored sentiment also rests on records the viewer cannot open.
+    expect(sentimentWhy('neutral', 'computed', { ...READABLE, others: true })).toBe(
+      "Neutral: 3 positive · 2 neutral · 1 negative across 6 calls and 2 emails, latest 12 Sep Also rests on records you can't open.",
+    );
+    // Nothing readable at all, but the stored sentiment rests on records
+    // the viewer cannot open.
+    expect(sentimentWhy('negative', 'computed', { ...READABLE, calls: 0, emails: 0, tickets: 0, others: true })).toBe(
+      "Negative, from records you can't open.",
     );
   });
 
   it('counts calls beside the sentiment', () => {
     expect(callsLabel(LUKAS)).toBe('6 calls');
-    expect(callsLabel({ ...LUKAS, sentiment_evidence: { ...EVIDENCE, calls: 1 } })).toBe('1 call');
+    expect(callsLabel({ ...LUKAS, calls: 1 })).toBe('1 call');
     expect(callsLabel(MIRA)).toBe('set by hand');
-    expect(callsLabel({ ...LUKAS, sentiment_evidence: { ...EVIDENCE, calls: 0 } })).toBe('no calls');
+    expect(callsLabel({ ...LUKAS, calls: 0 })).toBe('no calls');
+    // The old shape (no `calls`, `sentiment_evidence.calls` instead): the
+    // fallback this guards against a crash for.
+    expect(callsLabel({ ...LUKAS, calls: undefined, sentiment_evidence: OLD_EVIDENCE })).toBe('4 calls');
+    expect(callsLabel({ ...LUKAS, calls: undefined, sentiment_evidence: { ...OLD_EVIDENCE, calls: 0 } })).toBe('no calls');
+    // Neither field at all: must never throw.
+    const bareLukas = { ...LUKAS, calls: undefined, sentiment_evidence: undefined };
+    expect(() => callsLabel(bareLukas)).not.toThrow();
+    expect(callsLabel(bareLukas)).toBe('no calls');
   });
 
   it('names a classification, blanks left out', () => {

@@ -575,16 +575,21 @@ Organizations (see "Ask rail", Contacts shape); `ContactsPage`'s own
   and + Add (the existing `ContactFormModal`).
 - **List.** One item per person: initials, name and role, "Organisation ›
   Account" (or the organisation alone), sentiment in words in its colour with
-  "n calls" beside it, last contacted, and Active/Inactive. Load more at the end; skeleton,
+  "n calls" beside it (every call of theirs the viewer can open, read or
+  not), last contacted, and Active/Inactive. Load more at the end; skeleton,
   error with Try again, and empty states (Clear filters when filtered).
 - **Profile.** `/contacts/:id` chooses the person. Name (22px), role and
   Active/Inactive,
   "Organisation › Account" (the organisation links to its page, the account
   to it with `?account=` so its chip is chosen), email and phone links
   (sanitised). Their sentiment and why ("Neutral: 3 positive · 2 neutral · 1
-  negative across 6 calls and 2 emails, latest 12 Sep"), built only from
-  `sentiment_evidence` — never from the interactions listed below it, which
-  can include kinds `sentiment_evidence` doesn't count. Under it, on phones
+  negative across 6 calls and 2 emails, latest 12 Sep"), counted only over
+  the viewer's readable analysed records (`sentiment_readable`) — never from
+  the interactions listed below it, which can include kinds it doesn't
+  count. When the stored sentiment also rests on records the viewer cannot
+  open, it appends "Also rests on records you can't open."; when none of
+  what it rests on is readable, it reads "Negative, from records you can't
+  open." instead of the count. Under it, on phones
   too: "Last contacted 2 weeks ago" (or "Not contacted yet") and, for a
   computed sentiment, "Sentiment read 2 weeks ago" (`sentiment_computed_at`).
   An edit sends the sentiment only when it was changed (a sent one becomes

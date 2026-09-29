@@ -593,7 +593,7 @@ describe('AccountDetails page (/accounts/:id)', () => {
                       last_contacted_at: '2026-08-31T00:00:00Z',
                       companies: [{ id: 9, name: 'Kraft Heinz' }],
                       account_name: 'APAC Division',
-                      sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null,
+                      sentiment_source: 'manual' as const, sentiment_computed_at: null,
                     },
                   ]
                 : [],
@@ -641,7 +641,7 @@ describe('AccountDetails page (/accounts/:id)', () => {
       last_contacted_at: '2026-08-31T00:00:00Z',
       companies: [{ id: 9, name: 'Kraft Heinz' }],
       account_name: 'APAC Division',
-      sentiment_source: 'manual' as const, sentiment_evidence: {}, sentiment_computed_at: null,
+      sentiment_source: 'manual' as const, sentiment_computed_at: null,
     };
     const lukasVermeer = {
       ...priyaNair,

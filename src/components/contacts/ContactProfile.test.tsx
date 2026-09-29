@@ -5,7 +5,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import customersReducer from '../../features/customers/customersSlice';
-import { LUKAS, MIRA, emptyHistory, requested, stubContactsApi, type ContactsStub } from '../../features/contacts/testContacts';
+import { LUKAS, LUKAS_HISTORY, MIRA, emptyHistory, requested, stubContactsApi, type ContactsStub } from '../../features/contacts/testContacts';
 import { ContactProfile } from './ContactProfile';
 
 function renderProfile(id = 41, stub: ContactsStub = {}) {
@@ -87,10 +87,28 @@ describe('ContactProfile (spec 2026-09-28 §3)', () => {
   });
 
   it('a hand-set sentiment over analysed calls says they will be read again tonight', async () => {
-    renderProfile(41, { people: [{ ...LUKAS, sentiment: 'negative', sentiment_source: 'manual', sentiment_evidence: {}, sentiment_computed_at: null }] });
+    renderProfile(41, { people: [{ ...LUKAS, sentiment: 'negative', sentiment_source: 'manual', sentiment_computed_at: null }] });
     const sentiment = await screen.findByRole('region', { name: 'Sentiment' });
     expect(sentiment).toHaveTextContent('Negative. Set by hand; their calls will be read again tonight.');
     expect(sentiment).not.toHaveTextContent(/nothing of theirs/i);
+  });
+
+  it('says the sentiment also rests on records the viewer cannot open', async () => {
+    renderProfile(41, { histories: { 41: { ...LUKAS_HISTORY, sentiment_readable: { ...LUKAS_HISTORY.sentiment_readable!, others: true } } } });
+    const sentiment = await screen.findByRole('region', { name: 'Sentiment' });
+    expect(sentiment).toHaveTextContent(
+      "Neutral: 3 positive · 2 neutral · 1 negative across 6 calls and 2 emails, latest 12 Sep Also rests on records you can't open.",
+    );
+  });
+
+  it('says a sentiment rests only on records the viewer cannot open, when nothing readable was analysed', async () => {
+    renderProfile(41, {
+      histories: {
+        41: { ...LUKAS_HISTORY, sentiment_readable: { calls: 0, emails: 0, tickets: 0, positive: 0, neutral: 0, negative: 0, latest_at: null, others: true } },
+      },
+    });
+    const sentiment = await screen.findByRole('region', { name: 'Sentiment' });
+    expect(sentiment).toHaveTextContent("Neutral, from records you can't open.");
   });
 
   it('a person the viewer cannot open reads as not here', async () => {

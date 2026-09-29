@@ -459,7 +459,6 @@ describe('the organization page (/organizations/:id)', () => {
                 companies: [{ id: 7, name: 'Pizza Hut' }],
                 account_name: null,
                 sentiment_source: 'manual',
-                sentiment_evidence: {},
                 sentiment_computed_at: null,
               },
             ],

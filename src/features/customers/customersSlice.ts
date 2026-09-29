@@ -430,7 +430,11 @@ export interface Contact {
    * person's own classified calls, emails and tickets (the backend's
    * contact_sentiment.py). Computed wins whenever there is evidence. */
   sentiment_source: 'manual' | 'computed';
-  sentiment_evidence: ContactSentimentEvidence | Record<string, never>;
+  /** Old shape: revenact-backend PR fix/contacts-readable-evidence removes
+   *  this field in favour of the row's `calls` below. Kept optional only
+   *  until that backend change is live (this frontend deploys first); do
+   *  not add new reads of it beyond `callsLabel`'s fallback. */
+  sentiment_evidence?: ContactSentimentEvidence | Record<string, never>;
   sentiment_computed_at: string | null;
   last_contacted_at: string | null;
   companies: CompanyRef[];
@@ -443,6 +447,11 @@ export interface Contact {
    *  fixtures and nested lists read them from `companies`/`account_*`. */
   organisation?: CompanyRef | null;
   account?: CompanyRef | null;
+  /** How many of their calls the viewer can open, counting every visible
+   *  call, read or not (revenact-backend PR fix/contacts-readable-
+   *  evidence). Optional until that backend change is live; `callsLabel`
+   *  falls back to `sentiment_evidence.calls` until then. */
+  calls?: number;
 }
 
 export interface ContactSentimentEvidence {
