@@ -40,6 +40,7 @@ import { EntityUploadsPage } from './pages/settings/EntityUploadsPage';
 import { WebhooksPage } from './pages/settings/WebhooksPage';
 import { Integrations } from './pages/integrations/Integrations';
 import { ContactsPage } from './pages/contacts/ContactsPage';
+import { ContactsAskLayout } from './pages/contacts/ask/ContactsAskLayout';
 import { ContactsListRedirect } from './pages/contacts/ContactsListRedirect';
 import { CustomObjectRecordsPage } from './pages/customObjects/CustomObjectRecordsPage';
 import { PipelinesPage } from './pages/pipelines/PipelinesPage';
@@ -272,7 +273,10 @@ function App() {
               (spec 2026-09-28 §3). The old /contacts/list still lands,
               its query string kept. */}
           <Route path="contacts/list" element={<ContactsListRedirect />} />
-          <Route path="contacts/:id?" element={<ContactsPage />} />
+          {/* One Ask conversation above the list and every person (spec 2026-09-28 §4). */}
+          <Route element={<ContactsAskLayout />}>
+            <Route path="contacts/:id?" element={<ContactsPage />} />
+          </Route>
 
           <Route path="custom-objects/:id" element={<CustomObjectRecordsPage />} />
 

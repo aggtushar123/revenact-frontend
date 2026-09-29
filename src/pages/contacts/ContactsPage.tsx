@@ -15,6 +15,8 @@ import {
   toContactsSearch,
   type ContactsParams,
 } from '../../features/contacts/contactsParams';
+import { placeLabel, placeOf } from '../../features/contacts/contactsFormat';
+import type { ContactsNames } from '../../features/contacts/askContext';
 import { ErrorState } from '../dashboard/shared/DataState';
 import {
   CONTACT_NOT_FOUND,
@@ -26,6 +28,7 @@ import {
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { MD, SM, useMediaQuery } from '../../lib/useMediaQuery';
 import { ContactsFrame } from './ContactsFrame';
+import { useReportContactsNames } from './ask/contactsNames';
 
 const BACK = `-ml-2 inline-flex min-h-11 w-fit items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-ink-muted hover:bg-subtle hover:text-ink active:bg-line-subtle ${FOCUS}`;
 
@@ -65,6 +68,7 @@ export function ContactsPage() {
     allContactsSummary,
     allContactsLoadingMore,
     allContactsMoreError,
+    selectedContact,
   } = useAppSelector((state) => state.customers);
 
   useEffect(() => {
@@ -78,6 +82,24 @@ export function ContactsPage() {
   const organisations = useMemo(() => customers.map((c) => ({ id: c.id, name: c.name })), [customers]);
   const organisationName =
     allContacts.find((c) => c.organisation && String(c.organisation.id) === params.customer)?.organisation?.name ?? null;
+  const accountName =
+    allContacts.find((c) => c.account && String(c.account.id) === params.account)?.account?.name ?? null;
+
+  // What a live question's chip can name before the server has (spec
+  // 2026-09-28 §4.4): the open person and the filtered organisation and
+  // account, from what this page already knows.
+  const names = useMemo<ContactsNames>(
+    () => ({
+      person:
+        selectedId !== null && selectedContact?.id === selectedId
+          ? { id: selectedId, name: selectedContact.name, place: placeLabel(placeOf(selectedContact)) }
+          : null,
+      organisation: params.customer && organisationName ? { id: Number(params.customer), name: organisationName } : null,
+      account: params.account && accountName ? { id: Number(params.account), name: accountName } : null,
+    }),
+    [selectedId, selectedContact, params.customer, params.account, organisationName, accountName],
+  );
+  useReportContactsNames(names);
 
   const change = useCallback(
     (next: ContactsParams, replace = false) => setSearch(toContactsSearch(next), { replace }),
