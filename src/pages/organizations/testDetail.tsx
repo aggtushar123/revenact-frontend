@@ -1,11 +1,10 @@
 // Test-only helpers for the organization page: its store and its render.
 // Never hot-reloaded: Where sits beside the helpers so a test imports one module.
 /* eslint-disable react-refresh/only-export-components */
-import { useMemo, useState, type ReactNode } from 'react';
+import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { Link, MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { Navbar } from '../../components/layout/Navbar';
 import authReducer from '../../features/auth/authSlice';
 import callsReducer from '../../features/calls/callsSlice';
@@ -13,8 +12,8 @@ import customersReducer from '../../features/customers/customersSlice';
 import filesReducer from '../../features/files/filesSlice';
 import knowledgeReducer from '../../features/knowledge/knowledgeSlice';
 import notificationsReducer from '../../features/notifications/notificationsSlice';
-import { NavActionsSlotContext } from '../../layouts/navActionsSlot';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
+import { SlotHost } from '../../test/SlotHost';
 import { setViewport } from '../../test/viewport';
 import { dashboardRoutes } from '../dashboard/routes';
 import { OrganizationsAskLayout } from './ask/OrganizationsAskLayout';
@@ -86,20 +85,6 @@ function History({ goTo }: { goTo?: string }) {
       </button>
       {goTo ? <Link to={goTo}>Go to {goTo}</Link> : null}
     </p>
-  );
-}
-
-/** DashboardLayout's Navbar actions slot, where the Ask pill portals. With
- *  the real Navbar (`nav`) the Navbar renders the slot element; without it a
- *  bare one stands in (`data-testid="nav-actions"`). */
-function SlotHost({ bare, children }: { bare: boolean; children: ReactNode }) {
-  const [slot, setSlot] = useState<HTMLElement | null>(null);
-  const value = useMemo(() => ({ slot, setSlot }), [slot]);
-  return (
-    <NavActionsSlotContext.Provider value={value}>
-      {bare ? <div ref={setSlot} data-testid="nav-actions" /> : null}
-      {children}
-    </NavActionsSlotContext.Provider>
   );
 }
 

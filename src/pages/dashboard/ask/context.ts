@@ -53,10 +53,15 @@ export interface AskState {
 
 /** The surface's context narrowed by `focus`. Each screen takes only its
  *  own kind: the Dashboard a drill or attention item, the List and the Board
- *  a companies focus, an organisation's page a story item. Any other kind
- *  (never written there) reads as no focus rather than a cast. */
+ *  a companies focus, an organisation's page a story item. Contacts' person
+ *  view takes only the sentiment focus; its list takes none. */
 export function withFocus(context: SurfaceContext, focus: AskFocus | null): SurfaceContext {
-  if (context.surface === 'dashboard') return { ...context, focus: focus && !isStoryFocus(focus) ? focus : null };
+  if (context.surface === 'contacts') {
+    return context.view === 'person' ? { ...context, focus: focus?.kind === 'sentiment' ? 'sentiment' : null } : context;
+  }
+  if (context.surface === 'dashboard') {
+    return { ...context, focus: focus && (focus.kind === 'companies' || focus.kind === 'attention') ? focus : null };
+  }
   if (context.view === 'detail') return { ...context, focus: isStoryFocus(focus) ? focus : null };
   return { ...context, focus: focus?.kind === 'companies' ? focus : null };
 }

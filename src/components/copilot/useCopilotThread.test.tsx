@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import { ApiError } from '../../lib/apiClient';
 import type { SurfaceContext } from '../../pages/copilot/types';
 import { stubCopilot } from './testCopilot';
-import { useCopilotThread } from './useCopilotThread';
+import { refusalMessage, useCopilotThread } from './useCopilotThread';
 
 const org = (organization: number): SurfaceContext => ({ surface: 'organizations', view: 'detail', organization, account: null, focus: null });
 const board = (owner: string): SurfaceContext => ({ surface: 'organizations', view: 'board', filters: { owner }, focus: null });
@@ -82,5 +83,16 @@ describe('useCopilotThread across context changes', () => {
     await act(() => result.current.send({ text: 'Who renews first?', content: 'Who renews first?', context: board('2') }));
     rerender({ context: board('3') });
     expect(result.current.failed?.budget).toBe(true);
+  });
+});
+
+describe('refusalMessage', () => {
+  it('reads a Contacts refusal', () => {
+    expect(refusalMessage(new ApiError(400, { context: { contact: ['Not a person you can open.'] } }, 'Bad'))).toBe(
+      "You can't ask about this person here.",
+    );
+    expect(refusalMessage(new ApiError(400, { context: { filters: { account: ['Not an account you can open.'] } } }, 'Bad'))).toBe(
+      "You can't ask about this list. Clear the filters and ask again.",
+    );
   });
 });

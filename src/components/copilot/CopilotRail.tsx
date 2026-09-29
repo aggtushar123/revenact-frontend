@@ -1,15 +1,15 @@
 // The Copilot in a rail: shared by Communications (beside the inbox), the
-// Dashboard (beside the figures) and Organizations (beside the list and the
-// board).
+// Dashboard (beside the figures), Organizations (beside the list and the
+// board) and Contacts (beside the list and the profile).
 //
 // A conversation is real (`sendMessage` to /copilot/messages/); the rail holds
 // one at a time. The context says what a question is about: Communications
-// sends its picked source as a text prefix, the Dashboard and Organizations
-// send where the person is as a structured `context` the server grounds the
-// answer in.
+// sends its picked source as a text prefix, the Dashboard, Organizations and
+// Contacts send where the person is as a structured `context` the server
+// grounds the answer in.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, Clock, LayoutDashboard, MessageSquare, Network, Plus, Search, X } from 'lucide-react';
+import { ChevronDown, Clock, LayoutDashboard, MessageSquare, Network, Plus, Search, Users, X } from 'lucide-react';
 import { AskRevenactBox } from '../shared/AskRevenactBox';
 import { fetchConversation, fetchConversations } from '../../pages/copilot/copilotApi';
 import { MessageSources } from '../../pages/copilot/MessageSources';
@@ -111,8 +111,10 @@ export function CopilotRail({
     if (!active || active === document.body || railRef.current?.contains(active)) inputRef.current?.focus();
   }
 
-  // A label context can be dropped; on the dashboard only a focus can, never the screen.
-  const removable = context !== null && (context.kind === 'label' || context.context.focus !== null);
+  // A label context can be dropped; on a surface only a focus can, never the
+  // screen — and the Contacts list carries no focus at all, so it is never
+  // removable either.
+  const removable = context !== null && (context.kind === 'label' || ('focus' in context.context && context.context.focus !== null));
   const glass = variant === 'glass';
 
   return (
@@ -315,10 +317,16 @@ export function HistoryPopover({ onClose, onOpen }: { onClose: () => void; onOpe
                       >
                         {c.origin.surface === 'organizations' ? (
                           <Network className="w-3 h-3 shrink-0" aria-hidden="true" />
+                        ) : c.origin.surface === 'contacts' ? (
+                          <Users className="w-3 h-3 shrink-0" aria-hidden="true" />
                         ) : (
                           <LayoutDashboard className="w-3 h-3 shrink-0" aria-hidden="true" />
                         )}
-                        <span className="sr-only">{c.origin.surface === 'organizations' ? 'Started on ' : 'Started on the dashboard: '}</span>
+                        <span className="sr-only">
+                          {c.origin.surface === 'organizations' || c.origin.surface === 'contacts'
+                            ? 'Started on '
+                            : 'Started on the dashboard: '}
+                        </span>
                         {' '}
                         <span className="truncate">{originTag(c)}</span>
                       </span>

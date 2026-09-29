@@ -1,3 +1,4 @@
+import { contactsPath } from '../../../features/contacts/askContext';
 import { organizationsPath } from '../../../features/organizations/askContext';
 import { detailPath } from '../../../features/organizations/detailAskContext';
 import type { DashboardOrigin, SurfaceOrigin } from '../../copilot/types';
@@ -17,9 +18,10 @@ function dashboardPath(origin: DashboardOrigin): string {
 }
 
 /** The page a conversation started on, with its filters: a dashboard view,
- *  the Organizations list or board, or an organisation's page with its
- *  account chip. */
+ *  the Organizations list or board, an organisation's page with its account
+ *  chip, or a Contacts person or filtered list. */
 export function originPath(origin: SurfaceOrigin): string {
+  if (origin.surface === 'contacts') return contactsPath(origin);
   if (origin.surface === 'dashboard') return dashboardPath(origin);
   return origin.view === 'detail' ? detailPath(origin) : organizationsPath(origin);
 }

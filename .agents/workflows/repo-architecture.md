@@ -272,21 +272,23 @@ Organisations' own list (`pages/organizations/List.tsx`) reads a drill's
 "Open as a list" as `?ids=3,7`, passes it to the portfolio endpoint, and shows
 it as the removable chip "Opened from the dashboard (N)".
 
-#### Ask Revenact (`pages/dashboard/ask/`, `pages/organizations/ask/`, `components/copilot/`)
+#### Ask Revenact (`pages/dashboard/ask/`, `pages/organizations/ask/`, `pages/contacts/ask/`, `components/copilot/`)
 
 | File | What it does |
 |---|---|
-| `components/copilot/CopilotRail.tsx` | The shared rail (`CopilotRail`) and `HistoryPopover`. `context: RailContext` (`railContext.ts`) is `{kind:'label'}` (Communications: `[About: …]` text prefix) or `{kind:'surface'}` (the Dashboard's or Organizations' structured `context` field). Props for `variant`, `top`, `thread`, `chipLabel` (per-question chips; absent in Communications), `draft`, `onSent`. `HistoryPopover` tags a conversation with `originTag`. Assistant replies always render as plain text, never the Markdown `AnswerText` formatting `/copilot` uses — including a reply withheld from a reader with narrower visibility in a shared session |
+| `components/copilot/CopilotRail.tsx` | The shared rail (`CopilotRail`) and `HistoryPopover`. `context: RailContext` (`railContext.ts`) is `{kind:'label'}` (Communications: `[About: …]` text prefix) or `{kind:'surface'}` (the Dashboard's, Organizations' or Contacts' structured `context` field). Props for `variant`, `top`, `thread`, `chipLabel` (per-question chips; absent in Communications), `draft`, `onSent`. `HistoryPopover` tags a conversation with `originTag`. Assistant replies always render as plain text, never the Markdown `AnswerText` formatting `/copilot` uses — including a reply withheld from a reader with narrower visibility in a shared session |
 | `components/copilot/useCopilotThread.ts` | Sending on one conversation: pending, failed (`budget` on 429, any other status including 400 shown the same way with Retry), `retry` (resends the question's own context and focus, not the current screen) |
-| `components/copilot/dashboardLabels.ts`, `surfaceLabels.ts` | Chip text: `viewLabel`/`contextLabel` (dashboard), `surfaceLabel` (a question's chip on either surface), `originTag` (History's tag: the dashboard's area › view, or "Organizations" followed by the server's own `origin.labels`; there is no `origin_label` field) |
+| `components/copilot/dashboardLabels.ts`, `surfaceLabels.ts` | Chip text: `viewLabel`/`contextLabel` (dashboard), `surfaceLabel` (a question's chip on any of the three surfaces), `originTag` (History's tag: the dashboard's area › view, "Organizations" followed by the server's own `origin.labels` (there is no `origin_label` field), or an organisation page's or a Contacts one's own server-built `label`) |
 | `ask/useDashboardContext.ts` | Route + `SHARED_KEYS` → `DashboardContext` and its chip, read at send time |
 | `ask/filterNames.ts`, `FilterNamesProvider.tsx` | `DashboardToolbar` reports the shared filters' option names for chips |
-| `ask/context.ts`, `useAsk.ts`, `AskProvider.tsx`, `DashboardAskProvider.tsx` | One surface's conversation and thread (`AskProvider({surface, preferenceKey})`; the Dashboard's surface via `DashboardAskProvider`, Organizations' via `OrganizationsAskLayout`), `focusOn` (an opened Organizations account), a conversation from the other surface handed over by `askConversationId` in the navigation state, open state (`askPreference.ts`, written only by the Sparkles switch — an entry point opens the rail for that visit without touching it), focus, prefilled draft (`draft()`; a later `ask()` replaces it and its focus), history restore (`originPath.ts`); `useAsk()` is null outside the frame, so entry points hide in isolated view tests |
+| `ask/context.ts`, `useAsk.ts`, `AskProvider.tsx`, `DashboardAskProvider.tsx` | One surface's conversation and thread (`AskProvider({surface, preferenceKey})`; the Dashboard's surface via `DashboardAskProvider`, Organizations' via `OrganizationsAskLayout`, Contacts' via `ContactsAskLayout`), `focusOn` (an opened Organizations account), a conversation from the other surface handed over by `askConversationId` in the navigation state, open state (`askPreference.ts`, written only by the Sparkles switch — an entry point opens the rail for that visit without touching it), focus, prefilled draft (`draft()`; a later `ask()` replaces it and its focus), history restore (`originPath.ts`); `useAsk()` is null outside the frame, so entry points hide in isolated view tests |
 | `ask/AskRail.tsx` | The 320px glass rail (no header; hidden = not rendered) and the phone sheet (focus trap, Close, Escape/Close return focus to the Sparkles switch) |
 | `ask/AskControls.tsx` | Communications' pill (New chat, History + popover, Sparkles switch), portaled into the Navbar's actions slot (`layouts/navActionsSlot.ts`, owned by `DashboardLayout`) |
 | `ask/testAsk.tsx`, `components/copilot/testCopilot.ts` | `renderDashboard(url, view, width)`, `stubCopilot`, `postedBodies` |
 | `pages/organizations/ask/` | `OrganizationsAskLayout` (the layout route above List and Board: `AskProvider` with the `organizations` surface and `revenact_organizations_ask`), `useOrganizationsContext` (view + `toContextFilters`), `portfolioOptions` (pages report the portfolio's filter options for chips), `useAskFocusOnOpen`, `testOrganizationsAsk` (`stubOrganizationsAsk`) |
 | `features/organizations/askContext.ts` | `toContextFilters`/`fromContextFilters` (params ↔ the context's string form), `organizationsPath` (History restore), `organizationsLabel` (the chip) |
+| `pages/contacts/ask/` | Contacts, the third Ask surface (spec 2026-09-28 §4.4): `ContactsAskLayout` (the layout route above `/contacts/:id?`, wrapping `App.tsx`'s route: one `AskProvider` with the `contacts` surface and `revenact_contacts_ask`, `ContactsFrame`'s `rail` slot holding `AskRail`), `useContactsContext` (path/query → `ContactsListContext` \| `ContactsPersonContext`, null on a bad id), `contactsNames.ts` (`ContactsNamesContext`/`useReportContactsNames`: `ContactsPage` reports the open person's name and place and the filtered organisation/account so a live question's chip can name them before the server has), `testContactsAsk` (`stubContactsAsk`, one fetch spy answering both the Contacts endpoints and the Copilot's) |
+| `features/contacts/askContext.ts` | `contactsContextOf` (path/query → the context, one person or the set filters), `contactsLabel` (the chip: a stored `label` wins, a live one is built from `listParts`/the reported names, "Sentiment" appended from `focus`), `contactsPath` (History restore: `/contacts/:id` or `/contacts?<filters>`), `whyQuestion` (the "Why this sentiment?" draft, first name only) |
 
 #### Ticket Overview (`tabs/ticket-overview/`)
 Charts: `StatusDonut`, `PriorityDonut`, `AssigneesStackedBar`, `OriginBar`, `SentimentLineChart`, `KPIGrid`. The four countable KPIs (Total, On Hold, Positive/Negative sentiment) and every donut/bar's segments drill into `/tickets/stats/`; average lifetime and resolution rate stay plain — a rate isn't a set of tickets.
@@ -394,7 +396,16 @@ State is in `customersSlice` (`fetchAllContacts`, `loadMoreContacts`,
 `fetchContactById`, `fetchContactHistory`); the backend shapes are in
 `features/contacts/contactsTypes.ts` and the words and tones in
 `features/contacts/contactsFormat.ts`. `ContactsFrame` leaves a slot for the
-Ask rail (delivery 2).
+Ask rail, filled by `ContactsAskLayout` (delivery 2, spec §4.4 — see "Ask
+Revenact" above and `pages/contacts/ask/`): Contacts is the third Ask
+surface, alongside the Dashboard and Organizations, in the shared
+`pages/dashboard/ask` machinery (`AskProvider`, `AskRail`, `useAsk`,
+`useCopilotThread`, `withFocus`, `originPath.ts`). With the rail open beside
+the page, `ContactsPage` keeps two panes (list narrowed to 18rem, profile)
+only from `xl`; between `md` and `xl` it collapses to one pane while the
+rail is open. "Why this sentiment?" on `ContactProfile` reads the `draft`
+context `AskDraftContext` provides (null outside `ContactsAskLayout`, so the
+link disappears rather than disables itself).
 
 **`components/contacts/`:**
 - `ContactsToolbar.tsx` — summary line, search, organisation/account/sentiment/role filters, + Add
