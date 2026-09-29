@@ -16,7 +16,7 @@ import { List } from './List';
 
 // Test-only. Both Accounts routes on the real auth, customers and
 // notifications slices and the real router, as App.tsx routes them. Only
-// fetch is stubbed, by the caller, with stubAccountPortfolio().
+// fetch is stubbed, by the caller, with stubAccountsPortfolio().
 
 export function Where() {
   const location = useLocation();

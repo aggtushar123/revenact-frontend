@@ -35,6 +35,12 @@ export function DashboardLayout() {
   // The Contacts frame (spec 2026-09-28 §3): the list, and a person on it.
   // A trailing slash still reads as the same route (fix round 1, 2026-09-28).
   const isContacts = /^\/contacts(\/\d+)?\/?$/.test(location.pathname);
+  // The Accounts list and board wear the Organizations frame too (accounts
+  // spec 2026-09-29 §1), whose own px-4 pb-4 already gutters them — without
+  // this <main> doubled the side padding and added a gap under the
+  // transparent bar (fix round 1, 2026-09-30). /accounts/:id keeps its own
+  // padding: it isn't in this frame.
+  const isAccountsView = /^\/accounts\/(list|board)\/?$/.test(location.pathname);
   // The Navbar's actions slot, which a page below (the dashboard) portals into.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const slotValue = useMemo(() => ({ slot, setSlot }), [slot]);
@@ -70,7 +76,7 @@ export function DashboardLayout() {
         <Sidebar />
         <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden rv-canvas">
           {!isScenarios && !isCopilot && !isCommunications && <Navbar />}
-          <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications || isDashboard || isOrgView || isContacts) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
+          <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications || isDashboard || isOrgView || isContacts || isAccountsView) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
             <Outlet />
           </main>
         </div>

@@ -41,6 +41,10 @@ describe('DashboardLayout', () => {
     // A trailing slash is still the same route (fix round 1, 2026-09-28).
     '/contacts/',
     '/contacts/41/',
+    // The Accounts list and board wear the Organizations frame too, whose
+    // own px-4 pb-4 already gutters them (fix round 1, 2026-09-30).
+    '/accounts/list',
+    '/accounts/board',
   ])('adds no padding around %s', (url) => {
     const main = renderAt(url);
     expect(main).toHaveClass('p-0');
@@ -48,7 +52,9 @@ describe('DashboardLayout', () => {
   });
 
   it('keeps the padding on other pages', () => {
-    const main = renderAt('/accounts/list');
+    // /accounts/:id is not in the Organizations frame, unlike the list and
+    // board above (fix round 1, 2026-09-30).
+    const main = renderAt('/accounts/12');
     expect(main).toHaveClass('p-2', 'md:p-3', 'lg:p-4');
   });
 
