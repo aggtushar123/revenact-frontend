@@ -352,15 +352,39 @@ left for the phone sheet).
   otherwise). List rows (`@min-[60rem]:flex-nowrap`) and the tiles
   (`@min-[50rem]:grid-cols-5`) respond to their `@container`, the content
   column, so they wrap beside the rail instead of scrolling sideways.
+- **Contacts shape.** The same pill in the same transparent top bar, and the
+  same rail in `ContactsFrame`'s `rail` slot, wired once by
+  `ContactsAskLayout` above `ContactsPage` (its own preference key
+  `revenact_contacts_ask`, so hiding it says nothing about the Dashboard's or
+  Organizations' choice). The rail shows from `sm`, open by default from `xl`.
+  With it open beside the page, the list and the profile stay two panes only
+  from `xl` (the list narrowed to `w-[18rem]`, `w-[22rem] lg:w-[26rem]`
+  otherwise); between `md` and `xl` while the rail is open it collapses to one
+  pane (the profile, with its own "‹ Contacts" back link) until the rail is
+  hidden. Below `sm` it is the same full-screen sheet as the other two
+  surfaces. "Why this sentiment?" (Sparkles, 13px quiet link, under a
+  person's sentiment line) drafts "Why is Lukas's sentiment neutral?" (first
+  name only) with the sentiment focus and opens the rail without sending; it
+  renders only inside `ContactsAskLayout` (the `draft` context is null off
+  it), so it disappears rather than disables itself off that route. A person
+  the asker cannot open refuses "You can't ask about this person here."; the
+  filtered list refuses "You can't ask about this list. Clear the filters and
+  ask again." — both keep the question on screen, with no Retry, like any
+  other refusal.
 - **Chips.**
   - The composer's chip says what the next question is about ("Revenue ›
     Forecast · Owner: Priya · 2 accounts"). Its × removes only a focus, never
     the screen.
   - Each user question carries its own 11px `bg-subtle` chip above its bubble,
-    on the Dashboard and Organizations (a conversation reopened in
-    Communications or `/copilot` shows no chip, since only those two pass
+    on the Dashboard, Organizations and Contacts (a conversation reopened in
+    Communications or `/copilot` shows no chip, since only those three pass
     `chipLabel`). Organizations' chip is "Organizations", then the page's own
-    filter-chip labels, then the focus ("1 account").
+    filter-chip labels, then the focus ("1 account"). Contacts' chip is
+    "Contacts", then the filtered organisation (and account), sentiment and
+    role labels and a quoted search term (`listParts`), or, for an open
+    person, their name and place ("Lukas Vermeer · Kraft Heinz › Kraft Heinz
+    EMEA") with "Sentiment" appended while the question is narrowed to their
+    sentiment; a reopened conversation's chip is the server's own `label`.
 - **Empty.** Communications' empty state on both surfaces: one centred 13px
   `ink-faint` line, "Ask about what is in front of you. Answers use your
   accounts, mail and tickets." The dashboard's suggested questions were
@@ -390,9 +414,16 @@ left for the phone sheet).
     is on my list". Unlike the drill's draft, it sends at once. It is
     `aria-disabled` while an answer is on its way or while that row's
     Snooze/Done is in flight.
+  - Contacts' "Why this sentiment?" (a person's profile, under the sentiment
+    line, only inside `ContactsAskLayout`) drafts "Why is Lukas's sentiment
+    neutral?" (the first name and the sentiment word) with the sentiment
+    focus and opens the rail; like the drill panel's, it never sends until
+    asked.
   - Every entry point (and a History pick, and New chat) opens the rail (or
     the phone sheet) for that visit only; only the Navbar pill's Sparkles
-    switch, from `sm` up, persists the open/closed choice to `localStorage`.
+    switch, from `sm` up, persists the open/closed choice to `localStorage`
+    (`revenact_dashboard_ask`, `revenact_organizations_ask` or
+    `revenact_contacts_ask` — each surface keeps its own).
     The phone sheet's Close never saves anything; the sheet always starts
     closed. Sending at once (`ask()`)
     replaces any earlier drafted question and focus, so only one is ever
@@ -403,9 +434,14 @@ left for the phone sheet).
   conversations carry the Network icon and "Organizations" followed by the
   server's own `labels` ("Organizations · Owner: Carl CSM"; there is no
   `origin_label` field), or, when started on an organisation's page, the
-  server's `label` ("Pizza Hut · EMEA"), capped at 60% of the row and truncated. Picking a
-  conversation from History always navigates to the surface it started on
-  (Dashboard or Organizations), whichever page is currently showing.
+  server's `label` ("Pizza Hut · EMEA"), capped at 60% of the row and truncated.
+  Contacts conversations carry the Users icon and the server's own `label`,
+  read "Started on " for screen readers: "Contacts · Negative" for one
+  started on the filtered list, or "Lukas Vermeer · Kraft Heinz" for one
+  started on a person. Picking a conversation from History always navigates
+  to the surface it started on (Dashboard, Organizations or Contacts),
+  whichever page is currently showing; a Contacts pick lands on
+  `/contacts/:id` (a person) or `/contacts?<filters>` (a list).
 
 ### Portfolio rows and board (Organizations)
 
@@ -518,11 +554,14 @@ Rules specific to it, enforced by `components/organizations/detail/houseRules.te
 
 ### Contacts
 
-Spec `docs/superpowers/specs/2026-09-28-contacts-redesign-design.md` §3 and §5.
+Spec `docs/superpowers/specs/2026-09-28-contacts-redesign-design.md` §3–§5.
 A list and a profile panel, like the Communications inbox but solid (no
 glass), in `ContactsFrame` (the same bleed gutter as the organisation page —
-`OrganizationsFrame`'s classes — with a slot for the Ask rail that delivery 2
-fills).
+`OrganizationsFrame`'s classes — with a slot for the Ask rail).
+`ContactsAskLayout` (delivery 2, spec §4.4) draws the frame and the glass rail
+once, above `/contacts/:id?`, the same way `OrganizationsAskLayout` does for
+Organizations (see "Ask rail", Contacts shape); `ContactsPage`'s own
+`ContactsFrame` inside it then passes its content straight through.
 
 - **Header.** The summary line ("142 people · 38 decision makers · 120
   active · 61% positive · 12 negative · +12.5% growth (30d)", over the whole
@@ -561,8 +600,13 @@ fills).
   classification, host and length, the organisation › account tag and the
   recording. Then emails, then tickets ("Department · Status", falling back
   to the status alone when the ticket carries no department). Edit and
-  Delete are the existing flows. "Why this sentiment?" is hidden, not
-  disabled, until Ask on Contacts wires it (delivery 2).
+  Delete are the existing flows. "Why this sentiment?" (Sparkles, a quiet
+  link under the sentiment line) drafts "Why is <first name>'s sentiment
+  <word>?" with the sentiment focus and opens the rail without sending; it
+  renders only inside `ContactsAskLayout` — hidden, not disabled, off that
+  route (the existing `/contacts` route always has it, since it is a child of
+  the layout; a bare render of `ContactsPage` in a test with no `AskProvider`
+  is the only place it is absent).
 - **Phones** (below 768px). The list is full width; a person opens as their
   own screen with a "‹ Contacts" back link that keeps the filters. Rendered
   conditionally, not hidden with CSS.
