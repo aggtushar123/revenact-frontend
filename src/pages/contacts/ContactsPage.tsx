@@ -26,9 +26,10 @@ import {
   refreshContactsSummary,
 } from '../../features/customers/customersSlice';
 import { useAppDispatch, useAppSelector } from '../../hooks';
-import { MD, SM, useMediaQuery } from '../../lib/useMediaQuery';
+import { MD, SM, XL, useMediaQuery } from '../../lib/useMediaQuery';
 import { ContactsFrame } from './ContactsFrame';
 import { useReportContactsNames } from './ask/contactsNames';
+import { useAsk } from '../dashboard/ask/useAsk';
 
 const BACK = `-ml-2 inline-flex min-h-11 w-fit items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-ink-muted hover:bg-subtle hover:text-ink active:bg-line-subtle ${FOCUS}`;
 
@@ -52,6 +53,13 @@ export function ContactsPage() {
   const badId = id !== undefined && selectedId === null;
   const isMd = useMediaQuery(MD);
   const isSm = useMediaQuery(SM);
+  const isXl = useMediaQuery(XL);
+  const ask = useAsk();
+  // The rail beside the page takes 320px: two panes fit beside it only from
+  // xl, the list narrowed (spec 2026-09-28 §4.4 "the list narrows and the
+  // profile stays"). Below sm the rail is a sheet over the page.
+  const railBeside = isSm && Boolean(ask?.open);
+  const twoPanes = isMd && (!railBeside || isXl);
   const [search, setSearch] = useSearchParams();
   const params = useMemo(() => parseContactsParams(search), [search]);
   const query = toContactsSearch(params).toString();
@@ -158,7 +166,7 @@ export function ContactsPage() {
   );
 
   let body;
-  if (!isMd && (selectedId !== null || badId)) {
+  if (!twoPanes && (selectedId !== null || badId)) {
     body = (
       <div className="flex flex-col gap-2 pb-4">
         <Link to={listPath} className={BACK}>
@@ -168,7 +176,7 @@ export function ContactsPage() {
         {profile}
       </div>
     );
-  } else if (!isMd) {
+  } else if (!twoPanes) {
     body = (
       <div className="flex flex-col gap-3 pb-4">
         {toolbar}
@@ -180,7 +188,7 @@ export function ContactsPage() {
       <div className="flex min-h-0 flex-1 flex-col gap-3">
         {toolbar}
         <div className="flex min-h-0 flex-1 gap-3">
-          <div data-pane="list" className="w-[22rem] shrink-0 overflow-y-auto lg:w-[26rem]">
+          <div data-pane="list" className={`${railBeside ? 'w-[18rem]' : 'w-[22rem] lg:w-[26rem]'} shrink-0 overflow-y-auto`}>
             {list}
           </div>
           <section aria-label="Profile" data-pane="profile" className="min-w-0 flex-1 overflow-y-auto">

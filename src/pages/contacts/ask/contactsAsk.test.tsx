@@ -78,3 +78,39 @@ describe('Ask Revenact on Contacts', () => {
     expect(await screen.findByRole('dialog', { name: 'Ask Revenact' })).toBeInTheDocument();
   });
 });
+
+describe('layout beside the rail', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetViewport();
+  });
+  const pane = (name: string) => document.querySelector(`[data-pane="${name}"]`);
+
+  it('keeps two panes from xl with the rail open, the list narrowed', async () => {
+    stubContactsAsk();
+    renderContactsPage('/contacts/41', { ask: true, width: 1440 });
+    await screen.findByRole('heading', { name: 'Lukas Vermeer' });
+    expect(pane('list')).toHaveClass('w-[18rem]');
+    expect(pane('profile')).toBeInTheDocument();
+  });
+
+  it('shows one pane between md and xl while the rail is open, and two once it is hidden', async () => {
+    stubContactsAsk();
+    localStorage.setItem('revenact_contacts_ask', 'open');
+    renderContactsPage('/contacts/41', { ask: true, width: 1100 });
+    await screen.findByRole('heading', { name: 'Lukas Vermeer' });
+    expect(pane('list')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Contacts' })).toBeInTheDocument(); // the back link
+    await userEvent.click(within(screen.getByTestId('nav-actions')).getByRole('button', { name: 'Hide Copilot' }));
+    await waitFor(() => expect(pane('list')).toHaveClass('w-[22rem]'));
+    expect(pane('profile')).toBeInTheDocument();
+    localStorage.clear();
+  });
+
+  it('keeps the delivery 1 layout with no Ask provider', async () => {
+    stubContactsAsk();
+    renderContactsPage('/contacts/41', { width: 1100 });
+    await screen.findByRole('heading', { name: 'Lukas Vermeer' });
+    expect(pane('list')).toHaveClass('w-[22rem]');
+  });
+});
