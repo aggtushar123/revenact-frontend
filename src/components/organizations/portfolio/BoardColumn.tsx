@@ -2,15 +2,16 @@ import { useEffect, useId, useRef, useState, type DragEvent, type ReactNode } fr
 import { Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
-import type { LifecycleValue, PortfolioRow } from '../../../features/organizations/portfolioTypes';
+import type { FilterOptions, LifecycleValue, PortfolioRow, PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
 import { BoardCard } from './BoardCard';
+import { usePortfolioKind } from './portfolioKind';
 import { useOverlayActive, withMovedRow, type BoardColumnSpec, type BoardMove } from './boardMove';
 import { MoreButton } from './PortfolioSections';
 import { useEndSentinel } from './useEndSentinel';
 import { usePagedPortfolio } from './usePortfolio';
 import { FOCUS, QUIET } from './styles';
 
-export interface BoardColumnProps {
+export interface BoardColumnProps<R extends PortfolioRowBase = PortfolioRow> {
   /** The header's figures, already adjusted for an optimistic move. */
   spec: BoardColumnSpec;
   /** This column's read: the view's query plus group_value and limit. */
@@ -27,7 +28,7 @@ export interface BoardColumnProps {
   saving: boolean;
   /** Why moving is off, when it is stuck (the frame reload failed). */
   pausedNote?: string | null;
-  move: BoardMove | null;
+  move: BoardMove<R> | null;
   filtered: boolean;
   openId: number | null;
   /** The card moved here from its Move to… menu: until the move settles,
@@ -35,18 +36,20 @@ export interface BoardColumnProps {
    *  (its mount here, and every re-sort that moves its node). */
   focusId: number | null;
   /** The card being dragged, if any (held by the board, not read back from dataTransfer). */
-  dragging: PortfolioRow | null;
-  onOpen: (row: PortfolioRow) => void;
-  onMove: (row: PortfolioRow, to: LifecycleValue, fromMenu?: boolean) => void;
-  onDragStart: (row: PortfolioRow) => void;
+  dragging: R | null;
+  onOpen: (row: R) => void;
+  onMove: (row: R, to: LifecycleValue, fromMenu?: boolean) => void;
+  onDragStart: (row: R) => void;
   onDragEnd: () => void;
   /** This column has swapped a saved move's guess for its own fresh page
    *  (or its read failed, so it never will). */
   onHandedOver: (key: string, token: number) => void;
-  onRowsLoaded: (rows: PortfolioRow[]) => void;
-  onShowChurned: () => void;
-  /** Lifecycle columns other than Churn (ruling R2): the header's "+" adds
-   *  an organization already in this stage. Absent, there is no "+". */
+  onRowsLoaded: (rows: R[]) => void;
+  /** The drop-only Churn column's "Show churned" (Organizations only). */
+  onShowChurned?: () => void;
+  /** Lifecycle columns the kind adds to (Organizations: not Churn, ruling
+   *  R2): the header's "+" adds a record already in this stage. Absent,
+   *  there is no "+". */
   onAdd?: (stage: LifecycleValue) => void;
   /** Phones: the panel the column tabs scroll to. */
   panelRef?: (element: HTMLElement | null) => void;
@@ -78,7 +81,7 @@ function CardSkeleton({ label, count }: { label: string; count: number }) {
  *  (group_value=<key>) that loads its next page when its end scrolls into
  *  view, with a visible Show more as the fallback. Lifecycle columns are
  *  drop targets. The column has no surface of its own (cards are the items). */
-export function BoardColumn({
+export function BoardColumn<R extends PortfolioRowBase>({
   spec,
   query,
   enabled,
@@ -103,11 +106,12 @@ export function BoardColumn({
   onShowChurned,
   onAdd,
   panelRef,
-}: BoardColumnProps) {
+}: BoardColumnProps<R>) {
+  const kind = usePortfolioKind();
   const headingId = useId();
   const sectionRef = useRef<HTMLElement | null>(null);
   const [over, setOver] = useState(false);
-  const page = usePagedPortfolio(query, enabled, version, onRowsLoaded);
+  const page = usePagedPortfolio<R, FilterOptions>(query, enabled, version, onRowsLoaded);
   // The move shows here until this column's own fresh page one lands.
   const overlay = useOverlayActive(move?.token ?? null, page.loadedKey);
   const loaded = enabled ? page.rows : [];
@@ -177,7 +181,7 @@ export function BoardColumn({
   } else if (rows.length === 0) {
     body = (
       <p className="rounded-xl border border-dashed border-line p-3 text-[13px] text-ink-muted">
-        {filtered ? 'None match these filters.' : `No organizations in ${spec.label}.`}
+        {filtered ? 'None match these filters.' : `No ${kind.noun.many} in ${spec.label}.`}
       </p>
     );
   } else {
@@ -235,11 +239,11 @@ export function BoardColumn({
             </span>
           )}
         </h2>
-        {onAdd && spec.key !== 'churn' ? (
+        {onAdd && kind.addsTo(spec.key as LifecycleValue) ? (
           <button
             type="button"
             onClick={() => onAdd(spec.key as LifecycleValue)}
-            aria-label={`Add organization to ${spec.label}`}
+            aria-label={`Add ${kind.noun.one} to ${spec.label}`}
             className={`inline-flex min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-subtle hover:text-ink active:bg-line-subtle ${FOCUS}`}
           >
             <Plus className="w-4 h-4" aria-hidden="true" />

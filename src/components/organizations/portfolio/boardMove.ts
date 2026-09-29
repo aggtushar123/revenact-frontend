@@ -6,13 +6,14 @@ import type {
   LifecycleValue,
   PortfolioGroup,
   PortfolioRow,
+  PortfolioRowBase,
 } from '../../../features/organizations/portfolioTypes';
 
 /** One account moving between lifecycle columns. `token` is unique per
  *  move, so an overlay can tell a new move from one it has already seen. */
-export interface BoardMove {
+export interface BoardMove<R extends PortfolioRowBase = PortfolioRow> {
   token: number;
-  row: PortfolioRow;
+  row: R;
   from: LifecycleValue;
   to: LifecycleValue;
   /** The PATCH has succeeded; the move now waits for its reloads to land. */
@@ -54,7 +55,7 @@ export function boardColumns(group: GroupKey, groups: PortfolioGroup[], churnVis
 
 /** A column header's figures with a move applied: one account (and its
  *  ARR) out of `from`, into `to`. */
-export function withMove(spec: BoardColumnSpec, move: BoardMove | null): BoardColumnSpec {
+export function withMove(spec: BoardColumnSpec, move: BoardMove<PortfolioRowBase> | null): BoardColumnSpec {
   if (!move || spec.dropOnly) return spec;
   const arr = move.row.arr ?? 0;
   if (spec.key === move.from) return { ...spec, count: Math.max(0, spec.count - 1), arr: spec.arr - arr };
@@ -64,7 +65,7 @@ export function withMove(spec: BoardColumnSpec, move: BoardMove | null): BoardCo
 
 /** A column's cards with a move applied: the moved card leaves every column
  *  but its new one, where it sits on top, once, showing its new stage. */
-export function withMovedRow(rows: PortfolioRow[], key: string, move: BoardMove | null): PortfolioRow[] {
+export function withMovedRow<R extends PortfolioRowBase>(rows: R[], key: string, move: BoardMove<R> | null): R[] {
   if (!move) return rows;
   const others = rows.filter((row) => row.id !== move.row.id);
   if (key !== move.to) return others;
