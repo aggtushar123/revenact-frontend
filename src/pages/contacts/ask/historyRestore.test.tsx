@@ -5,6 +5,8 @@ import { resetViewport } from '../../../test/viewport';
 import { renderContactsPage } from '../testPage';
 import { stubContactsAsk } from './testContactsAsk';
 
+const log = () => screen.getByRole('log', { name: 'Ask Revenact messages' });
+
 const ON_LUKAS = {
   id: 9,
   title: 'How is Lukas?',
@@ -32,7 +34,7 @@ describe('History on Contacts', () => {
     expect(within(item).getByText('Lukas Vermeer · Kraft Heinz')).toBeInTheDocument();
     await userEvent.click(item);
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/contacts/41'));
-    expect(await screen.findByText('Lukas is steady.')).toBeInTheDocument();
+    expect(await within(log()).findByText('Lukas is steady.')).toBeInTheDocument();
   });
 
   it('reopens a list conversation with its filters', async () => {
@@ -43,5 +45,6 @@ describe('History on Contacts', () => {
     await userEvent.click(within(screen.getByTestId('nav-actions')).getByRole('button', { name: 'History' }));
     await userEvent.click(await screen.findByRole('button', { name: /Who is unhappy\?/ }));
     await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/contacts?sentiment=negative'));
+    expect(await within(log()).findByText('Lukas is steady.')).toBeInTheDocument();
   });
 });
