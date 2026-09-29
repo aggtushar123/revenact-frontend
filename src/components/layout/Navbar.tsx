@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useContext } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { ACCOUNTS_DATA } from '../organizations/accountsData';
 import type { AccountRow } from '../organizations/accountsData';
-import { companyLabel, formatRelativeTime } from '../../features/customers/formatters';
+import { formatRelativeTime } from '../../features/customers/formatters';
 import { EntityAvatar } from '../shared';
 import {
   ChevronLeft,
@@ -91,15 +91,6 @@ export function Navbar() {
     ? (accountNavState?.account ?? ACCOUNTS_DATA.find((a) => a.id === accountId) ?? ACCOUNTS_DATA[0])
     : null;
 
-  // Detect contact details path (/contacts/:id — not /contacts/list,
-  // which \d+ already excludes). Same "read the same fetch the Details
-  // page itself already made" reasoning as organization/account above —
-  // pages/contacts/Details.tsx's own fetchContactById() populates this.
-  const contactDetailMatch = location.pathname.match(/\/contacts\/(\d+)/);
-  const contactId = contactDetailMatch ? parseInt(contactDetailMatch[1], 10) : null;
-  const selectedContact = useAppSelector((state) => state.customers.selectedContact);
-  const contact = contactId && selectedContact?.id === contactId ? selectedContact : null;
-
   const isOrganizations = location.pathname.startsWith('/organizations');
   // Only /accounts/list and /accounts/board — never /accounts/:id,
   // which the `account` branch above already claims first (checked
@@ -118,7 +109,11 @@ export function Navbar() {
   // An organization's page wears the same frame (organization page spec
   // §1.1): the page draws its own name row, so the bar only leads back.
   const isOrgDetail = /^\/organizations\/\d+$/.test(location.pathname);
-  const isFramed = isDashboard || isOrgView || isOrgDetail;
+  // Contacts wears the same frame (spec 2026-09-28 §3): the list and the
+  // person open on it share one page, titled here; the page draws the rest.
+  // A trailing slash still reads as the same route (fix round 1, 2026-09-28).
+  const isContacts = /^\/contacts(\/\d+)?\/?$/.test(location.pathname);
+  const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts;
   const dashboardSharedSearch = sharedSearch(location.search);
 
 
@@ -236,26 +231,9 @@ export function Navbar() {
                  </div>
               </div>
           </div>
-        ) : contact ? (
-          <div className="flex items-center gap-4">
-             <button
-                onClick={() => navigate(-1)}
-                className="p-1.5 hover:bg-subtle rounded-lg transition-colors text-ink-faint hover:text-accent border border-transparent hover:border-line-subtle"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-
-              <div className="flex items-center gap-3">
-                 <EntityAvatar
-                    name={contact.name}
-                    className="w-[36px] h-[36px] rounded-full border border-line-subtle shadow-sm"
-                 />
-                 <div className="flex items-center gap-3">
-                    <h1 className="text-[16px] font-bold text-ink tracking-tight uppercase whitespace-nowrap">{contact.name}</h1>
-                    <div className="w-px h-3.5 bg-line" />
-                    <span className="text-[13.5px] font-bold text-ink-faint tracking-widest uppercase truncate max-w-[140px]">{companyLabel(contact.companies)}</span>
-                 </div>
-              </div>
+        ) : isContacts ? (
+          <div className="flex items-center gap-4 h-full">
+            <h1 className="text-[17px] font-bold text-ink tracking-tight">Contacts</h1>
           </div>
         ) : isOrgDetail ? (
           <nav aria-label="Breadcrumb" className="flex items-center h-full">

@@ -2,27 +2,24 @@ import { useId, useState } from 'react';
 import { ExternalLink, FileText, Phone, Sparkles } from 'lucide-react';
 import { durationLabel } from '../../../features/calls/callFormat';
 import type { Call } from '../../../features/calls/callsSlice';
+import { readingOf } from '../../../features/contacts/contactsFormat';
 import { downloadAttachment } from '../../../features/files/filesSlice';
 import { timeLabel } from '../../../features/organizations/storyDays';
 import { AccountTag } from './ListParts';
 import { ITEM_LINK, META, ROW_ICON, TITLE_BUTTON } from './listStyles';
 
-const SENTIMENT: Record<Exclude<Call['sentiment'], ''>, { label: string; tone: string }> = {
-  positive: { label: 'Positive', tone: 'bg-success-dim text-success' },
-  neutral: { label: 'Neutral', tone: 'bg-subtle text-ink-muted' },
-  negative: { label: 'Negative', tone: 'bg-danger-dim text-danger' },
-};
 
 /** One call as a plain row, like a Story item (spec 2026-09-27 §4): title
  *  and time, a one-line summary its title opens in place, then the account
  *  tag, host, duration, where it came from (a recorder, or who logged it),
- *  sentiment and the AI's classification, who was on it with their roles,
+ *  sentiment or "Not enough to analyse" (nothing while it waits to be read,
+ *  spec 2026-09-28 §5) and the AI's classification, who was on it with their roles,
  *  and the transcript and recording. */
 export function CallItem({ call }: { call: Call }) {
   const [expanded, setExpanded] = useState(false);
   const [failed, setFailed] = useState(false);
   const detailId = useId();
-  const sentiment = call.sentiment ? SENTIMENT[call.sentiment] : null;
+  const sentiment = readingOf(call);
   // The value lands in an href: only http(s) is linked.
   const recording = /^https?:\/\//i.test(call.recording_url) ? call.recording_url : null;
   const who = [call.host_name, durationLabel(call.duration_minutes) || null].filter(Boolean).join(' · ');

@@ -1,9 +1,10 @@
 import { Ellipsis, Mail, Phone } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { Contact } from '../../../features/customers/customersSlice';
 import { capitalize, formatRelativeTime, initials } from '../../../features/customers/formatters';
 import { mailtoHref, telHref } from '../../../lib/contactLinks';
 import { AccountTag } from './ListParts';
-import { ITEM_LINK, META, ROW_ACTION, ROW_ICON } from './listStyles';
+import { ITEM_LINK, META, ROW_ACTION, ROW_ICON, TITLE_BUTTON } from './listStyles';
 import { Menu } from './Menu';
 
 const SENTIMENT_TONE: Record<Contact['sentiment'], string> = {
@@ -40,7 +41,8 @@ function Links({ contact }: { contact: Contact }) {
 /** One person (spec 2026-09-27 §2): initials, name and role, how to reach
  *  them, the account tag, status, sentiment and when they were last
  *  contacted; ⋯ edits or deletes through the existing flows. Phones put the
- *  links on their own line, as 44px targets. */
+ *  links on their own line, as 44px targets. The name opens their profile
+ *  on the Contacts page (spec 2026-09-28 §5). */
 export function PersonItem({
   contact,
   isSm,
@@ -61,7 +63,11 @@ export function PersonItem({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex min-w-0 items-baseline gap-2">
-          <h3 className="min-w-0 truncate text-[13px] font-semibold text-ink">{contact.name}</h3>
+          <h3 className="min-w-0 truncate text-[13px] font-semibold text-ink">
+            <Link to={`/contacts/${contact.id}`} className={TITLE_BUTTON}>
+              {contact.name}
+            </Link>
+          </h3>
           <span className="min-w-0 flex-1 truncate text-[13px] text-ink-muted">{contact.role_display}</span>
           {isSm ? <span className="shrink-0 text-[11px] text-ink-muted">{contacted}</span> : null}
         </div>

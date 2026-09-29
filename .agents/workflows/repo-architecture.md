@@ -50,14 +50,14 @@ react-ts-app/
 │   │   ├── auth/               ← ProtectedRoute guard
 │   │   ├── layout/             ← Sidebar, Navbar
 │   │   ├── shared/             ← Multi-domain components (ActivityFeed, PinnedAttributes, Summary)
-│   │   ├── contacts/           ← ContactsTable, ActionBar, MetricsPanel
+│   │   ├── contacts/           ← ContactsToolbar, ContactList(Item), ContactProfile, HistoryItems, ContactFormModal
 │   │   ├── dashboard/charts/   ← Shared Recharts chart components (AI Trending)
 │   │   └── organizations/      ← Org domain components; portfolio/ holds the list page's (see below)
 │   └── pages/                  ← Route-level page components
 │       ├── auth/               ← Login page
 │       ├── organizations/      ← List, Board, Details (org detail view)
 │       ├── accounts/           ← Account Details page
-│       ├── contacts/           ← Contacts list
+│       ├── contacts/           ← ContactsPage (list + profile), ContactsFrame
 │       ├── copilot/            ← AI Copilot module (Home, Chat, Cockpit)
 │       ├── scenarios/          ← Visual scenario builder (React Flow)
 │       ├── settings/           ← Settings module (data, currency, etc.)
@@ -119,9 +119,9 @@ react-ts-app/
 ├── integrations               → Integrations catalogue
 ├── profile                    → My Profile (any role)
 ├── users                      → User Management [ADMIN ONLY — AdminRoute]
-├── contacts/
-│   ├── (index)                → Redirects to /contacts/list
-│   └── list                   → ContactsList
+├── contacts                   → ContactsPage (list + profile panel)
+├── contacts/:id               → ContactsPage, that person chosen
+├── contacts/list              → Redirects to /contacts
 └── pipelines/
     ├── (index)                → Redirects to /pipelines/board
     ├── list                   → Pipelines list view
@@ -386,14 +386,21 @@ Account-level detail page linked from Org Details.
 
 ---
 
-### 5. Contacts (`pages/contacts/List.tsx`)
+### 5. Contacts (`pages/contacts/ContactsPage.tsx`)
 
-Simple contacts list view.
+A list and a profile panel (spec 2026-09-28 §3). `/contacts/:id` chooses a
+person; the filters live in the URL (`features/contacts/contactsParams.ts`).
+State is in `customersSlice` (`fetchAllContacts`, `loadMoreContacts`,
+`fetchContactById`, `fetchContactHistory`); the backend shapes are in
+`features/contacts/contactsTypes.ts` and the words and tones in
+`features/contacts/contactsFormat.ts`. `ContactsFrame` leaves a slot for the
+Ask rail (delivery 2).
 
 **`components/contacts/`:**
-- `ContactsTable.tsx` — contacts data grid
-- `ActionBar.tsx` — search and filters
-- `MetricsPanel.tsx` — contact count metrics
+- `ContactsToolbar.tsx` — summary line, search, organisation/account/sentiment/role filters, + Add
+- `ContactList.tsx`, `ContactListItem.tsx` — the list, its states and Load more
+- `ContactProfile.tsx`, `HistoryItems.tsx` — the chosen person, their sentiment and why, calls, emails and tickets
+- `ContactFormModal.tsx`, `ContactRowActionsPopover.tsx` — shared with the account page
 
 ---
 

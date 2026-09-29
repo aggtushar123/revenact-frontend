@@ -4,6 +4,7 @@ import type { UserFunction } from '../auth/authSlice';
 import { apiFetch, ApiError } from '../../lib/apiClient';
 import { listScope } from '../../lib/listScope';
 import type { User, CurrencyCode } from '../auth/authSlice';
+import type { ContactHistory, ContactsPage, ContactsSummary } from '../contacts/contactsTypes';
 
 // Mirrors revenact-backend's CustomerSerializer field-for-field — see
 // revenact-backend/docs/API_CONTRACTS.md -> customers. One of a *tenant's*
@@ -403,7 +404,7 @@ export interface CalendarEvent {
 // Email/Task/Note/Ticket/CalendarEvent above (each one filter within
 // ActivityFeed), Contact backs its own sibling tab — the Organization
 // Details page's Contacts tab, the standalone Account page's Contacts
-// tab, and the global /contacts/list page — so it also carries
+// tab, and the Contacts page (/contacts) — so it also carries
 // `companies`/`account_name`, which those other models don't need
 // (their parent scope is always already known from which endpoint
 // fetched them; the global list page spans every Customer/Account at
@@ -437,6 +438,11 @@ export interface Contact {
   /** The account it is on; null on the organization itself (spec
    *  2026-09-27 §6). Optional: fixtures from before it read as null. */
   account_id?: number | null;
+  /** The first parent organisation the viewer may open, and the account,
+   *  as refs (the Contacts list, spec 2026-09-28 §2). Optional: older
+   *  fixtures and nested lists read them from `companies`/`account_*`. */
+  organisation?: CompanyRef | null;
+  account?: CompanyRef | null;
 }
 
 export interface ContactSentimentEvidence {
@@ -450,36 +456,6 @@ export interface ContactSentimentEvidence {
   latest_at: string | null;
 }
 
-// GET /api/v1/contacts/<id>/interactions/ — what the sentiment rests on.
-export interface ContactInteraction {
-  kind: 'call' | 'email' | 'ticket';
-  id: number;
-  title: string;
-  snippet: string;
-  when: string;
-  sentiment: 'positive' | 'neutral' | 'negative' | '';
-  ai_category: string;
-}
-
-export interface ContactInteractions {
-  sentiment: 'positive' | 'neutral' | 'negative' | null;
-  score: number;
-  source: 'manual' | 'computed';
-  evidence: ContactSentimentEvidence | Record<string, never>;
-  interactions: ContactInteraction[];
-}
-
-// Mirrors revenact-backend's ContactStatsView response exactly — see
-// docs/API_CONTRACTS.md -> GET /api/v1/contacts/stats/.
-export interface ContactStats {
-  total: number;
-  active: number;
-  sentiment: { positive: number; neutral: number; negative: number };
-  sentiment_pct: { positive: number; neutral: number; negative: number };
-  /** null (not 0) when there were no contacts yet 30 days ago — a
-   * percentage change off a zero base is undefined, not zero. */
-  growth_30d_pct: number | null;
-}
 
 // The fields the Add/Edit Contact form actually exposes — everything
 // ContactSerializer accepts except `customer`/`account` (never sent;
@@ -853,31 +829,36 @@ interface CustomersState {
   contactsFor: string | null;
   /** The last contacts read asked for: a slower, earlier one never lands. */
   contactsRequestId?: string;
-  /** The global, paginated, searchable/company-filterable contact list
-   * for the standalone /contacts/list page — separate from `contacts`
-   * above the same way `customers` (the Organizations list) is
-   * separate from `selectedCustomer`: this page isn't scoped to one
-   * Customer/Account at all. */
+  /** The Contacts page's list (/contacts): every person the viewer may
+   * open, filtered, paged by "Load more" — separate from `contacts`
+   * above, which is one organisation's or account's people. */
   allContacts: Contact[];
   allContactsCount: number;
   allContactsNext: string | null;
   allContactsPrevious: string | null;
   allContactsLoading: boolean;
   allContactsError: string | null;
-  /** Total/Active/Sentiment/Growth rollups for the standalone
-   * /contacts/list page's MetricsPanel — null until the first fetch
-   * resolves, same reasoning as `stats` (Customer's own). */
-  contactStats: ContactStats | null;
-  contactStatsLoading: boolean;
-  contactStatsError: string | null;
-  /** The single Contact the new /contacts/:id page is showing — same
-   * "separate from the paginated/scoped lists" reasoning as
-   * selectedCustomer vs. `customers`/`accountsForCustomer`. */
+  /** Over the whole filtered set; null until a read lands. */
+  allContactsSummary: ContactsSummary | null;
+  /** The last list read asked for: a slower, earlier one never lands. */
+  allContactsRequestId?: string;
+  /** The path that read asked for, so a summary refresh lands only on it. */
+  allContactsPath?: string;
+  allContactsLoadingMore: boolean;
+  allContactsMoreError: string | null;
+  /** The Load more in flight for the list on screen; cleared when the list
+   *  is read again or someone is deleted, so its late page never lands. */
+  allContactsMoreRequestId?: string;
+  /** The person the Contacts page's profile shows (/contacts/:id). */
   selectedContact: Contact | null;
   selectedContactLoading: boolean;
   selectedContactError: string | null;
-  selectedContactInteractions: ContactInteractions | null;
-  selectedContactInteractionsLoading: boolean;
+  selectedContactRequestId?: string;
+  /** Their calls, emails and tickets (GET /contacts/<id>/history/). */
+  selectedContactHistory: ContactHistory | null;
+  selectedContactHistoryLoading: boolean;
+  selectedContactHistoryError: string | null;
+  selectedContactHistoryRequestId?: string;
   /** Every Opportunity the caller's organisation owns — the standalone
    * Pipelines board's own "Opportunities" tab, unpaginated (a Kanban
    * board needs every card in every column at once, see
@@ -1018,14 +999,15 @@ const initialState: CustomersState = {
   allContactsPrevious: null,
   allContactsLoading: false,
   allContactsError: null,
-  contactStats: null,
-  contactStatsLoading: false,
-  contactStatsError: null,
+  allContactsSummary: null,
+  allContactsLoadingMore: false,
+  allContactsMoreError: null,
   selectedContact: null,
   selectedContactLoading: false,
   selectedContactError: null,
-  selectedContactInteractions: null,
-  selectedContactInteractionsLoading: false,
+  selectedContactHistory: null,
+  selectedContactHistoryLoading: false,
+  selectedContactHistoryError: null,
   opportunities: [],
   opportunitiesLoading: false,
   opportunitiesError: null,
@@ -1515,19 +1497,10 @@ export const fetchContactsForAccount = createAsyncThunk<
   }
 );
 
-interface ContactsPage {
-  count: number;
-  next: string | null;
-  previous: string | null;
-  results: Contact[];
-}
-
-// Powers the standalone /contacts/list page — spans every Customer/
-// Account the tenant owns, unlike the two entity-scoped thunks above.
-// Same "raw path in, paginated page out" shape as fetchCustomers: pass
-// a full `/contacts/?search=...&company=...` path for a fresh
-// filtered fetch, or one of the response's own next/previous links to
-// page through it, same reasoning as fetchCustomers's own docstring.
+// Powers the Contacts page (/contacts) — spans every Customer/Account the
+// viewer may open, unlike the two entity-scoped thunks above. Pass a full
+// `/contacts/?search=...&customer=...` path (contactsApiPath) for a fresh
+// filtered read; loadMoreContacts appends the response's `next` page.
 export const fetchAllContacts = createAsyncThunk<ContactsPage, string | void, { rejectValue: string }>(
   'customers/fetchAllContacts',
   async (url, { rejectWithValue }) => {
@@ -1540,46 +1513,68 @@ export const fetchAllContacts = createAsyncThunk<ContactsPage, string | void, { 
   }
 );
 
-export const fetchContactStats = createAsyncThunk<ContactStats, void, { rejectValue: string }>(
-  'customers/fetchContactStats',
-  async (_, { rejectWithValue }) => {
+/** The summary line again, for the list already on screen (after an edit
+ *  changed someone's sentiment or status): the rows and pages loaded stay
+ *  as they are, and updateContact has already patched the edited row. */
+export const refreshContactsSummary = createAsyncThunk<ContactsSummary | null, string, { rejectValue: string }>(
+  'customers/refreshContactsSummary',
+  async (url, { rejectWithValue }) => {
     try {
-      return await apiFetch<ContactStats>('/contacts/stats/');
+      return (await apiFetch<ContactsPage>(url)).summary ?? null;
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Could not load contact stats.';
-      return rejectWithValue(message);
+      return rejectWithValue(err instanceof ApiError ? err.message : 'Could not read the summary.');
     }
   }
 );
 
-// Powers the new /contacts/:id page.
-export const fetchContactInteractions = createAsyncThunk<ContactInteractions, number, { rejectValue: string }>(
-  'customers/fetchContactInteractions',
-  async (id, { rejectWithValue }) => {
+/** The next page of the Contacts list (a response's own `next` link), appended. */
+export const loadMoreContacts = createAsyncThunk<ContactsPage, string, { rejectValue: string }>(
+  'customers/loadMoreContacts',
+  async (next, { rejectWithValue }) => {
     try {
-      return await apiFetch<ContactInteractions>(`/contacts/${id}/interactions/`);
+      return await apiFetch<ContactsPage>(next);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Could not load this contact\'s interactions.';
-      return rejectWithValue(message);
+      return rejectWithValue(err instanceof ApiError ? err.message : 'Could not load more people.');
     }
   }
 );
 
+/** What a 404 on a person means: they are gone, or on an account this
+ *  viewer cannot open (the backend answers both the same way). */
+export const CONTACT_NOT_FOUND = 'This person is not here. They may have been deleted, or they are on an account you cannot open.';
+
+function contactReadError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.status === 404) return CONTACT_NOT_FOUND;
+  return err instanceof ApiError ? err.message : fallback;
+}
+
+// Powers the Contacts page's profile (/contacts/:id).
 export const fetchContactById = createAsyncThunk<Contact, number, { rejectValue: string }>(
   'customers/fetchContactById',
   async (id, { rejectWithValue }) => {
     try {
       return await apiFetch<Contact>(`/contacts/${id}/`);
     } catch (err) {
-      const message = err instanceof ApiError ? err.message : 'Could not load this contact.';
-      return rejectWithValue(message);
+      return rejectWithValue(contactReadError(err, 'Could not load this contact.'));
+    }
+  }
+);
+
+/** A person's calls, emails and tickets, each under its own record rule. */
+export const fetchContactHistory = createAsyncThunk<ContactHistory, number, { rejectValue: string }>(
+  'customers/fetchContactHistory',
+  async (id, { rejectWithValue }) => {
+    try {
+      return await apiFetch<ContactHistory>(`/contacts/${id}/history/`);
+    } catch (err) {
+      return rejectWithValue(contactReadError(err, 'Could not load their calls, emails and tickets.'));
     }
   }
 );
 
 // Adds an organization-level Contact under `customerId` — used both by
 // the Organization Details page's own Contacts tab (customerId fixed)
-// and the standalone /contacts/list page's "Add Contact" (customerId
+// and the Contacts page's (/contacts) "Add Contact" (customerId
 // picked from a dropdown; that page only ever creates org-level
 // Contacts, there's no account-picker on it). No extraReducers case:
 // unlike createAccount (which unshifts into the single
@@ -2705,57 +2700,91 @@ const customersSlice = createSlice({
         state.contactsLoading = false;
         state.contactsError = action.payload ?? 'Could not load contacts.';
       })
-      .addCase(fetchAllContacts.pending, (state) => {
+      .addCase(fetchAllContacts.pending, (state, action) => {
+        state.allContactsRequestId = action.meta.requestId;
+        state.allContactsPath = action.meta.arg || '/contacts/';
+        state.allContactsMoreRequestId = undefined;
         state.allContactsLoading = true;
         state.allContactsError = null;
+        state.allContactsLoadingMore = false;
+        state.allContactsMoreError = null;
       })
       .addCase(fetchAllContacts.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.allContactsRequestId) return;
         state.allContactsLoading = false;
         state.allContacts = action.payload.results;
         state.allContactsCount = action.payload.count;
         state.allContactsNext = action.payload.next;
         state.allContactsPrevious = action.payload.previous;
+        state.allContactsSummary = action.payload.summary ?? null;
       })
       .addCase(fetchAllContacts.rejected, (state, action) => {
+        if (action.meta.requestId !== state.allContactsRequestId) return;
         state.allContactsLoading = false;
         state.allContactsError = action.payload ?? 'Something went wrong.';
       })
-      .addCase(fetchContactStats.pending, (state) => {
-        state.contactStatsLoading = true;
-        state.contactStatsError = null;
+      // A failed refresh keeps the summary it had.
+      .addCase(refreshContactsSummary.fulfilled, (state, action) => {
+        if (state.allContactsLoading || action.meta.arg !== state.allContactsPath || !action.payload) return;
+        state.allContactsSummary = action.payload;
       })
-      .addCase(fetchContactStats.fulfilled, (state, action) => {
-        state.contactStatsLoading = false;
-        state.contactStats = action.payload;
+      .addCase(loadMoreContacts.pending, (state, action) => {
+        state.allContactsMoreRequestId = action.meta.requestId;
+        state.allContactsLoadingMore = true;
+        state.allContactsMoreError = null;
       })
-      .addCase(fetchContactStats.rejected, (state, action) => {
-        state.contactStatsLoading = false;
-        state.contactStatsError = action.payload ?? 'Something went wrong.';
+      // A page lands only on the list it continues: not while a fresh read
+      // is on its way, and not after one replaced the list or a delete
+      // shifted it (the request id; the new list's `next` can be the same URL).
+      .addCase(loadMoreContacts.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.allContactsMoreRequestId) return;
+        if (state.allContactsLoading || state.allContactsNext !== action.meta.arg) return;
+        state.allContactsLoadingMore = false;
+        const seen = new Set(state.allContacts.map((c) => c.id));
+        state.allContacts.push(...action.payload.results.filter((c) => !seen.has(c.id)));
+        state.allContactsCount = action.payload.count;
+        state.allContactsNext = action.payload.next;
       })
-      .addCase(fetchContactInteractions.pending, (state) => {
-        state.selectedContactInteractionsLoading = true;
+      .addCase(loadMoreContacts.rejected, (state, action) => {
+        if (action.meta.requestId !== state.allContactsMoreRequestId) return;
+        if (state.allContactsNext !== action.meta.arg) return;
+        state.allContactsLoadingMore = false;
+        state.allContactsMoreError = action.payload ?? 'Could not load more people.';
       })
-      .addCase(fetchContactInteractions.fulfilled, (state, action) => {
-        state.selectedContactInteractionsLoading = false;
-        state.selectedContactInteractions = action.payload;
-      })
-      .addCase(fetchContactInteractions.rejected, (state) => {
-        state.selectedContactInteractionsLoading = false;
-        state.selectedContactInteractions = null;
-      })
-      .addCase(fetchContactById.pending, (state) => {
+      .addCase(fetchContactById.pending, (state, action) => {
+        state.selectedContactRequestId = action.meta.requestId;
         state.selectedContactLoading = true;
         state.selectedContactError = null;
-        // Cleared, not left stale — same reasoning as fetchCustomerById.
-        state.selectedContact = null;
+        // Another person: cleared, not left stale (same reasoning as
+        // fetchCustomerById). The same person read again (after a save)
+        // stays on screen until the fresh copy lands.
+        if (state.selectedContact?.id !== action.meta.arg) state.selectedContact = null;
       })
       .addCase(fetchContactById.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.selectedContactRequestId) return;
         state.selectedContactLoading = false;
         state.selectedContact = action.payload;
       })
       .addCase(fetchContactById.rejected, (state, action) => {
+        if (action.meta.requestId !== state.selectedContactRequestId) return;
         state.selectedContactLoading = false;
         state.selectedContactError = action.payload ?? 'Could not load this contact.';
+      })
+      .addCase(fetchContactHistory.pending, (state, action) => {
+        state.selectedContactHistoryRequestId = action.meta.requestId;
+        state.selectedContactHistoryLoading = true;
+        state.selectedContactHistoryError = null;
+        if (state.selectedContactHistory?.contact_id !== action.meta.arg) state.selectedContactHistory = null;
+      })
+      .addCase(fetchContactHistory.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.selectedContactHistoryRequestId) return;
+        state.selectedContactHistoryLoading = false;
+        state.selectedContactHistory = action.payload;
+      })
+      .addCase(fetchContactHistory.rejected, (state, action) => {
+        if (action.meta.requestId !== state.selectedContactHistoryRequestId) return;
+        state.selectedContactHistoryLoading = false;
+        state.selectedContactHistoryError = action.payload ?? 'Could not load their calls, emails and tickets.';
       })
       // updateContact/deleteContact patch every list a Contact could be
       // showing in (`contacts`, `allContacts`, `selectedContact`) rather
@@ -2778,6 +2807,9 @@ const customersSlice = createSlice({
         state.contacts = state.contacts.filter((c) => c.id !== id);
         state.allContacts = state.allContacts.filter((c) => c.id !== id);
         state.allContactsCount = Math.max(0, state.allContactsCount - 1);
+        // A page read before the delete is offset against the old list.
+        state.allContactsMoreRequestId = undefined;
+        state.allContactsLoadingMore = false;
       })
       .addCase(fetchOpportunities.pending, (state) => {
         state.opportunitiesLoading = true;
