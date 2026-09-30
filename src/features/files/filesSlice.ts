@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { apiFetch, apiFetchBlob, ApiError } from '../../lib/apiClient';
+import { accountBase } from '../../lib/accountPaths';
 import { listScope, parentScope } from '../../lib/listScope';
 
 // The Files tab on an organisation or account — see revenact-backend
@@ -25,14 +26,18 @@ export interface Attachment {
 
 export interface FileParent {
   entityType: 'organization' | 'account';
-  customerId: number;
+  /** The organisation; null for an account read on its own page (the flat route). */
+  customerId: number | null;
   accountId?: number;
 }
 
 export function filesPath({ entityType, customerId, accountId }: FileParent): string {
-  return entityType === 'organization'
-    ? `/customers/${customerId}/files/`
-    : `/customers/${customerId}/accounts/${accountId}/files/`;
+  if (entityType === 'organization') {
+    if (customerId == null) throw new Error('filesPath: an organisation read needs a customerId.');
+    return `/customers/${customerId}/files/`;
+  }
+  if (accountId == null) throw new Error('filesPath: an account read needs an accountId.');
+  return `${accountBase(accountId, customerId)}/files/`;
 }
 
 interface FilesState {
@@ -144,7 +149,8 @@ const filesSlice = createSlice({
         state.uploading = false;
         // Only into the list it belongs to: its own, or its organization's roll-up.
         const { customerId } = action.meta.arg;
-        if (state.scope === parentScope(action.meta.arg) || state.scope === listScope(customerId)) state.items.unshift(action.payload);
+        const rollUp = customerId !== null && state.scope === listScope(customerId);
+        if (state.scope === parentScope(action.meta.arg) || rollUp) state.items.unshift(action.payload);
       })
       .addCase(uploadFile.rejected, (state, action) => {
         state.uploading = false;
