@@ -30,4 +30,12 @@ describe('originPath', () => {
       '/contacts?sentiment=negative',
     );
   });
+
+  it('reopens an Accounts conversation on its List, Board or account', () => {
+    expect(originPath({ surface: 'accounts', view: 'board', filters: { renews_within: '30' }, label: 'x' })).toBe(
+      '/accounts/board?renews_within=30',
+    );
+    expect(originPath({ surface: 'accounts', view: 'list', filters: {}, label: 'Accounts' })).toBe('/accounts/list');
+    expect(originPath({ surface: 'accounts', view: 'detail', account: 12, label: 'EMEA' })).toBe('/accounts/12');
+  });
 });

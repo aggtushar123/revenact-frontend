@@ -30,17 +30,25 @@ export interface CopilotThread {
 
 export const BUDGET_MESSAGE = "This month's AI budget is used up.";
 
-/** What a `400 {"context": {"organization" | "account" | "contact" |
- *  "filters": [...]}}` means to the asker (backend delivery 3, backend #72):
- *  the page is no longer theirs to ask about. Null for any other failure. */
-export function refusalMessage(err: unknown): string | null {
+/** What a `400 {"context": {…}}` means to the asker: the page, or the item
+ *  asked about, is no longer theirs to ask about. `context` is the question's
+ *  own, so a key can read per surface: an Accounts `account` is the page
+ *  itself, an organisation page's `account` is its account chip. Null for any
+ *  other failure. */
+export function refusalMessage(err: unknown, context?: SurfaceContext | null): string | null {
   if (!(err instanceof ApiError) || err.status !== 400) return null;
-  const context = (err.body as { context?: unknown } | null)?.context;
-  if (!context || typeof context !== 'object') return null;
-  if ('contact' in context) return "You can't ask about this person here.";
-  if ('filters' in context) return "You can't ask about this list. Clear the filters and ask again.";
-  if ('organization' in context) return 'You can no longer ask about this organization.';
-  if ('account' in context) return 'You can no longer ask about this account. Choose All and ask again.';
+  const body = (err.body as { context?: unknown } | null)?.context;
+  if (!body || typeof body !== 'object') return null;
+  if (context?.surface === 'accounts') {
+    if ('account' in body) return 'You can no longer ask about this account.';
+    if ('focus' in body) return 'You can no longer ask about this item. Ask about the account instead.';
+    if ('filters' in body) return "You can't ask about this list. Clear the filters and ask again.";
+    return null;
+  }
+  if ('contact' in body) return "You can't ask about this person here.";
+  if ('filters' in body) return "You can't ask about this list. Clear the filters and ask again.";
+  if ('organization' in body) return 'You can no longer ask about this organization.';
+  if ('account' in body) return 'You can no longer ask about this account. Choose All and ask again.';
   return null;
 }
 
@@ -110,7 +118,7 @@ export function useCopilotThread(
     } catch (err) {
       if (!stillHere()) return;
       const budget = err instanceof ApiError && err.status === 429;
-      const refusal = refusalMessage(err);
+      const refusal = refusalMessage(err, turn.context);
       if (refusal !== null && liveContext.current !== askedOn) return;
       const message = budget
         ? BUDGET_MESSAGE

@@ -73,8 +73,8 @@ export function Navbar() {
   const isOrganizations = location.pathname.startsWith('/organizations');
   // The Accounts list and board wear the Organizations frame (accounts spec
   // 2026-09-29 §1): the transparent bar, "Accounts", List | Board carrying
-  // the query, the actions slot (the Ask pill lands there in delivery 3),
-  // no avatar.
+  // the query, the actions slot (where `AccountsAskLayout`'s rail portals
+  // the Ask pill), no avatar.
   const isAccountsView = /^\/accounts\/(list|board)\/?$/.test(location.pathname);
   // An account's page wears the same frame (accounts spec 2026-09-29 §2.1):
   // the page draws its own name row from the URL id, so the bar only leads

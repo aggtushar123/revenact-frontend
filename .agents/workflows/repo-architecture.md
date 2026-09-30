@@ -105,7 +105,7 @@ react-ts-app/
 │   ├── list                   → Portfolio (List.tsx on GET /organizations/portfolio/)
 │   ├── board                  → Board (Board.tsx: PortfolioBoard on GET /organizations/portfolio/)
 │   └── :id                    → Organization page (Details.tsx: the story, on GET /organizations/{id}/story/)
-├── accounts/
+├── accounts/                  → (list, board and :id all under AccountsAskLayout, one AskProvider — spec 2026-09-29 §3)
 │   ├── (index)                → Redirects to /accounts/list
 │   ├── list                   → Portfolio (List.tsx on GET /accounts/portfolio/, ACCOUNT_KIND)
 │   ├── board                  → Board (Board.tsx: PortfolioBoard on GET /accounts/portfolio/)
@@ -278,16 +278,16 @@ Organisations' own list (`pages/organizations/List.tsx`) reads a drill's
 "Open as a list" as `?ids=3,7`, passes it to the portfolio endpoint, and shows
 it as the removable chip "Opened from the dashboard (N)".
 
-#### Ask Revenact (`pages/dashboard/ask/`, `pages/organizations/ask/`, `pages/contacts/ask/`, `components/copilot/`)
+#### Ask Revenact (`pages/dashboard/ask/`, `pages/organizations/ask/`, `pages/contacts/ask/`, `pages/accounts/ask/`, `components/copilot/`)
 
 | File | What it does |
 |---|---|
 | `components/copilot/CopilotRail.tsx` | The shared rail (`CopilotRail`) and `HistoryPopover`. `context: RailContext` (`railContext.ts`) is `{kind:'label'}` (Communications: `[About: …]` text prefix) or `{kind:'surface'}` (the Dashboard's, Organizations' or Contacts' structured `context` field). Props for `variant`, `top`, `thread`, `chipLabel` (per-question chips; absent in Communications), `draft`, `onSent`. `HistoryPopover` tags a conversation with `originTag`. Assistant replies always render as plain text, never the Markdown `AnswerText` formatting `/copilot` uses — including a reply withheld from a reader with narrower visibility in a shared session |
-| `components/copilot/useCopilotThread.ts` | Sending on one conversation: pending, failed (`budget` on 429, any other status including 400 shown the same way with Retry), `retry` (resends the question's own context and focus, not the current screen) |
+| `components/copilot/useCopilotThread.ts` | Sending on one conversation: pending, failed (`budget` on 429; a 400 refusal (`refusalMessage`) shows its own copy with no Retry; any other failure shows Retry), `retry` (resends the question's own context and focus, not the current screen). `refusalMessage(err, context)` takes the question's own context, since a `400`'s body keys (`account`, `focus`, `filters`, `contact`, `organization`) read differently per surface — Accounts' own `account`/`focus`/`filters` wording, checked first when `context.surface === 'accounts'` |
 | `components/copilot/dashboardLabels.ts`, `surfaceLabels.ts` | Chip text: `viewLabel`/`contextLabel` (dashboard), `surfaceLabel` (a question's chip on any of the three surfaces), `originTag` (History's tag: the dashboard's area › view, "Organizations" followed by the server's own `origin.labels` (there is no `origin_label` field), or an organisation page's or a Contacts one's own server-built `label`) |
 | `ask/useDashboardContext.ts` | Route + `SHARED_KEYS` → `DashboardContext` and its chip, read at send time |
 | `ask/filterNames.ts`, `FilterNamesProvider.tsx` | `DashboardToolbar` reports the shared filters' option names for chips |
-| `ask/context.ts`, `useAsk.ts`, `AskProvider.tsx`, `DashboardAskProvider.tsx` | One surface's conversation and thread (`AskProvider({surface, preferenceKey})`; the Dashboard's surface via `DashboardAskProvider`, Organizations' via `OrganizationsAskLayout`, Contacts' via `ContactsAskLayout`), `focusOn` (an opened Organizations account), a conversation from the other surface handed over by `askConversationId` in the navigation state, open state (`askPreference.ts`, written only by the Sparkles switch — an entry point opens the rail for that visit without touching it), focus, prefilled draft (`draft()`; a later `ask()` replaces it and its focus), history restore (`originPath.ts`); `useAsk()` is null outside the frame, so entry points hide in isolated view tests |
+| `ask/context.ts`, `useAsk.ts`, `AskProvider.tsx`, `DashboardAskProvider.tsx` | One surface's conversation and thread (`AskProvider({surface, preferenceKey})`; the Dashboard's surface via `DashboardAskProvider`, Organizations' via `OrganizationsAskLayout`, Contacts' via `ContactsAskLayout`, Accounts' via `AccountsAskLayout`), `focusOn` (an opened Organizations account), a conversation from the other surface handed over by `askConversationId` in the navigation state, open state (`askPreference.ts`, written only by the Sparkles switch — an entry point opens the rail for that visit without touching it), focus, prefilled draft (`draft()`; a later `ask()` replaces it and its focus), history restore (`originPath.ts`); `useAsk()` is null outside the frame, so entry points hide in isolated view tests |
 | `ask/AskRail.tsx` | The 320px glass rail (no header; hidden = not rendered) and the phone sheet (focus trap, Close, Escape/Close return focus to the Sparkles switch) |
 | `ask/AskControls.tsx` | Communications' pill (New chat, History + popover, Sparkles switch), portaled into the Navbar's actions slot (`layouts/navActionsSlot.ts`, owned by `DashboardLayout`) |
 | `ask/testAsk.tsx`, `components/copilot/testCopilot.ts` | `renderDashboard(url, view, width)`, `stubCopilot`, `postedBodies` |
@@ -295,6 +295,8 @@ it as the removable chip "Opened from the dashboard (N)".
 | `features/organizations/askContext.ts` | `toContextFilters`/`fromContextFilters` (params ↔ the context's string form), `organizationsPath` (History restore), `organizationsLabel` (the chip) |
 | `pages/contacts/ask/` | Contacts, the third Ask surface (spec 2026-09-28 §4.4): `ContactsAskLayout` (the layout route above `/contacts/:id?`, wrapping `App.tsx`'s route: one `AskProvider` with the `contacts` surface and `revenact_contacts_ask`, `ContactsFrame`'s `rail` slot holding `AskRail`), `useContactsContext` (path/query → `ContactsListContext` \| `ContactsPersonContext`, null on a bad id), `contactsNames.ts` (`ContactsNamesContext`/`useReportContactsNames`: `ContactsPage` reports the open person's name and place and the filtered organisation/account so a live question's chip can name them before the server has), `testContactsAsk` (`stubContactsAsk`, one fetch spy answering both the Contacts endpoints and the Copilot's) |
 | `features/contacts/askContext.ts` | `contactsContextOf` (path/query → the context, one person or the set filters), `contactsLabel` (the chip: a stored `label` wins, a live one is built from `listParts`/the reported names, "Sentiment" appended from `focus`), `contactsPath` (History restore: `/contacts/:id` or `/contacts?<filters>`), `whyQuestion` (the "Why this sentiment?" draft, first name only) |
+| `pages/accounts/ask/` | Accounts, the fourth Ask surface (spec 2026-09-29 §3): `AccountsAskLayout` (the layout route above `list`, `board` and `:id`, wrapping `App.tsx`'s route: one `AskProvider` with the `accounts` surface and `revenact_accounts_ask`, `OrganizationsFrame`'s `rail` slot holding `AskRail`, `bleed` on the account's page), `useAccountsContext` (path/query → `AccountsListContext` \| `AccountDetailContext`, dropping the query on the detail view so a tab or story filter never rebuilds it), `accountsNames.ts` (`AccountsNamesContext`/`useReportAccountsOptions`/`useReportAccountName`: the List and the Board report their portfolio's filter options, the account page (`Details.tsx`) its row's name, so a live question's chip can name them before the server has; each falls back to its placeholder — "Accounts", "This account" — until its page's own read lands), each account story item's `StoryItemRow` "Ask about this" (shared with the organization page) narrowing one question to it, spent by the send, `testAccountsAsk` (`stubAccountsAsk`, one fetch spy behind `stubAccountsPortfolio` + `stubAccountPage` + `stubCopilot`) |
+| `features/accounts/askContext.ts` | `accountsContextOf` (path/query → the context, the view's filters or one account's id), `accountsLabel` (the chip: a stored `label` wins, a live one is built from `filterChips`/the reported names), `accountsPath` (History restore: `/accounts/list?<filters>`, `/accounts/board?<filters>` or `/accounts/:id`, reusing Organizations' `viewPath` rather than `/accounts`, whose redirect drops the query), `toAccountsFilters`/`fromAccountsFilters` (params ↔ the context's string form, reusing Organizations' `fromContextFilters`) |
 
 #### Ticket Overview (`tabs/ticket-overview/`)
 Charts: `StatusDonut`, `PriorityDonut`, `AssigneesStackedBar`, `OriginBar`, `SentimentLineChart`, `KPIGrid`. The four countable KPIs (Total, On Hold, Positive/Negative sentiment) and every donut/bar's segments drill into `/tickets/stats/`; average lifetime and resolution rate stay plain — a rate isn't a set of tickets.
@@ -579,6 +581,7 @@ App.tsx
   │           CompanyViewTab + activity/HeadlinesTab, activity/FilesTab + activity/CallSenseTab
   │
   ├── pages/accounts/Details.tsx  (GET /accounts/portfolio/?ids=, /accounts/{id}/, /accounts/{id}/story/)
+  │     ├── AccountsAskLayout (AskProvider, accounts surface, spec 2026-09-29 §3) → OrganizationsFrame (rail slot: AskRail, bleed)
   │     ├── components/accounts/detail/* (AccountHeader, AccountTiles, AccountDetailsTab, CanvasesTab, useAccount)
   │     ├── organizations/detail/* with an account scope (StoryTab, PeopleTab, DealsTab, FilesCallsTab, DetailTabs)
   │     └── shared/CustomObjectsTab, shared/CanvasListTab, shared/OwnerTile, shared/AIAttributesPanel
@@ -596,7 +599,7 @@ App.tsx
   │           + AccountSidePanel / AccountSheet, useBoardMove (optimistic move), boardMove, useEndSentinel
   │
   ├── pages/accounts/List.tsx, Board.tsx  (GET /accounts/portfolio/, POST /accounts/bulk/, PATCH /customers/<cid>/accounts/<id>/)
-  │     ├── PortfolioKindContext = ACCOUNT_KIND around the page; OrganizationsFrame (rail slot empty until delivery 3)
+  │     ├── AccountsAskLayout (AskProvider, accounts surface) → OrganizationsFrame (rail slot: AskRail); PortfolioKindContext = ACCOUNT_KIND around the page
   │     └── the Organizations portfolio components + accounts/portfolio/AccountPanels; AccountFormModal (edit, add)
   │
   ├── pages/copilot/Index.tsx

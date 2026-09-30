@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { ACCOUNT_FILTER_OPTIONS } from '../../features/accounts/testPortfolio';
 import { FILTER_OPTIONS } from '../../features/organizations/testPortfolio';
 import type { DashboardContext, OrganizationDetailContext, OrganizationsContext } from '../../pages/copilot/types';
 import { originTag, surfaceLabel } from './surfaceLabels';
@@ -47,5 +48,18 @@ describe('surface labels', () => {
       'Lukas Vermeer · Kraft Heinz',
     );
     expect(originTag({ origin: { surface: 'contacts', view: 'list', filters: {}, label: 'Contacts' } })).toBe('Contacts');
+  });
+
+  it('labels an Accounts question from the page, and tags an Accounts conversation with the server label', () => {
+    const accounts = { options: ACCOUNT_FILTER_OPTIONS, account: { id: 12, name: 'Pizza EMEA' } };
+    expect(surfaceLabel({ surface: 'accounts', view: 'board', filters: { owner: '2' } }, { accounts })).toBe('Accounts · Owner: Carl CSM');
+    expect(surfaceLabel({ surface: 'accounts', view: 'detail', account: 12, focus: { kind: 'call', id: 112 } }, { accounts })).toBe(
+      'Pizza EMEA · This call',
+    );
+    expect(surfaceLabel({ surface: 'accounts', view: 'detail', account: 12, focus: null, label: 'EMEA' })).toBe('EMEA');
+    expect(
+      originTag({ origin: { surface: 'accounts', view: 'board', filters: { renews_within: '30' }, label: 'Accounts · Renews within 30 days' } }),
+    ).toBe('Accounts · Renews within 30 days');
+    expect(originTag({ origin: { surface: 'accounts', view: 'detail', account: 12, label: 'EMEA' } })).toBe('EMEA');
   });
 });
