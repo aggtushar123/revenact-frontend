@@ -2,19 +2,26 @@ import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { DETAIL_TABS, detailPanelId, detailTabId, type DetailTab } from '../../../features/organizations/detailParams';
 import { FOCUS } from '../portfolio/styles';
 
-/** The page's tabs (spec §1.5): a real tablist whose selection lives in the
- *  URL. Arrows, Home and End move and select (automatic activation); only
- *  the selected tab is in the tab order. On phones the row scrolls sideways
- *  and the selected tab scrolls into view. */
-export function DetailTabs({
+/** A detail page's tabs (organisation spec §1.5; account spec §2.4): a real
+ *  tablist whose selection lives in the URL. Arrows, Home and End move and
+ *  select (automatic activation); only the selected tab is in the tab order.
+ *  On phones the row scrolls sideways and the selected tab scrolls into view.
+ *  The organization page's tabs unless `tabs` is given. */
+export function DetailTabs<K extends string = DetailTab>({
   idBase,
   active,
   onChange,
+  tabs,
+  label = 'Organization sections',
 }: {
   idBase: string;
-  active: DetailTab;
-  onChange: (tab: DetailTab) => void;
+  active: K;
+  onChange: (tab: K) => void;
+  tabs?: readonly { key: K; label: string }[];
+  /** The tablist's accessible name. */
+  label?: string;
 }) {
+  const list = tabs ?? (DETAIL_TABS as unknown as readonly { key: K; label: string }[]);
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -24,7 +31,7 @@ export function DetailTabs({
   }, [active]);
 
   const onKey = (event: KeyboardEvent, index: number) => {
-    const last = DETAIL_TABS.length - 1;
+    const last = list.length - 1;
     const next =
       event.key === 'ArrowRight'
         ? index === last
@@ -41,7 +48,7 @@ export function DetailTabs({
               : null;
     if (next === null) return;
     event.preventDefault();
-    const tab = DETAIL_TABS[next].key;
+    const tab = list[next].key;
     onChange(tab);
     document.getElementById(detailTabId(idBase, tab))?.focus();
   };
@@ -50,10 +57,10 @@ export function DetailTabs({
     <div
       ref={listRef}
       role="tablist"
-      aria-label="Organization sections"
+      aria-label={label}
       className="-mx-4 flex gap-4 overflow-x-auto border-b border-line-subtle px-4 sm:mx-0 sm:px-0"
     >
-      {DETAIL_TABS.map((tab, index) => {
+      {list.map((tab, index) => {
         const selected = tab.key === active;
         return (
           <button

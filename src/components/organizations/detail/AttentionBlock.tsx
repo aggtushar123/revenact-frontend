@@ -33,11 +33,17 @@ export function AttentionBlock({
   onFilter,
   onOpenTab,
   onJump,
+  renewalPanel = 'contract',
 }: {
   attention: StoryAttention;
   onFilter: (group: StoryGroup) => void;
-  onOpenTab: (tab: DetailTab) => void;
+  /** Where the questions row goes. The account page has no Knowledge tab
+   *  and never has questions. */
+  onOpenTab?: (tab: DetailTab) => void;
   onJump: (panel: PanelKey) => void;
+  /** Where the renewal row goes: the organisation's contract timeline, or
+   *  an account's Commercial panel. */
+  renewalPanel?: PanelKey;
 }) {
   const headingId = useId();
   const { renewal, tickets, overdue_tasks, questions, anomaly } = attention;
@@ -58,7 +64,7 @@ export function AttentionBlock({
         </>
       ),
       detail: formatDate(renewal.date),
-      action: () => onJump('contract'),
+      action: () => onJump(renewalPanel),
     });
   }
   if (tickets) {
@@ -84,7 +90,7 @@ export function AttentionBlock({
       key: 'questions',
       tone: 'text-warning',
       text: plural(questions.count, 'unanswered question', 'unanswered questions'),
-      action: () => onOpenTab('knowledge'),
+      action: onOpenTab ? () => onOpenTab('knowledge') : undefined,
     });
   }
   if (anomaly) {

@@ -19,6 +19,7 @@ import { timeLabel } from '../../../features/organizations/storyDays';
 import type { StoryItem, StoryKind } from '../../../features/organizations/storyTypes';
 import { AskDraftContext } from '../../../pages/dashboard/ask/context';
 import { FOCUS } from '../portfolio/styles';
+import { ShowAccountTags } from './accountNames';
 
 const ICON: Record<StoryKind, LucideIcon> = {
   activity: Activity,
@@ -73,6 +74,7 @@ function AskAbout({ item }: { item: StoryItem }) {
  *  the account tag, kind · who · source, and "Ask about this". An email with
  *  a thread opens it; any other item with more to show opens in place. */
 export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEmail: (item: StoryItem) => void }) {
+  const showTag = useContext(ShowAccountTags);
   const [expanded, setExpanded] = useState(false);
   const detailId = useId();
   const Icon = ICON[item.kind] ?? Activity;
@@ -147,9 +149,11 @@ export function StoryItemRow({ item, onOpenEmail }: { item: StoryItem; onOpenEma
           </p>
         ) : null}
         <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-ink-muted">
-          <span className="inline-block min-w-0 max-w-[10rem] truncate rounded-full bg-subtle px-2 py-0.5 text-ink">
-            {item.account?.name ?? 'Organization'}
-          </span>
+          {showTag ? (
+            <span className="inline-block min-w-0 max-w-[10rem] truncate rounded-full bg-subtle px-2 py-0.5 text-ink">
+              {item.account?.name ?? 'Organization'}
+            </span>
+          ) : null}
           <span className="min-w-0 truncate">{meta}</span>
           <AskAbout item={item} />
         </p>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
+import { accountBase } from '../../../lib/accountPaths';
 import { apiFetch } from '../../../lib/apiClient';
 import { clearCallSaveError, logCall, type LogCallInput } from '../../../features/calls/callsSlice';
 import { createNote, createTask, type Contact } from '../../../features/customers/customersSlice';
@@ -12,7 +13,9 @@ import { TaskForm } from '../activity/TasksTab';
 import { Sheet } from './Sheet';
 
 /** "+ Add" (spec §1.6): one of the existing create flows in a sheet, saved on
- *  the organization, or on the chosen account when an account chip is on. */
+ *  the organization, on the chosen account when an account chip is on, or,
+ *  on an account's own page (no `customerId`), on that account through its
+ *  flat routes. */
 export function AddFlow({
   what,
   customerId,
@@ -23,7 +26,8 @@ export function AddFlow({
   onClose,
 }: {
   what: AddKind;
-  customerId: number;
+  /** The organization; absent on the account page, where `accountId` is the account itself. */
+  customerId?: number;
   accountId?: number;
   accountName?: string;
   isSm: boolean;
@@ -33,7 +37,9 @@ export function AddFlow({
   const dispatch = useAppDispatch();
   const { saving, saveError } = useAppSelector((state) => state.calls);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const parent: FileParent = accountId ? { entityType: 'account', customerId, accountId } : { entityType: 'organization', customerId };
+  const parent: FileParent = accountId
+    ? { entityType: 'account', customerId: customerId ?? null, accountId }
+    : { entityType: 'organization', customerId: customerId ?? null };
 
   // The calls slice is global: an earlier sheet's (or CallSense's) failure
   // must not greet this one.
@@ -45,7 +51,7 @@ export function AddFlow({
   useEffect(() => {
     if (what !== 'call') return;
     let cancelled = false;
-    const path = accountId ? `/customers/${customerId}/accounts/${accountId}/contacts/` : `/customers/${customerId}/contacts/`;
+    const path = accountId ? `${accountBase(accountId, customerId)}/contacts/` : `/customers/${customerId}/contacts/`;
     apiFetch<Contact[]>(path).then(
       (rows) => {
         if (!cancelled) setContacts(Array.isArray(rows) ? rows : []);
@@ -64,13 +70,25 @@ export function AddFlow({
     <Sheet title={title} description={`On ${accountName ?? 'the organization'}`} isSm={isSm} onClose={onClose}>
       {what === 'task' ? (
         <TaskForm
-          onCreate={async (task) => createTask.fulfilled.match(await dispatch(createTask({ customerId, accountId, ...task })))}
+          onCreate={async (task) =>
+            createTask.fulfilled.match(
+              await dispatch(
+                accountId != null ? createTask({ customerId, accountId, ...task }) : createTask({ customerId: customerId as number, ...task }),
+              ),
+            )
+          }
           onDone={onAdded}
         />
       ) : null}
       {what === 'note' ? (
         <NoteForm
-          onCreate={async (note) => createNote.fulfilled.match(await dispatch(createNote({ customerId, accountId, ...note })))}
+          onCreate={async (note) =>
+            createNote.fulfilled.match(
+              await dispatch(
+                accountId != null ? createNote({ customerId, accountId, ...note }) : createNote({ customerId: customerId as number, ...note }),
+              ),
+            )
+          }
           onDone={onAdded}
         />
       ) : null}

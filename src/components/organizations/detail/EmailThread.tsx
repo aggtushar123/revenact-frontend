@@ -1,9 +1,11 @@
-import { useEffect, useState } from 'react';
-import { fetchThread } from '../../../features/organizations/storyApi';
+import { useContext, useEffect, useState } from 'react';
+import type { StoryTarget } from '../../../features/organizations/detailScope';
+import { fetchThreadAt, storyPath } from '../../../features/organizations/storyApi';
 import { sourceName } from '../../../features/organizations/storyKinds';
 import type { StoryItem } from '../../../features/organizations/storyTypes';
 import { errorMessage } from '../portfolio/usePortfolio';
 import { QUIET } from '../portfolio/styles';
+import { ShowAccountTags } from './accountNames';
 import { Sheet } from './Sheet';
 
 type Load = { key: string; items: StoryItem[] } | { key: string; error: string };
@@ -12,6 +14,7 @@ const when = (iso: string) =>
   new Date(iso).toLocaleString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 function Message({ item, current }: { item: StoryItem; current: boolean }) {
+  const showTag = useContext(ShowAccountTags);
   const source = sourceName(item.source);
   return (
     <li aria-current={current ? 'true' : undefined} className="py-3">
@@ -22,16 +25,18 @@ function Message({ item, current }: { item: StoryItem; current: boolean }) {
         </time>
       </p>
       {item.summary ? <p className="mt-2 whitespace-pre-line break-words text-[13px] text-ink">{item.summary}</p> : null}
-      <p className="mt-1 text-[11px] text-ink-muted">{[item.account?.name ?? 'Organization', source ? `via ${source}` : null].filter(Boolean).join(' · ')}</p>
+      <p className="mt-1 text-[11px] text-ink-muted">
+        {[showTag ? (item.account?.name ?? 'Organization') : null, source ? `via ${source}` : null].filter(Boolean).join(' · ')}
+      </p>
     </li>
   );
 }
 
 /** One email's thread (spec §1.6). The backend has no thread endpoint: the
- *  story read with `thread` returns that thread's emails, across the
- *  organization and its accounts, each under its own visibility rule. Each
- *  message shows its sender, time and the story's one-line summary; the full
- *  message and replying stay in Communications. */
+ *  story read with `thread` returns that thread's emails, across the page's
+ *  scope (an organization and its accounts, or one account), each under its
+ *  own visibility rule. Each message shows its sender, time and the story's
+ *  one-line summary; the full message and replying stay in Communications. */
 export function EmailThread({
   orgId,
   threadId,
@@ -40,7 +45,8 @@ export function EmailThread({
   isSm,
   onClose,
 }: {
-  orgId: number;
+  /** The page: an organization id, or a scope. */
+  orgId: StoryTarget;
   threadId: string;
   /** The email that was opened; it is marked current in the thread. */
   openedId: number;
@@ -48,13 +54,14 @@ export function EmailThread({
   isSm: boolean;
   onClose: () => void;
 }) {
+  const path = storyPath(orgId);
   const [attempt, setAttempt] = useState(0);
-  const key = `${orgId}#${threadId}#${attempt}`;
+  const key = `${path}#${threadId}#${attempt}`;
   const [load, setLoad] = useState<Load | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetchThread(orgId, threadId).then(
+    fetchThreadAt(path, threadId).then(
       (items) => {
         if (!cancelled) setLoad({ key, items });
       },
@@ -65,7 +72,7 @@ export function EmailThread({
     return () => {
       cancelled = true;
     };
-  }, [key, orgId, threadId]);
+  }, [key, path, threadId]);
 
   const current = load && load.key === key ? load : null;
   // The opened email may have gone (or no longer be visible) since the story loaded.

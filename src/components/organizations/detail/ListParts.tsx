@@ -4,15 +4,20 @@ import { accountTag } from '../../../features/organizations/accountScope';
 import type { SummaryPart } from '../../../features/organizations/listSummaries';
 import { EmptyState } from '../portfolio/PortfolioSections';
 import { FOCUS, QUIET } from '../portfolio/styles';
-import { AccountNames } from './accountNames';
+import { AccountNames, ShowAccountTags } from './accountNames';
 import { LIST } from './listStyles';
 
 /** The account a record is on, as the Story tags it, named from the
- *  organization's accounts when a list tab provides them. */
+ *  organization's accounts when a list tab provides them. None on an
+ *  account's own page. */
 export function AccountTag({ record }: { record: { account_id?: number | null; account_name?: string | null } }) {
-  const name = accountTag(record, useContext(AccountNames));
+  const accounts = useContext(AccountNames);
+  const shown = useContext(ShowAccountTags);
+  if (!shown) return null;
   return (
-    <span className="inline-block min-w-0 max-w-[10rem] truncate rounded-full bg-subtle px-2 py-0.5 text-ink">{name}</span>
+    <span className="inline-block min-w-0 max-w-[10rem] truncate rounded-full bg-subtle px-2 py-0.5 text-ink">
+      {accountTag(record, accounts)}
+    </span>
   );
 }
 
