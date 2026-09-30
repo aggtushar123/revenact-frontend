@@ -68,7 +68,7 @@ export function SourcesGroup() {
           onClick={() => setOpen((o) => !o)}
           aria-expanded={open}
           aria-label={open ? 'Show fewer sources' : 'Show all sources'}
-          className="flex items-center justify-center rounded-xl w-11 h-8 text-ink-faint hover:text-ink transition-colors duration-[var(--dur-fast)]"
+          className="flex items-center justify-center rounded-xl w-11 min-h-11 sm:min-h-8 text-ink-faint hover:text-ink transition-colors duration-[var(--dur-fast)]"
         >
           {open ? <ChevronUp className="w-5 h-5" aria-hidden="true" /> : <ChevronDown className="w-5 h-5" aria-hidden="true" />}
         </button>
