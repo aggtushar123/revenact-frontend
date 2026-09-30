@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { surfaceLabel } from '../../../components/copilot/surfaceLabels';
 import { detailIdOf, type DetailNames } from '../../../features/organizations/detailAskContext';
+import { same } from '../../../lib/same';
 import { ORGANIZATIONS_ASK_KEY } from '../../dashboard/ask/askPreference';
 import { AskProvider } from '../../dashboard/ask/AskProvider';
 import { AskRail } from '../../dashboard/ask/AskRail';
@@ -10,8 +11,6 @@ import { OrganizationsFrame } from '../OrganizationsFrame';
 import { DetailNamesContext } from './detailNames';
 import { PortfolioOptionsContext, type PortfolioOptions } from './portfolioOptions';
 import { parseOrganizationsView, useOrganizationsContext } from './useOrganizationsContext';
-
-const same = <T,>(prev: T | null, next: T) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next);
 
 /** The Organizations routes' Ask (spec §3): one conversation above the List,
  *  the Board and every organisation's page, so it lasts from the List into

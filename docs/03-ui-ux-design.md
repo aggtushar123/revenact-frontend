@@ -525,8 +525,14 @@ Everything in the section above holds, with these differences:
   `/accounts/:id` by its id alone: the account page reads everything from
   the URL.
 - The top bar is the framed one: "Accounts", List | Board keeping the query,
-  the actions slot, and no avatar. The rail slot stays empty until Ask
-  (delivery 3).
+  the actions slot, and no avatar. `AccountsAskLayout` (delivery 3, spec
+  2026-09-29 §3) now draws the rail here, above both views: one `AskProvider`
+  with the `accounts` surface and its own preference key
+  (`revenact_accounts_ask`), so a conversation lasts from the List into the
+  Board and an account and back. The List and the Board do not yet call
+  `useReportAccountsOptions`, so a live chip's filter names fall back to
+  their placeholders ("Owner: User 2") until they do; the server's own
+  `label` on a sent question always wins.
 
 ### Account page (`/accounts/:id`)
 
@@ -539,7 +545,9 @@ specific to it, enforced by `components/accounts/detail/houseRules.test.ts`
 `shared/CanvasListTab.tsx` and `shared/OwnerTile.tsx`):
 
 - Frame: the organization page's bleed frame, the transparent top bar with
-  "‹ Accounts", and the rail slot kept empty until Ask (delivery 3).
+  "‹ Accounts", and the Ask rail `AccountsAskLayout` draws above it (delivery
+  3, `bleed` on this route): the page does not yet call `useReportAccountName`,
+  so a live chip reads "This account" until it does.
 - Name row (`AccountHeader`): initials, the name at 22px, "owner · lifecycle ·
   Touched Nd ago" at 13px and the signal tag; then "Part of" with one link per
   linked organisation the viewer may open (`/organizations/:id?account=<id>`;

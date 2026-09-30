@@ -295,6 +295,8 @@ it as the removable chip "Opened from the dashboard (N)".
 | `features/organizations/askContext.ts` | `toContextFilters`/`fromContextFilters` (params ↔ the context's string form), `organizationsPath` (History restore), `organizationsLabel` (the chip) |
 | `pages/contacts/ask/` | Contacts, the third Ask surface (spec 2026-09-28 §4.4): `ContactsAskLayout` (the layout route above `/contacts/:id?`, wrapping `App.tsx`'s route: one `AskProvider` with the `contacts` surface and `revenact_contacts_ask`, `ContactsFrame`'s `rail` slot holding `AskRail`), `useContactsContext` (path/query → `ContactsListContext` \| `ContactsPersonContext`, null on a bad id), `contactsNames.ts` (`ContactsNamesContext`/`useReportContactsNames`: `ContactsPage` reports the open person's name and place and the filtered organisation/account so a live question's chip can name them before the server has), `testContactsAsk` (`stubContactsAsk`, one fetch spy answering both the Contacts endpoints and the Copilot's) |
 | `features/contacts/askContext.ts` | `contactsContextOf` (path/query → the context, one person or the set filters), `contactsLabel` (the chip: a stored `label` wins, a live one is built from `listParts`/the reported names, "Sentiment" appended from `focus`), `contactsPath` (History restore: `/contacts/:id` or `/contacts?<filters>`), `whyQuestion` (the "Why this sentiment?" draft, first name only) |
+| `pages/accounts/ask/` | Accounts, the fourth Ask surface (spec 2026-09-29 §3): `AccountsAskLayout` (the layout route above `list`, `board` and `:id`, wrapping `App.tsx`'s route: one `AskProvider` with the `accounts` surface and `revenact_accounts_ask`, `OrganizationsFrame`'s `rail` slot holding `AskRail`, `bleed` on the account's page), `useAccountsContext` (path/query → `AccountsListContext` \| `AccountDetailContext`, dropping the query on the detail view so a tab or story filter never rebuilds it), `accountsNames.ts` (`AccountsNamesContext`/`useReportAccountsOptions`/`useReportAccountName`: the List and the Board would report their portfolio's filter options, the account page its row's name, so a live question's chip can name them before the server has — not yet called by `List.tsx`/`Board.tsx`/`Details.tsx`, so a live chip on Accounts still reads with the "Accounts"/"This account" placeholders until they do) |
+| `features/accounts/askContext.ts` | `accountsContextOf` (path/query → the context, the view's filters or one account's id), `accountsLabel` (the chip: a stored `label` wins, a live one is built from `filterChips`/the reported names), `accountsPath` (History restore: `/accounts/list`, `/accounts/board` or `/accounts/:id`, reusing Organizations' `viewPath`), `toAccountsFilters`/`fromAccountsFilters` (params ↔ the context's string form, reusing Organizations' `fromContextFilters`) |
 
 #### Ticket Overview (`tabs/ticket-overview/`)
 Charts: `StatusDonut`, `PriorityDonut`, `AssigneesStackedBar`, `OriginBar`, `SentimentLineChart`, `KPIGrid`. The four countable KPIs (Total, On Hold, Positive/Negative sentiment) and every donut/bar's segments drill into `/tickets/stats/`; average lifetime and resolution rate stay plain — a rate isn't a set of tickets.
@@ -579,6 +581,7 @@ App.tsx
   │           CompanyViewTab + activity/HeadlinesTab, activity/FilesTab + activity/CallSenseTab
   │
   ├── pages/accounts/Details.tsx  (GET /accounts/portfolio/?ids=, /accounts/{id}/, /accounts/{id}/story/)
+  │     ├── AccountsAskLayout (AskProvider, accounts surface, spec 2026-09-29 §3) → OrganizationsFrame (rail slot: AskRail, bleed)
   │     ├── components/accounts/detail/* (AccountHeader, AccountTiles, AccountDetailsTab, CanvasesTab, useAccount)
   │     ├── organizations/detail/* with an account scope (StoryTab, PeopleTab, DealsTab, FilesCallsTab, DetailTabs)
   │     └── shared/CustomObjectsTab, shared/CanvasListTab, shared/OwnerTile, shared/AIAttributesPanel
@@ -596,7 +599,7 @@ App.tsx
   │           + AccountSidePanel / AccountSheet, useBoardMove (optimistic move), boardMove, useEndSentinel
   │
   ├── pages/accounts/List.tsx, Board.tsx  (GET /accounts/portfolio/, POST /accounts/bulk/, PATCH /customers/<cid>/accounts/<id>/)
-  │     ├── PortfolioKindContext = ACCOUNT_KIND around the page; OrganizationsFrame (rail slot empty until delivery 3)
+  │     ├── AccountsAskLayout (AskProvider, accounts surface) → OrganizationsFrame (rail slot: AskRail); PortfolioKindContext = ACCOUNT_KIND around the page
   │     └── the Organizations portfolio components + accounts/portfolio/AccountPanels; AccountFormModal (edit, add)
   │
   ├── pages/copilot/Index.tsx
