@@ -119,6 +119,33 @@ describe('CanvasEditor', () => {
     ).toBeInTheDocument();
   });
 
+  it('starts a new canvas on an account alone, reading its people and saving on it', async () => {
+    const created = canvasFixture({ id: 11, account_id: 12, account_name: 'Pizza EMEA' });
+    const fetchMock = vi.fn((url: string, options?: FetchOptions) => {
+      if (url.includes('/accounts/12/contacts/')) return Promise.resolve(jsonResponse(200, [jamesContact]));
+      if (options?.method === 'POST') return Promise.resolve(jsonResponse(201, created));
+      return Promise.resolve(jsonResponse(200, created));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const user = userEvent.setup();
+    render(
+      <Provider store={configureStore({ reducer: { customers: customersReducer, auth: authReducer } })}>
+        <MemoryRouter initialEntries={['/canvas/create?accountId=12']}>
+          <Routes>
+            <Route path="/canvas/create" element={<CanvasEditor />} />
+            <Route path="/canvas/:id" element={<CanvasEditor />} />
+          </Routes>
+        </MemoryRouter>
+      </Provider>
+    );
+
+    expect(await screen.findByDisplayValue('Untitled Canvas')).toBeInTheDocument();
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes('/accounts/12/contacts/'))).toBe(true);
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    const postCall = fetchMock.mock.calls.find(([, o]) => o?.method === 'POST');
+    expect(JSON.parse(postCall![1]!.body!)).toMatchObject({ account_id: 12 });
+  });
+
   it('Save POSTs a new canvas and swaps the URL to its own id', async () => {
     const created = canvasFixture({ id: 9, name: 'My New Canvas' });
     const fetchMock = vi.fn((url: string, options?: FetchOptions) => {

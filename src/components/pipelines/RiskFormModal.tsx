@@ -119,7 +119,7 @@ export function RiskFormModal({
     e.preventDefault();
     setError(null);
 
-    if (!isEdit && customerId === undefined && !selectedCompanyId) {
+    if (!isEdit && customerId === undefined && accountId === undefined && !selectedCompanyId) {
       setError('Pick a company.');
       return;
     }
@@ -145,6 +145,10 @@ export function RiskFormModal({
         } else {
           await dispatch(createRiskForCustomer({ customerId, ...data })).unwrap();
         }
+        onSaved?.();
+      } else if (customerId === undefined && accountId !== undefined) {
+        // The account page: no organisation id, the flat account route.
+        await dispatch(createRiskForAccount({ accountId, ...data })).unwrap();
         onSaved?.();
       } else if (selectedAccountId) {
         // The standalone board's own Add — createRisk's own
@@ -192,7 +196,7 @@ export function RiskFormModal({
                 {risk.account_name ? ` • ${risk.account_name}` : ''}
               </p>
             </div>
-          ) : customerId === undefined ? (
+          ) : customerId === undefined && accountId === undefined ? (
             <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
               <option value="">Select a company…</option>
               {(companies ?? []).map((c) => (

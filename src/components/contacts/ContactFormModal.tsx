@@ -26,17 +26,11 @@ interface ContactFormModalProps {
    * moved between parents (see ContactDetailView's own docstring on
    * the backend), so Company is shown read-only there instead. */
   customerId?: number;
-  /** Add-only: set together with a fixed `customerId` when opened from
-   * the standalone Account page's own Contacts tab — creates an
-   * account-level Contact (POST .../accounts/<accountId>/contacts/)
-   * instead of an organization-level one, and hides the Account picker
-   * below (already inside one specific account's own context, nothing
-   * to pick). Omitted everywhere else, which is what lets that picker
-   * show up on the Organization Details page's own Contacts tab and
-   * the Contacts page (/contacts) — a Contact can be an
-   * organisation-level one *or* belong to one specific Account (see
-   * the Contact model's own docstring on the backend), and both of
-   * those surfaces can create either kind. */
+  /** Add-only: the account to create the contact on. With a fixed
+   * `customerId` it saves through the nested route (the organisation
+   * page's chosen account); alone it saves through
+   * /accounts/<id>/contacts/ (the account page). Either way no Company
+   * or Account picker shows. */
   accountId?: number;
   /** Add-only, and only when `customerId` isn't already fixed: every
    * company to choose from. */
@@ -124,7 +118,7 @@ export function ContactFormModal({
     e.preventDefault();
     setError(null);
 
-    if (!isEdit && !selectedCompanyId) {
+    if (!isEdit && accountId === undefined && !selectedCompanyId) {
       setError('Pick a company.');
       return;
     }
@@ -151,12 +145,10 @@ export function ContactFormModal({
         await dispatch(updateContact({ id: contact.id, ...payload })).unwrap();
         onSaved();
       } else if (accountId !== undefined) {
-        // Already inside one specific account's own context (the
-        // standalone Account page's own Add Contact) — no picker was
-        // shown, so `accountId` here is the only account it could be.
-        await dispatch(
-          createContactForAccount({ customerId: Number(selectedCompanyId), accountId, ...payload })
-        ).unwrap();
+        // The account page (no organisation id: the flat route) or the
+        // organisation page's chosen account (the nested one) — either
+        // way the only account it could be.
+        await dispatch(createContactForAccount({ customerId, accountId, ...payload })).unwrap();
         onSaved();
       } else if (selectedAccountId) {
         // The caller left Account on "Organization contact" or picked
@@ -215,7 +207,7 @@ export function ContactFormModal({
                 {contact.account_name ? ` • ${contact.account_name}` : ''}
               </p>
             </div>
-          ) : customerId === undefined ? (
+          ) : customerId === undefined && accountId === undefined ? (
             <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
               <option value="">Select a company…</option>
               {(companies ?? []).map((c) => (

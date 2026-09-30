@@ -49,7 +49,8 @@ export interface SurveysTabProps {
 // Response" is a small inline score entry per still-`sent` row, not a
 // second modal, since it's just one number.
 export interface LogSurveyFormProps {
-  customerId: number;
+  /** The organization; absent on the account page, where `accountId` is the account itself. */
+  customerId?: number;
   /** Set to log it on one of the organization's accounts. */
   accountId?: number;
   /** CES is asked of an organization only. */
@@ -74,10 +75,12 @@ export function LogSurveyForm({ customerId, accountId, allowCes, onLogged, onCan
     setLogError(null);
     setIsLogging(true);
     try {
-      if (accountId === undefined) {
+      if (accountId !== undefined) {
+        await dispatch(createSurveyForAccount({ customerId, accountId, survey_type: newType, sent_at: newSentAt })).unwrap();
+      } else if (customerId !== undefined) {
         await dispatch(createSurveyForCustomer({ customerId, survey_type: newType, sent_at: newSentAt })).unwrap();
       } else {
-        await dispatch(createSurveyForAccount({ customerId, accountId, survey_type: newType, sent_at: newSentAt })).unwrap();
+        throw new Error('Nowhere to log this survey.');
       }
       // Busy until the caller has taken the new survey (it may refetch
       // first): a second press in that window would log it twice.
