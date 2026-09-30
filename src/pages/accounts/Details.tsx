@@ -95,9 +95,9 @@ function AccountPage({ accountId }: { accountId: number }) {
   const saveOwner = useCallback(
     async (userId: number | null, note: string) => {
       const result = await dispatch(updateAccount({ id: accountId, owner_id: userId, handover_note: note }));
-      if (!updateAccount.fulfilled.match(result)) return false;
+      if (!updateAccount.fulfilled.match(result)) return result.payload ?? 'Could not update the owner.';
       reloadHeader();
-      return true;
+      return null;
     },
     [dispatch, accountId, reloadHeader],
   );
@@ -163,8 +163,10 @@ function AccountPage({ accountId }: { accountId: number }) {
                     currency={account.currency}
                     isSm={isSm}
                     owner={owner}
+                    ownerError={owner === undefined ? account.accountError : null}
                     mayChangeOwner={mayChangeOwner}
                     onSaveOwner={saveOwner}
+                    onRetryOwner={account.retry}
                     onEdit={record ? () => setEditing(true) : undefined}
                   />
                 ) : (

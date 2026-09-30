@@ -48,8 +48,10 @@ export function AccountDetailsTab({
   currency,
   isSm,
   owner,
+  ownerError,
   mayChangeOwner,
   onSaveOwner,
+  onRetryOwner,
   onEdit,
 }: {
   row: AccountPortfolioRow;
@@ -57,8 +59,13 @@ export function AccountDetailsTab({
   isSm: boolean;
   /** From GET /accounts/<id>/ (with their function); undefined while it loads. */
   owner: OwnerSummary | null | undefined;
+  /** Set when GET /accounts/<id>/ (the record the owner comes from) failed;
+   *  null while it's still loading or once it has landed. */
+  ownerError: string | null;
   mayChangeOwner: boolean;
-  onSaveOwner: (userId: number | null, note: string) => Promise<boolean>;
+  onSaveOwner: (userId: number | null, note: string) => Promise<string | null>;
+  /** Reads the record again after a failed load. */
+  onRetryOwner: () => void;
   /** Absent until the account record has landed. */
   onEdit?: () => void;
 }) {
@@ -83,9 +90,18 @@ export function AccountDetailsTab({
       </div>
       <div className="px-3 pb-3">
         {owner === undefined ? (
-          <div role="status" aria-label="Loading the owner" className="border-t border-line-subtle pt-3">
-            <span aria-hidden="true" className="block h-3 w-40 animate-pulse rounded bg-subtle" />
-          </div>
+          ownerError ? (
+            <div role="alert" className="flex flex-col items-start gap-2 border-t border-line-subtle pt-3">
+              <p className="text-[13px] text-danger">{ownerError}</p>
+              <button type="button" onClick={onRetryOwner} className={`${QUIET} border border-line`}>
+                Try again
+              </button>
+            </div>
+          ) : (
+            <div role="status" aria-label="Loading the owner" className="border-t border-line-subtle pt-3">
+              <span aria-hidden="true" className="block h-3 w-40 animate-pulse rounded bg-subtle" />
+            </div>
+          )
         ) : (
           <OwnerTile owner={owner} members={members} mayChange={mayChangeOwner} onSave={onSaveOwner} plain />
         )}

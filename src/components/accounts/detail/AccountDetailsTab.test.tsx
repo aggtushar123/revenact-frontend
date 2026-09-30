@@ -22,15 +22,18 @@ function renderDetails(
   opts: {
     row?: AccountPortfolioRow;
     owner?: OwnerSummary | null | undefined;
+    ownerError?: string | null;
     mayChangeOwner?: boolean;
     onEdit?: (() => void) | undefined;
   } = {},
 ) {
   const row = opts.row ?? (pizzaEmea as AccountPortfolioRow);
   const owner = 'owner' in opts ? opts.owner : CARL;
+  const ownerError = opts.ownerError ?? null;
   const mayChangeOwner = opts.mayChangeOwner ?? true;
   const onEdit = 'onEdit' in opts ? opts.onEdit : vi.fn();
-  const onSaveOwner = vi.fn(async () => true);
+  const onSaveOwner = vi.fn(async () => null);
+  const onRetryOwner = vi.fn();
   render(
     <Provider store={makeDetailStore()}>
       <MemoryRouter>
@@ -39,14 +42,16 @@ function renderDetails(
           currency="USD"
           isSm
           owner={owner}
+          ownerError={ownerError}
           mayChangeOwner={mayChangeOwner}
           onSaveOwner={onSaveOwner}
+          onRetryOwner={onRetryOwner}
           onEdit={onEdit}
         />
       </MemoryRouter>
     </Provider>,
   );
-  return { onSaveOwner, onEdit };
+  return { onSaveOwner, onEdit, onRetryOwner };
 }
 
 describe('AccountDetailsTab (spec 2026-09-29 §2.6)', () => {
@@ -131,5 +136,15 @@ describe('AccountDetailsTab (spec 2026-09-29 §2.6)', () => {
     renderDetails({ owner: undefined, onEdit: undefined });
     expect(screen.getByRole('status', { name: 'Loading the owner' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit details' })).not.toBeInTheDocument();
+  });
+
+  it('shows an inline error with Try again when the record fails to load, instead of loading forever', async () => {
+    stubAccountPage({ lists: ACCOUNT_LISTS });
+    const { onRetryOwner } = renderDetails({ owner: undefined, ownerError: "Could not load this account's record.", onEdit: undefined });
+    expect(screen.queryByRole('status', { name: 'Loading the owner' })).not.toBeInTheDocument();
+    const alert = screen.getByRole('alert');
+    expect(alert).toHaveTextContent("Could not load this account's record.");
+    await userEvent.click(within(alert).getByRole('button', { name: 'Try again' }));
+    expect(onRetryOwner).toHaveBeenCalledOnce();
   });
 });
