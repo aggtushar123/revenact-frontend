@@ -9,8 +9,9 @@ type Props = {
   members: User[];
   /** Whether the viewer may assign or hand over (the backend decides for real). */
   mayChange: boolean;
-  /** Save the new owner (null clears) with a handover note; resolve true on success. */
-  onSave: (userId: number | null, note: string) => Promise<boolean>;
+  /** Save the new owner (null clears) with a handover note; resolve null on
+   *  success, or the rejection's message to show inline. */
+  onSave: (userId: number | null, note: string) => Promise<string | null>;
   /** A row divided from what is above it, not a tinted box: for a card
    *  that already has its own surface (no card in a card). Off by default. */
   plain?: boolean;
@@ -29,12 +30,17 @@ const CONTROL = `min-h-11 rounded-lg border border-line bg-surface px-2 text-[15
 export function OwnerTile({ title = 'Account owner', owner, members, mayChange, onSave, plain = false }: Props) {
   const [pending, setPending] = useState<string | null>(null);
   const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   async function save() {
     if (pending === null) return;
-    if (await onSave(pending ? Number(pending) : null, note)) {
+    const rejection = await onSave(pending ? Number(pending) : null, note);
+    if (rejection === null) {
       setPending(null);
       setNote('');
+      setError(null);
+    } else {
+      setError(rejection);
     }
   }
 
@@ -53,7 +59,10 @@ export function OwnerTile({ title = 'Account owner', owner, members, mayChange, 
         {mayChange && pending === null && (
           <button
             type="button"
-            onClick={() => setPending(owner ? String(owner.id) : '')}
+            onClick={() => {
+              setError(null);
+              setPending(owner ? String(owner.id) : '');
+            }}
             className={`inline-flex min-h-11 items-center rounded-lg px-2 text-[13px] font-semibold text-ink hover:bg-subtle active:bg-line-subtle sm:min-h-9 ${FOCUS}`}
           >
             {owner ? 'Hand over' : 'Assign'}
@@ -78,6 +87,11 @@ export function OwnerTile({ title = 'Account owner', owner, members, mayChange, 
             placeholder="Why is it moving? (written down for the record)"
             className={CONTROL}
           />
+          {error ? (
+            <p role="alert" className="text-[13px] text-danger">
+              {error}
+            </p>
+          ) : null}
           <div className="flex gap-2">
             <button
               type="button"
@@ -88,7 +102,10 @@ export function OwnerTile({ title = 'Account owner', owner, members, mayChange, 
             </button>
             <button
               type="button"
-              onClick={() => setPending(null)}
+              onClick={() => {
+                setError(null);
+                setPending(null);
+              }}
               className={`inline-flex min-h-11 items-center rounded-lg px-3 text-[13px] font-semibold text-ink-muted hover:bg-subtle sm:min-h-9 ${FOCUS}`}
             >
               Cancel
