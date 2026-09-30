@@ -1,6 +1,7 @@
 // Thin apiFetch wrappers over revenact-backend's Pipelines endpoints.
 import { apiFetch } from '../../lib/apiClient';
 import { downloadAttachment } from '../files/filesSlice';
+import { localDay } from '../organizations/storyDays';
 import type { BulkResult } from '../organizations/portfolioTypes';
 import type { PipelineBulkRequest, PipelineKindKey, PipelinePage } from './pipelineTypes';
 
@@ -12,10 +13,11 @@ export function fetchPipeline(kind: PipelineKindKey, query: string): Promise<Pip
 }
 
 /** Every row of the query as CSV with every field, fetched with the
- *  session's token (the API never exposes a URL a plain link could open). */
+ *  session's token (the API never exposes a URL a plain link could open).
+ *  Named for the viewer's own calendar day, not UTC's. */
 export function exportPipeline(kind: PipelineKindKey, query: string, today: Date = new Date()): Promise<void> {
   const path = `${pipelinePath(kind)}export.csv`;
-  return downloadAttachment({ download_url: query ? `${path}?${query}` : path, name: `${kind}-${today.toISOString().slice(0, 10)}.csv` });
+  return downloadAttachment({ download_url: query ? `${path}?${query}` : path, name: `${kind}-${localDay(today)}.csv` });
 }
 
 export function bulkUpdatePipeline(kind: PipelineKindKey, body: PipelineBulkRequest): Promise<BulkResult> {

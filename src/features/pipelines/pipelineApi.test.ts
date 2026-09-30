@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { localDay } from '../organizations/storyDays';
 import { bulkUpdatePipeline, exportPipeline, fetchPipeline } from './pipelineApi';
 import { pipelineBulkBodies, pipelineQueries, stubPipelines } from './testPipelines';
 
@@ -24,14 +25,16 @@ describe('the Pipelines API', () => {
     expect(pipelineBulkBodies(spy, 'opportunities')).toEqual([{ ids: [41, 999], action: 'set_date', value: null }]);
   });
 
-  it('downloads the export with the query, named for the kind and the day', async () => {
+  it("downloads the export with the query, named for the kind and the viewer's own calendar day", async () => {
     const spy = stubPipelines();
     URL.createObjectURL = vi.fn(() => 'blob:x');
     URL.revokeObjectURL = vi.fn();
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
-    await exportPipeline('risks', 'owner=2&sort=-mrr', new Date('2026-10-01T12:00:00Z'));
+    const today = new Date('2026-10-01T12:00:00Z');
+    await exportPipeline('risks', 'owner=2&sort=-mrr', today);
     const call = spy.mock.calls.find(([input]) => String(input).includes('/pipelines/risks/export.csv'));
     expect(String(call?.[0])).toContain('export.csv?owner=2&sort=-mrr');
-    expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe('risks-2026-10-01.csv');
+    // The viewer's local date, not toISOString's UTC date.
+    expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe(`risks-${localDay(today)}.csv`);
   });
 });
