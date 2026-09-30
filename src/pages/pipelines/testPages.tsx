@@ -13,6 +13,7 @@ import { Navbar } from '../../components/layout/Navbar';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 import { SlotHost } from '../../test/SlotHost';
 import { setViewport } from '../../test/viewport';
+import { Board } from './Board';
 import { List } from './List';
 
 // Test-only. The Pipelines routes on the real auth, customers and
@@ -86,6 +87,15 @@ export function renderPipelines(url: string, { width = 1440, nav = false }: { wi
               element={
                 <>
                   <List />
+                  <Where />
+                </>
+              }
+            />
+            <Route
+              path="/pipelines/board"
+              element={
+                <>
+                  <Board />
                   <Where />
                 </>
               }

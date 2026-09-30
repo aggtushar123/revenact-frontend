@@ -45,7 +45,7 @@ import { ContactsPage } from './pages/contacts/ContactsPage';
 import { ContactsAskLayout } from './pages/contacts/ask/ContactsAskLayout';
 import { ContactsListRedirect } from './pages/contacts/ContactsListRedirect';
 import { CustomObjectRecordsPage } from './pages/customObjects/CustomObjectRecordsPage';
-import { PipelinesPage } from './pages/pipelines/PipelinesPage';
+import { Board as PipelinesBoard } from './pages/pipelines/Board';
 import { SurveysPage } from './pages/surveys/SurveysPage';
 import { CanvasPage } from './pages/canvas/CanvasPage';
 import { CanvasEditor } from './pages/canvas/CanvasEditor';
@@ -289,7 +289,7 @@ function App() {
           <Route path="pipelines">
             <Route index element={<Navigate to="list" replace />} />
             <Route path="list" element={<PipelinesList />} />
-            <Route path="board" element={<PipelinesPage view="board" />} />
+            <Route path="board" element={<PipelinesBoard />} />
           </Route>
 
           {/* Company Brain: one real page now (the metric layer). The mock
