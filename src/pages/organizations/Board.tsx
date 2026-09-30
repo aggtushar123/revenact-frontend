@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 import { useAppSelector, useOrgCurrency } from '../../hooks';
 import { apiFetch } from '../../lib/apiClient';
-import { SM, XL, useMediaQuery } from '../../lib/useMediaQuery';
+import { SM, useMediaQuery } from '../../lib/useMediaQuery';
 import type { Customer } from '../../features/customers/customersSlice';
 import { exportPortfolio, fetchPortfolio } from '../../features/organizations/portfolioApi';
 import { BOARD_GROUP, boardParams, hasFilters, includesChurned, toApiQuery } from '../../features/organizations/portfolioParams';
@@ -21,9 +21,9 @@ import { useBoardMove } from '../../components/organizations/portfolio/useBoardM
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
 import { FOCUS } from '../../components/organizations/portfolio/styles';
-import { useAsk } from '../dashboard/ask/useAsk';
 import { useReportPortfolioOptions } from './ask/portfolioOptions';
 import { useAskFocusOnOpen } from './ask/useAskFocus';
+import { useBoardRail } from './ask/useBoardRail';
 import { OrganizationsFrame } from './OrganizationsFrame';
 
 /** /organizations/board: the portfolio as columns (spec 2026-09-25 §1
@@ -36,14 +36,6 @@ export function Board() {
   const { params: urlParams, update, clearFilters } = usePortfolioParams(BOARD_GROUP);
   const params = useMemo(() => boardParams(urlParams), [urlParams]);
   const isSm = useMediaQuery(SM);
-  const isXl = useMediaQuery(XL);
-  const ask = useAsk();
-  // The Ask rail (spec §3), open beside the board from sm, wins the room
-  // (plan pre-flight 12): the columns narrow, and below xl, where a 320px
-  // rail and the 26rem side panel don't both fit, an opened card is the
-  // bottom sheet instead of the side panel.
-  const railOpen = isSm && Boolean(ask?.open);
-  const sidePanel = isSm && (!railOpen || isXl);
   const orgCurrency = useOrgCurrency();
   const defaultLifecycleStage = useAppSelector(
     (state) => state.auth.user?.organisation.default_lifecycle_stage || undefined,
@@ -66,14 +58,11 @@ export function Board() {
     setOpenRow((current) => (current && rows.find((row) => row.id === current.id)) || current);
   }, []);
 
-  // Opening the rail below xl takes the side panel's room: the open card
-  // closes rather than turning into a sheet over the rail, and its focus
-  // stays for the next question. Adjusted during render, not in an effect.
-  const [railWas, setRailWas] = useState(railOpen);
-  if (railWas !== railOpen) {
-    setRailWas(railOpen);
-    if (railOpen && !isXl) setOpenRow(null);
-  }
+  // The Ask rail (spec §3) wins the room (useBoardRail): the columns
+  // narrow, and below xl an opened card is the sheet. Opening the rail there
+  // closes the open card, and its focus stays for the next question.
+  const closeOpen = useCallback(() => setOpenRow(null), []);
+  const { railOpen, sidePanel } = useBoardRail(closeOpen);
 
   const [churning, setChurning] = useState<PortfolioRow | null>(null);
   const onSaved = useCallback((move: BoardMove) => {
@@ -113,7 +102,6 @@ export function Board() {
   useAskFocusOnOpen(openRow?.id ?? null);
 
   const toggleOpen = useCallback((row: PortfolioRow) => setOpenRow((current) => (current?.id === row.id ? null : row)), []);
-  const closeOpen = useCallback(() => setOpenRow(null), []);
 
   // When a fresh frame lands (a filter, a churn, a move, an edit) the opened
   // card may have left the view. Ask for that one account under the view's

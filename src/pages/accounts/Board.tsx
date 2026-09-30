@@ -19,7 +19,9 @@ import { useBoardMove } from '../../components/organizations/portfolio/useBoardM
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
 import { AccountFormModal } from '../organizations/AccountFormModal';
+import { useBoardRail } from '../organizations/ask/useBoardRail';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
+import { useReportAccountsOptions } from './ask/accountsNames';
 import { useAccountEditing } from './useAccountEditing';
 
 const DISMISS = `inline-flex w-11 h-11 sm:w-8 sm:h-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-subtle active:bg-line-subtle ${FOCUS}`;
@@ -68,6 +70,12 @@ function AccountsBoard() {
     [remember],
   );
 
+  // The Ask rail (spec §3) wins the room, as on the Organizations board
+  // (useBoardRail): the columns narrow, and below xl an opened card is the
+  // sheet. Opening the rail there closes the open card.
+  const closeOpen = useCallback(() => setOpenRow(null), []);
+  const { railOpen, sidePanel } = useBoardRail(closeOpen);
+
   const onSaved = useCallback((move: BoardMove<AccountPortfolioRow>) => {
     setFrameBump((n) => n + 1);
     setColumnBumps((bumps) => ({
@@ -91,13 +99,16 @@ function AccountsBoard() {
   const searchRef = useRef<HTMLInputElement>(null);
   const currency = portfolio.data?.currency ?? orgCurrency;
   const options = portfolio.data?.filters ?? null;
+  // Ask Revenact (spec §3): the chip names owners and organisations from
+  // this read's options. Opening a card narrows nothing: the server drops a
+  // focus on the Board (plan Decision 3).
+  useReportAccountsOptions(options);
   const failed = !portfolio.data && portfolio.error !== null;
 
   const toggleOpen = useCallback(
     (row: AccountPortfolioRow) => setOpenRow((current) => (current?.id === row.id ? null : row)),
     [],
   );
-  const closeOpen = useCallback(() => setOpenRow(null), []);
 
   // When a fresh frame lands (a filter, a move, an edit) the opened card may
   // have left the view. Ask for that one account under the view's filters;
@@ -211,6 +222,7 @@ function AccountsBoard() {
             columnBumps={columnBumps}
             currency={currency}
             isSm={isSm}
+            narrow={railOpen}
             filtered={hasFilters(params)}
             move={board.move}
             saving={board.busy}
@@ -222,13 +234,13 @@ function AccountsBoard() {
             onAdd={forms.openAdd}
             onMoveSettled={board.settle}
           />
-          {isSm && openRow ? (
+          {sidePanel && openRow ? (
             <AccountSidePanel row={openRow} currency={currency} onClose={closeOpen} onEdit={forms.openEdit} />
           ) : null}
         </div>
       </div>
 
-      {!isSm && openRow ? <AccountSheet row={openRow} currency={currency} onClose={closeOpen} onEdit={forms.openEdit} /> : null}
+      {!sidePanel && openRow ? <AccountSheet row={openRow} currency={currency} onClose={closeOpen} onEdit={forms.openEdit} /> : null}
 
       {forms.adding ? (
         <AccountFormModal

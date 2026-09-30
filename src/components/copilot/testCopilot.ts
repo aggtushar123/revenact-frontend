@@ -26,8 +26,9 @@ export function stubCopilot(
      *  EMEA"), stored on the context and the origin as the backend does. */
     label?: (context: Record<string, unknown>) => string;
     /** A `400 {"context": refuse}` for every question asked with a context,
-     *  as the backend answers an organisation or account the asker may not open. */
-    refuse?: Record<string, string[]>;
+     *  as the backend answers an organisation or account the asker may not open
+     *  (nested, as `{filters: {organisation: [...]}}`, allowed). */
+    refuse?: Record<string, unknown>;
   } = {},
 ) {
   const statuses = [...(options.statuses ?? [])];
