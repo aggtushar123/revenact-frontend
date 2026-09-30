@@ -387,7 +387,8 @@ sheet).
   Board's cards and columns, the account page's tiles and story items and
   every side panel and sheet stay solid `bg-surface`, the same exception
   Organizations already carries. Opening a row or a card narrows nothing —
-  Accounts has no drill focus, unlike the Dashboard's. An account the asker
+  Accounts' List and Board send no focus, unlike Organizations' (the server
+  drops a focus on those views). An account the asker
   can no longer open refuses "You can no longer ask about this account."; a
   story item no longer open refuses "You can no longer ask about this item.
   Ask about the account instead."; the filtered List or Board refuses "You
