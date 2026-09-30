@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useRef, useState, type RefObject } from 'react';
 import { CheckSquare, Download, Pin, Plus, Search, SlidersHorizontal } from 'lucide-react';
 import type { ColumnId } from '../tableData';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
@@ -7,6 +7,7 @@ import { FiltersPanel, GroupSortControls, type GroupOption } from './FiltersPane
 import { PinFieldsMenu } from './PinFieldsMenu';
 import { usePortfolioKind } from './portfolioKind';
 import { BUTTON, FOCUS } from './styles';
+import { useSearchText } from './useSearchText';
 
 const LABEL = 'Search by name or Revenact ID';
 
@@ -54,19 +55,8 @@ export function PortfolioToolbar({
 }) {
   const kind = usePortfolioKind();
   // The box shows what is typed; the URL gets it 300ms after typing stops.
-  // A chip or "Clear all" changing the URL resets the box (adjusted during
-  // render, not in an effect).
-  const [text, setText] = useState(params.search);
-  const [synced, setSynced] = useState(params.search);
-  if (params.search !== synced) {
-    setSynced(params.search);
-    setText(params.search);
-  }
-  useEffect(() => {
-    if (text.trim() === params.search) return;
-    const timeout = window.setTimeout(() => update({ search: text.trim() }), 300);
-    return () => window.clearTimeout(timeout);
-  }, [text, params.search, update]);
+  const commitSearch = useCallback((search: string) => update({ search }), [update]);
+  const [text, setText] = useSearchText(params.search, commitSearch);
 
   const [open, setOpen] = useState<'filters' | 'pins' | null>(null);
   const close = useCallback(() => setOpen(null), []);

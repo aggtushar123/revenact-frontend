@@ -3,29 +3,28 @@ import { countText, filterChips } from '../../../features/organizations/filterCh
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { FilterOptions } from '../../../features/organizations/portfolioTypes';
 import { usePortfolioKind } from './portfolioKind';
-import { FOCUS } from './styles';
+import { FOCUS, MONO } from './styles';
 
+/** One active filter as a chip: removing it writes `patch` to the URL. */
+export interface RemovableChip<P> {
+  key: string;
+  label: string;
+  patch: Partial<P>;
+}
 
-export function FilterChips({
-  params,
-  options,
-  count,
-  total,
-  failed = false,
+/** The row under a portfolio's toolbar, for any params shape: one
+ *  removable chip per active filter, "Clear all", and a live count. */
+export function ChipRow<P>({
+  chips,
+  status,
   onChange,
   onClearAll,
 }: {
-  params: PortfolioParams;
-  options: FilterOptions | null;
-  count: number | null;
-  total: number | null;
-  /** The first load failed: there is no count to wait for. */
-  failed?: boolean;
-  onChange: (patch: Partial<PortfolioParams>) => void;
+  chips: RemovableChip<P>[];
+  status: string;
+  onChange: (patch: Partial<P>) => void;
   onClearAll: () => void;
 }) {
-  const kind = usePortfolioKind();
-  const chips = filterChips(params, options);
   return (
     <div className="flex flex-wrap items-center gap-2">
       {chips.map((chip) => (
@@ -49,9 +48,39 @@ export function FilterChips({
           Clear all
         </button>
       ) : null}
-      <p role="status" aria-live="polite" className="ml-auto font-mono-brand tabular-nums text-[13px] text-ink-muted">
-        {countText(count, total, chips.length > 0, failed, kind.noun)}
+      <p role="status" aria-live="polite" className={`ml-auto ${MONO} text-[13px] text-ink-muted`}>
+        {status}
       </p>
     </div>
+  );
+}
+
+export function FilterChips({
+  params,
+  options,
+  count,
+  total,
+  failed = false,
+  onChange,
+  onClearAll,
+}: {
+  params: PortfolioParams;
+  options: FilterOptions | null;
+  count: number | null;
+  total: number | null;
+  /** The first load failed: there is no count to wait for. */
+  failed?: boolean;
+  onChange: (patch: Partial<PortfolioParams>) => void;
+  onClearAll: () => void;
+}) {
+  const kind = usePortfolioKind();
+  const chips = filterChips(params, options);
+  return (
+    <ChipRow
+      chips={chips}
+      status={countText(count, total, chips.length > 0, failed, kind.noun)}
+      onChange={onChange}
+      onClearAll={onClearAll}
+    />
   );
 }

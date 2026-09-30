@@ -51,7 +51,7 @@ export interface PortfolioBoardProps<R extends PortfolioRowBase = PortfolioRow> 
   onMoveSettled: (token: number) => void;
 }
 
-function BoardSkeleton({ isSm, narrow }: { isSm: boolean; narrow: boolean }) {
+export function BoardSkeleton({ isSm, narrow }: { isSm: boolean; narrow: boolean }) {
   return (
     <div role="status" aria-label="Loading the board" className="flex gap-3 overflow-hidden">
       {Array.from({ length: isSm ? 4 : 1 }, (_, i) => (

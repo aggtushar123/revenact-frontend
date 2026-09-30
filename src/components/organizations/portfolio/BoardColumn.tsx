@@ -56,7 +56,7 @@ export interface BoardColumnProps<R extends PortfolioRowBase = PortfolioRow> {
 }
 
 /** Card-shaped loading placeholders. */
-function CardSkeleton({ label, count }: { label: string; count: number }) {
+export function CardSkeleton({ label, count }: { label: string; count: number }) {
   return (
     <div role="status" aria-label={`Loading ${label}`}>
       <ul aria-hidden="true" className="flex flex-col gap-2">

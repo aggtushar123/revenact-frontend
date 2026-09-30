@@ -13,3 +13,6 @@ export const QUIET = `inline-flex min-h-11 sm:min-h-9 items-center justify-cente
  *  text colour. Written out rather than layered on BUTTON, whose surface
  *  fill and ink text would win in the stylesheet's order. */
 export const PRIMARY = `inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rounded-lg border border-accent bg-accent px-3 text-[13px] font-semibold text-on-accent hover:bg-accent-hover active:bg-accent-hover disabled:opacity-50 ${FOCUS}`;
+
+/** Numbers and ids: DM Mono with tabular figures. */
+export const MONO = 'font-mono-brand tabular-nums';

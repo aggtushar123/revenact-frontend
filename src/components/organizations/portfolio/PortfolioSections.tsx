@@ -24,10 +24,10 @@ export function sectionStartsOpen(index: number, total: number): boolean {
  *  in flight (spec §1's "disabled while loading" rule). */
 export type PortfolioRowRenderer<R extends PortfolioRowBase = PortfolioRow> = (row: R, state: { loading: boolean }) => ReactNode;
 
-export function RowSkeleton({ count }: { count: number }) {
+export function RowSkeleton({ count, label }: { count: number; label?: string }) {
   const kind = usePortfolioKind();
   return (
-    <div role="status" aria-label={`Loading ${kind.noun.many}`}>
+    <div role="status" aria-label={label ?? `Loading ${kind.noun.many}`}>
       <ul aria-hidden="true" className="flex flex-col gap-1.5">
         {Array.from({ length: Math.max(1, count) }, (_, i) => (
           <li key={i} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2.5">
