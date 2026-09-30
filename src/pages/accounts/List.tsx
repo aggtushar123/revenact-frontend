@@ -24,6 +24,7 @@ import { usePortfolioParams } from '../../components/organizations/portfolio/use
 import { useSelection } from '../../components/organizations/portfolio/useSelection';
 import { AccountFormModal } from '../organizations/AccountFormModal';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
+import { useReportAccountsOptions } from './ask/accountsNames';
 import { useAccountEditing } from './useAccountEditing';
 
 const DISMISS = `inline-flex w-11 h-11 sm:w-8 sm:h-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-subtle active:bg-line-subtle ${FOCUS}`;
@@ -106,6 +107,10 @@ function AccountsList() {
 
   const currency = portfolio.data?.currency ?? orgCurrency;
   const options = portfolio.data?.filters ?? null;
+  // Ask Revenact (spec §3): the chip names owners and organisations from
+  // this read's options. Opening a row narrows nothing: the server drops a
+  // focus on the List (plan Decision 3).
+  useReportAccountsOptions(options);
   const failed = !portfolio.data && portfolio.error !== null;
 
   const toggleOpen = useCallback(
@@ -187,7 +192,7 @@ function AccountsList() {
     <OrganizationsFrame>
       <div className="flex flex-col gap-4 pb-6">
         {/* Containers: the tiles and rows follow this column, which the Ask
-            rail (delivery 3) will narrow, not the window. */}
+            rail narrows, not the window. */}
         <div className="@container">
           <SummaryTiles
             summary={portfolio.data?.summary ?? null}

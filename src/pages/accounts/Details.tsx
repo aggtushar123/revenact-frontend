@@ -31,6 +31,7 @@ import { CustomObjectsTab } from '../../components/shared/CustomObjectsTab';
 import type { OwnerSummary } from '../../components/shared/OwnerTile';
 import { AccountFormModal } from '../organizations/AccountFormModal';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
+import { useReportAccountName } from './ask/accountsNames';
 
 /** One account has no account chips: the organization page's lists get none. */
 const NO_ACCOUNTS: Account[] = [];
@@ -56,7 +57,8 @@ export function AccountDetails() {
  *  navigation state, no mock). The name row and tiles come from the Accounts
  *  list's own row; the record adds the owner, the account pulse and the
  *  edit form; seven tabs whose choice, like the story's filters, lives in
- *  the URL. The rail slot waits for Ask (delivery 3). */
+ *  the URL. Ask Revenact sits beside it (`AccountsAskLayout`), and each
+ *  story item's "Ask about this" narrows one question to that item. */
 function AccountPage({ accountId }: { accountId: number }) {
   const isSm = useMediaQuery(SM);
   const dispatch = useAppDispatch();
@@ -71,6 +73,10 @@ function AccountPage({ accountId }: { accountId: number }) {
   const record = account.account;
   const name = row?.name ?? '';
   const scope = useMemo<DetailScope>(() => ({ kind: 'account', id: accountId, name }), [accountId, name]);
+
+  // Ask Revenact (spec §3): the chip names this account from its own row
+  // until the server's label comes back; "This account" until it lands.
+  useReportAccountName(accountId, name);
 
   // Each tab reads when first opened, then stays mounted (useVisitedTabs).
   const visited = useVisitedTabs(params.tab);

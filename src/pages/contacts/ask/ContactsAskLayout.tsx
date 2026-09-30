@@ -2,6 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { surfaceLabel } from '../../../components/copilot/surfaceLabels';
 import type { ContactsNames } from '../../../features/contacts/askContext';
+import { same } from '../../../lib/same';
 import { CONTACTS_ASK_KEY } from '../../dashboard/ask/askPreference';
 import { AskProvider } from '../../dashboard/ask/AskProvider';
 import { AskRail } from '../../dashboard/ask/AskRail';
@@ -9,8 +10,6 @@ import type { AskSurface } from '../../dashboard/ask/context';
 import { ContactsFrame } from '../ContactsFrame';
 import { ContactsNamesContext } from './contactsNames';
 import { useContactsContext } from './useContactsContext';
-
-const same = <T,>(prev: T | null, next: T) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next);
 
 /** The Contacts route's Ask (spec 2026-09-28 §4.4): one conversation above
  *  the list and every person, so it lasts through filters, people and back.

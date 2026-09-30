@@ -13,6 +13,7 @@ import { Navbar } from '../../components/layout/Navbar';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 import { SlotHost } from '../../test/SlotHost';
 import { setViewport } from '../../test/viewport';
+import { AccountsAskLayout } from './ask/AccountsAskLayout';
 import { Board } from './Board';
 import { AccountDetails } from './Details';
 import { List } from './List';
@@ -80,46 +81,59 @@ function makeStore() {
 
 /** Both Accounts views, and the account page (the real one with `realPage`,
  *  else a stand-in), on the real store and router. `nav` adds the real
- *  Navbar, whose List/Board tabs switch views carrying the query. */
+ *  Navbar, whose List/Board tabs switch views carrying the query. `ask` puts
+ *  the three routes under AccountsAskLayout, as App.tsx does. `url` may
+ *  carry navigation state (a History handover). */
 export function renderAccounts(
-  url: string,
-  { width = 1440, nav = false, realPage = false }: { width?: number; nav?: boolean; realPage?: boolean } = {},
+  url: string | { pathname: string; search?: string; state?: unknown },
+  {
+    width = 1440,
+    nav = false,
+    realPage = false,
+    ask = false,
+  }: { width?: number; nav?: boolean; realPage?: boolean; ask?: boolean } = {},
 ) {
   setViewport(width);
   const store = makeStore();
+  const pages = [
+    <Route
+      key="list"
+      path="/accounts/list"
+      element={
+        <>
+          <List />
+          <Where />
+        </>
+      }
+    />,
+    <Route
+      key="board"
+      path="/accounts/board"
+      element={
+        <>
+          <Board />
+          <Where />
+        </>
+      }
+    />,
+    <Route
+      key="account"
+      path="/accounts/:id"
+      element={
+        <>
+          {realPage ? <AccountDetails /> : <AccountPage />}
+          <Where />
+        </>
+      }
+    />,
+  ];
   render(
     <Provider store={store}>
       <MemoryRouter initialEntries={[url]}>
         <SlotHost bare={!nav}>
           {nav ? <Navbar /> : null}
           <Routes>
-            <Route
-              path="/accounts/list"
-              element={
-                <>
-                  <List />
-                  <Where />
-                </>
-              }
-            />
-            <Route
-              path="/accounts/board"
-              element={
-                <>
-                  <Board />
-                  <Where />
-                </>
-              }
-            />
-            <Route
-              path="/accounts/:id"
-              element={
-                <>
-                  {realPage ? <AccountDetails /> : <AccountPage />}
-                  <Where />
-                </>
-              }
-            />
+            {ask ? <Route element={<AccountsAskLayout />}>{pages}</Route> : pages}
             <Route path="/organizations/:id" element={<><p>Organization page</p><Where /></>} />
           </Routes>
         </SlotHost>

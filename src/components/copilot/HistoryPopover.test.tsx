@@ -80,4 +80,23 @@ describe('HistoryPopover', () => {
     expect(tag).not.toHaveClass('max-w-[60%]', 'shrink-0');
     expect(tag).toHaveAttribute('title', 'Organizations · Owner: Carl CSM');
   });
+
+  it("tags a conversation started on Accounts with the server's label and the Accounts icon", async () => {
+    stubCopilot({
+      conversations: [
+        {
+          id: 14,
+          title: 'What renews soon?',
+          created_at: '',
+          updated_at: '',
+          origin: { surface: 'accounts', view: 'board', filters: { renews_within: '30' }, label: 'Accounts · Renews within 30 days' },
+        },
+      ],
+    });
+    render(<HistoryPopover onClose={() => {}} onOpen={() => {}} />);
+    const tagged = await screen.findByRole('button', { name: /What renews soon\?/ });
+    expect(within(tagged).getByText('Accounts · Renews within 30 days')).toBeInTheDocument();
+    expect(tagged).toHaveAccessibleName(/What renews soon\?\s*Started on Accounts · Renews within 30 days/);
+    expect(tagged.querySelector('svg.lucide-layers')).not.toBeNull();
+  });
 });

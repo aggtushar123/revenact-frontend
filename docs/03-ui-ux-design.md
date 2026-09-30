@@ -303,10 +303,12 @@ for the whole dashboard, not one per view.
 ### Ask rail
 
 `src/components/copilot/CopilotRail.tsx`, shared by Communications, the
-Dashboard and Organizations (list and board), all variant `glass` at
+Dashboard, Organizations (list, board and an organization's page), Contacts
+and Accounts (list, board and an account's page), all variant `glass` at
 `w-[320px]` (the Dashboard's glass is the owner's decision of 2026-09-24,
-Organizations' of 2026-09-26; `plain`, a bordered `bg-surface` column, is
-left for the phone sheet).
+Organizations' of 2026-09-26, Accounts' the same exception carried over for
+delivery 3; `plain`, a bordered `bg-surface` column, is left for the phone
+sheet).
 
 - **Dashboard shape.** The frame is Communications', class for class (owner's
   decision, 2026-09-24):
@@ -370,20 +372,47 @@ left for the phone sheet).
   filtered list refuses "You can't ask about this list. Clear the filters and
   ask again." — both keep the question on screen, with no Retry, like any
   other refusal.
+- **Accounts shape** (delivery 3, spec 2026-09-29 §3). The same pill in the
+  same transparent top bar, and the same rail in `OrganizationsFrame`'s `rail`
+  slot, wired once by `AccountsAskLayout` above the List, the Board and every
+  account's page (its own preference key `revenact_accounts_ask`, so hiding it
+  says nothing about the other surfaces' choice) — one conversation from the
+  List into the Board, into an account and back. Open by default from `xl`,
+  the full-screen sheet below `sm`. The Board reuses Organizations'
+  `useBoardRail`: from `xl` the side panel sits beside the rail, both showing;
+  below `xl`, opening the rail closes an open side panel and narrows the
+  columns to `w-64` (`w-72` otherwise), and a card then opens as the bottom
+  sheet. On an account's page the layout draws the page's own `bleed` frame,
+  as the organization page does. Only the rail is glass; the List's rows, the
+  Board's cards and columns, the account page's tiles and story items and
+  every side panel and sheet stay solid `bg-surface`, the same exception
+  Organizations already carries. Opening a row or a card narrows nothing —
+  Accounts' List and Board send no focus, unlike Organizations' (the server
+  drops a focus on those views). An account the asker
+  can no longer open refuses "You can no longer ask about this account."; a
+  story item no longer open refuses "You can no longer ask about this item.
+  Ask about the account instead."; the filtered List or Board refuses "You
+  can't ask about this list. Clear the filters and ask again." — all three
+  keep the question on screen, with no Retry.
 - **Chips.**
   - The composer's chip says what the next question is about ("Revenue ›
     Forecast · Owner: Priya · 2 accounts"). Its × removes only a focus, never
     the screen.
   - Each user question carries its own 11px `bg-subtle` chip above its bubble,
-    on the Dashboard, Organizations and Contacts (a conversation reopened in
-    Communications or `/copilot` shows no chip, since only those three pass
-    `chipLabel`). Organizations' chip is "Organizations", then the page's own
-    filter-chip labels, then the focus ("1 account"). Contacts' chip is
-    "Contacts", then the filtered organisation (and account), sentiment and
-    role labels and a quoted search term (`listParts`), or, for an open
-    person, their name and place ("Lukas Vermeer · Kraft Heinz › Kraft Heinz
-    EMEA") with "Sentiment" appended while the question is narrowed to their
-    sentiment; a reopened conversation's chip is the server's own `label`.
+    on the Dashboard, Organizations, Contacts and Accounts (a conversation
+    reopened in Communications or `/copilot` shows no chip, since only those
+    four pass `chipLabel`). Organizations' chip is "Organizations", then the
+    page's own filter-chip labels, then the focus ("1 account"). Contacts'
+    chip is "Contacts", then the filtered organisation (and account),
+    sentiment and role labels and a quoted search term (`listParts`), or, for
+    an open person, their name and place ("Lukas Vermeer · Kraft Heinz ›
+    Kraft Heinz EMEA") with "Sentiment" appended while the question is
+    narrowed to their sentiment. Accounts' chip is "Accounts", then the
+    List's or the Board's own filter-chip labels ("Accounts · Owner: Carl
+    CSM"), or, for an open account, its own name from the page's row ("This
+    account" until it lands) with the focused story item's kind appended
+    ("Pizza EMEA · This call"); a reopened conversation's chip, on every
+    surface, is the server's own `label`.
 - **Empty.** Communications' empty state on both surfaces: one centred 13px
   `ink-faint` line, "Ask about what is in front of you. Answers use your
   accounts, mail and tickets." The dashboard's suggested questions were
@@ -437,10 +466,16 @@ left for the phone sheet).
   Contacts conversations carry the Users icon and the server's own `label`,
   read "Started on " for screen readers: "Contacts · Negative" for one
   started on the filtered list, or "Lukas Vermeer · Kraft Heinz" for one
-  started on a person. Picking a conversation from History always navigates
-  to the surface it started on (Dashboard, Organizations or Contacts),
-  whichever page is currently showing; a Contacts pick lands on
-  `/contacts/:id` (a person) or `/contacts?<filters>` (a list).
+  started on a person. Accounts conversations carry the Layers icon and the
+  server's own `label`, read the same "Started on " way: "Accounts · Owner:
+  Carl CSM" for one started on the List or the Board, or the account's own
+  name ("Pizza EMEA") for one started on its page. Picking a conversation
+  from History always navigates to the surface it started on (Dashboard,
+  Organizations, Contacts or Accounts), whichever page is currently showing;
+  a Contacts pick lands on `/contacts/:id` (a person) or `/contacts?<filters>`
+  (a list), and an Accounts pick lands on `/accounts/list?<filters>`,
+  `/accounts/board?<filters>` or `/accounts/:id` (never `/accounts`, whose
+  redirect drops the query).
 
 ### Portfolio rows and board (Organizations)
 
@@ -525,8 +560,15 @@ Everything in the section above holds, with these differences:
   `/accounts/:id` by its id alone: the account page reads everything from
   the URL.
 - The top bar is the framed one: "Accounts", List | Board keeping the query,
-  the actions slot, and no avatar. The rail slot stays empty until Ask
-  (delivery 3).
+  the actions slot, and no avatar. `AccountsAskLayout` (delivery 3, spec
+  2026-09-29 §3) draws the ✦ rail and pill here, above both views, as it does
+  on Organizations: one `AskProvider` with the `accounts` surface and its own
+  preference key (`revenact_accounts_ask`), so a conversation lasts from the
+  List into the Board and an account and back, open by default from `xl` and
+  a sheet below `sm`. Both views call `useReportAccountsOptions` with their
+  own portfolio read's filter options, so a live chip names them for real
+  ("Accounts · Owner: Carl CSM"); the server's own `label` on a sent question
+  always wins. Opening a row or a card narrows nothing.
 
 ### Account page (`/accounts/:id`)
 
@@ -539,7 +581,16 @@ specific to it, enforced by `components/accounts/detail/houseRules.test.ts`
 `shared/CanvasListTab.tsx` and `shared/OwnerTile.tsx`):
 
 - Frame: the organization page's bleed frame, the transparent top bar with
-  "‹ Accounts", and the rail slot kept empty until Ask (delivery 3).
+  "‹ Accounts", and the glass Ask rail `AccountsAskLayout` draws above it
+  (delivery 3, `bleed` on this route): the page calls `useReportAccountName`
+  from its own row, so a live chip names the account ("Pizza EMEA") once the
+  row lands, "This account" until then; the server's own `label` on a sent
+  question always wins. Each story item's meta line ends with a quiet "Ask
+  about this" (`StoryItemRow`, shared with the organization page below),
+  which types in "What should I know about this `<kind>`?" and moves the
+  chip to "`<account>` · This `<kind>`" without sending — the person can edit
+  it — and the focus is spent by that one send; the question after it is
+  about the account again.
 - Name row (`AccountHeader`): initials, the name at 22px, "owner · lifecycle ·
   Touched Nd ago" at 13px and the signal tag; then "Part of" with one link per
   linked organisation the viewer may open (`/organizations/:id?account=<id>`;
@@ -912,6 +963,12 @@ Organizations' Ask rail changes shape at the same `sm` and `xl`. Below `xl`
 it and the board's side panel never share the row: with the rail open a card
 opens in the bottom sheet. Below `sm` it is the full-screen sheet from ✦,
 which cannot open at the same time as an account's bottom sheet.
+
+Accounts' Ask rail (`AccountsAskLayout`, delivery 3) changes shape the same
+way, reusing Organizations' `useBoardRail`: below `xl`, opening the rail on
+the Board closes an open side panel and turns the next opened card into the
+bottom sheet, and the columns narrow to `w-64` (`w-72` with the rail closed).
+Below `sm` it is the same full-screen sheet.
 
 The Organizations list below `sm`: rows become two-line cards, the toolbar is
 Search plus a Filters bottom sheet (group, sort, Export and Add inside), the
