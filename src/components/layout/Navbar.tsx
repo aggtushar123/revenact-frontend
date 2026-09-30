@@ -79,7 +79,11 @@ export function Navbar() {
   // An account's page wears the same frame (accounts spec 2026-09-29 §2.1):
   // the page draws its own name row from the URL id, so the bar only leads
   // back, as on an organization's page. A trailing slash is the same route.
-  const isAccountDetail = /^\/accounts\/\d+\/?$/.test(location.pathname);
+  // Any single segment that isn't list/board is an account id to the route
+  // (`/accounts/:id`) — including a non-numeric one, which the page itself
+  // renders as "Account not found" still inside this frame (fix round 2,
+  // 2026-09-30: a digits-only regex left that page double-guttered).
+  const isAccountDetail = /^\/accounts\/(?!list\/?$|board\/?$)[^/]+\/?$/.test(location.pathname);
   const isSettings = location.pathname.startsWith('/settings');
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   const isPipelines = location.pathname.startsWith('/pipelines');

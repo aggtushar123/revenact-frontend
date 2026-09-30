@@ -382,6 +382,14 @@ describe('Navbar on an account page (/accounts/:id)', () => {
     renderNavbar('/accounts/list');
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
   });
+
+  it('wears the same framed bar on a non-numeric id (a not-found account), not the double gutter of an unframed page', () => {
+    renderNavbar('/accounts/abc');
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('h-16', 'shrink-0', 'flex', 'items-center', 'gap-3', 'px-4');
+    const back = within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Accounts' });
+    expect(back).toHaveAttribute('href', '/accounts/list');
+  });
 });
 
 describe('Navbar on Contacts (spec 2026-09-28 §3)', () => {

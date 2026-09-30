@@ -46,9 +46,11 @@ describe('DashboardLayout', () => {
     '/accounts/list',
     '/accounts/board',
     // …and an account's page, the organization page's bleed frame (accounts
-    // spec 2026-09-29 §2.1).
+    // spec 2026-09-29 §2.1) — including a non-numeric id (the page's own
+    // "Account not found" state), fix round 2, 2026-09-30.
     '/accounts/12',
     '/accounts/12/',
+    '/accounts/abc',
   ])('adds no padding around %s', (url) => {
     const main = renderAt(url);
     expect(main).toHaveClass('p-0');

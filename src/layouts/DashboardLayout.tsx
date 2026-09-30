@@ -39,8 +39,11 @@ export function DashboardLayout() {
   // spec 2026-09-29 §1), whose own px-4 pb-4 already gutters them — without
   // this <main> doubled the side padding and added a gap under the
   // transparent bar (fix round 1, 2026-09-30). An account's page wears the
-  // organization page's bleed frame (§2.1), so it takes no padding either.
-  const isAccountsView = /^\/accounts\/(list|board|\d+)\/?$/.test(location.pathname);
+  // organization page's bleed frame (§2.1), so it takes no padding either —
+  // including a non-numeric id (fix round 2, 2026-09-30: a digits-only
+  // regex left the not-found page double-guttered, matching Navbar.tsx's
+  // own `isAccountDetail`).
+  const isAccountsView = /^\/accounts\/[^/]+\/?$/.test(location.pathname);
   // The Navbar's actions slot, which a page below (the dashboard) portals into.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const slotValue = useMemo(() => ({ slot, setSlot }), [slot]);
