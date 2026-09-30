@@ -178,6 +178,58 @@ export interface ContactsPersonOrigin {
   label: string;
 }
 
+/** The Accounts portfolio's URL filters as a question carries them (backend
+ *  `accounts_context.FILTER_KEYS`): only the set keys, in the page's own URL
+ *  spelling. `sort` only when it is not the default; `group` only when it
+ *  differs from the view's default, or `''` for the List's "None". */
+export interface AccountsFilters {
+  search?: string;
+  organisation?: string;
+  owner?: string;
+  lifecycle?: string;
+  health?: string;
+  renews_within?: string;
+  nps?: string;
+  ids?: string;
+  sort?: string;
+  group?: string;
+}
+
+/** A question asked on the Accounts List or Board (spec 2026-09-29 §3). No
+ *  focus: the server drops one on these views. The server builds `label`
+ *  ("Accounts · Owner: Carl CSM") and echoes it on a stored context. */
+export interface AccountsListContext {
+  surface: 'accounts';
+  view: OrganizationsView;
+  filters: AccountsFilters;
+  label?: string;
+}
+
+/** A question asked on one account's page. `focus` is "Ask about this" on a
+ *  story item; the server refuses (400) an item the asker cannot open. The
+ *  server builds `label` (the account's name). */
+export interface AccountDetailContext {
+  surface: 'accounts';
+  view: 'detail';
+  account: number;
+  focus: StoryFocus | null;
+  label?: string;
+}
+
+export interface AccountsListOrigin {
+  surface: 'accounts';
+  view: OrganizationsView;
+  filters: AccountsFilters;
+  label: string;
+}
+
+export interface AccountDetailOrigin {
+  surface: 'accounts';
+  view: 'detail';
+  account: number;
+  label: string;
+}
+
 /** Every structured context a question can carry, told apart by `surface`
  *  (and, on Organizations and Contacts, by `view`). */
 export type SurfaceContext = DashboardContext | OrganizationsContext | OrganizationDetailContext | ContactsListContext | ContactsPersonContext;

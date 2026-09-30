@@ -1,7 +1,15 @@
 import { focusLabel } from '../../components/copilot/dashboardLabels';
 import type { OrganizationsFilters, OrganizationsFocus, OrganizationsOrigin, OrganizationsView } from '../../pages/copilot/types';
 import { filterChips } from './filterChips';
-import { BOARD_GROUP, DEFAULT_GROUP, DEFAULT_SORT, parseParams, type PortfolioParams } from './portfolioParams';
+import {
+  BOARD_GROUP,
+  DEFAULT_GROUP,
+  DEFAULT_SORT,
+  ORGANIZATION_PARAMS,
+  parseParams,
+  type ParamSpec,
+  type PortfolioParams,
+} from './portfolioParams';
 import type { GroupKey, PortfolioResponse } from './portfolioTypes';
 
 /** Each view's own default grouping (an absent `group` in a stored context
@@ -38,25 +46,36 @@ export function toContextFilters(p: PortfolioParams, view: OrganizationsView): O
 /** A context's filters back to params, through the URL parser, so a value
  *  the page would not accept is dropped the same way. A key left out behaves
  *  as it would off the URL; `group: ''` is "no grouping" (the URL's
- *  `group=none`), and a missing `group` is the view's own default. */
-export function fromContextFilters(filters: OrganizationsFilters, view: OrganizationsView): PortfolioParams {
+ *  `group=none`), and a missing `group` is the view's own default. `spec`
+ *  parameterises which params a kind of portfolio reads, so Accounts'
+ *  `fromAccountsFilters` reuses this rather than copying it. */
+export function fromContextFilters(
+  filters: OrganizationsFilters,
+  view: OrganizationsView,
+  spec: ParamSpec = ORGANIZATION_PARAMS,
+): PortfolioParams {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(filters)) if (value) search.set(key, value);
   if (filters.group === '') search.set('group', 'none');
-  return parseParams(search, defaultGroupOf(view));
+  return parseParams(search, defaultGroupOf(view), spec);
 }
 
-/** The page a conversation started on, with its filters (History restore).
- *  `origin.filters` is already the page's own URL parameters, only the set
- *  keys present (backend ruling), so it is used as-is rather than round-
- *  tripped through the params parser — except `group: ''` (the stored
- *  "None"), which the URL spells `group=none`, as `fromContextFilters`
- *  already does; the page only reads that sentinel as ungrouped, and would
- *  otherwise fall back to its own default group for a bare `group=`. */
+/** A view's own URL under `base` (`/organizations/list`, or another
+ *  surface's own routes, e.g. Accounts' `/accounts/board`), with `filters`
+ *  as its query. `filters` is used as-is (already only the set keys) —
+ *  except `group: ''` (the stored "None"), which the URL spells `group=none`;
+ *  the page only reads that sentinel as ungrouped, and would otherwise fall
+ *  back to its own default group for a bare `group=`. Parameterised by
+ *  `base` so Accounts' `accountsPath` reuses this rather than copying it. */
+export function viewPath(base: string, view: OrganizationsView, filters: OrganizationsFilters): string {
+  const patched = filters.group === '' ? { ...filters, group: 'none' } : filters;
+  const query = new URLSearchParams(patched as Record<string, string>).toString();
+  return query ? `/${base}/${view}?${query}` : `/${base}/${view}`;
+}
+
+/** The page a conversation started on, with its filters (History restore). */
 export function organizationsPath(origin: OrganizationsOrigin): string {
-  const filters = origin.filters.group === '' ? { ...origin.filters, group: 'none' } : origin.filters;
-  const query = new URLSearchParams(filters as Record<string, string>).toString();
-  return query ? `/organizations/${origin.view}?${query}` : `/organizations/${origin.view}`;
+  return viewPath('organizations', origin.view, origin.filters);
 }
 
 /** The chip: "Organizations · Owner: Carl CSM · 1 account". When the server
