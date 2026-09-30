@@ -1,7 +1,8 @@
 import { X } from 'lucide-react';
 import { countText, filterChips } from '../../../features/organizations/filterChips';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
-import type { PortfolioResponse } from '../../../features/organizations/portfolioTypes';
+import type { FilterOptions } from '../../../features/organizations/portfolioTypes';
+import { usePortfolioKind } from './portfolioKind';
 import { FOCUS } from './styles';
 
 
@@ -15,7 +16,7 @@ export function FilterChips({
   onClearAll,
 }: {
   params: PortfolioParams;
-  options: PortfolioResponse['filters'] | null;
+  options: FilterOptions | null;
   count: number | null;
   total: number | null;
   /** The first load failed: there is no count to wait for. */
@@ -23,6 +24,7 @@ export function FilterChips({
   onChange: (patch: Partial<PortfolioParams>) => void;
   onClearAll: () => void;
 }) {
+  const kind = usePortfolioKind();
   const chips = filterChips(params, options);
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -48,7 +50,7 @@ export function FilterChips({
         </button>
       ) : null}
       <p role="status" aria-live="polite" className="ml-auto font-mono-brand tabular-nums text-[13px] text-ink-muted">
-        {countText(count, total, chips.length > 0, failed)}
+        {countText(count, total, chips.length > 0, failed, kind.noun)}
       </p>
     </div>
   );

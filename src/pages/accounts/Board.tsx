@@ -1,222 +1,252 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
-import { ActionBar } from '../../components/accounts/ActionBar';
-import { MetricsPanel } from '../../components/accounts/MetricsPanel';
-import { AccountFormModal } from '../organizations/AccountFormModal';
-import { KanbanBoard } from '../../components/pipelines/KanbanBoard';
-import { EntityAvatar } from '../../components/shared';
-import { fetchAllAccounts, fetchCustomers, updateAccount } from '../../features/customers/customersSlice';
-import { HEALTH_COLORS, companyLabel, formatCompactMoney } from '../../features/customers/formatters';
-import { mapAccountToAccountRow } from '../../features/customers/mapToAccountRow';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { X } from 'lucide-react';
 import { useOrgCurrency } from '../../hooks';
-import type { Account } from '../../features/customers/customersSlice';
-import type { CurrencyCode } from '../../features/auth/authSlice';
-import type { AppDispatch, RootState } from '../../store';
+import { SM, useMediaQuery } from '../../lib/useMediaQuery';
+import { exportAccountPortfolio, fetchAccountPortfolio } from '../../features/accounts/portfolioApi';
+import type { AccountFilterOptions, AccountPortfolioRow } from '../../features/accounts/portfolioTypes';
+import { BOARD_GROUP, boardParams, hasFilters, toApiQuery } from '../../features/organizations/portfolioParams';
+import { ACCOUNT_KIND } from '../../components/accounts/portfolio/accountKind';
+import { AccountSheet } from '../../components/organizations/portfolio/AccountSheet';
+import { AccountSidePanel } from '../../components/organizations/portfolio/AccountSidePanel';
+import type { BoardMove } from '../../components/organizations/portfolio/boardMove';
+import { FilterChips } from '../../components/organizations/portfolio/FilterChips';
+import { PortfolioBoard } from '../../components/organizations/portfolio/PortfolioBoard';
+import { PortfolioKindContext } from '../../components/organizations/portfolio/portfolioKind';
+import { PortfolioToolbar } from '../../components/organizations/portfolio/PortfolioToolbar';
+import { SummaryTiles } from '../../components/organizations/portfolio/SummaryTiles';
+import { FOCUS } from '../../components/organizations/portfolio/styles';
+import { useBoardMove } from '../../components/organizations/portfolio/useBoardMove';
+import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
+import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
+import { AccountFormModal } from '../organizations/AccountFormModal';
+import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
+import { useAccountEditing } from './useAccountEditing';
 
-// Real data, grouped by lifecycle_stage — the standalone Accounts
-// page's own equivalent of the Organizations board (pages/
-// organizations/Board.tsx, same reasoning there applies here almost
-// unchanged) and the Pipelines board's own "stage" (see
-// components/pipelines/KanbanBoard.tsx, shared by all three rather
-// than a fourth copy of the same drag-and-drop columns). Previously a
-// route that didn't exist at all; List.tsx already has the real fetch/
-// search/company-filter/Add this reuses via the same ActionBar.
-//
-// Unlike the Organizations board's own Churn column, Account's
-// lifecycle dropdown already includes 'churn' as a plain selectable
-// option (see AccountFormModal's own LIFECYCLE_OPTIONS/docstring) —
-// Account has no dedicated churn-with-reason modal the way Customer
-// does (see AccountWritePayload's own docstring), so every column here
-// gets the same "+" and the same plain PATCH on drag, no special case.
-const LIFECYCLE_COLUMNS: { stage: Account['lifecycle_stage']; title: string }[] = [
-  { stage: 'onboarding', title: 'Onboarding' },
-  { stage: 'kickoff', title: 'Kickoff' },
-  { stage: 'adoption', title: 'Adoption' },
-  { stage: 'live', title: 'Live' },
-  { stage: 'renewal', title: 'Renewal' },
-  { stage: 'expansion', title: 'Expansion' },
-  { stage: 'churn', title: 'Churn' },
-  { stage: 'other', title: 'Other' },
-];
+const DISMISS = `inline-flex w-11 h-11 sm:w-8 sm:h-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-subtle active:bg-line-subtle ${FOCUS}`;
 
-interface AccountCardEntity {
-  id: number;
-  stage: Account['lifecycle_stage'];
-  name: string;
-  domain: string;
-  health: { val: number; clr: string };
-  arr: number;
-  owner: string;
-  orgLabel: string;
-}
-
-// Plain function passed as KanbanBoard's renderCard prop (called directly
-// as renderCard(entity), not rendered as JSX) — can't call useOrgCurrency()
-// itself, so currency comes in as an explicit param, threaded by Board()'s
-// own renderCard={(entity) => AccountCardContent(entity, currency)} closure.
-function AccountCardContent(entity: AccountCardEntity, currency: CurrencyCode) {
-  return (
-    <>
-      <div className="flex items-center gap-2 mb-2.5 min-w-0">
-        <EntityAvatar
-          name={entity.name}
-          logoUrl={entity.domain ? `https://logo.clearbit.com/${entity.domain}` : ''}
-          className="w-7 h-7 rounded-lg text-[10px] shrink-0"
-        />
-        <h4 className="text-[12.5px] font-bold text-ink leading-snug truncate">{entity.name}</h4>
-      </div>
-      <div className="flex items-center justify-between mb-2.5">
-        <div className="flex items-center gap-1.5">
-          <span className={`w-1.5 h-1.5 rounded-full ${entity.health.clr}`} />
-          <span className="text-[11px] font-bold text-ink-muted">Health {entity.health.val}</span>
-        </div>
-        <span className="text-[11.5px] font-bold text-accent">{formatCompactMoney(entity.arr, currency)}</span>
-      </div>
-      <div className="flex items-center justify-between gap-2 min-w-0">
-        <span className="text-[11px] text-ink-faint font-medium truncate">{entity.owner}</span>
-        <span className="text-[10.5px] text-ink-faint font-semibold truncate max-w-[90px]">{entity.orgLabel}</span>
-      </div>
-    </>
-  );
-}
-
+/** /accounts/board: the Accounts portfolio as columns (spec 2026-09-29 §1
+ *  "Board"), the Organizations board's components with ACCOUNT_KIND. The
+ *  tiles, toolbar and chips are the List's, on the same URL params; group
+ *  defaults to lifecycle, and every stage is a column (Churn included, as
+ *  an ordinary stage). A card moves by drag or Move to…, saved through the
+ *  single-account PATCH. No selection mode: bulk work stays on the List. */
 export function Board() {
-  const dispatch = useDispatch<AppDispatch>();
-  const navigate = useNavigate();
-  const { customers, allAccounts, allAccountsLoading, allAccountsError } = useSelector(
-    (state: RootState) => state.customers
+  return (
+    <PortfolioKindContext.Provider value={ACCOUNT_KIND}>
+      <AccountsBoard />
+    </PortfolioKindContext.Provider>
   );
-  const currency = useOrgCurrency();
+}
 
-  // Same debounced-search + company-filter convention as List.tsx's own.
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('');
-  // Bumped after a successful Add to re-run the fetch effect below with
-  // the current search/company filters still applied — same reasoning
-  // as List.tsx's own refreshKey (createAccount doesn't know this
-  // board's own `entities` need refreshing the way updateAccount's own
-  // extraReducers already patch `allAccounts` directly for a move).
-  const [refreshKey, setRefreshKey] = useState(0);
-  const refetch = () => setRefreshKey((k) => k + 1);
+function AccountsBoard() {
+  const { params: urlParams, update, clearFilters } = usePortfolioParams(BOARD_GROUP);
+  const params = useMemo(() => boardParams(urlParams), [urlParams]);
+  const isSm = useMediaQuery(SM);
+  const orgCurrency = useOrgCurrency();
 
-  useEffect(() => {
-    const timeout = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
-    return () => clearTimeout(timeout);
-  }, [searchQuery]);
+  // `version` reloads everything (Add, Edit details). A saved move reloads
+  // only the frame and the two columns it touched.
+  const [version, setVersion] = useState(0);
+  const [frameBump, setFrameBump] = useState(0);
+  const [columnBumps, setColumnBumps] = useState<Record<string, number>>({});
+  const reload = useCallback(() => setVersion((v) => v + 1), []);
+  const [notice, setNotice] = useState<string | null>(null);
+  const forms = useAccountEditing(setNotice);
+  const { remember } = forms;
 
-  // Organization filter dropdown's own options — also what "Add
-  // Account" picks an organization from.
-  useEffect(() => {
-    dispatch(fetchCustomers());
-  }, [dispatch]);
+  // A move's frame reload skips the M probe: a lifecycle move can't change M.
+  const portfolio = usePortfolio<AccountPortfolioRow, AccountFilterOptions>(params, version + frameBump, undefined, version);
 
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (debouncedSearch) params.set('search', debouncedSearch);
-    if (companyFilter) params.set('company', companyFilter);
-    const query = params.toString();
-    dispatch(fetchAllAccounts(query ? `/accounts/?${query}` : undefined));
-  }, [dispatch, debouncedSearch, companyFilter, refreshKey]);
-
-  const companies = useMemo(() => customers.map((c) => ({ id: c.id, name: c.name })), [customers]);
-
-  const [isAdding, setIsAdding] = useState(false);
-  const [addDefaultStage, setAddDefaultStage] = useState<Account['lifecycle_stage']>('onboarding');
-
-  const entities: AccountCardEntity[] = useMemo(
-    () =>
-      allAccounts.map((a) => ({
-        id: a.id,
-        stage: a.lifecycle_stage,
-        name: a.name,
-        domain: a.domain,
-        health: { val: Number(a.health_score), clr: HEALTH_COLORS[a.health_category] },
-        arr: Number(a.arr),
-        owner: a.owner?.name ?? 'Unassigned',
-        orgLabel: companyLabel(a.customers),
-      })),
-    [allAccounts]
+  const [openRow, setOpenRow] = useState<AccountPortfolioRow | null>(null);
+  // Any column's page landing: remember its rows, and swap the opened card
+  // for its fresh copy.
+  const onRowsLoaded = useCallback(
+    (rows: AccountPortfolioRow[]) => {
+      remember(rows);
+      setOpenRow((current) => (current && rows.find((row) => row.id === current.id)) || current);
+    },
+    [remember],
   );
 
-  function handleMove(id: number, stage: Account['lifecycle_stage']) {
-    const account = allAccounts.find((a) => a.id === id);
-    if (!account) return;
-    // Any one of the account's own linked Customers addresses the
-    // nested update URL — AccountDetailView's own get_queryset accepts
-    // any of them (see AccountFormModal's own edit-flow reasoning).
-    dispatch(updateAccount({ customerId: account.customers[0]?.id ?? 0, id, lifecycle_stage: stage }));
+  const onSaved = useCallback((move: BoardMove<AccountPortfolioRow>) => {
+    setFrameBump((n) => n + 1);
+    setColumnBumps((bumps) => ({
+      ...bumps,
+      [move.from]: (bumps[move.from] ?? 0) + 1,
+      [move.to]: (bumps[move.to] ?? 0) + 1,
+    }));
+  }, []);
+  const board = useBoardMove<AccountPortfolioRow>({ onSaved });
+
+  // A different list landing (a filter, sort or group change) forgets a
+  // move at once. Adjusted during render, not in an effect.
+  const { loadedQuery } = portfolio;
+  const [seenQuery, setSeenQuery] = useState(loadedQuery);
+  if (seenQuery !== loadedQuery) {
+    setSeenQuery(loadedQuery);
+    board.reset();
   }
 
+  const [exporting, setExporting] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const currency = portfolio.data?.currency ?? orgCurrency;
+  const options = portfolio.data?.filters ?? null;
+  const failed = !portfolio.data && portfolio.error !== null;
+
+  const toggleOpen = useCallback(
+    (row: AccountPortfolioRow) => setOpenRow((current) => (current?.id === row.id ? null : row)),
+    [],
+  );
+  const closeOpen = useCallback(() => setOpenRow(null), []);
+
+  // When a fresh frame lands (a filter, a move, an edit) the opened card may
+  // have left the view. Ask for that one account under the view's filters;
+  // if it no longer matches, close its panel or sheet.
+  const openId = openRow?.id ?? null;
+  const lastKey = useRef(portfolio.loadedKey);
+  useEffect(() => {
+    const landed = lastKey.current !== portfolio.loadedKey;
+    lastKey.current = portfolio.loadedKey;
+    if (!landed || openId === null || portfolio.loadedKey === null) return;
+    const close = () => setOpenRow((current) => (current?.id === openId ? null : current));
+    if (params.ids.length > 0 && !params.ids.includes(openId)) {
+      close();
+      return;
+    }
+    let cancelled = false;
+    fetchAccountPortfolio(toApiQuery({ ...params, group: '', ids: [openId] }, { limit: '1' })).then(
+      (data) => {
+        if (cancelled) return;
+        const row = data.results.find((r) => r.id === openId);
+        if (!row) close();
+        else setOpenRow((current) => (current?.id === openId ? row : current));
+      },
+      () => {
+        // Unknown: keep the panel rather than close it on a network blip.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [portfolio.loadedKey, openId, params]);
+
+  const runExport = async () => {
+    setExporting(true);
+    setNotice(null);
+    try {
+      await exportAccountPortfolio(toApiQuery(params));
+    } catch (err) {
+      setNotice(errorMessage(err, 'Could not export accounts.'));
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
-    <div className="flex flex-col h-full w-full bg-surface text-ink">
-      <div className="flex flex-col flex-1 overflow-hidden p-6">
-        <MetricsPanel />
-
-        <ActionBar
-          searchQuery={searchQuery}
-          setSearchQuery={setSearchQuery}
-          companyFilter={companyFilter}
-          setCompanyFilter={setCompanyFilter}
-          companies={companies}
-          onAddAccount={() => {
-            setAddDefaultStage('onboarding');
-            setIsAdding(true);
-          }}
-        />
-
-        <div className="flex-1 overflow-hidden">
-          {allAccountsLoading && allAccounts.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-[13px] font-medium text-ink-faint">
-              Loading accounts…
-            </div>
-          ) : allAccountsError ? (
-            <div className="flex items-center justify-center h-full text-[13px] font-medium text-danger">
-              {allAccountsError}
-            </div>
-          ) : (
-            <KanbanBoard
-              columns={LIFECYCLE_COLUMNS}
-              entities={entities}
-              renderCard={(entity) => AccountCardContent(entity, currency)}
-              onCardClick={(entity) => {
-                const account = allAccounts.find((a) => a.id === entity.id);
-                if (!account) return;
-                // Same "pass the already-known real AccountRow through
-                // navigation state" pattern as AccountsTable's own
-                // click-through — the *first* linked Customer, when
-                // there's more than one (see that table's own reasoning).
-                navigate(`/accounts/${account.id}`, {
-                  state: {
-                    account: mapAccountToAccountRow(
-                      account,
-                      account.customers[0]?.id ?? 0,
-                      account.customers[0]?.name ?? '',
-                      '', '', '', ''
-                    ),
-                  },
-                });
-              }}
-              onAddClick={(stage) => {
-                setAddDefaultStage(stage);
-                setIsAdding(true);
-              }}
-              onMove={handleMove}
-              minHeight="calc(100vh - 300px)"
+    <OrganizationsFrame>
+      {/* From sm the page fills the frame, so the page doesn't scroll and
+          the columns do. Phones scroll the page. */}
+      <div data-part="board-page" className={`flex flex-col gap-4 pb-4 ${isSm ? 'min-h-0 flex-1' : ''}`}>
+        <div className="flex shrink-0 flex-col gap-4">
+          <div className="@container">
+            <SummaryTiles
+              summary={portfolio.data?.summary ?? null}
+              failed={failed}
+              currency={currency}
+              params={params}
+              onFilter={update}
             />
-          )}
+          </div>
+          <PortfolioToolbar
+            params={params}
+            update={update}
+            options={options}
+            isSm={isSm}
+            onExport={() => void runExport()}
+            exporting={exporting}
+            onAdd={() => forms.openAdd()}
+            searchRef={searchRef}
+            groupOptions={ACCOUNT_KIND.boardGroupOptions}
+          />
+          <FilterChips
+            params={params}
+            options={options}
+            count={portfolio.data?.count ?? null}
+            total={portfolio.total}
+            failed={failed}
+            onChange={(patch) => {
+              update(patch);
+              searchRef.current?.focus();
+            }}
+            onClearAll={() => {
+              clearFilters();
+              searchRef.current?.focus();
+            }}
+          />
+          {notice ? (
+            <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
+              {notice}
+              <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className={DISMISS}>
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </p>
+          ) : null}
+          {board.error ? (
+            <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
+              {board.error}
+              <button type="button" onClick={board.dismissError} aria-label="Dismiss" className={DISMISS}>
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </p>
+          ) : null}
+          <p role="status" aria-live="polite" className="sr-only">
+            {board.notice ?? ''}
+          </p>
+        </div>
+        <div data-part="board-area" className={`flex gap-3 ${isSm ? 'min-h-[360px] flex-1' : ''}`}>
+          <PortfolioBoard
+            params={params}
+            portfolio={portfolio}
+            version={version}
+            columnBumps={columnBumps}
+            currency={currency}
+            isSm={isSm}
+            filtered={hasFilters(params)}
+            move={board.move}
+            saving={board.busy}
+            openId={openRow?.id ?? null}
+            onOpen={toggleOpen}
+            onMove={board.moveTo}
+            onRowsLoaded={onRowsLoaded}
+            onClearFilters={clearFilters}
+            onAdd={forms.openAdd}
+            onMoveSettled={board.settle}
+          />
+          {isSm && openRow ? (
+            <AccountSidePanel row={openRow} currency={currency} onClose={closeOpen} onEdit={forms.openEdit} />
+          ) : null}
         </div>
       </div>
 
-      {isAdding && (
+      {!isSm && openRow ? <AccountSheet row={openRow} currency={currency} onClose={closeOpen} onEdit={forms.openEdit} /> : null}
+
+      {forms.adding ? (
         <AccountFormModal
-          companies={companies}
-          defaultLifecycleStage={addDefaultStage}
-          onClose={() => setIsAdding(false)}
-          onSaved={refetch}
+          companies={forms.companies}
+          defaultLifecycleStage={forms.adding.stage}
+          onSaved={reload}
+          onClose={forms.closeAdd}
         />
-      )}
-    </div>
+      ) : null}
+      {forms.editing ? (
+        <AccountFormModal
+          account={forms.editing}
+          onClose={() => {
+            forms.closeEdit();
+            reload();
+          }}
+        />
+      ) : null}
+    </OrganizationsFrame>
   );
 }

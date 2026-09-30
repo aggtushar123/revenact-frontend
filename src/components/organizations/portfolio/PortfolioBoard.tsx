@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type UIEvent } from 'react';
 import { Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
-import { includesChurned, toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
-import type { LifecycleValue, PortfolioRow } from '../../../features/organizations/portfolioTypes';
+import { toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
+import type { FilterOptions, LifecycleValue, PortfolioRow, PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
 import { BoardColumn } from './BoardColumn';
 import { boardColumns, useOverlayActive, withMove, type BoardMove } from './boardMove';
+import { usePortfolioKind } from './portfolioKind';
 import { EmptyState, ErrorBlock } from './PortfolioSections';
 import { SECTION_PAGE_SIZE, type PortfolioState } from './usePortfolio';
 import { FOCUS, QUIET } from './styles';
@@ -16,11 +17,11 @@ const PANEL_GAP = 12;
 const JUMP_MS = 1000;
 const PAUSED = 'Moving is paused until the board reloads.';
 
-export interface PortfolioBoardProps {
+export interface PortfolioBoardProps<R extends PortfolioRowBase = PortfolioRow> {
   /** The Board's params (boardParams): `group` is never '' here. */
   params: PortfolioParams;
   /** The frame read: groups (the column headers), count and currency. */
-  portfolio: PortfolioState;
+  portfolio: PortfolioState<R, FilterOptions>;
   /** Reloads everything when bumped (Add, Edit, Churn). */
   version: number;
   /** Per-column reload counters, bumped for the two columns a move touched. */
@@ -31,18 +32,20 @@ export interface PortfolioBoardProps {
    *  rather than w-72, so more of them fit beside it. */
   narrow?: boolean;
   filtered: boolean;
-  move: BoardMove | null;
+  move: BoardMove<R> | null;
   /** A move is saving or settling: moving is off (one at a time). */
   saving: boolean;
   openId: number | null;
-  onOpen: (row: PortfolioRow) => void;
-  onMove: (row: PortfolioRow, to: LifecycleValue) => void;
-  onRowsLoaded: (rows: PortfolioRow[]) => void;
+  onOpen: (row: R) => void;
+  onMove: (row: R, to: LifecycleValue) => void;
+  onRowsLoaded: (rows: R[]) => void;
   onClearFilters: () => void;
-  /** Add an organization: from the empty state with no stage, or from a
-   *  lifecycle column's "+" with that stage (ruling R2). */
+  /** Add a row (an organization or an account, by kind): from the empty
+   *  state with no stage, or from a lifecycle column's "+" with that
+   *  stage (ruling R2). */
   onAdd: (stage?: LifecycleValue) => void;
-  onShowChurned: () => void;
+  /** The drop-only Churn column's "Show churned" (Organizations only). */
+  onShowChurned?: () => void;
   /** A saved move's reloads have all landed (the frame and both columns),
    *  so the page can forget it and allow the next one. */
   onMoveSettled: (token: number) => void;
@@ -68,7 +71,7 @@ function BoardSkeleton({ isSm, narrow }: { isSm: boolean; narrow: boolean }) {
  *  move between them. From `sm` the columns sit in a row that scrolls
  *  sideways, and each column scrolls on its own. Below `sm` they are
  *  full-width panels that snap, with a strip of column tabs. */
-export function PortfolioBoard({
+export function PortfolioBoard<R extends PortfolioRowBase>({
   params,
   portfolio,
   version,
@@ -87,8 +90,9 @@ export function PortfolioBoard({
   onAdd,
   onShowChurned,
   onMoveSettled,
-}: PortfolioBoardProps) {
-  const [dragging, setDragging] = useState<PortfolioRow | null>(null);
+}: PortfolioBoardProps<R>) {
+  const kind = usePortfolioKind();
+  const [dragging, setDragging] = useState<R | null>(null);
   const [active, setActive] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<number | null>(null);
   const [handed, setHanded] = useState<{ token: number; keys: string[] } | null>(null);
@@ -116,7 +120,7 @@ export function PortfolioBoard({
 
   const group = inputs.params.group || 'lifecycle';
   const canMove = group === 'lifecycle';
-  const columns = data ? boardColumns(group, data.groups, includesChurned(inputs.params)) : [];
+  const columns = data ? boardColumns(group, data.groups, kind.churnVisible(inputs.params)) : [];
   const reads = (key: string) => columns.some((spec) => spec.key === key && spec.count > 0 && !spec.dropOnly);
 
   // A saved move settles when the frame's reload has landed and each of its
@@ -136,15 +140,15 @@ export function PortfolioBoard({
 
   // Stable, so the memoised cards don't all re-render on every board render.
   const moveCard = useCallback(
-    (row: PortfolioRow, to: LifecycleValue, fromMenu = false) => {
+    (row: R, to: LifecycleValue, fromMenu = false) => {
       setDragging(null);
       // A Move to… choice (keyboard or touch): the card remounts in its new
       // column and focus follows it there. A mouse drag leaves focus alone,
-      // and Churn opens a modal that takes focus itself.
-      if (fromMenu && to !== 'churn') setFocusId(row.id);
+      // and a kind's churn form (Organizations) takes focus itself.
+      if (fromMenu && !(to === 'churn' && kind.churnByModal)) setFocusId(row.id);
       onMove(row, to);
     },
-    [onMove],
+    [onMove, kind],
   );
   const endDrag = useCallback(() => setDragging(null), []);
 
@@ -185,7 +189,7 @@ export function PortfolioBoard({
   if (data.count === 0) {
     return filtered ? (
       <EmptyState
-        title="No organizations match these filters"
+        title={`No ${kind.noun.many} match these filters`}
         detail="Remove a filter, or clear them all."
         action={
           <button type="button" onClick={onClearFilters} className={`${QUIET} border border-line`}>
@@ -195,12 +199,12 @@ export function PortfolioBoard({
       />
     ) : (
       <EmptyState
-        title="No organizations yet"
-        detail="Add an organization to start your portfolio."
+        title={`No ${kind.noun.many} yet`}
+        detail={`Add an ${kind.noun.one} to start your portfolio.`}
         action={
           <button type="button" onClick={() => onAdd()} className={`${QUIET} bg-accent text-on-accent hover:bg-accent-hover`}>
             <Plus className="w-4 h-4" aria-hidden="true" />
-            Add organization
+            {`Add ${kind.noun.one}`}
           </button>
         }
       />

@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Archive, Download, UserX, X } from 'lucide-react';
+import type { PortfolioNoun } from '../../../features/organizations/portfolioLabels';
 import type { Option } from '../../../features/organizations/portfolioTypes';
+import { usePortfolioKind } from './portfolioKind';
 import { BUTTON, FOCUS } from './styles';
 
 export interface BulkReport {
@@ -13,8 +15,8 @@ export interface BulkReport {
 
 type Pending = { action: 'owner' | 'lifecycle'; value: string };
 
-function reportText(report: BulkReport): string {
-  return `Updated ${report.updated} organization${report.updated === 1 ? '' : 's'}.${report.failed.length ? ` ${report.failed.length} failed:` : ''}`;
+function reportText(report: BulkReport, noun: PortfolioNoun): string {
+  return `Updated ${report.updated} ${report.updated === 1 ? noun.one : noun.many}.${report.failed.length ? ` ${report.failed.length} failed:` : ''}`;
 }
 
 /** Selection mode's action bar (spec §1). It sticks to the bottom of the
@@ -37,6 +39,7 @@ export function SelectionBar({
   onExport,
   onArchive,
   onChurn,
+  keepChurn = false,
   onClose,
 }: {
   count: number;
@@ -52,10 +55,15 @@ export function SelectionBar({
   onSetOwner: (userId: number | null) => void;
   onSetLifecycle: (stage: string) => void;
   onExport: () => void;
-  onArchive: () => void;
-  onChurn: () => void;
+  /** Absent (Accounts): no Archive button. */
+  onArchive?: () => void;
+  /** Absent (Accounts): no Churn button. */
+  onChurn?: () => void;
+  /** Offer Churn among the stages (Accounts, where it is only a stage). */
+  keepChurn?: boolean;
   onClose: () => void;
 }) {
+  const kind = usePortfolioKind();
   const [pending, setPending] = useState<Pending | null>(null);
   // An armed choice never outlives the selection it was armed for.
   if (count === 0 && pending) setPending(null);
@@ -138,7 +146,7 @@ export function SelectionBar({
                 >
                   <option value="">Set lifecycle</option>
                   {lifecycles
-                    .filter((stage) => stage.value !== 'churn')
+                    .filter((stage) => keepChurn || stage.value !== 'churn')
                     .map((stage) => (
                       <option key={stage.value} value={stage.value}>
                         {stage.name}
@@ -150,11 +158,13 @@ export function SelectionBar({
                   <Download className="w-4 h-4" aria-hidden="true" />
                   Export
                 </button>
-                <button type="button" onClick={onArchive} disabled={disabled} className={BUTTON}>
-                  <Archive className="w-4 h-4" aria-hidden="true" />
-                  Archive
-                </button>
-                {count === 1 ? (
+                {onArchive ? (
+                  <button type="button" onClick={onArchive} disabled={disabled} className={BUTTON}>
+                    <Archive className="w-4 h-4" aria-hidden="true" />
+                    Archive
+                  </button>
+                ) : null}
+                {count === 1 && onChurn ? (
                   <button type="button" onClick={onChurn} disabled={disabled} className={`${BUTTON} text-danger`}>
                     <UserX className="w-4 h-4" aria-hidden="true" />
                     Churn
@@ -178,7 +188,7 @@ export function SelectionBar({
           ) : null}
           {report ? (
             <div ref={reportRef} tabIndex={-1} className={`rounded-md text-[13px] ${FOCUS}`}>
-              {report.error ? <p className="text-danger">{report.error}</p> : <p className="text-ink">{reportText(report)}</p>}
+              {report.error ? <p className="text-danger">{report.error}</p> : <p className="text-ink">{reportText(report, kind.noun)}</p>}
               {report.failed.length ? (
                 <ul className="mt-1 flex flex-col gap-0.5">
                   {report.failed.map((failure) => (

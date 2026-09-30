@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../../../lib/apiClient';
-import { fetchPortfolio } from '../../../features/organizations/portfolioApi';
-import { hasFilters, includesChurned, toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
-import type { PortfolioResponse, PortfolioRow } from '../../../features/organizations/portfolioTypes';
+import { toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
+import type {
+  FilterOptions,
+  OrganizationFilters,
+  PortfolioPage,
+  PortfolioRow,
+  PortfolioRowBase,
+} from '../../../features/organizations/portfolioTypes';
+import { usePortfolioKind } from './portfolioKind';
 
 export const PAGE_SIZE = 50;
 export const SECTION_PAGE_SIZE = 25;
@@ -11,17 +17,17 @@ export function errorMessage(err: unknown, fallback: string): string {
   return err instanceof ApiError ? err.message : fallback;
 }
 
-type Loaded =
-  | { key: string; query: string; data: PortfolioResponse; rows: PortfolioRow[]; next: string | null }
+type Loaded<R extends PortfolioRowBase, F extends FilterOptions> =
+  | { key: string; query: string; data: PortfolioPage<R, F>; rows: R[]; next: string | null }
   | { key: string; error: string };
 
 type MoreState = { key: string; token: number; loading: boolean; error: string | null };
 
-export interface PagedState {
+export interface PagedState<R extends PortfolioRowBase = PortfolioRow, F extends FilterOptions = OrganizationFilters> {
   /** The latest response. While a new query loads, the previous one stays so
    *  the list does not flash empty. `loading` says it is stale. */
-  data: PortfolioResponse | null;
-  rows: PortfolioRow[];
+  data: PortfolioPage<R, F> | null;
+  rows: R[];
   next: string | null;
   loading: boolean;
   error: string | null;
@@ -40,19 +46,20 @@ export interface PagedState {
   loadedQuery: string | null;
 }
 
-/** One cursor-paged read of the portfolio endpoint. The frame, each grouped
- *  section and (delivery 2) each board column is one of these. Loading is
- *  derived from which query the stored answer belongs to, so no state is
- *  set synchronously inside the effect. */
-export function usePagedPortfolio(
+/** One cursor-paged read of the kind's portfolio endpoint (`kind.fetch`).
+ *  The frame, each grouped section and each board column is one of these.
+ *  Loading is derived from which query the stored answer belongs to, so no
+ *  state is set synchronously inside the effect. */
+export function usePagedPortfolio<R extends PortfolioRowBase = PortfolioRow, F extends FilterOptions = OrganizationFilters>(
   query: string,
   enabled: boolean,
   version: number,
-  onLoaded?: (rows: PortfolioRow[]) => void,
-): PagedState {
+  onLoaded?: (rows: R[]) => void,
+): PagedState<R, F> {
+  const kind = usePortfolioKind();
   const [attempt, setAttempt] = useState(0);
   const key = `${query}#${version}#${attempt}`;
-  const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [loaded, setLoaded] = useState<Loaded<R, F> | null>(null);
   const [moreState, setMoreState] = useState<MoreState | null>(null);
   // A generation counter, bumped every time the fetch effect's cleanup runs
   // (a params/version change, or unmount) — never reset, so it never repeats.
@@ -77,14 +84,14 @@ export function usePagedPortfolio(
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    fetchPortfolio(query).then(
+    (kind.fetch(query) as Promise<PortfolioPage<R, F>>).then(
       (data) => {
         if (cancelled) return;
         setLoaded({ key, query, data, rows: data.results, next: data.next_cursor });
         onLoadedRef.current?.(data.results);
       },
       (err: unknown) => {
-        if (!cancelled) setLoaded({ key, error: errorMessage(err, 'Could not load organizations.') });
+        if (!cancelled) setLoaded({ key, error: errorMessage(err, `Could not load ${kind.noun.many}.`) });
       },
     );
     return () => {
@@ -98,7 +105,7 @@ export function usePagedPortfolio(
       // yet.
       setMoreState(null);
     };
-  }, [enabled, key, query]);
+  }, [enabled, key, query, kind]);
 
   const current = loaded && 'data' in loaded ? loaded : null;
 
@@ -109,7 +116,7 @@ export function usePagedPortfolio(
     const cursor = current.next;
     setMoreState({ key, token, loading: true, error: null });
     try {
-      const page = await fetchPortfolio(`${query}&cursor=${encodeURIComponent(cursor)}`);
+      const page = (await kind.fetch(`${query}&cursor=${encodeURIComponent(cursor)}`)) as PortfolioPage<R, F>;
       if (generationRef.current !== token) {
         // Superseded — drop the answer. Never clear a newer call's own
         // moreState; only clear if it's still (somehow) this stale one's.
@@ -129,11 +136,11 @@ export function usePagedPortfolio(
         setMoreState((prev) => (prev && prev.token === token ? null : prev));
         return;
       }
-      setMoreState({ key, token, loading: false, error: errorMessage(err, 'Could not load more organizations.') });
+      setMoreState({ key, token, loading: false, error: errorMessage(err, `Could not load more ${kind.noun.many}.`) });
     } finally {
       if (loadMoreCallRef.current === token) loadMoreCallRef.current = null;
     }
-  }, [current, key, query]);
+  }, [current, key, query, kind]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
@@ -152,29 +159,31 @@ export function usePagedPortfolio(
   };
 }
 
-export interface PortfolioState extends PagedState {
-  /** M in "N of M": the whole visible book, in the view's churn scope.
-   *  Null when no filter is active (the page then says "N organizations").
-   *  Never less than N (the frame's own filtered count) even if the probe's
-   *  answer is momentarily stale. */
+export interface PortfolioState<R extends PortfolioRowBase = PortfolioRow, F extends FilterOptions = OrganizationFilters>
+  extends PagedState<R, F> {
+  /** M in "N of M": the whole visible book, in the view's scope (the kind's
+   *  `totalQuery`). Null when no filter is active (the page then says
+   *  "N organizations"). Never less than N (the frame's own filtered count)
+   *  even if the probe's answer is momentarily stale. */
   total: number | null;
 }
 
 /** `totalVersion` reloads the M probe (default: `version`). The Board passes
  *  a smaller one that skips its lifecycle moves, which can't change M. */
-export function usePortfolio(
+export function usePortfolio<R extends PortfolioRowBase = PortfolioRow, F extends FilterOptions = OrganizationFilters>(
   params: PortfolioParams,
   version: number,
-  onLoaded?: (rows: PortfolioRow[]) => void,
+  onLoaded?: (rows: R[]) => void,
   totalVersion: number = version,
-): PortfolioState {
+): PortfolioState<R, F> {
+  const kind = usePortfolioKind();
   const grouped = params.group !== '';
   // Grouped, the frame only needs summary, groups, filters, count and
   // currency; each section reads its own rows (plan pre-flight #6). Its own
   // limit=1 read is never paged from here — grouped paging happens per
   // section — so `next`/`loadMore` are suppressed below regardless of what
   // the frame response implies.
-  const frame = usePagedPortfolio(
+  const frame = usePagedPortfolio<R, F>(
     toApiQuery(params, { limit: String(grouped ? 1 : PAGE_SIZE) }),
     true,
     version,
@@ -182,15 +191,14 @@ export function usePortfolio(
   );
   const noopLoadMore = useCallback(async () => {}, []);
 
-  const withChurn = includesChurned(params);
-  const probeQuery = hasFilters(params) ? (withChurn ? 'include_churned=1&limit=1' : 'limit=1') : null;
+  const probeQuery = kind.totalQuery(params);
   const probeKey = probeQuery ? `${probeQuery}#${totalVersion}` : null;
   const [probe, setProbe] = useState<{ key: string; count: number } | null>(null);
 
   useEffect(() => {
     if (!probeQuery || !probeKey) return;
     let cancelled = false;
-    fetchPortfolio(probeQuery).then(
+    kind.fetch(probeQuery).then(
       (data) => {
         if (!cancelled) setProbe({ key: probeKey, count: data.count });
       },
@@ -201,7 +209,7 @@ export function usePortfolio(
     return () => {
       cancelled = true;
     };
-  }, [probeQuery, probeKey]);
+  }, [probeQuery, probeKey, kind]);
 
   const rawTotal = probeKey && probe?.key === probeKey ? probe.count : null;
 

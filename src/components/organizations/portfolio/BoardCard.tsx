@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { ArrowRightLeft, PanelRight } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { LIFECYCLE_LABELS, formatCompactMoney } from '../../../features/customers/formatters';
-import { PORTFOLIO_FIELDS } from '../../../features/organizations/portfolioFields';
 import { LIFECYCLE_VALUES } from '../../../features/organizations/portfolioParams';
-import type { LifecycleValue, PortfolioRow } from '../../../features/organizations/portfolioTypes';
+import type { LifecycleValue, PortfolioRow, PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
+import { usePortfolioKind } from './portfolioKind';
 import { HealthRing, SignalTag, TrendLine } from './rowParts';
 import { FOCUS } from './styles';
 import { useDismiss } from './useDismiss';
@@ -13,8 +13,8 @@ import { useDismiss } from './useDismiss';
 /** The id of the Board's side panel (AccountSidePanel), which an open card controls. */
 export const DETAILS_PANEL_ID = 'board-account-details';
 
-export interface BoardCardProps {
-  row: PortfolioRow;
+export interface BoardCardProps<R extends PortfolioRowBase = PortfolioRow> {
+  row: R;
   currency: CurrencyCode;
   /** From `sm`. HTML5 drag has no touch support, so phones move with the menu only. */
   isSm: boolean;
@@ -26,11 +26,11 @@ export interface BoardCardProps {
   moveDisabled: boolean;
   /** Why moving is off, shown on the Move to… button when it is stuck. */
   moveNote?: string | null;
-  onOpen: (row: PortfolioRow) => void;
+  onOpen: (row: R) => void;
   /** `fromMenu` is true for a Move to… choice (keyboard or touch), whose
    *  card should keep focus in its new column; a drag leaves focus alone. */
-  onMove: (row: PortfolioRow, to: LifecycleValue, fromMenu?: boolean) => void;
-  onDragStart: (row: PortfolioRow) => void;
+  onMove: (row: R, to: LifecycleValue, fromMenu?: boolean) => void;
+  onDragStart: (row: R) => void;
   onDragEnd: () => void;
 }
 
@@ -79,18 +79,18 @@ function placeMenu(button: HTMLElement): { upward: boolean; maxHeight: number } 
  *  menu and return focus to the button. A press outside closes it and leaves
  *  focus where the user put it, and Tab closes it as focus moves on. Opening
  *  another card's menu closes this one (the press is outside it). */
-function MoveToMenu({
+function MoveToMenu<R extends PortfolioRowBase>({
   row,
   disabled,
   note,
   targets,
   onMove,
 }: {
-  row: PortfolioRow;
+  row: R;
   disabled: boolean;
   note: string | null;
   targets: LifecycleValue[];
-  onMove: (row: PortfolioRow, to: LifecycleValue, fromMenu?: boolean) => void;
+  onMove: (row: R, to: LifecycleValue, fromMenu?: boolean) => void;
 }) {
   const [openMenu, setOpenMenu] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -185,11 +185,12 @@ function MoveToMenu({
 /** One account on the Board (spec §1 "Board"): AccountRow's phone-card
  *  content (ring, name, owner, then ARR, signal and trend) as a compact
  *  card. A click opens its details beside the board. The name links to the
- *  organization page. The header's Move to… icon button is the keyboard and
+ *  card's kind (Organizations: the organization page; Accounts: its own
+ *  page). The header's Move to… icon button is the keyboard and
  *  touch path for a move; after one, the board keeps focus on this card's
  *  Open button (`data-part="open"`) in its new column. Memoised: dragging re-renders the board, and only
  *  the cards whose props change should follow. */
-export const BoardCard = memo(function BoardCard({
+function BoardCardView<R extends PortfolioRowBase>({
   row,
   currency,
   isSm,
@@ -201,8 +202,12 @@ export const BoardCard = memo(function BoardCard({
   onMove,
   onDragStart,
   onDragEnd,
-}: BoardCardProps) {
-  const draggable = isSm && canMove && !moveDisabled;
+}: BoardCardProps<R>) {
+  const kind = usePortfolioKind();
+  // A record the kind cannot save from here (an account none of whose
+  // organisations the viewer may open) neither drags nor has Move to….
+  const movable = canMove && kind.editable(row);
+  const draggable = isSm && movable && !moveDisabled;
   const arr = row.arr == null ? '—' : formatCompactMoney(row.arr, currency);
   const targets = LIFECYCLE_VALUES.filter((value) => value !== row.lifecycle.value);
 
@@ -228,16 +233,17 @@ export const BoardCard = memo(function BoardCard({
         <HealthRing score={row.health.score} category={row.health.category} />
         <div className="min-w-0 flex-1">
           <Link
-            to={`/organizations/${row.id}`}
+            to={kind.href(row)}
+            state={kind.linkState(row)}
             draggable={false}
             onClick={(event) => event.stopPropagation()}
             className={`flex min-h-11 min-w-0 items-center truncate rounded-sm text-[13px] font-semibold text-ink hover:underline sm:block sm:min-h-0 ${FOCUS}`}
           >
             <span className="truncate">{row.name}</span>
           </Link>
-          <p className="truncate text-[11px] text-ink-muted">{PORTFOLIO_FIELDS.owner.value(row)}</p>
+          <p className="truncate text-[11px] text-ink-muted">{kind.cardSubtitle(row)}</p>
         </div>
-        {canMove ? <MoveToMenu row={row} disabled={moveDisabled} note={moveNote} targets={targets} onMove={onMove} /> : null}
+        {movable ? <MoveToMenu row={row} disabled={moveDisabled} note={moveNote} targets={targets} onMove={onMove} /> : null}
         <button
           data-part="open"
           type="button"
@@ -260,4 +266,8 @@ export const BoardCard = memo(function BoardCard({
       </div>
     </li>
   );
-});
+}
+
+/** Memoised (see above). `memo` drops the row's type parameter; the cast
+ *  gives it back. */
+export const BoardCard = memo(BoardCardView) as typeof BoardCardView;

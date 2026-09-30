@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   RefreshCw,
@@ -18,6 +18,8 @@ import { useMembers } from '../../features/knowledge/useMembers';
 import { OwnerTile, type OwnerSummary } from '../../components/shared/OwnerTile';
 import { CompanyViewTab } from '../../components/organizations/CompanyViewTab';
 import { formatCompactMoney } from '../../features/customers/formatters';
+import { apiFetch } from '../../lib/apiClient';
+import type { UserFunction } from '../../features/auth/authSlice';
 import {
   fetchContactsForAccount,
   clearContacts,
@@ -27,6 +29,8 @@ import {
   fetchCanvasesForAccount,
   clearCanvases,
   updateAccount,
+  type Account,
+  type AccountPulse,
 } from '../../features/customers/customersSlice';
 
 export function AccountDetails() {
@@ -72,19 +76,67 @@ export function AccountDetails() {
   // A direct URL visit or refresh has no state to read, so it still
   // falls back to the mock, same as before.
   const accountNavState = location.state as { account: AccountRow; activityFilter?: string } | null;
-  const account = accountNavState?.account ?? ACCOUNTS_DATA.find((a) => a.id === id) ?? ACCOUNTS_DATA[0];
+  const navAccount = accountNavState?.account ?? ACCOUNTS_DATA.find((a) => a.id === id) ?? ACCOUNTS_DATA[0];
   // Set by the standalone Surveys page's own row-click navigation (see
   // SurveysPage.tsx) so landing here opens straight to the Surveys
   // filter instead of the general feed — see ActivityFeedProps' own
   // `initialFilter` docstring.
   const activityFilter = accountNavState?.activityFilter;
 
+  // The Accounts List/Board hand this page an accountNavRow (see
+  // accountNavState.ts) whose accountPulse/ownerFunction are always
+  // null — that row has no already-fetched parent Customer to source
+  // them from, unlike a click-through from a real Organization's own
+  // Accounts tab (mapToAccountRow.ts). Once a real orgId is known, read
+  // the same GET /customers/<orgId>/accounts/<id>/ useAccountEditing's
+  // openEdit already reads for editing, and fill those two fields in —
+  // the nav-state row keeps showing meanwhile, and a failed read just
+  // leaves it as it was.
+  // Keyed by orgId:revenactId, not reset on every nav/account change (that
+  // would mean calling the setter synchronously in the effect body, which
+  // react-hooks/set-state-in-effect flags) — a stale-keyed result is simply
+  // ignored below, the same as if nothing had landed yet.
+  const accountKey = `${navAccount.orgId}:${navAccount.revenactId}`;
+  const [fetchedDetail, setFetchedDetail] = useState<{
+    key: string;
+    accountPulse: AccountPulse | null;
+    ownerFunction: UserFunction | null;
+  } | null>(null);
+  useEffect(() => {
+    if (!accountNavState?.account || !navAccount.orgId) return;
+    let cancelled = false;
+    const key = `${navAccount.orgId}:${navAccount.revenactId}`;
+    apiFetch<Account>(`/customers/${navAccount.orgId}/accounts/${navAccount.revenactId}/`)
+      .then((a) => {
+        if (!cancelled) setFetchedDetail({ key, accountPulse: a.account_pulse ?? null, ownerFunction: a.owner?.function ?? null });
+      })
+      .catch(() => {
+        // Read failed — the nav-state row's own values keep showing.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [accountNavState, navAccount.orgId, navAccount.revenactId]);
+  // Memoised: a plain `fetchedDetail ? {...} : navAccount` would build a new
+  // object every render once fetchedDetail lands, and this reference is
+  // itself a dependency below (the contacts/opportunities/risks/canvases
+  // fetch) — a fresh object each render would refire that effect forever.
+  const account: AccountRow = useMemo(
+    () =>
+      fetchedDetail && fetchedDetail.key === accountKey
+        ? { ...navAccount, accountPulse: fetchedDetail.accountPulse, ownerFunction: fetchedDetail.ownerFunction }
+        : navAccount,
+    [navAccount, fetchedDetail, accountKey],
+  );
+
   // Same "only fetch real data when reached with a real, already-known
   // parent customer id" convention as ActivityFeed's own `customerId`
   // prop (see this component's JSX below) — a mock-fallback account has
-  // no real customer/account id pair to fetch Contacts for.
+  // no real customer/account id pair to fetch Contacts for. An account
+  // with no openable organisation (orgId 0, see accountNavState.ts) has
+  // no real parent id either — these would 404 against /customers/0/….
   useEffect(() => {
-    if (accountNavState?.account) {
+    if (accountNavState?.account && account.orgId) {
       dispatch(fetchContactsForAccount({ customerId: account.orgId, accountId: account.revenactId }));
       dispatch(fetchOpportunitiesForAccount({ customerId: account.orgId, accountId: account.revenactId }));
       dispatch(fetchRisksForAccount({ customerId: account.orgId, accountId: account.revenactId }));

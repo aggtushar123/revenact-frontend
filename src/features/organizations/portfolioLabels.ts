@@ -20,3 +20,14 @@ export const NPS_LABEL: Record<NpsBand, string> = {
 export const RENEWAL_WINDOWS = ['30', '90', '180'] as const;
 export type RenewalWindow = (typeof RENEWAL_WINDOWS)[number];
 export const windowLabel = (days: RenewalWindow) => `${days} days`;
+
+/** What a portfolio lists, in its own words ("organization", "account"). */
+export interface PortfolioNoun {
+  one: string;
+  many: string;
+}
+
+export const ORGANIZATION_NOUN: PortfolioNoun = { one: 'organization', many: 'organizations' };
+
+/** "organizations" → "Organizations". */
+export const capitalise = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);

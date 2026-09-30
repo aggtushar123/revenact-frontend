@@ -1,7 +1,7 @@
 import { LIFECYCLE_LABELS } from '../customers/formatters';
 import type { PortfolioParams } from './portfolioParams';
-import { HEALTH_LABEL, NPS_LABEL } from './portfolioLabels';
-import type { Option, PortfolioResponse } from './portfolioTypes';
+import { HEALTH_LABEL, NPS_LABEL, ORGANIZATION_NOUN, capitalise, type PortfolioNoun } from './portfolioLabels';
+import type { FilterOptions, Option } from './portfolioTypes';
 
 export interface Chip {
   key: string;
@@ -13,13 +13,18 @@ export interface Chip {
 const nameIn = (list: Option[] | undefined, value: string) => list?.find((o) => o.value === value)?.name;
 
 /** One removable chip per active filter (spec §1), in a fixed order. */
-export function filterChips(p: PortfolioParams, options: PortfolioResponse['filters'] | null): Chip[] {
+export function filterChips(p: PortfolioParams, options: FilterOptions | null): Chip[] {
   const chips: Chip[] = [];
   if (p.ids.length) chips.push({ key: 'ids', label: `Opened from the dashboard (${p.ids.length})`, patch: { ids: [] } });
   if (p.search) chips.push({ key: 'search', label: `Search: ${p.search}`, patch: { search: '' } });
   if (p.owner) {
     const name = p.owner === 'unassigned' ? 'Unassigned' : (nameIn(options?.owners, p.owner) ?? `User ${p.owner}`);
     chips.push({ key: 'owner', label: `Owner: ${name}`, patch: { owner: '' } });
+  }
+  const organisations = p.organisation ?? [];
+  for (const id of organisations) {
+    const name = nameIn(options?.organisations, id) ?? `Organization ${id}`;
+    chips.push({ key: `organisation:${id}`, label: `Organization: ${name}`, patch: { organisation: organisations.filter((v) => v !== id) } });
   }
   for (const stage of p.lifecycle) {
     const name = nameIn(options?.lifecycles, stage) ?? LIFECYCLE_LABELS[stage];
@@ -38,8 +43,14 @@ export function filterChips(p: PortfolioParams, options: PortfolioResponse['filt
   return chips;
 }
 
-export function countText(count: number | null, total: number | null, filtered: boolean, failed = false): string {
-  if (count == null) return failed ? 'Organizations unavailable' : 'Loading organizations…';
-  if (filtered && total != null) return `${count} of ${total} organizations`;
-  return `${count} organization${count === 1 ? '' : 's'}`;
+export function countText(
+  count: number | null,
+  total: number | null,
+  filtered: boolean,
+  failed = false,
+  noun: PortfolioNoun = ORGANIZATION_NOUN,
+): string {
+  if (count == null) return failed ? `${capitalise(noun.many)} unavailable` : `Loading ${noun.many}…`;
+  if (filtered && total != null) return `${count} of ${total} ${noun.many}`;
+  return `${count} ${count === 1 ? noun.one : noun.many}`;
 }

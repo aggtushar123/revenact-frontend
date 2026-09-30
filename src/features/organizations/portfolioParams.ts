@@ -10,6 +10,9 @@ export interface PortfolioParams {
   lifecycle: LifecycleValue[];
   health: HealthBand[];
   product: string[];
+  /** Accounts only: linked organisation ids (`organisation` in the URL and
+   *  the API). Absent on Organizations, whose URL never carries it. */
+  organisation?: string[];
   renews_within: '' | RenewalWindow;
   nps: '' | NpsBand;
   ids: number[];
@@ -42,8 +45,27 @@ export const NUMERIC_SORT_KEYS = [
 ] as const;
 const SORT_KEYS: readonly string[] = [...BASE_SORT_KEYS, ...NUMERIC_SORT_KEYS];
 
+/** Which parameters a kind of portfolio reads from its URL: its own sorts
+ *  and groups, and the filters only some kinds have. A value outside them
+ *  is dropped, as each backend drops it. */
+export interface ParamSpec {
+  sortKeys: readonly string[];
+  groupKeys: readonly GroupKey[];
+  product: boolean;
+  churned: boolean;
+  organisation: boolean;
+}
+
+export const ORGANIZATION_PARAMS: ParamSpec = {
+  sortKeys: SORT_KEYS,
+  groupKeys: GROUP_KEYS,
+  product: true,
+  churned: true,
+  organisation: false,
+};
+
 export const EMPTY_FILTERS: Partial<PortfolioParams> = {
-  search: '', owner: '', lifecycle: [], health: [], product: [], renews_within: '', nps: '', ids: [], include_churned: false,
+  search: '', owner: '', lifecycle: [], health: [], product: [], organisation: [], renews_within: '', nps: '', ids: [], include_churned: false,
 };
 
 const list = (raw: string | null) =>
@@ -53,28 +75,36 @@ function only<T extends string>(values: string[], allowed: readonly T[]): T[] {
   return values.filter((value): value is T => (allowed as readonly string[]).includes(value));
 }
 
-function parseSort(raw: string | null): string {
+function parseSort(raw: string | null, keys: readonly string[]): string {
   if (!raw) return DEFAULT_SORT;
-  return SORT_KEYS.includes(raw.replace(/^-/, '')) ? raw : DEFAULT_SORT;
+  return keys.includes(raw.replace(/^-/, '')) ? raw : DEFAULT_SORT;
 }
 
-export function parseParams(search: URLSearchParams, defaultGroup: GroupKey = DEFAULT_GROUP): PortfolioParams {
+export function parseParams(
+  search: URLSearchParams,
+  defaultGroup: GroupKey = DEFAULT_GROUP,
+  spec: ParamSpec = ORGANIZATION_PARAMS,
+): PortfolioParams {
   const owner = search.get('owner') ?? '';
   const renews = search.get('renews_within') ?? '';
   const nps = search.get('nps') ?? '';
   const group = search.get('group');
+  const digits = (key: string) => list(search.get(key)).filter((value) => /^\d+$/.test(value));
   return {
     search: (search.get('search') ?? '').trim(),
     owner: owner === 'unassigned' || /^\d+$/.test(owner) ? owner : '',
     lifecycle: only(list(search.get('lifecycle')), LIFECYCLE_VALUES),
     health: only(list(search.get('health')), HEALTH_BANDS),
-    product: list(search.get('product')).filter((value) => /^\d+$/.test(value)),
+    product: spec.product ? digits('product') : [],
+    // Only a kind that has the filter gets the key, so Organizations' params
+    // stay exactly the object they were.
+    ...(spec.organisation ? { organisation: digits('organisation') } : {}),
     renews_within: only([renews], RENEWAL_WINDOWS)[0] ?? '',
     nps: only([nps], NPS_BANDS)[0] ?? '',
-    ids: list(search.get('ids')).filter((value) => /^\d+$/.test(value)).map(Number).slice(0, MAX_IDS),
-    include_churned: search.get('include_churned') === '1',
-    sort: parseSort(search.get('sort')),
-    group: group === 'none' ? '' : (only([group ?? ''], GROUP_KEYS)[0] ?? defaultGroup),
+    ids: digits('ids').map(Number).slice(0, MAX_IDS),
+    include_churned: spec.churned && search.get('include_churned') === '1',
+    sort: parseSort(search.get('sort'), spec.sortKeys),
+    group: group === 'none' ? '' : (only([group ?? ''], spec.groupKeys)[0] ?? defaultGroup),
   };
 }
 
@@ -84,6 +114,7 @@ function setFilters(query: URLSearchParams, p: PortfolioParams) {
   if (p.lifecycle.length) query.set('lifecycle', p.lifecycle.join(','));
   if (p.health.length) query.set('health', p.health.join(','));
   if (p.product.length) query.set('product', p.product.join(','));
+  if (p.organisation?.length) query.set('organisation', p.organisation.join(','));
   if (p.renews_within) query.set('renews_within', p.renews_within);
   if (p.nps) query.set('nps', p.nps);
   if (p.ids.length) query.set('ids', p.ids.join(','));

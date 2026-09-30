@@ -50,13 +50,14 @@ react-ts-app/
 │   │   ├── auth/               ← ProtectedRoute guard
 │   │   ├── layout/             ← Sidebar, Navbar
 │   │   ├── shared/             ← Multi-domain components (ActivityFeed, PinnedAttributes, Summary)
+│   │   ├── accounts/portfolio/ ← AccountPanels, accountKind (ACCOUNT_KIND) for the Accounts list and board
 │   │   ├── contacts/           ← ContactsToolbar, ContactList(Item), ContactProfile, HistoryItems, ContactFormModal
 │   │   ├── dashboard/charts/   ← Shared Recharts chart components (AI Trending)
 │   │   └── organizations/      ← Org domain components; portfolio/ holds the list page's (see below)
 │   └── pages/                  ← Route-level page components
 │       ├── auth/               ← Login page
 │       ├── organizations/      ← List, Board, Details (org detail view)
-│       ├── accounts/           ← Account Details page
+│       ├── accounts/           ← List and Board (the Accounts portfolio), Details (the account page)
 │       ├── contacts/           ← ContactsPage (list + profile), ContactsFrame
 │       ├── copilot/            ← AI Copilot module (Home, Chat, Cockpit)
 │       ├── scenarios/          ← Visual scenario builder (React Flow)
@@ -103,7 +104,11 @@ react-ts-app/
 │   ├── list                   → Portfolio (List.tsx on GET /organizations/portfolio/)
 │   ├── board                  → Board (Board.tsx: PortfolioBoard on GET /organizations/portfolio/)
 │   └── :id                    → Organization page (Details.tsx: the story, on GET /organizations/{id}/story/)
-├── accounts/:id               → Account Details page
+├── accounts/
+│   ├── (index)                → Redirects to /accounts/list
+│   ├── list                   → Portfolio (List.tsx on GET /accounts/portfolio/, ACCOUNT_KIND)
+│   ├── board                  → Board (Board.tsx: PortfolioBoard on GET /accounts/portfolio/)
+│   └── :id                    → Account Details page
 ├── copilot                    → Copilot AI module (Home / Chat / Cockpit)
 ├── scenarios/create           → Visual scenario flow builder
 ├── settings/
@@ -323,6 +328,8 @@ inside `OrganizationsFrame` (the dashboard's body, with the Ask rail in its `rai
 | `components/organizations/portfolio/usePortfolio.ts` | `usePagedPortfolio` (one cursor-paged read: the frame, each section, each board column) and `usePortfolio` (frame + M probe) |
 | `components/organizations/portfolio/*` | `AccountRow`, `rowParts`, `AccountDetails`, `AccountSheet`, `SummaryTiles`, `PortfolioToolbar`, `FiltersPanel`, `PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `useSelection`, `usePins`, `usePortfolioParams`; for the board `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`, `useBoardMove`, `boardMove`, `useEndSentinel` |
 | `features/organizations/testPortfolio.ts`, `pages/organizations/testList.tsx` | Fixtures, `buildPortfolio`, `stubPortfolio`; `renderOrganizations(url, {width, nav, ask})`, `renderList`, `renderBoard`; `src/test/intersection.ts` (fake IntersectionObserver) |
+| `components/organizations/portfolio/portfolioKind.ts`, `organizationKind.ts` | The portfolio kind the shared components read from `PortfolioKindContext` (endpoint, params, words, links, row line, panels, how a move saves); `ORGANIZATION_KIND` is the default |
+| `features/accounts/*`, `components/accounts/portfolio/*` | The Accounts kind: `portfolioTypes`, `portfolioApi`, `ACCOUNT_PARAMS`, the 24-field `accountFields`, `accountNavRow`, `AccountPanels`, `ACCOUNT_KIND`; `features/accounts/testPortfolio.ts` and `pages/accounts/testList.tsx` (`renderAccounts`) for tests |
 
 #### Board View (`pages/organizations/Board.tsx`)
 The portfolio as columns (spec §1 "Board", owner decisions 2026-09-26), in
@@ -349,8 +356,8 @@ dismissable alert with the server's reason. It hands Churn to
 `useOverlayActive` keeps the optimistic guess on screen until each read's
 fresh page lands. From `sm` an opened card is `AccountSidePanel`, a non-modal
 aside beside the board; below it, the modal `AccountSheet`, with column tabs
-over snapping panels. `KanbanBoard` is no longer used here (Pipelines and the
-Accounts board keep it).
+over snapping panels. `KanbanBoard` is no longer used here (Pipelines keeps
+it). The Accounts board is this board with `ACCOUNT_KIND` (`pages/accounts/Board.tsx`).
 
 #### Details View (`pages/organizations/Details.tsx`)
 The organization's story (spec `docs/superpowers/specs/2026-09-26-organization-detail-design.md`,
@@ -382,7 +389,7 @@ delivery 1). It draws itself in `OrganizationsFrame` (no rail until delivery 3).
 
 Account-level detail page linked from Org Details.
 - Same layout as Organizations Details but scoped to a single account
-- Uses `AccountMetricsPanel` for stakeholder diagnostics (Health, NPS, CSAT, Renewal)
+- Renders its own `AccountMetricsBanner` (defined in the same file) for stakeholder diagnostics (Health, Account Pulse, NPS, CSAT, ARR)
 - Recycles `PinnedAttributes` and `ActivityFeed` from `shared/`
 - Injects `ACCOUNT_ID_MAP` and `accountActivityData` at runtime for account-scoped feed data
 
@@ -590,6 +597,10 @@ App.tsx
   │     └── components/organizations/portfolio/PortfolioBoard → BoardColumn → BoardCard
   │           + AccountSidePanel / AccountSheet, useBoardMove (optimistic move), boardMove, useEndSentinel
   │
+  ├── pages/accounts/List.tsx, Board.tsx  (GET /accounts/portfolio/, POST /accounts/bulk/, PATCH /customers/<cid>/accounts/<id>/)
+  │     ├── PortfolioKindContext = ACCOUNT_KIND around the page; OrganizationsFrame (rail slot empty until delivery 3)
+  │     └── the Organizations portfolio components + accounts/portfolio/AccountPanels; AccountFormModal (edit, add)
+  │
   ├── pages/copilot/Index.tsx
   │     ├── HomeView, ChatView, CockpitView
   │     └── CopilotSidebar
@@ -641,7 +652,6 @@ App.tsx
 | Route | Status |
 |---|---|
 | `/communications` | No route defined |
-| `/accounts` (list) | No list route, only `/accounts/:id` |
 | `/sfdc`, `/feedbacks` | No route defined |
 | `/segments`, `/projects`, `/surveys`, `/campaigns`, `/canvas` | No route defined |
 | `/lifecycle` | No route defined (`/health` redirects to `/dashboard/health/distribution`) |

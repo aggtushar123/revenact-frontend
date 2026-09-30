@@ -19,6 +19,48 @@ export interface Option {
   name: string;
 }
 
+/** The header fields every portfolio row carries, organisation or account:
+ *  what the kind-agnostic row, card, sheet and board read. */
+export interface PortfolioRowBase {
+  id: number;
+  name: string;
+  initials: string;
+  owner: { id: number; name: string } | null;
+  lifecycle: { value: LifecycleValue; label: string };
+  health: { score: number; category: HealthBand; trend: number[] };
+  renewal: { date: string | null; days: number | null };
+  arr: number | null;
+  risk: { score: number; direction: RiskDirection };
+  pulse: {
+    csm: number | null;
+    ai: number | null;
+    /** An account with no AI pulse carries null here; an organisation ''. */
+    ai_category: string | null;
+    ai_label: string;
+    reason: string;
+    history: number[];
+    disagree: boolean;
+  };
+  last_touch_days: number | null;
+  urgent_tickets: number;
+  signal: { kind: SignalKind; label: string } | null;
+}
+
+/** A portfolio's filter choices. Organizations list products, Accounts
+ *  organisations; both list owners and stages. */
+export interface FilterOptions {
+  owners: Option[];
+  lifecycles: Option[];
+  products?: Option[];
+  organisations?: Option[];
+}
+
+export interface OrganizationFilters {
+  owners: Option[];
+  lifecycles: Option[];
+  products: Option[];
+}
+
 export interface PortfolioDetails {
   commercial: {
     /** The account's own contract currency: these five figures are in it,
@@ -136,15 +178,19 @@ export interface PortfolioSummary {
   renewing: { '30': number; '90': number };
 }
 
-export interface PortfolioResponse {
-  results: PortfolioRow[];
+/** One read of a portfolio endpoint (`/organizations/portfolio/` or
+ *  `/accounts/portfolio/`): one envelope, each kind's own rows and filters. */
+export interface PortfolioPage<R extends PortfolioRowBase = PortfolioRowBase, F extends FilterOptions = FilterOptions> {
+  results: R[];
   next_cursor: string | null;
   count: number;
   groups: PortfolioGroup[];
   summary: PortfolioSummary;
-  filters: { owners: Option[]; lifecycles: Option[]; products: Option[] };
+  filters: F;
   currency: CurrencyCode;
 }
+
+export type PortfolioResponse = PortfolioPage<PortfolioRow, OrganizationFilters>;
 
 export type BulkAction = 'set_owner' | 'set_lifecycle' | 'archive';
 
