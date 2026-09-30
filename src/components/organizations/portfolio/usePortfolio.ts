@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import { toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type {
   FilterOptions,
@@ -8,6 +8,7 @@ import type {
   PortfolioRowBase,
 } from '../../../features/organizations/portfolioTypes';
 import { usePortfolioKind } from './portfolioKind';
+import { usePagedBook, type PagedBook } from './usePagedBook';
 import { usePagedRead, type PagedRead } from './usePagedRead';
 
 export { errorMessage } from './usePagedRead';
@@ -34,7 +35,7 @@ export function usePagedPortfolio<R extends PortfolioRowBase = PortfolioRow, F e
 }
 
 export interface PortfolioState<R extends PortfolioRowBase = PortfolioRow, F extends FilterOptions = OrganizationFilters>
-  extends PagedState<R, F> {
+  extends PagedBook<R, PortfolioPage<R, F>> {
   /** M in "N of M": the whole visible book, in the view's scope (the kind's
    *  `totalQuery`). Null when no filter is active (the page then says
    *  "N organizations"). Never less than N (the frame's own filtered count)
@@ -51,47 +52,18 @@ export function usePortfolio<R extends PortfolioRowBase = PortfolioRow, F extend
   totalVersion: number = version,
 ): PortfolioState<R, F> {
   const kind = usePortfolioKind();
-  const grouped = params.group !== '';
+  const read = useCallback((q: string) => kind.fetch(q) as Promise<PortfolioPage<R, F>>, [kind]);
   // Grouped, the frame only needs summary, groups, filters, count and
-  // currency; each section reads its own rows (plan pre-flight #6). Its own
-  // limit=1 read is never paged from here — grouped paging happens per
-  // section — so `next`/`loadMore` are suppressed below regardless of what
-  // the frame response implies.
-  const frame = usePagedPortfolio<R, F>(
+  // currency; each section reads its own rows (plan pre-flight #6).
+  const grouped = params.group !== '';
+  return usePagedBook<R, PortfolioPage<R, F>>(
+    read,
+    kind.noun,
     toApiQuery(params, { limit: String(grouped ? 1 : PAGE_SIZE) }),
-    true,
+    grouped,
     version,
-    grouped ? undefined : onLoaded,
+    onLoaded,
+    kind.totalQuery(params),
+    totalVersion,
   );
-  const noopLoadMore = useCallback(async () => {}, []);
-
-  const probeQuery = kind.totalQuery(params);
-  const probeKey = probeQuery ? `${probeQuery}#${totalVersion}` : null;
-  const [probe, setProbe] = useState<{ key: string; count: number } | null>(null);
-
-  useEffect(() => {
-    if (!probeQuery || !probeKey) return;
-    let cancelled = false;
-    kind.fetch(probeQuery).then(
-      (data) => {
-        if (!cancelled) setProbe({ key: probeKey, count: data.count });
-      },
-      () => {
-        // M stays unknown; the page says "N organizations" instead of a guess.
-      },
-    );
-    return () => {
-      cancelled = true;
-    };
-  }, [probeQuery, probeKey, kind]);
-
-  const rawTotal = probeKey && probe?.key === probeKey ? probe.count : null;
-
-  return {
-    ...frame,
-    rows: grouped ? [] : frame.rows,
-    next: grouped ? null : frame.next,
-    loadMore: grouped ? noopLoadMore : frame.loadMore,
-    total: rawTotal === null ? null : Math.max(rawTotal, frame.data?.count ?? 0),
-  };
 }

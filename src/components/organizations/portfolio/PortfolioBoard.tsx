@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type UIEvent } from 'react';
-import { Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { FilterOptions, LifecycleValue, PortfolioRow, PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
 import { BoardColumn } from './BoardColumn';
 import { boardColumns, useOverlayActive, withMove, type BoardMove } from './boardMove';
 import { usePortfolioKind } from './portfolioKind';
-import { EmptyState, ErrorBlock } from './PortfolioSections';
+import { EmptyBook, ErrorBlock } from './PortfolioSections';
 import { SECTION_PAGE_SIZE, type PortfolioState } from './usePortfolio';
 import { FOCUS, QUIET } from './styles';
 
@@ -187,26 +186,14 @@ export function PortfolioBoard<R extends PortfolioRowBase>({
   if (!data && error) return <ErrorBlock message={error} onRetry={portfolio.retry} />;
   if (!data) return <BoardSkeleton isSm={isSm} narrow={narrow} />;
   if (data.count === 0) {
-    return filtered ? (
-      <EmptyState
-        title={`No ${kind.noun.many} match these filters`}
-        detail="Remove a filter, or clear them all."
-        action={
-          <button type="button" onClick={onClearFilters} className={`${QUIET} border border-line`}>
-            Clear filters
-          </button>
-        }
-      />
-    ) : (
-      <EmptyState
+    return (
+      <EmptyBook
+        filtered={filtered}
+        noun={kind.noun}
         title={`No ${kind.noun.many} yet`}
         detail={`Add an ${kind.noun.one} to start your portfolio.`}
-        action={
-          <button type="button" onClick={() => onAdd()} className={`${QUIET} bg-accent text-on-accent hover:bg-accent-hover`}>
-            <Plus className="w-4 h-4" aria-hidden="true" />
-            {`Add ${kind.noun.one}`}
-          </button>
-        }
+        onClearFilters={onClearFilters}
+        onAdd={() => onAdd()}
       />
     );
   }
