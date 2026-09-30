@@ -1,10 +1,12 @@
-import { useId, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useId, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { LayoutGrid, List as ListIcon, Plus } from 'lucide-react';
 import { useAppDispatch, useAppSelector, useOrgCurrency } from '../../../hooks';
 import {
   deleteOpportunity,
   deleteRisk,
+  fetchOpportunitiesForAccount,
   fetchOpportunitiesForCustomer,
+  fetchRisksForAccount,
   fetchRisksForCustomer,
   updateOpportunity,
   updateRisk,
@@ -12,8 +14,8 @@ import {
   type Opportunity,
   type Risk,
 } from '../../../features/customers/customersSlice';
-import { listScope } from '../../../lib/listScope';
 import { awaitingAccount, byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
+import { resolveScope, scopeSlot, type ScopeProps } from '../../../features/organizations/detailScope';
 import { opportunitiesSummary, risksSummary } from '../../../features/organizations/listSummaries';
 import { KanbanBoard, PipelineCardContent } from '../../pipelines/KanbanBoard';
 import { OPPORTUNITY_STAGE_COLUMNS, RISK_STAGE_COLUMNS } from '../../pipelines/kanbanConfig';
@@ -35,24 +37,24 @@ const SEGMENT = `inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-[
 
 const titled = (title: string, q: string) => title.toLowerCase().includes(q.trim().toLowerCase());
 
-/** Deals & risks (spec 2026-09-27 §3): an Opportunities / Risks switch over
- *  list items, narrowed by the account chip, each with a one-line summary.
- *  The board stays an option from sm. Selecting an item opens its existing
- *  edit form; Add saves on the chosen account when there is one. */
-export function DealsTab({
-  customerId,
-  account,
-  accounts,
-  isSm,
-  onShowAll,
-}: {
-  customerId: number;
-  /** The chip: '' All, 'none' the organization itself, or an account id. */
+type DealsTabProps = ScopeProps & {
+  /** The chip: '' All, 'none' the organization itself, or an account id. Always '' on an account's page. */
   account: string;
   accounts: Account[];
   isSm: boolean;
   onShowAll: () => void;
-}) {
+};
+
+/** Deals & risks (spec 2026-09-27 §3; account spec §2.8): an Opportunities /
+ *  Risks switch over list items — the organization's, narrowed by the
+ *  account chip, or one account's — each with a one-line summary. The board
+ *  stays an option from sm. Selecting an item opens its existing edit form;
+ *  Add saves on the chosen account, or on the page's account. */
+export function DealsTab(props: DealsTabProps) {
+  const { account, accounts, isSm, onShowAll } = props;
+  const scope = resolveScope(props);
+  const kindOfPage = scope.kind;
+  const scopeId = scope.id;
   const dispatch = useAppDispatch();
   const currency = useOrgCurrency();
   const {
@@ -68,10 +70,11 @@ export function DealsTab({
   const [kind, setKind] = useState<Kind>('opportunities');
   const [view, setView] = useState<'list' | 'board'>('list');
   const [q, setQ] = useState('');
-  // Each shared slot holds this organization's records (not another's).
+  // Each shared slot holds this page's records (not another's).
+  const slot = scopeSlot({ kind: kindOfPage, id: scopeId });
   const loaded = {
-    opportunities: pipelineOpportunitiesFor === listScope(customerId),
-    risks: pipelineRisksFor === listScope(customerId),
+    opportunities: pipelineOpportunitiesFor === slot,
+    risks: pipelineRisksFor === slot,
   };
   const [attempt, setAttempt] = useState(0);
   const [addingOpportunity, setAddingOpportunity] = useState<Opportunity['stage'] | null>(null);
@@ -81,12 +84,21 @@ export function DealsTab({
   const [deletingOpportunity, setDeletingOpportunity] = useState<Opportunity | null>(null);
   const [deletingRisk, setDeletingRisk] = useState<Risk | null>(null);
 
+  const readOpportunities = useCallback(() => {
+    if (kindOfPage === 'account') void dispatch(fetchOpportunitiesForAccount({ accountId: scopeId }));
+    else void dispatch(fetchOpportunitiesForCustomer(scopeId));
+  }, [dispatch, kindOfPage, scopeId]);
+  const readRisks = useCallback(() => {
+    if (kindOfPage === 'account') void dispatch(fetchRisksForAccount({ accountId: scopeId }));
+    else void dispatch(fetchRisksForCustomer(scopeId));
+  }, [dispatch, kindOfPage, scopeId]);
+
   // Read before paint, as People does: the chips never count another page's
   // records left in the shared slots.
   useLayoutEffect(() => {
-    void dispatch(fetchOpportunitiesForCustomer(customerId));
-    void dispatch(fetchRisksForCustomer(customerId));
-  }, [dispatch, customerId, attempt]);
+    readOpportunities();
+    readRisks();
+  }, [readOpportunities, readRisks, attempt]);
 
   const scopedOpportunities = useMemo(() => byAccount(opportunities, account), [opportunities, account]);
   const scopedRisks = useMemo(() => byAccount(risks, account), [risks, account]);
@@ -95,6 +107,11 @@ export function DealsTab({
   const target = chosenAccount(accounts, account);
   const paused = awaitingAccount(accounts, account);
   const pausedId = useId();
+  // New records go on the page's account, or the chosen chip's, or the organization.
+  const addOn = {
+    customerId: kindOfPage === 'organization' ? scopeId : undefined,
+    accountId: kindOfPage === 'account' ? scopeId : target?.id,
+  };
 
   const isOpps = kind === 'opportunities';
   const error = isOpps ? pipelineOpportunitiesError : pipelineRisksError;
@@ -202,11 +219,11 @@ export function DealsTab({
 
         {addingOpportunity ? (
           <OpportunityFormModal
-            customerId={customerId}
-            accountId={target?.id}
+            customerId={addOn.customerId}
+            accountId={addOn.accountId}
             defaultStage={addingOpportunity}
             onClose={() => setAddingOpportunity(null)}
-            onSaved={() => void dispatch(fetchOpportunitiesForCustomer(customerId))}
+            onSaved={readOpportunities}
           />
         ) : null}
         {editingOpportunity ? (
@@ -233,11 +250,11 @@ export function DealsTab({
         ) : null}
         {addingRisk ? (
           <RiskFormModal
-            customerId={customerId}
-            accountId={target?.id}
+            customerId={addOn.customerId}
+            accountId={addOn.accountId}
             defaultStage={addingRisk}
             onClose={() => setAddingRisk(null)}
-            onSaved={() => void dispatch(fetchRisksForCustomer(customerId))}
+            onSaved={readRisks}
           />
         ) : null}
         {editingRisk ? (

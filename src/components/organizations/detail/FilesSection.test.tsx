@@ -15,7 +15,12 @@ import {
 import { makeDetailStore } from '../../../pages/organizations/testDetail';
 import { FilesSection } from './FilesSection';
 
-function ui(props: Partial<ComponentProps<typeof FilesSection>> = {}) {
+// The organisation page always names its page with `customerId` (never
+// `scope`, the account page's own prop): narrowed here so a partial props
+// object can still be spread onto the union `FilesSection` now takes.
+type Props = Extract<ComponentProps<typeof FilesSection>, { customerId: number }>;
+
+function ui(props: Partial<Props> = {}) {
   return (
     <Provider store={makeDetailStore()}>
       <MemoryRouter>
@@ -25,7 +30,7 @@ function ui(props: Partial<ComponentProps<typeof FilesSection>> = {}) {
   );
 }
 
-function renderFiles(props: Partial<ComponentProps<typeof FilesSection>> = {}, lists: OrganizationLists = ORGANIZATION_LISTS) {
+function renderFiles(props: Partial<Props> = {}, lists: OrganizationLists = ORGANIZATION_LISTS) {
   const spy = stubOrganizationPage({ lists });
   const onShowAll = vi.fn();
   render(ui({ onShowAll, ...props }));
