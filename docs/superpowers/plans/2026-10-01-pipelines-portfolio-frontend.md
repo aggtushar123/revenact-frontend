@@ -87,7 +87,7 @@
 | `src/components/pipelines/portfolio/*` (new) | `itemParts`, `PipelineItem`, `PipelineSections`, `PipelineTiles`, `PipelineToolbar`, `PipelineFilters`, `PipelineKindSwitch`, `PipelineModals`, `PipelineCard`, `PipelineColumn`, `PipelineBoard`, `pipelineMove.ts`, `usePipelineParams`, `usePipelineBook`, `usePipelineForms`, `usePipelineMove`, `houseRules.test.ts` |
 | `src/components/pipelines/{OpportunityFormModal,RiskFormModal}.tsx`, `kanbanConfig.ts` | The date field, Closed Lost, `onSaved` after every save; stage columns from the kinds |
 | `src/components/organizations/detail/DealItem.tsx` | The date line and the Overdue signal |
-| `src/pages/pipelines/List.tsx`, `Board.tsx`, `testPipelines.tsx` (new) | The two pages and their test harness |
+| `src/pages/pipelines/List.tsx`, `Board.tsx`, `testPages.tsx` (new) | The two pages and their test harness |
 | `src/App.tsx`, `src/components/layout/Navbar.tsx`, `src/layouts/DashboardLayout.tsx` | Routes; the framed Pipelines bar with both switches; no `<main>` padding |
 | `src/pages/pipelines/PipelinesPage.tsx`, `PipelinesPage.test.tsx`, `src/components/shared/PipelinesTab.tsx`, `PipelinesTab.test.tsx` | Deleted |
 | `src/e2e/pipelines.test.tsx` (new) | The end-to-end journey |
