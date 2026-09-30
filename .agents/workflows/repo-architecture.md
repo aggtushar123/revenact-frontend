@@ -49,7 +49,7 @@ react-ts-app/
 │   ├── components/             ← Reusable UI components
 │   │   ├── auth/               ← ProtectedRoute guard
 │   │   ├── layout/             ← Sidebar, Navbar
-│   │   ├── shared/             ← Multi-domain components (ActivityFeed, PinnedAttributes, Summary)
+│   │   ├── shared/             ← Multi-domain components (Summary; ActivityFeed and PinnedAttributes are unused — see "Adding a New Activity Tab" below and §4.4 of docs/04-app-flow.md)
 │   │   ├── accounts/portfolio/ ← AccountPanels, accountKind (ACCOUNT_KIND) for the Accounts list and board
 │   │   ├── accounts/detail/    ← the account page: AccountHeader, AccountTiles, AccountPulseBreakdown, AccountDetailsTab, CanvasesTab, useAccount
 │   │   ├── contacts/           ← ContactsToolbar, ContactList(Item), ContactProfile, HistoryItems, ContactFormModal
@@ -624,12 +624,29 @@ App.tsx
 
 ---
 
-## Adding a New Activity Tab — Checklist
+## Adding a New Activity Tab — Checklist (dead: `ActivityFeed` is unused)
+
+**`ActivityFeed` is not on any route any more.** Both detail pages (an
+organization's and an account's) now use the Story tab instead (see "Account
+page" above, and docs/04-app-flow.md §4.2 step 5 / §4.3 step 6 / §4.4). This
+checklist is kept for the sweep PR that deletes `ActivityFeed`,
+`PinnedAttributes` and the other modules the account page's delivery
+retired (spec 2026-09-29 §2.10, "Removed"); do not add a new tab through it.
+
+To add a new record kind to the Story instead: give it a `StoryKind` and, if
+it can be created inline, an `AddKind` (`src/features/organizations/
+storyKinds.ts`), a row in `StoryItemRow.tsx`, and wire its backend shape into
+`storyApi.ts`. See `src/components/organizations/detail/StoryTab.tsx` and
+`StoryToolbar.tsx`.
+
+<details><summary>The old checklist, for reference until the sweep PR</summary>
 
 1. Create `src/components/organizations/activity/MyTab.tsx` — follows `{ entityId }` prop pattern
 2. Export it from `src/components/organizations/activity/index.ts`
 3. Register it in `src/components/shared/ActivityFeed.tsx` in the `TABS` array and the `renderContent()` switch
 4. Add unit + integration tests — see the `testing` skill.
+
+</details>
 
 ---
 

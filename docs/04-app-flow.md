@@ -446,21 +446,31 @@ readers by the same write-time snapshot rule as the Dashboard's; see
    `/accounts/{id}/ {owner_id, handover_note}`. ⋯ opens Add contact, Log a call
    and New task; New canvas opens `/canvas/create?accountId={id}`.
 
-### 4.4 Activity feed
+### 4.4 Activity feed (unused)
 
-The old account page's feed. Both detail pages now use the Story (§4.2 step 5, §4.3 step 6), so no route renders `ActivityFeed`; removing it is a follow-up.
+**Dead:** the old account page's feed. Both detail pages (an organization's,
+§4.3, and an account's, §4.2) now use the Story instead (§4.2 step 5, §4.3
+step 6) — no route renders `ActivityFeed` or `PinnedAttributes` any more.
+Removing them is a follow-up (accounts spec 2026-09-29 §2.10's "Removed",
+and the owner's 2026-09-30 ruling). For what replaced it — filters, sources,
+search, + Add, the day-grouped stream — see the Story tab in §4.2/§4.3 and
+`src/components/organizations/detail/StoryTab.tsx`/`StoryToolbar.tsx`.
 
-| Filter | State |
+The table below describes `ActivityFeed` as it was before the Story
+replaced it; it is history, not a live surface.
+
+| Filter | State (when this page was live) |
 |---|---|
 | All, Activities, Emails, Tasks, Notes, Tickets, Calendar Events, Surveys, Sessions | Real |
 | Slack | Inline `SLACK_DATA` mock |
 | Pulse, Conversations, Revenact Support | "coming soon" |
 
-Emails open a thread panel with a quick reply, and Compose sends through the
-signed-in person's own connected mailbox. Tasks and notes can be created inline.
-Files upload with validation and download through an authenticated blob request.
-CallSense logs a call with an optional transcript, which the backend summarises
-and classifies immediately.
+Emails opened a thread panel with a quick reply, and Compose sent through the
+signed-in person's own connected mailbox. Tasks and notes could be created
+inline. Files uploaded with validation and downloaded through an
+authenticated blob request. CallSense logged a call with an optional
+transcript, which the backend summarised and classified immediately — all of
+which the Story's own + Add and Files/Calls tabs carry forward.
 
 ### 4.5 Pipelines
 

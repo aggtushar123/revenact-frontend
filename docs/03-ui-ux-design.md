@@ -183,7 +183,7 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 | Contacts list and profile (`components/contacts/`) | `/contacts`: `ContactsToolbar` (summary line, search, organisation, account, sentiment and role filters in the URL, + Add), `ContactList` of `ContactListItem`s (never a table row; Load more), `ContactProfile` (sentiment and why, then `HistoryItems`: calls newest first, emails, tickets). See "Contacts" below |
 | `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by Pipelines |
 | Dashboard tables | `AccountHealthDetailTable`, `RenewalQueueTable`, `ActivityDetailedTable`, `GoingDarkTable`, `SwingTable` |
-| `PinnedAttributes` | Label and value pairs typed as text, truncated, dot, owner or pulse |
+| `PinnedAttributes` *(unused — no route renders it; kept for a later cleanup PR, see §4.4 of docs/04-app-flow.md)* | Label and value pairs typed as text, truncated, dot, owner or pulse |
 | `EntityAvatar` | Company logo, else deterministic initials in one of five semantic hues |
 | `PresenceStrip` | Session participants, maximum five |
 
