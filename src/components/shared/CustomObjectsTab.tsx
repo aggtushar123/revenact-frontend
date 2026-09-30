@@ -36,6 +36,12 @@ function titleOf(definition: CustomObjectDefinition, record: CustomObjectRecord)
   return value === '—' ? `${definition.name} ${record.id}` : value;
 }
 
+/** House rule: DM Mono is for numbers (and the digits in a formatted date),
+ *  never for plain or picklist text. */
+function isNumericFieldType(fieldType: CustomFieldDefinition['field_type']): boolean {
+  return fieldType === 'number' || fieldType === 'currency' || fieldType === 'date';
+}
+
 /** The add and edit forms: a label above each input (the input carries it too). */
 function RecordFields({
   fields,
@@ -275,7 +281,9 @@ export function CustomObjectsTab({ customerId, accountId, onCountChange }: Custo
                             {rest.map((field) => (
                               <div key={field.id} className="inline-flex min-w-0 gap-1">
                                 <dt>{field.name}</dt>
-                                <dd className="font-mono-brand tabular-nums text-ink">{displayValue(field, record)}</dd>
+                                <dd className={isNumericFieldType(field.field_type) ? 'font-mono-brand tabular-nums text-ink' : 'text-ink'}>
+                                  {displayValue(field, record)}
+                                </dd>
                               </div>
                             ))}
                           </dl>

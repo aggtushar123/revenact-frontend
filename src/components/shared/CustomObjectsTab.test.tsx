@@ -125,6 +125,30 @@ describe('CustomObjectsTab', () => {
     expect(document.querySelector('[data-summary]')).toHaveTextContent('1 record · 1 object');
   });
 
+  it('puts DM Mono only on numeric and date field values (house rule: numbers only), plain text otherwise', async () => {
+    const fields = [
+      { id: 9, name: 'Product', api_name: 'product', field_type: 'text', field_type_display: 'Text', is_required: true, picklist_options: [], order: 1, created_at: '2026-09-06T00:00:00Z' },
+      { id: 10, name: 'Quantity', api_name: 'qty', field_type: 'number', field_type_display: 'Number', is_required: false, picklist_options: [], order: 2, created_at: '2026-09-06T00:00:00Z' },
+      { id: 11, name: 'Region', api_name: 'region', field_type: 'text', field_type_display: 'Text', is_required: false, picklist_options: [], order: 3, created_at: '2026-09-06T00:00:00Z' },
+      { id: 12, name: 'Renews', api_name: 'renews', field_type: 'date', field_type_display: 'Date', is_required: false, picklist_options: [], order: 4, created_at: '2026-09-06T00:00:00Z' },
+    ];
+    stubFetch((url) => {
+      if (url.includes('/custom-objects/definitions/')) return jsonResponse(200, [lineItemDefinition({ fields })]);
+      if (url.includes('/custom-objects/records/'))
+        return jsonResponse(200, [lineItemRecord({ data: { product: 'Seat License', qty: 50, region: 'EMEA', renews: '2026-12-01' } })]);
+      return undefined;
+    });
+
+    render(<CustomObjectsTab accountId={17} />);
+
+    const item = (await screen.findByRole('heading', { name: 'Seat License' })).closest('li')!;
+    const valueFor = (label: string) => within(item).getByText(label).closest('div')!.querySelector('dd')!;
+    expect(valueFor('Quantity')).toHaveClass('font-mono-brand', 'tabular-nums');
+    expect(valueFor('Renews')).toHaveClass('font-mono-brand', 'tabular-nums');
+    expect(valueFor('Region')).not.toHaveClass('font-mono-brand');
+    expect(valueFor('Region')).not.toHaveClass('tabular-nums');
+  });
+
   it('reports the real total record count once loaded', async () => {
     stubFetch((url) => {
       if (url.includes('/custom-objects/definitions/')) return jsonResponse(200, [lineItemDefinition()]);
