@@ -45,15 +45,19 @@ export function RowSkeleton({ count }: { count: number }) {
   );
 }
 
-export function ErrorBlock({ message, onRetry }: { message: string; onRetry: () => void }) {
+/** Retry renders only when `onRetry` is given — some callers (a shared tab
+ *  mounted by a page that doesn't own that fetch's retry) have none. */
+export function ErrorBlock({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="rounded-xl bg-surface">
       <ErrorState message={message} detail="Nothing is shown rather than a partial list." />
-      <div className="flex justify-center pb-6">
-        <button type="button" onClick={onRetry} className={`${QUIET} border border-line`}>
-          Try again
-        </button>
-      </div>
+      {onRetry ? (
+        <div className="flex justify-center pb-6">
+          <button type="button" onClick={onRetry} className={`${QUIET} border border-line`}>
+            Try again
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

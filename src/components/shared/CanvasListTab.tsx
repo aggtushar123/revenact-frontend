@@ -9,7 +9,6 @@ import { ListSkeleton, SummaryLine } from '../organizations/detail/ListParts';
 import { LIST, META, ROW_ACTION, ROW_ICON, TITLE_BUTTON } from '../organizations/detail/listStyles';
 import { EmptyState, ErrorBlock } from '../organizations/portfolio/PortfolioSections';
 import { BUTTON } from '../organizations/portfolio/styles';
-import { ErrorState } from '../../pages/dashboard/shared/DataState';
 
 export interface CanvasListTabProps {
   canvases: Canvas[];
@@ -57,13 +56,7 @@ export function CanvasListTab({ canvases, isLoading, error, customerId, accountI
 
   let body: ReactNode;
   if (error) {
-    body = onRetry ? (
-      <ErrorBlock message={error} onRetry={onRetry} />
-    ) : (
-      <div className="rounded-xl bg-surface">
-        <ErrorState message={error} detail="Nothing is shown rather than a partial list." />
-      </div>
-    );
+    body = <ErrorBlock message={error} onRetry={onRetry} />;
   } else if (isLoading) {
     body = <ListSkeleton label="Loading canvases" />;
   } else if (canvases.length === 0) {
