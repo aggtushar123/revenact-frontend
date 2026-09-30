@@ -128,7 +128,7 @@ export function FilterSheetFooter({
         <Download className="w-4 h-4" aria-hidden="true" />
         {exporting ? 'Exporting…' : 'Export'}
       </button>
-      <button type="button" onClick={onAdd} className={`${PRIMARY} min-h-11 justify-center`}>
+      <button type="button" onClick={onAdd} className={`${PRIMARY} justify-center`}>
         <Plus className="w-4 h-4" aria-hidden="true" />
         {addLabel}
       </button>
