@@ -938,6 +938,10 @@ interface CustomersState {
   entityCanvases: Canvas[];
   entityCanvasesLoading: boolean;
   entityCanvasesError: string | null;
+  /** The last fetchCanvasesForCustomer/ForAccount asked for: a slower,
+   *  earlier read (another Customer's or Account's) never lands after a
+   *  newer one already has — same guard as `filesSlice`'s `requestId`. */
+  entityCanvasesRequestId?: string;
   /** Every Canvas the caller's organisation owns — the standalone
    * Canvas gallery, unpaginated, same reasoning as `surveys` above. */
   canvases: Canvas[];
@@ -3098,31 +3102,39 @@ const customersSlice = createSlice({
         state.canvases = state.canvases.filter((c) => c.id !== action.payload);
         state.entityCanvases = state.entityCanvases.filter((c) => c.id !== action.payload);
       })
-      .addCase(fetchCanvasesForCustomer.pending, (state) => {
+      .addCase(fetchCanvasesForCustomer.pending, (state, action) => {
         state.entityCanvasesLoading = true;
         state.entityCanvasesError = null;
+        state.entityCanvasesRequestId = action.meta.requestId;
         // Same "clear on pending" convention as fetchSurveysForCustomer
         // above — avoids a stale previous entity's canvases flashing.
         state.entityCanvases = [];
       })
       .addCase(fetchCanvasesForCustomer.fulfilled, (state, action) => {
+        // A slower, earlier read (this or fetchCanvasesForAccount's) landing
+        // after a newer one already has: never overwrite it.
+        if (action.meta.requestId !== state.entityCanvasesRequestId) return;
         state.entityCanvasesLoading = false;
         state.entityCanvases = action.payload;
       })
       .addCase(fetchCanvasesForCustomer.rejected, (state, action) => {
+        if (action.meta.requestId !== state.entityCanvasesRequestId) return;
         state.entityCanvasesLoading = false;
         state.entityCanvasesError = action.payload ?? 'Could not load canvases.';
       })
-      .addCase(fetchCanvasesForAccount.pending, (state) => {
+      .addCase(fetchCanvasesForAccount.pending, (state, action) => {
         state.entityCanvasesLoading = true;
         state.entityCanvasesError = null;
+        state.entityCanvasesRequestId = action.meta.requestId;
         state.entityCanvases = [];
       })
       .addCase(fetchCanvasesForAccount.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.entityCanvasesRequestId) return;
         state.entityCanvasesLoading = false;
         state.entityCanvases = action.payload;
       })
       .addCase(fetchCanvasesForAccount.rejected, (state, action) => {
+        if (action.meta.requestId !== state.entityCanvasesRequestId) return;
         state.entityCanvasesLoading = false;
         state.entityCanvasesError = action.payload ?? 'Could not load canvases.';
       })
