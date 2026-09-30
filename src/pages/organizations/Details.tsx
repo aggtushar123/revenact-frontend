@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
@@ -13,7 +13,6 @@ import {
 } from '../../features/organizations/detailParams';
 import { parseOrganizationId, type DetailNames } from '../../features/organizations/detailAskContext';
 import { bulkUpdate } from '../../features/organizations/portfolioApi';
-import type { PanelKey } from '../../features/organizations/portfolioFields';
 import { storyQuery } from '../../features/organizations/storyApi';
 import { ChurnOrganizationModal } from '../../components/organizations/ChurnOrganizationModal';
 import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
@@ -27,9 +26,11 @@ import { HeaderTiles } from '../../components/organizations/detail/HeaderTiles';
 import { KnowledgeTab } from '../../components/organizations/detail/KnowledgeTab';
 import { OrganizationHeader } from '../../components/organizations/detail/OrganizationHeader';
 import { PeopleTab } from '../../components/organizations/detail/PeopleTab';
+import { HeaderSkeleton, TabSkeleton } from '../../components/organizations/detail/Skeletons';
 import { StoryTab } from '../../components/organizations/detail/StoryTab';
 import { useDetailParams } from '../../components/organizations/detail/useDetailParams';
 import { useOrganization } from '../../components/organizations/detail/useOrganization';
+import { usePanelJump } from '../../components/organizations/detail/usePanelJump';
 import { useStory } from '../../components/organizations/detail/useStory';
 import { useChipCounts } from '../../components/organizations/detail/useChipCounts';
 import { EmptyState, ErrorBlock } from '../../components/organizations/portfolio/PortfolioSections';
@@ -64,40 +65,6 @@ function Centered({ children }: { children: ReactNode }) {
     <OrganizationsFrame bleed>
       <div className={`${PAGE_COLUMN} py-6`}>{children}</div>
     </OrganizationsFrame>
-  );
-}
-
-/** A tab's content before the organization's row lands. */
-function TabSkeleton({ label }: { label: string }) {
-  return (
-    <div role="status" aria-label={label} className="flex flex-col gap-3">
-      {[0, 1].map((i) => (
-        <div key={i} aria-hidden="true" className="flex flex-col gap-2 rounded-xl bg-surface p-3">
-          <span className="block h-3 w-32 animate-pulse rounded bg-subtle" />
-          <span className="block h-3 w-full animate-pulse rounded bg-subtle" />
-          <span className="block h-3 w-2/3 animate-pulse rounded bg-subtle" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function HeaderSkeleton({ isSm }: { isSm: boolean }) {
-  return (
-    <div role="status" aria-label="Loading organization" className="flex flex-col gap-3">
-      <div aria-hidden="true" className="flex items-center gap-3">
-        <span className="h-11 w-11 animate-pulse rounded-full bg-subtle" />
-        <span className="flex flex-col gap-1.5">
-          <span className="block h-5 w-48 animate-pulse rounded bg-subtle" />
-          <span className="block h-3 w-64 animate-pulse rounded bg-subtle" />
-        </span>
-      </div>
-      <div aria-hidden="true" className={isSm ? 'grid grid-cols-4 gap-3' : 'flex gap-3 overflow-hidden'}>
-        {[0, 1, 2, 3].map((i) => (
-          <span key={i} className="block h-24 min-w-[11rem] animate-pulse rounded-xl bg-surface sm:min-w-0" />
-        ))}
-      </div>
-    </div>
   );
 }
 
@@ -170,27 +137,9 @@ function OrganizationPage({ id }: { id: string | undefined }) {
   const [addingAccount, setAddingAccount] = useState(false);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
 
-  // A tile jumps to its Details panel: the tab switches, then the panel
-  // scrolls into view and takes focus. Each jump is numbered, so a second
-  // jump while already on Details still moves.
-  const [jump, setJump] = useState<{ panel: PanelKey; n: number } | null>(null);
-  const handledJump = useRef(0);
-  const jumpTo = useCallback(
-    (panel: PanelKey) => {
-      setJump((prev) => ({ panel, n: (prev?.n ?? 0) + 1 }));
-      update({ tab: 'details' });
-    },
-    [update],
-  );
-  useEffect(() => {
-    if (!jump || jump.n === handledJump.current || params.tab !== 'details' || !org.row) return;
-    handledJump.current = jump.n;
-    const section = document.querySelector<HTMLElement>(`[data-panel="${jump.panel}"]`);
-    if (!section) return;
-    section.setAttribute('tabindex', '-1');
-    section.scrollIntoView?.({ block: 'start' });
-    section.focus();
-  }, [jump, params.tab, org.row]);
+  // A tile jumps to its Details panel (usePanelJump).
+  const openDetails = useCallback(() => update({ tab: 'details' }), [update]);
+  const jumpTo = usePanelJump(params.tab === 'details', org.row !== null, openDetails);
 
   if (orgId === null || org.notFound) {
     return (
@@ -235,7 +184,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
             <HeaderTiles row={row} customer={org.customer} customerError={org.customerError} isSm={isSm} onJump={jumpTo} />
           </section>
         ) : (
-          <HeaderSkeleton isSm={isSm} />
+          <HeaderSkeleton isSm={isSm} label="Loading organization" />
         )}
 
         {row && org.error ? (
