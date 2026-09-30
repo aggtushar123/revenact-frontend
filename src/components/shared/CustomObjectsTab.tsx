@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Boxes, Plus, Trash2, Pencil } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { ApiError } from '../../lib/apiClient';
 import {
   createCustomObjectRecord,
@@ -12,34 +12,67 @@ import { displayValue } from '../../features/customObjects/displayValue';
 import { FieldInput } from '../../features/customObjects/FieldInput';
 import { initialFormValues, toPayload } from '../../features/customObjects/recordForm';
 import type { FormValues } from '../../features/customObjects/recordForm';
-import type { CustomObjectDefinition, CustomObjectRecord } from '../../features/customObjects/types';
+import type { CustomFieldDefinition, CustomObjectDefinition, CustomObjectRecord } from '../../features/customObjects/types';
 import { ConfirmDialog } from '../organizations/ConfirmDialog';
+import { ListSkeleton, SummaryLine } from '../organizations/detail/ListParts';
+import { LIST, META, ROW_ACTION, SECTION_HEADING } from '../organizations/detail/listStyles';
+import { EmptyState, ErrorBlock } from '../organizations/portfolio/PortfolioSections';
+import { BUTTON, PRIMARY, QUIET } from '../organizations/portfolio/styles';
 
 export interface CustomObjectsTabProps {
-  /** Set on the Organization Details page's own Custom Objects tab. */
+  /** Set on an organization's page. */
   customerId?: number;
-  /** Set on the standalone Account page's own Custom Objects tab. */
+  /** Set on an account's page. */
   accountId?: number;
-  /** Reports the real total record count across every applicable
-   * object once loaded, so the hosting Details page can show it on
-   * the tab label itself instead of today's hardcoded `2`/`0`. */
+  /** Reports the total record count across every applicable object once
+   *  loaded; the tab shows it itself as its summary line. */
   onCountChange?: (count: number) => void;
 }
 
-// Shared between the Organization Details page's own Custom Objects tab
-// and the standalone Account page's — same "one component, driven by
-// whichever of customerId/accountId is set" shape as ContactsTab/
-// PipelinesTab/CanvasListTab. Unlike those, this fetches its own data
-// directly (definitions, then each applicable one's own records)
-// rather than through customersSlice — custom objects are entirely
-// admin-defined and dynamic, not a fixed entity the rest of that slice
-// already knows how to load, same "self-contained feature fetches its
-// own data" reasoning as CockpitView.tsx/WebhooksPage.tsx.
+/** An item's title: its first field's value, else the object's name and the record's id. */
+function titleOf(definition: CustomObjectDefinition, record: CustomObjectRecord): string {
+  const first = definition.fields[0];
+  const value = first ? displayValue(first, record) : '—';
+  return value === '—' ? `${definition.name} ${record.id}` : value;
+}
+
+/** The add and edit forms: a label above each input (the input carries it too). */
+function RecordFields({
+  fields,
+  values,
+  onChange,
+}: {
+  fields: CustomFieldDefinition[];
+  values: FormValues;
+  onChange: (apiName: string, value: string | boolean) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {fields.map((field) => (
+        <div key={field.id} className="flex flex-col gap-1">
+          <span aria-hidden="true" className="text-[11px] font-semibold text-ink-muted">
+            {field.name}
+            {field.is_required ? ' (required)' : ''}
+          </span>
+          <FieldInput field={field} value={values[field.api_name] ?? ''} onChange={(value) => onChange(field.api_name, value)} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Custom objects (account spec 2026-09-29 §2.9a): each object that applies
+ *  to this parent, its records as list items (never a table): the first
+ *  field as the title, the others by name. Add, edit and delete in place.
+ *  Reads its own data (definitions, then each object's records), since
+ *  custom objects are admin-defined and dynamic. */
 export function CustomObjectsTab({ customerId, accountId, onCountChange }: CustomObjectsTabProps) {
+  const baseId = useId();
   const [definitions, setDefinitions] = useState<CustomObjectDefinition[]>([]);
   const [recordsByDefinition, setRecordsByDefinition] = useState<Record<number, CustomObjectRecord[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   const [addingForId, setAddingForId] = useState<number | null>(null);
   const [addValues, setAddValues] = useState<FormValues>({});
@@ -49,7 +82,7 @@ export function CustomObjectsTab({ customerId, accountId, onCountChange }: Custo
   const [editingRecord, setEditingRecord] = useState<CustomObjectRecord | null>(null);
   const [editValues, setEditValues] = useState<FormValues>({});
 
-  const [deleteTarget, setDeleteTarget] = useState<CustomObjectRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<{ record: CustomObjectRecord; title: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -57,13 +90,9 @@ export function CustomObjectsTab({ customerId, accountId, onCountChange }: Custo
     async function load() {
       try {
         const allDefinitions = await fetchCustomObjectDefinitions();
-        const applicable = allDefinitions.filter((d) =>
-          customerId !== undefined ? d.applies_to_customer : d.applies_to_account
-        );
+        const applicable = allDefinitions.filter((d) => (customerId !== undefined ? d.applies_to_customer : d.applies_to_account));
         const parent = customerId !== undefined ? { customerId } : { accountId: accountId! };
-        const recordLists = await Promise.all(
-          applicable.map((definition) => fetchCustomObjectRecords(definition.id, parent))
-        );
+        const recordLists = await Promise.all(applicable.map((definition) => fetchCustomObjectRecords(definition.id, parent)));
         if (cancelled) return;
 
         setDefinitions(applicable);
@@ -83,15 +112,19 @@ export function CustomObjectsTab({ customerId, accountId, onCountChange }: Custo
     return () => {
       cancelled = true;
     };
-  }, [customerId, accountId]);
+  }, [customerId, accountId, attempt]);
 
-  // Derived from the same state that actually renders the tables below,
-  // rather than recomputed by hand at every add/delete call site — one
-  // real source of truth for "how many records exist right now."
+  // Derived from the state the list renders: one source for "how many records exist now".
+  const total = Object.values(recordsByDefinition).reduce((sum, records) => sum + records.length, 0);
   useEffect(() => {
-    const total = Object.values(recordsByDefinition).reduce((sum, records) => sum + records.length, 0);
     onCountChange?.(total);
-  }, [recordsByDefinition, onCountChange]);
+  }, [total, onCountChange]);
+
+  function retry() {
+    setLoadError(null);
+    setIsLoading(true);
+    setAttempt((n) => n + 1);
+  }
 
   function startAdding(definition: CustomObjectDefinition) {
     setAddingForId(definition.id);
@@ -146,190 +179,141 @@ export function CustomObjectsTab({ customerId, accountId, onCountChange }: Custo
     }
   }
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40">
-        <span className="text-sm font-semibold text-ink-faint">Loading custom objects…</span>
-      </div>
-    );
-  }
-
-  if (loadError) {
-    return (
-      <div className="flex flex-col items-center justify-center flex-1 py-16">
-        <span className="text-sm font-semibold text-danger">{loadError}</span>
-      </div>
-    );
-  }
-
+  if (isLoading) return <ListSkeleton label="Loading custom objects" />;
+  if (loadError) return <ErrorBlock message={loadError} onRetry={retry} />;
   if (definitions.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center flex-1 py-16 opacity-40 gap-2">
-        <Boxes className="w-10 h-10 text-ink-faint" />
-        <span className="text-sm font-semibold text-ink-faint">No custom objects yet</span>
-        <span className="text-[12px] text-ink-faint">An organisation admin can add one in Settings → Custom Objects.</span>
-      </div>
+      <EmptyState
+        title="No custom objects yet"
+        detail="An organization admin can add one in Settings, under Custom objects."
+        action={null}
+      />
     );
   }
 
+  const formErrorLine = formError ? (
+    <p role="alert" className="text-[13px] text-danger">
+      {formError}
+    </p>
+  ) : null;
+
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar px-8 py-6 bg-subtle/40 font-sans flex flex-col gap-5">
+    <div className="flex flex-col gap-4">
+      <SummaryLine
+        parts={[
+          { value: String(total), label: total === 1 ? 'record' : 'records' },
+          { value: String(definitions.length), label: definitions.length === 1 ? 'object' : 'objects' },
+        ]}
+      />
       {definitions.map((definition) => {
         const records = recordsByDefinition[definition.id] ?? [];
-        const fields = definition.fields;
+        const headingId = `${baseId}-${definition.id}`;
+        const rest = definition.fields.slice(1);
         return (
-          <div key={definition.id} className="bg-surface rounded-xl border border-line/80 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-3 border-b border-line-subtle">
-              <h3 className="text-[13.5px] font-bold text-ink">{definition.name}</h3>
-              <button
-                onClick={() => startAdding(definition)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Add row
+          <section key={definition.id} aria-labelledby={headingId} className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 id={headingId} className={SECTION_HEADING}>
+                {definition.name}
+              </h2>
+              <button type="button" onClick={() => startAdding(definition)} className={BUTTON}>
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add record
               </button>
             </div>
 
-            {addingForId === definition.id && (
-              <div className="flex flex-col gap-2.5 p-4 bg-subtle/30 border-b border-line-subtle">
-                <div className="flex flex-wrap gap-2.5">
-                  {fields.map((field) => (
-                    <div key={field.id} className="flex flex-col gap-1 min-w-[140px]">
-                      <label className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">
-                        {field.name}
-                        {field.is_required && ' *'}
-                      </label>
-                      <FieldInput
-                        field={field}
-                        value={addValues[field.api_name] ?? ''}
-                        onChange={(value) => setAddValues((v) => ({ ...v, [field.api_name]: value }))}
-                      />
-                    </div>
-                  ))}
-                </div>
-                {formError && <p className="text-[12px] text-danger">{formError}</p>}
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => handleAdd(definition)}
-                    disabled={isSubmitting}
-                    className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold transition-colors disabled:opacity-50"
-                  >
+            {addingForId === definition.id ? (
+              <div className="flex flex-col gap-3 rounded-xl bg-surface p-3">
+                <RecordFields
+                  fields={definition.fields}
+                  values={addValues}
+                  onChange={(apiName, value) => setAddValues((v) => ({ ...v, [apiName]: value }))}
+                />
+                {formErrorLine}
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => handleAdd(definition)} disabled={isSubmitting} className={PRIMARY}>
                     {isSubmitting ? 'Adding…' : 'Add'}
                   </button>
-                  <button
-                    onClick={() => setAddingForId(null)}
-                    className="text-[12px] font-semibold text-ink-muted hover:text-ink"
-                  >
+                  <button type="button" onClick={() => setAddingForId(null)} className={QUIET}>
                     Cancel
                   </button>
                 </div>
               </div>
-            )}
+            ) : null}
 
             {records.length === 0 && addingForId !== definition.id ? (
-              <p className="text-[12.5px] text-ink-faint font-medium px-4 py-6 text-center">No records yet.</p>
-            ) : (
-              records.length > 0 && (
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-subtle/40 border-b border-line-subtle">
-                      {fields.map((field) => (
-                        <th key={field.id} className="px-4 py-2 text-[11px] font-bold text-ink-faint uppercase tracking-wider">
-                          {field.name}
-                        </th>
-                      ))}
-                      <th className="px-4 py-2 w-16"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line-subtle">
-                    {records.map((record) =>
-                      editingRecord?.id === record.id ? (
-                        <tr key={record.id}>
-                          <td colSpan={fields.length + 1} className="p-3 bg-subtle/30">
-                            <div className="flex flex-wrap gap-2.5">
-                              {fields.map((field) => (
-                                <div key={field.id} className="flex flex-col gap-1 min-w-[140px]">
-                                  <label className="text-[11px] font-bold text-ink-faint uppercase tracking-wide">
-                                    {field.name}
-                                  </label>
-                                  <FieldInput
-                                    field={field}
-                                    value={editValues[field.api_name] ?? ''}
-                                    onChange={(value) => setEditValues((v) => ({ ...v, [field.api_name]: value }))}
-                                  />
-                                </div>
-                              ))}
-                            </div>
-                            {formError && <p className="text-[12px] text-danger mt-2">{formError}</p>}
-                            <div className="flex items-center gap-3 mt-2.5">
-                              <button
-                                onClick={() => handleSaveEdit(definition)}
-                                disabled={isSubmitting}
-                                className="px-3 py-1.5 bg-accent hover:bg-accent-hover text-on-accent rounded-lg text-[12px] font-bold transition-colors disabled:opacity-50"
-                              >
-                                {isSubmitting ? 'Saving…' : 'Save'}
-                              </button>
-                              <button
-                                onClick={() => setEditingRecord(null)}
-                                className="text-[12px] font-semibold text-ink-muted hover:text-ink"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ) : (
-                        <tr key={record.id} className="hover:bg-subtle/40 transition-colors">
-                          {fields.map((field) => (
-                            <td key={field.id} className="px-4 py-2.5 text-[12.5px] text-ink font-medium">
-                              {displayValue(field, record)}
-                            </td>
-                          ))}
-                          <td className="px-4 py-2.5 text-right whitespace-nowrap">
-                            <button
-                              onClick={() => startEditing(record, definition)}
-                              aria-label="Edit record"
-                              className="p-1.5 hover:bg-subtle rounded-md text-ink-faint hover:text-accent transition-all"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setDeleteTarget(record)}
-                              aria-label="Delete record"
-                              className="p-1.5 hover:bg-subtle rounded-md text-ink-faint hover:text-danger transition-all"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </tbody>
-                </table>
-              )
-            )}
-          </div>
+              <p className="rounded-xl bg-surface px-3 py-4 text-[13px] text-ink-muted">No {definition.name} records yet.</p>
+            ) : records.length > 0 ? (
+              <ul aria-label={definition.name} className={LIST}>
+                {records.map((record) => {
+                  const title = titleOf(definition, record);
+                  if (editingRecord?.id === record.id) {
+                    return (
+                      <li key={record.id} data-record={record.id} className="flex flex-col gap-3 px-3 py-2.5">
+                        <RecordFields
+                          fields={definition.fields}
+                          values={editValues}
+                          onChange={(apiName, value) => setEditValues((v) => ({ ...v, [apiName]: value }))}
+                        />
+                        {formErrorLine}
+                        <div className="flex items-center gap-2">
+                          <button type="button" onClick={() => handleSaveEdit(definition)} disabled={isSubmitting} className={PRIMARY}>
+                            {isSubmitting ? 'Saving…' : 'Save'}
+                          </button>
+                          <button type="button" onClick={() => setEditingRecord(null)} className={QUIET}>
+                            Cancel
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  }
+                  return (
+                    <li key={record.id} data-record={record.id} className="flex items-start gap-3 px-3 py-2.5">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-[13px] font-semibold text-ink">{title}</h3>
+                        {rest.length ? (
+                          <dl className={META}>
+                            {rest.map((field) => (
+                              <div key={field.id} className="inline-flex min-w-0 gap-1">
+                                <dt>{field.name}</dt>
+                                <dd className="font-mono-brand tabular-nums text-ink">{displayValue(field, record)}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        ) : null}
+                      </div>
+                      <button type="button" onClick={() => startEditing(record, definition)} aria-label={`Edit ${title}`} className={ROW_ACTION}>
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                      <button type="button" onClick={() => setDeleteTarget({ record, title })} aria-label={`Delete ${title}`} className={ROW_ACTION}>
+                        <Trash2 className="h-4 w-4" aria-hidden="true" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </section>
         );
       })}
 
-      {deleteTarget && (
+      {deleteTarget ? (
         <ConfirmDialog
-          title="Delete this record?"
+          title={`Delete ${deleteTarget.title}?`}
           message="This can't be undone."
           confirmLabel="Delete"
           danger
           onConfirm={async () => {
-            await deleteCustomObjectRecord(deleteTarget.id);
+            await deleteCustomObjectRecord(deleteTarget.record.id);
             setRecordsByDefinition((current) => ({
               ...current,
-              [deleteTarget.object_definition_id]: current[deleteTarget.object_definition_id].filter(
-                (r) => r.id !== deleteTarget.id
+              [deleteTarget.record.object_definition_id]: current[deleteTarget.record.object_definition_id].filter(
+                (r) => r.id !== deleteTarget.record.id
               ),
             }));
           }}
           onClose={() => setDeleteTarget(null)}
         />
-      )}
+      ) : null}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CustomObjectsTab } from './CustomObjectsTab';
 
@@ -104,11 +104,12 @@ describe('CustomObjectsTab', () => {
 
     render(<CustomObjectsTab accountId={17} />);
 
-    expect(await screen.findByText('Opportunity Line Item')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Opportunity Line Item' })).toBeInTheDocument();
     expect(screen.queryByText('Renewal Note')).not.toBeInTheDocument();
+    expect(screen.getByText('No Opportunity Line Item records yet.')).toBeInTheDocument();
   });
 
-  it('renders real records in a table with columns for each real field', async () => {
+  it('lists each record as an item: its first field as the title, the others by name, never a table', async () => {
     stubFetch((url) => {
       if (url.includes('/custom-objects/definitions/')) return jsonResponse(200, [lineItemDefinition()]);
       if (url.includes('/custom-objects/records/')) return jsonResponse(200, [lineItemRecord()]);
@@ -117,10 +118,11 @@ describe('CustomObjectsTab', () => {
 
     render(<CustomObjectsTab accountId={17} />);
 
-    expect(await screen.findByText('Seat License')).toBeInTheDocument();
-    expect(screen.getByText('50')).toBeInTheDocument();
-    expect(screen.getByText('Product')).toBeInTheDocument();
-    expect(screen.getByText('Quantity')).toBeInTheDocument();
+    const item = (await screen.findByRole('heading', { name: 'Seat License' })).closest('li')!;
+    expect(within(item).getByText('Quantity')).toBeInTheDocument();
+    expect(within(item).getByText('50')).toBeInTheDocument();
+    expect(document.querySelector('table')).toBeNull();
+    expect(document.querySelector('[data-summary]')).toHaveTextContent('1 record · 1 object');
   });
 
   it('reports the real total record count once loaded', async () => {
@@ -132,13 +134,13 @@ describe('CustomObjectsTab', () => {
     const onCountChange = vi.fn();
 
     render(<CustomObjectsTab accountId={17} onCountChange={onCountChange} />);
-    await screen.findAllByText('Seat License');
+    await screen.findAllByRole('heading', { name: 'Seat License' });
 
     // The count is reported from an effect after the rows render, so wait for it.
     await waitFor(() => expect(onCountChange).toHaveBeenCalledWith(2));
   });
 
-  it('adding a row posts real data and shows the new record', async () => {
+  it('adding a record posts real data and shows the new record', async () => {
     stubFetch((url, options) => {
       if (url.includes('/custom-objects/definitions/')) return jsonResponse(200, [lineItemDefinition({ records_count: 0 })]);
       if (options?.method === 'POST') {
@@ -151,14 +153,14 @@ describe('CustomObjectsTab', () => {
     const user = userEvent.setup();
 
     render(<CustomObjectsTab accountId={17} />);
-    await screen.findByText('Opportunity Line Item');
+    await screen.findByRole('heading', { name: 'Opportunity Line Item' });
 
-    await user.click(screen.getByRole('button', { name: /Add row/ }));
+    await user.click(screen.getByRole('button', { name: 'Add record' }));
     await user.type(screen.getByLabelText('Product'), 'Enterprise Plan');
     await user.type(screen.getByLabelText('Quantity'), '10');
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
-    expect(await screen.findByText('Enterprise Plan')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Enterprise Plan' })).toBeInTheDocument();
     expect(screen.getByText('10')).toBeInTheDocument();
   });
 
@@ -172,11 +174,11 @@ describe('CustomObjectsTab', () => {
     const user = userEvent.setup();
 
     render(<CustomObjectsTab accountId={17} />);
-    await screen.findByText('Opportunity Line Item');
-    await user.click(screen.getByRole('button', { name: /Add row/ }));
+    await screen.findByRole('heading', { name: 'Opportunity Line Item' });
+    await user.click(screen.getByRole('button', { name: 'Add record' }));
     await user.click(screen.getByRole('button', { name: 'Add' }));
 
-    expect(await screen.findByText('Product is required.')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Product is required.');
   });
 
   it('editing a record saves real changes', async () => {
@@ -192,15 +194,15 @@ describe('CustomObjectsTab', () => {
     const user = userEvent.setup();
 
     render(<CustomObjectsTab accountId={17} />);
-    await screen.findByText('Seat License');
+    await screen.findByRole('heading', { name: 'Seat License' });
 
-    await user.click(screen.getByRole('button', { name: 'Edit record' }));
+    await user.click(screen.getByRole('button', { name: 'Edit Seat License' }));
     const productInput = screen.getByLabelText('Product');
     await user.clear(productInput);
     await user.type(productInput, 'Seat License Renewed');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(await screen.findByText('Seat License Renewed')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Seat License Renewed' })).toBeInTheDocument();
   });
 
   it('deleting a record removes it after confirming', async () => {
@@ -213,11 +215,27 @@ describe('CustomObjectsTab', () => {
     const user = userEvent.setup();
 
     render(<CustomObjectsTab accountId={17} />);
-    await screen.findByText('Seat License');
+    await screen.findByRole('heading', { name: 'Seat License' });
 
-    await user.click(screen.getByRole('button', { name: 'Delete record' }));
+    await user.click(screen.getByRole('button', { name: 'Delete Seat License' }));
     await user.click(screen.getByRole('button', { name: 'Delete' }));
 
-    expect(screen.queryByText('Seat License')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Seat License' })).not.toBeInTheDocument());
+  });
+
+  it('says so when the read fails, and Try again reads again', async () => {
+    let fail = true;
+    stubFetch((url) => {
+      if (url.includes('/custom-objects/definitions/')) return fail ? jsonResponse(500, { detail: 'Try later.' }) : jsonResponse(200, [lineItemDefinition()]);
+      if (url.includes('/custom-objects/records/')) return jsonResponse(200, [lineItemRecord()]);
+      return undefined;
+    });
+    const user = userEvent.setup();
+
+    render(<CustomObjectsTab accountId={17} />);
+    expect(await screen.findByText('Try later.')).toBeInTheDocument();
+    fail = false;
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await screen.findByRole('heading', { name: 'Seat License' })).toBeInTheDocument();
   });
 });
