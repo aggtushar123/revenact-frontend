@@ -201,4 +201,26 @@ describe('the Pipelines stub', () => {
     expect(page.results).toHaveLength(1);
     expect(page.results[0]).toMatchObject({ mrr: 400, owner: { id: 2, name: 'Carl CSM' }, date: { value: null, days: null }, priority: { value: 'medium' } });
   });
+
+  it('creates on the parent a scoped route names, and records those writes', async () => {
+    const spy = stubPipelines();
+    await apiFetch('/customers/1/opportunities/', { method: 'POST', body: { title: 'On Globex' } });
+    await apiFetch('/customers/7/accounts/12/opportunities/', { method: 'POST', body: { title: 'On EMEA' } });
+    await apiFetch('/accounts/14/risks/', { method: 'POST', body: { title: 'On APAC' } });
+    const parents = async (kind: 'opportunities' | 'risks', search: string) =>
+      (await fetchPipeline(kind, `search=${search}`)).results.map((row) => [row.title, row.parent.type, row.parent.id]);
+    expect(await parents('opportunities', 'on globex')).toEqual([['On Globex', 'organisation', 1]]);
+    expect(await parents('opportunities', 'on emea')).toEqual([['On EMEA', 'account', 12]]);
+    expect(await parents('risks', 'on apac')).toEqual([['On APAC', 'account', 14]]);
+    expect(recordWrites(spy).map((write) => write.path)).toEqual(['/customers/1/opportunities/', '/customers/7/accounts/12/opportunities/', '/accounts/14/risks/']);
+  });
+
+  it('answers the Add picker\'s searches by name, and an organisation\'s accounts', async () => {
+    stubPipelines();
+    const names = (page: { results: { name: string }[] }) => page.results.map((row) => row.name);
+    expect(names(await apiFetch('/customers/?search=GLOB'))).toEqual(['Globex']);
+    expect(names(await apiFetch('/accounts/?search=apac'))).toEqual(['Initech APAC']);
+    expect(names(await apiFetch('/accounts/'))).toEqual(['Pizza Hut EMEA', 'Initech APAC']);
+    expect((await apiFetch<{ name: string }[]>('/customers/7/accounts/')).map((row) => row.name)).toEqual(['Pizza Hut EMEA']);
+  });
 });

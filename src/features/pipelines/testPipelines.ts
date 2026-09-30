@@ -521,19 +521,61 @@ function bulkError(kindKey: PipelineKindKey, body: Record<string, unknown>): Rec
 function parentOf(books: Record<PipelineKindKey, PipelineRow[]>, type: 'organisation' | 'account', id: number) {
   const known = [...books.opportunities, ...books.risks].find((row) => row.parent.type === type && row.parent.id === id);
   if (known) return { parent: known.parent, companies: known.companies, owner: known.owner };
-  const name = type === 'organisation' ? (PICKER_ORGANISATIONS.find((org) => org.id === id)?.name ?? `Organization ${id}`) : `Account ${id}`;
+  const name = (type === 'organisation' ? PICKER_ORGANISATIONS : PICKER_ACCOUNTS).find((parent) => parent.id === id)?.name ?? `${type === 'organisation' ? 'Organization' : 'Account'} ${id}`;
   return { parent: { type, id, name }, companies: type === 'organisation' ? [{ id, name }] : [], owner: null };
 }
 
-const PICKER_ORGANISATIONS = [
+/** The organisations and accounts the viewer may open, as the Add
+ *  picker's searches list them (a Customer's and an Account's fields that
+ *  the picker reads; the real rows carry more). */
+export const PICKER_ORGANISATIONS = [
   { id: 7, name: 'Pizza Hut' },
   { id: 1, name: 'Globex' },
 ];
+export const PICKER_ACCOUNTS = [
+  { id: 12, name: 'Pizza Hut EMEA', customers: [{ id: 7, name: 'Pizza Hut' }] },
+  { id: 14, name: 'Initech APAC', customers: [] },
+];
+
+/** DRF's PageNumberPagination (PAGE_SIZE 25) over a `?search=` on the name. */
+function searchPage<T extends { name: string }>(rows: T[], query: URLSearchParams) {
+  const search = (query.get('search') ?? '').trim().toLowerCase();
+  const results = rows.filter((row) => row.name.toLowerCase().includes(search));
+  return { count: results.length, next: null, previous: null, results: results.slice(0, 25) };
+}
 
 export function stubPipelines(stub: PipelinesStub = {}) {
   const books: Record<PipelineKindKey, PipelineRow[]> = {
     opportunities: [...(stub.opportunities ?? OPPORTUNITY_ROWS)],
     risks: [...(stub.risks ?? RISK_ROWS)],
+  };
+  /** POST of a new item on its parent, as the backend stores it. */
+  const createItem = (kind: PipelineKindKey, type: 'organisation' | 'account', parentId: number, body: Record<string, unknown>) => {
+    const id = Math.max(0, ...books.opportunities.map((row) => row.id), ...books.risks.map((row) => row.id)) + 1;
+    const where = parentOf(books, type, parentId);
+    const first = PIPELINE_KINDS[kind].stages[0];
+    const row = applyEdit(
+      {
+        ...where,
+        id,
+        kind: PIPELINE_KINDS[kind].item,
+        title: '',
+        mrr: 0,
+        stage: { value: first.value, label: first.label },
+        priority: { value: 'medium', label: 'Medium' },
+        department: { value: '', label: '' },
+        date: { value: null, days: null },
+        open: true,
+        overdue: false,
+        signal: null,
+        stage_changed_at: STUB_NOW,
+        created_at: STUB_NOW,
+      },
+      kind,
+      body,
+    );
+    books[kind].push(row);
+    return json(201, record(kind, row));
   };
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -587,38 +629,26 @@ export function stubPipelines(stub: PipelinesStub = {}) {
     }
     const create = /^\/(opportunities|risks)\/$/.exec(path);
     if (create && method === 'POST') {
-      const kind = create[1] as PipelineKindKey;
-      const id = Math.max(0, ...books.opportunities.map((row) => row.id), ...books.risks.map((row) => row.id)) + 1;
       const onAccount = body.account_id !== undefined && body.account_id !== null;
-      const where = parentOf(books, onAccount ? 'account' : 'organisation', Number(onAccount ? body.account_id : body.customer_id));
-      const first = PIPELINE_KINDS[kind].stages[0];
-      const row = applyEdit(
-        {
-          ...where,
-          id,
-          kind: PIPELINE_KINDS[kind].item,
-          title: '',
-          mrr: 0,
-          stage: { value: first.value, label: first.label },
-          priority: { value: 'medium', label: 'Medium' },
-          department: { value: '', label: '' },
-          date: { value: null, days: null },
-          open: true,
-          overdue: false,
-          signal: null,
-          stage_changed_at: STUB_NOW,
-          created_at: STUB_NOW,
-        },
-        kind,
-        body,
-      );
-      books[kind].push(row);
-      return json(201, record(kind, row));
+      return createItem(create[1] as PipelineKindKey, onAccount ? 'account' : 'organisation', Number(onAccount ? body.account_id : body.customer_id), body);
     }
-    if (path === '/customers/') {
-      return json(200, { count: PICKER_ORGANISATIONS.length, next: null, previous: null, results: PICKER_ORGANISATIONS });
+    // The forms' scoped creates: an organisation's (/customers/<id>/…), one
+    // of its accounts' (/customers/<id>/accounts/<id>/…), and an account's
+    // own flat route (/accounts/<id>/…); the parent comes from the URL.
+    const nested = /^\/customers\/(\d+)\/(?:accounts\/(\d+)\/)?(opportunities|risks)\/$/.exec(path);
+    if (nested && method === 'POST') {
+      const kind = nested[3] as PipelineKindKey;
+      return nested[2] ? createItem(kind, 'account', Number(nested[2]), body) : createItem(kind, 'organisation', Number(nested[1]), body);
     }
-    if (/^\/customers\/\d+\/accounts\/$/.test(path)) return json(200, []);
+    const flat = /^\/accounts\/(\d+)\/(opportunities|risks)\/$/.exec(path);
+    if (flat && method === 'POST') return createItem(flat[2] as PipelineKindKey, 'account', Number(flat[1]), body);
+    // The Add picker's searches: CustomerListCreateView and AccountListView,
+    // `?search=` a case-insensitive substring of the name, paginated.
+    if (path === '/customers/' && method === 'GET') return json(200, searchPage(PICKER_ORGANISATIONS, url.searchParams));
+    if (path === '/accounts/' && method === 'GET') return json(200, searchPage(PICKER_ACCOUNTS, url.searchParams));
+    // The form's optional Account picker: one organisation's accounts, unpaginated.
+    const accountsOf = /^\/customers\/(\d+)\/accounts\/$/.exec(path);
+    if (accountsOf) return json(200, PICKER_ACCOUNTS.filter((account) => account.customers.some((org) => org.id === Number(accountsOf[1]))));
     return json(404, { detail: `Not stubbed: ${path}` });
   });
   vi.stubGlobal('fetch', spy);
@@ -641,11 +671,15 @@ export function pipelineBulkBodies(spy: FetchSpy, kind: PipelineKindKey): Pipeli
     .map(([, init]) => JSON.parse(String(init?.body)) as PipelineBulkRequest);
 }
 
-/** Every POST, PATCH or DELETE to /opportunities/ or /risks/ so far, oldest first. */
+/** An item's own routes, and the forms' scoped creates under an
+ *  organisation or an account. */
+const WRITE_PATH = /^\/(?:customers\/\d+\/(?:accounts\/\d+\/)?|accounts\/\d+\/)?(opportunities|risks)\//;
+
+/** Every POST, PATCH or DELETE to an opportunity or risk route so far, oldest first. */
 export function recordWrites(spy: FetchSpy): { method: string; path: string; body: Record<string, unknown> | null }[] {
   return spy.mock.calls
     .map(([input, init]) => ({ path: new URL(String(input)).pathname.replace(/^\/api\/v1/, ''), init }))
-    .filter(({ path, init }) => init?.method !== undefined && init.method !== 'GET' && /^\/(opportunities|risks)\//.test(path))
+    .filter(({ path, init }) => init?.method !== undefined && init.method !== 'GET' && WRITE_PATH.test(path))
     .map(({ path, init }) => ({
       method: String(init?.method),
       path,
