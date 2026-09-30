@@ -1,3 +1,9 @@
+// Pinned to a non-UTC, non-DST zone (IST, UTC+5:30) so the export test's
+// timezone assertions can actually fail on a UTC CI runner. Set before any
+// Date is used; Node re-reads process.env.TZ on every local-time
+// computation (storyDays.test.ts does the same).
+process.env.TZ = 'Asia/Kolkata';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { bulkUpdate, exportPortfolio, fetchPortfolio } from './portfolioApi';
 import { portfolioQueries, stubPortfolio } from './testPortfolio';
@@ -37,18 +43,23 @@ describe('portfolioApi', () => {
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({ ids: [7, 1], action: 'set_owner', value: 3 });
   });
 
-  it('downloads the export through the session, named for the day', async () => {
+  it.each([
+    ['just after local midnight', new Date(2026, 8, 25, 0, 30)],
+    ['just before local midnight', new Date(2026, 8, 25, 23, 30)],
+  ])("downloads the export through the session, named for the viewer's own calendar day (%s)", async (_label, today) => {
     const spy = stubPortfolio();
     URL.createObjectURL = vi.fn(() => 'blob:x');
     URL.revokeObjectURL = vi.fn();
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
 
-    await exportPortfolio('health=poor&sort=-arr', new Date('2026-09-25T12:00:00Z'));
+    await exportPortfolio('health=poor&sort=-arr', today);
 
     const call = spy.mock.calls.find(([input]) => String(input).includes('/organizations/portfolio/export.csv'));
     expect(String(call?.[0])).toContain('export.csv?health=poor&sort=-arr');
     expect((call?.[1]?.headers as Record<string, string>)['Content-Type']).toBe('application/json');
     expect(URL.createObjectURL).toHaveBeenCalled();
+    // The viewer's local date (IST here), not toISOString's UTC date: at
+    // 00:30 IST this moment is still 2026-09-24 in UTC.
     expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe('organizations-2026-09-25.csv');
   });
 });

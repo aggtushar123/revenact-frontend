@@ -1,6 +1,7 @@
 // Thin apiFetch wrappers over revenact-backend's Accounts portfolio endpoints (backend #74).
 import { apiFetch } from '../../lib/apiClient';
 import { downloadAttachment } from '../files/filesSlice';
+import { localDay } from '../organizations/storyDays';
 import type { BulkResult } from '../organizations/portfolioTypes';
 import type { AccountBulkRequest, AccountPortfolioResponse } from './portfolioTypes';
 
@@ -11,10 +12,11 @@ export function fetchAccountPortfolio(query: string): Promise<AccountPortfolioRe
 }
 
 /** Every row of the query as CSV with every Account field, fetched with
- *  the session's token (the API never exposes a URL a plain link could open). */
+ *  the session's token (the API never exposes a URL a plain link could open).
+ *  Named for the viewer's own calendar day, not UTC's. */
 export function exportAccountPortfolio(query: string, today: Date = new Date()): Promise<void> {
   const path = query ? `${ACCOUNTS_PORTFOLIO_PATH}export.csv?${query}` : `${ACCOUNTS_PORTFOLIO_PATH}export.csv`;
-  return downloadAttachment({ download_url: path, name: `accounts-${today.toISOString().slice(0, 10)}.csv` });
+  return downloadAttachment({ download_url: path, name: `accounts-${localDay(today)}.csv` });
 }
 
 export function bulkUpdateAccounts(body: AccountBulkRequest): Promise<BulkResult> {
