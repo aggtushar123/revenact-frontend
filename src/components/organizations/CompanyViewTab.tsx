@@ -226,7 +226,7 @@ function AccountOwnerTile({
       plain={plain}
       onSave={async (userId, note) => {
         const result = await dispatch(setResponsible({ customerId, function: 'cs', user_id: userId, note }));
-        return setResponsible.fulfilled.match(result);
+        return setResponsible.fulfilled.match(result) ? null : (result.payload ?? 'Could not change who is responsible.');
       }}
     />
   );

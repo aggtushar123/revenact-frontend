@@ -1,9 +1,6 @@
 import { useState, useEffect, useRef, useContext } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { ACCOUNTS_DATA } from '../organizations/accountsData';
-import type { AccountRow } from '../organizations/accountsData';
 import { formatRelativeTime } from '../../features/customers/formatters';
-import { EntityAvatar } from '../shared';
 import {
   ChevronLeft,
   ChevronDown,
@@ -73,30 +70,20 @@ export function Navbar() {
   }
 
 
-  // Detect account details path (/accounts/:id — not /accounts/list,
-  // which \d+ excludes, same reasoning as the Contacts breadcrumb
-  // below). pages/accounts/Details.tsx itself still falls back to
-  // ACCOUNTS_DATA mock data on a direct visit/refresh (a real backend
-  // id from the Accounts tab never matches the mock's own 'acc-N'
-  // string ids) — but a click through from that real Accounts tab (see
-  // organizations/Details.tsx, or the standalone Accounts list page)
-  // carries the real AccountRow via navigation `state`, the same one
-  // that page's own body now renders, so this header shows the
-  // org/account actually clicked instead of whatever the mock falls
-  // back to.
-  const accountMatch = location.pathname.match(/\/accounts\/(\d+)/);
-  const accountId = accountMatch ? accountMatch[1] : null;
-  const accountNavState = location.state as { account: AccountRow } | null;
-  const account = accountId
-    ? (accountNavState?.account ?? ACCOUNTS_DATA.find((a) => a.id === accountId) ?? ACCOUNTS_DATA[0])
-    : null;
-
   const isOrganizations = location.pathname.startsWith('/organizations');
   // The Accounts list and board wear the Organizations frame (accounts spec
   // 2026-09-29 §1): the transparent bar, "Accounts", List | Board carrying
   // the query, the actions slot (the Ask pill lands there in delivery 3),
-  // no avatar. /accounts/:id is claimed by the `account` branch first.
+  // no avatar.
   const isAccountsView = /^\/accounts\/(list|board)\/?$/.test(location.pathname);
+  // An account's page wears the same frame (accounts spec 2026-09-29 §2.1):
+  // the page draws its own name row from the URL id, so the bar only leads
+  // back, as on an organization's page. A trailing slash is the same route.
+  // Any single segment that isn't list/board is an account id to the route
+  // (`/accounts/:id`) — including a non-numeric one, which the page itself
+  // renders as "Account not found" still inside this frame (fix round 2,
+  // 2026-09-30: a digits-only regex left that page double-guttered).
+  const isAccountDetail = /^\/accounts\/(?!list\/?$|board\/?$)[^/]+\/?$/.test(location.pathname);
   const isSettings = location.pathname.startsWith('/settings');
   const isAccountSettings = location.pathname.startsWith('/account-settings');
   const isPipelines = location.pathname.startsWith('/pipelines');
@@ -113,7 +100,7 @@ export function Navbar() {
   // person open on it share one page, titled here; the page draws the rest.
   // A trailing slash still reads as the same route (fix round 1, 2026-09-28).
   const isContacts = /^\/contacts(\/\d+)?\/?$/.test(location.pathname);
-  const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts || isAccountsView;
+  const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts || isAccountsView || isAccountDetail;
   const dashboardSharedSearch = sharedSearch(location.search);
 
 
@@ -209,28 +196,16 @@ export function Navbar() {
       }
     >
       <div className="flex items-center gap-8 h-full">
-        {account ? (
-          <div className="flex items-center gap-4">
-             <button 
-                onClick={() => navigate(-1)}
-                className="p-1.5 hover:bg-subtle rounded-lg transition-colors text-ink-faint hover:text-accent border border-transparent hover:border-line-subtle"
-              >
-                <ChevronLeft className="w-5 h-5" />
-              </button>
-              
-              <div className="flex items-center gap-3">
-                 <EntityAvatar
-                    name={account.name}
-                    logoUrl={account.logo}
-                    className="w-[36px] h-[36px] rounded-full border border-line-subtle shadow-sm"
-                 />
-                 <div className="flex items-center gap-3">
-                    <h1 className="text-[16px] font-bold text-ink tracking-tight uppercase whitespace-nowrap">{account.name}</h1>
-                    <div className="w-px h-3.5 bg-line" />
-                    <span className="text-[13.5px] font-bold text-ink-faint tracking-widest uppercase truncate max-w-[140px]">{account.orgName}</span>
-                 </div>
-              </div>
-          </div>
+        {isAccountDetail ? (
+          <nav aria-label="Breadcrumb" className="flex items-center h-full">
+            <Link
+              to="/accounts/list"
+              className="-ml-2 inline-flex min-h-11 sm:min-h-9 items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-ink-muted hover:bg-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+              Accounts
+            </Link>
+          </nav>
         ) : isContacts ? (
           <div className="flex items-center gap-4 h-full">
             <h1 className="text-[17px] font-bold text-ink tracking-tight">Contacts</h1>

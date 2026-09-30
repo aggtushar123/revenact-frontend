@@ -3,34 +3,19 @@ import { Plus } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
 import { fetchCalls } from '../../../features/calls/callsSlice';
 import type { Account } from '../../../features/customers/customersSlice';
-import { listScope } from '../../../lib/listScope';
 import { awaitingAccount, byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
+import { resolveScope, scopeSlot, type ScopeProps } from '../../../features/organizations/detailScope';
 import { callsSummary } from '../../../features/organizations/listSummaries';
 import { dayLabel, groupByDay, localDay } from '../../../features/organizations/storyDays';
 import { ErrorBlock } from '../portfolio/PortfolioSections';
 import { BUTTON } from '../portfolio/styles';
-import { AddFlow } from './AddFlow';
+import { AddFlow, type AddFlowParent } from './AddFlow';
 import { CallItem } from './CallItem';
 import { AccountNames } from './accountNames';
 import { AddPaused, ListSkeleton, ScopedEmpty, SummaryLine } from './ListParts';
 import { LIST, SECTION_HEADING } from './listStyles';
 
-/** Calls (spec 2026-09-27 §4): the organization's calls and every visible
- *  account's, narrowed by the account chip, as day-grouped plain rows like
- *  the Story's. No timeline rail and no scroll area of its own: the page
- *  scrolls. "Log a call" is the Story's + Add sheet, on the chosen account
- *  when there is one. */
-export function CallsSection({
-  customerId,
-  account,
-  accounts,
-  isSm,
-  active,
-  version,
-  onLogged,
-  onShowAll,
-}: {
-  customerId: number;
+type CallsSectionProps = ScopeProps & {
   account: string;
   accounts: Account[];
   isSm: boolean;
@@ -41,11 +26,23 @@ export function CallsSection({
   /** A call was logged here; the page reads the story again. */
   onLogged: () => void;
   onShowAll: () => void;
-}) {
+};
+
+/** Calls (spec 2026-09-27 §4; account spec §2.9): the organization's calls
+ *  and every visible account's, narrowed by the account chip, or one
+ *  account's own, as day-grouped plain rows like the Story's. No timeline
+ *  rail and no scroll area of its own: the page scrolls. "Log a call" is the
+ *  Story's + Add sheet, on the chosen account or the page's account. */
+export function CallsSection(props: CallsSectionProps) {
+  const { account, accounts, isSm, active, version, onLogged, onShowAll } = props;
+  const scope = resolveScope(props);
+  const kind = scope.kind;
+  const scopeId = scope.id;
+  const pageAccountName = scope.kind === 'account' ? scope.name : undefined;
   const dispatch = useAppDispatch();
-  const { items, isLoading, error, scope } = useAppSelector((state) => state.calls);
-  // The shared slot holds this organization's calls (not another's).
-  const loaded = scope === listScope(customerId);
+  const { items, isLoading, error, scope: slot } = useAppSelector((state) => state.calls);
+  // The shared slot holds this page's calls (not another's).
+  const loaded = slot === scopeSlot({ kind, id: scopeId });
   const [attempt, setAttempt] = useState(0);
   const [logging, setLogging] = useState(false);
   if (!active && logging) setLogging(false);
@@ -54,11 +51,17 @@ export function CallsSection({
 
   // Before paint, as People does.
   useLayoutEffect(() => {
-    void dispatch(fetchCalls({ entityType: 'organization', customerId }));
-  }, [dispatch, customerId, version, attempt]);
+    void dispatch(
+      fetchCalls(kind === 'account' ? { entityType: 'account', customerId: null, accountId: scopeId } : { entityType: 'organization', customerId: scopeId }),
+    );
+  }, [dispatch, kind, scopeId, version, attempt]);
 
   const target = chosenAccount(accounts, account);
   const paused = awaitingAccount(accounts, account);
+  // Same shape AddFlow itself now requires (never neither id): this
+  // account's own page, or the organization with whichever account (if any)
+  // is chosen.
+  const addFlowParent: AddFlowParent = kind === 'account' ? { accountId: scopeId } : target ? { customerId: scopeId, accountId: target.id } : { customerId: scopeId };
   const shown = useMemo(() => byAccount(items, account), [items, account]);
   const days = useMemo(() => groupByDay(shown.map((call) => ({ ...call, all_day: false }))), [shown]);
   const today = localDay(new Date());
@@ -117,9 +120,10 @@ export function CallsSection({
         {active && logging ? (
           <AddFlow
             what="call"
-            customerId={customerId}
-            accountId={target?.id}
-            accountName={target?.name}
+            {...addFlowParent}
+            // A truthy check, not `??`: an account's own page names it '' until
+            // its row lands, and `''` is not "no name" the way `undefined` is.
+            accountName={pageAccountName || target?.name}
             isSm={isSm}
             onClose={() => setLogging(false)}
             onAdded={() => {

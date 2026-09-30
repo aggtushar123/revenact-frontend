@@ -1411,6 +1411,33 @@ describe('customersSlice', () => {
 
       expect(store.getState().customers.entityCanvases).toEqual([]);
     });
+
+    it("a slower, earlier account's read never lands after a newer one has (stale response guard)", async () => {
+      const store = makeStore();
+      let resolveFirst!: (value: { ok: true; status: 200; json: () => Promise<typeof accountCanvas[]> }) => void;
+      const firstResponse = new Promise<{ ok: true; status: 200; json: () => Promise<typeof accountCanvas[]> }>((resolve) => {
+        resolveFirst = resolve;
+      });
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockImplementationOnce(() => firstResponse)
+          .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [orgCanvas] }),
+      );
+
+      // The first (account 17's) read starts but its response is still in flight...
+      const firstDispatch = store.dispatch(fetchCanvasesForAccount({ customerId: null, accountId: 17 }));
+      // ...when the account page moves on and reads account 34's canvases, which lands first.
+      await store.dispatch(fetchCanvasesForAccount({ customerId: null, accountId: 34 }));
+      expect(store.getState().customers.entityCanvases).toEqual([orgCanvas]);
+
+      // Now the slow, stale first read finally resolves — it must not
+      // overwrite what the newer, already-landed read put there.
+      resolveFirst({ ok: true, status: 200, json: async () => [accountCanvas] });
+      await firstDispatch;
+      expect(store.getState().customers.entityCanvases).toEqual([orgCanvas]);
+    });
   });
 
   describe('fetchCalendarEventsForCustomer / fetchCalendarEventsForAccount (ActivityFeed\'s Calendar Events filter)', () => {

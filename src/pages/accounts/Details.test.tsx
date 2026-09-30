@@ -1,1184 +1,268 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Provider } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { AccountDetails } from './Details';
-import type { AccountRow } from '../../components/organizations/accountsData';
-import customersReducer from '../../features/customers/customersSlice';
-import authReducer from '../../features/auth/authSlice';
-import copilotSessionsReducer from '../../features/copilotSessions/copilotSessionsSlice';
-import knowledgeReducer from '../../features/knowledge/knowledgeSlice';
-import { ALL_CAPABILITIES } from '../../test/capabilities';
+import {
+  ACCOUNT_LISTS,
+  LINE_ITEMS,
+  LINE_ITEM_RECORDS,
+  accountStoryQueries,
+  stubAccountPage,
+} from '../../features/accounts/testAccountPage';
+import { initechApac } from '../../features/accounts/testPortfolio';
 import { resetMembersCache } from '../../features/knowledge/useMembers';
+import { postBodies, requestPaths } from '../../features/organizations/testStory';
+import { resetViewport } from '../../test/viewport';
+import { renderAccountPage } from './testDetail';
 
-// Real-shaped AccountRow, the kind organizations/Details.tsx's AccountsTab
-// passes through navigate()'s state when a row is clicked — see that
-// file and mapToAccountRow.test.ts for the full field list.
-const apacDivision: AccountRow = {
-  orgId: 9,
-  id: '17',
-  name: 'APAC Division',
-  orgName: 'Kraft Heinz',
-  logo: 'https://logo.clearbit.com/kraftheinz.com',
-  revenactId: 17,
-  pulse: [],
-  aiPulseScore: '—',
-  aiPulseReason: '-',
-  owner: 'Unassigned',
-  avatar: '—',
-  accountPulse: {
-    value: '3.2',
-    label: 'Watch',
-    category: 3,
-    breakdown: [
-      { key: 'ai_pulse', label: 'AI pulse', weight: '3.0', reading: '3.0', note: 'what the model reads' },
-      { key: 'csm_pulse', label: 'CSM pulse', weight: '2.5', reading: null, note: 'not set' },
-      { key: 'sentiment', label: 'Recent sentiment', weight: '2.0', reading: '4.0', note: '2 positive, 0 negative of 4 in the last 30 days' },
-      { key: 'touch', label: 'Last contact', weight: '1.5', reading: '2.0', note: '68 days ago' },
-      { key: 'support', label: 'Open tickets', weight: '1.0', reading: '4.6', note: '1 open' },
-    ],
-  },
-  health: { val: 6.2, clr: 'bg-[var(--warning)]' },
-  healthCategory: 'average',
-  nps: '-20',
-  npsValue: -20,
-  csat: '45%',
-  csatValue: 45,
-  lifecycleStage: 'Onboarding',
-  mrr: 2833,
-  arr: 34000,
-  renewal: '-',
-  orgs: [{ id: 9, name: 'Kraft Heinz' }],
-};
+// Integration tier: the real page, store and router; only fetch is stubbed,
+// in backend #75's shapes (stubAccountPage). Every render starts from the
+// URL alone: no navigation state, no mock data (spec 2026-09-29 §2).
 
-// ActivityFeed (rendered on the General tab, which is the default) fetches
-// real Activities on mount whenever it has real ids to fetch with — every
-// test below reaches that tab, so `fetch` needs stubbing regardless of
-// what each test is actually asserting on.
-function renderAccountDetails(state?: { account: AccountRow }) {
-  const store = configureStore({
-    reducer: { customers: customersReducer, auth: authReducer, copilotSessions: copilotSessionsReducer, knowledge: knowledgeReducer },
-    preloadedState: {
-      auth: {
-        user: {
-          id: 1,
-          email: 'alice@acme.io',
-          name: 'Alice',
-          avatar: '',
-          role: 'admin' as const,
-          role_id: 1,
-          role_name: 'Admin',
-          permissions: ALL_CAPABILITIES,
-          function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
-          organisation: {
-            id: 1,
-            name: 'Acme Inc',
-            slug: 'acme-inc',
-            currency: 'USD' as const,
-            currency_display: 'US Dollar ($)',
-            default_lifecycle_stage: '',
-            ai_agent_enabled: true,
-            ai_agent_tone: 'professional' as const,
-            ai_agent_tone_display: 'Professional',
-          },
-          is_active: true,
-        },
-        accessToken: 'token',
-        refreshToken: 'refresh',
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      },
-    },
-  });
-  render(
-    <Provider store={store}>
-      <MemoryRouter initialEntries={[{ pathname: '/accounts/17', state }]}>
-        <Routes>
-          <Route path="/accounts/:id" element={<AccountDetails />} />
-        </Routes>
-      </MemoryRouter>
-    </Provider>
-  );
-}
+const where = () => new URL(`http://x${screen.getByTestId('where').textContent}`);
+const itemKeys = () => [...document.querySelectorAll('[data-story-item]')].map((el) => el.getAttribute('data-story-item'));
+const landed = (name = 'Pizza EMEA') => screen.findByRole('heading', { level: 1, name });
+const header = () => document.querySelector('[data-part="header"]') as HTMLElement;
+type Spy = ReturnType<typeof stubAccountPage>;
+const patches = (spy: Spy) =>
+  spy.mock.calls
+    .filter(([, init]) => init?.method === 'PATCH')
+    .map(([input, init]) => [new URL(String(input)).pathname.replace(/^\/api\/v1/, ''), JSON.parse(String(init?.body))]);
 
-describe('AccountDetails page (/accounts/:id)', () => {
+describe('the account page (/accounts/:id)', () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => [] }))
-    );
+    Element.prototype.scrollIntoView = vi.fn();
   });
-
-  it('renders every metric from the real AccountRow passed via navigation state, not hardcoded placeholders', () => {
-    // These used to be hardcoded regardless of which account was passed
-    // in (9.3/100/100, "Very Satisfied", Promoters 10/Passives 0/
-    // Detractors 0) — this pins them down as actually derived.
-    renderAccountDetails({ account: apacDivision });
-
-    expect(screen.getByText('APAC Division')).toBeInTheDocument();
-    expect(screen.getByText('6.2')).toBeInTheDocument();
-    expect(screen.getByText('Onboarding')).toBeInTheDocument();
-    // Account Pulse comes from the API's computed blend, not from the health score.
-    expect(screen.getByText('Account Pulse')).toBeInTheDocument();
-    expect(screen.getByText('Watch')).toBeInTheDocument();
-    expect(screen.getByText('3.2 / 5')).toBeInTheDocument();
-    expect(screen.getByLabelText('Account pulse')).toHaveAttribute('title', expect.stringContaining('Last contact: 2.0 (68 days ago, weight 1.5)'));
-    expect(screen.queryByText('CSM Pulse')).not.toBeInTheDocument();
-    expect(screen.getByText('-20')).toBeInTheDocument(); // NPS, no leading '+'
-    expect(screen.getByText('45%')).toBeInTheDocument();
-    expect(screen.getByText('$34.0K')).toBeInTheDocument();
-
-    // A negative NPS is a detractor, not a promoter — the mock's old
-    // hardcoded "Promoters 10" would fail this.
-    const detractorsRow = screen.getByText('Detractors').closest('div')!.parentElement!;
-    expect(detractorsRow).toHaveTextContent('1');
-  });
-
-  it('shows a real $0 ARR as $0.0, not the old hardcoded "$1.2M" fallback', () => {
-    // A freshly-Added account (Add Account) genuinely has arr=0 — the old
-    // `account.arr ? ... : '1.2M'` treated that falsy-but-real 0 as
-    // "missing" and substituted a made-up placeholder instead.
-    renderAccountDetails({ account: { ...apacDivision, arr: 0 } });
-
-    expect(screen.getByText('$0.0')).toBeInTheDocument();
-    expect(screen.queryByText('$1.2M')).not.toBeInTheDocument();
-  });
-
-  it('falls back to the mock data when reached without navigation state (a direct URL visit or refresh)', () => {
-    renderAccountDetails();
-
-    expect(screen.queryByText('APAC Division')).not.toBeInTheDocument();
-    // ACCOUNTS_DATA[0]'s own real mock health (9.5), not the old
-    // hardcoded 9.3 that didn't even match it.
-    expect(screen.getByText('9.5')).toBeInTheDocument();
-  });
-
-  describe('Activity Feed (real Activities, not the same mock for every account)', () => {
-    // The bug this whole feature replaced: ACCOUNT_ID_MAP's `?? 101`
-    // fallback made every real account show the exact same hardcoded
-    // activities. This pins down the fix — a real account's own
-    // orgId/revenactId (from the navigated AccountRow) must reach the
-    // correctly-nested endpoint, and its own distinct activity content
-    // must be what actually renders.
-    it('fetches and renders this account\'s own activities, from its own nested endpoint', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) =>
-          Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () =>
-              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/activities/`)
-                ? [
-                    {
-                      id: 1,
-                      type: 'escalation_triggered',
-                      type_display: 'Escalation Triggered',
-                      occurred_at: '2026-03-02',
-                      links: 1,
-                      watchers: 5,
-                    },
-                  ]
-                : [],
-          })
-        )
-      );
-
-      renderAccountDetails({ account: apacDivision });
-
-      expect(await screen.findByText('Escalation Triggered')).toBeInTheDocument();
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining(
-          `/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/activities/`
-        ),
-        expect.objectContaining({ method: 'GET' })
-      );
-    });
-
-    it('a different account fetches its own activities, not the first account\'s', async () => {
-      const otherAccount: AccountRow = {
-        ...apacDivision,
-        orgId: 6,
-        id: '6',
-        revenactId: 6,
-        name: 'Heinz Europe',
-      };
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) =>
-          Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () =>
-              url.includes(`/customers/${otherAccount.orgId}/accounts/${otherAccount.revenactId}/activities/`)
-                ? [
-                    {
-                      id: 2,
-                      type: 'success_plan_created',
-                      type_display: 'Success Plan Created',
-                      occurred_at: '2026-03-01',
-                      links: 2,
-                      watchers: 1,
-                    },
-                  ]
-                : [],
-          })
-        )
-      );
-
-      renderAccountDetails({ account: otherAccount });
-
-      expect(await screen.findByText('Success Plan Created')).toBeInTheDocument();
-      expect(screen.queryByText('Escalation Triggered')).not.toBeInTheDocument();
-    });
-
-    it('shows no activities (not a stale or hardcoded set) when reached without navigation state', async () => {
-      renderAccountDetails();
-
-      await screen.findByText('9.5'); // page finished rendering the mock fallback
-      // The default "All" filter is a merged stream of every source
-      // now, so its empty state speaks for all of them rather than for
-      // activities alone.
-      expect(screen.getByText('No activity yet')).toBeInTheDocument();
-    });
-  });
-
-  describe('Email Feed (real Emails, same wiring as Activities)', () => {
-    it('fetches and renders this account\'s own emails, from its own nested endpoint', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) =>
-          Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () =>
-              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/emails/`)
-                ? [
-                    {
-                      id: 1,
-                      subject: 'Usage Analysis — APAC Division',
-                      sender_name: 'Sarah Chen',
-                      recipient_name: 'Edgar Holmes',
-                      body: 'Usage in the APAC division ticked up after the new rollout.',
-                      sent_at: '2026-07-15T09:30:00Z',
-                      links: 1,
-                      watchers: 2,
-                      is_starred: false,
-                    },
-                  ]
-                : [],
-          })
-        )
-      );
-
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Emails' }));
-
-      expect(await screen.findByText('Usage Analysis — APAC Division')).toBeInTheDocument();
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/emails/`),
-        expect.objectContaining({ method: 'GET' })
-      );
-    });
-
-    it('shows no emails (not a stale or hardcoded set) when reached without navigation state', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Emails' }));
-
-      expect(await screen.findByText('No emails found')).toBeInTheDocument();
-    });
-  });
-
-  describe('Task Feed (real Tasks, same wiring as Activities)', () => {
-    it('fetches and renders this account\'s own tasks, from its own nested endpoint', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) =>
-          Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () =>
-              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/tasks/`)
-                ? [
-                    {
-                      id: 1,
-                      title: 'Review APAC usage uptick',
-                      assignee_name: 'Sarah Chen',
-                      due_date: '2026-07-15',
-                      priority: 'low',
-                      status: 'completed',
-                    },
-                  ]
-                : [],
-          })
-        )
-      );
-
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Tasks' }));
-
-      expect(await screen.findByText('Review APAC usage uptick')).toBeInTheDocument();
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/tasks/`),
-        expect.objectContaining({ method: 'GET' })
-      );
-    });
-
-    it('shows no tasks (not a stale or hardcoded set) when reached without navigation state', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Tasks' }));
-
-      expect(await screen.findByText('No tasks found')).toBeInTheDocument();
-    });
-  });
-
-  describe('Notes Feed (real Notes, same wiring as Activities)', () => {
-    it('fetches and renders this account\'s own notes, from its own nested endpoint', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) =>
-          Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () =>
-              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/notes/`)
-                ? [
-                    {
-                      id: 1,
-                      title: 'Usage Uptick Notes',
-                      author_name: 'Sarah Chen',
-                      body: 'Adoption ticked up noticeably after the new regional rollout completed.',
-                      logged_at: '2026-07-15',
-                      links: 1,
-                    },
-                  ]
-                : [],
-          })
-        )
-      );
-
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Notes' }));
-
-      expect(await screen.findByText('Usage Uptick Notes')).toBeInTheDocument();
-      expect(screen.getByText('1 Links')).toBeInTheDocument();
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/notes/`),
-        expect.objectContaining({ method: 'GET' })
-      );
-    });
-
-    it('shows no notes (not a stale or hardcoded set) when reached without navigation state', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Notes' }));
-
-      expect(await screen.findByText('No notes found')).toBeInTheDocument();
-    });
-  });
-
-  describe('Tickets Feed (real Tickets, same wiring as Activities)', () => {
-    it('fetches and renders this account\'s own tickets, from its own nested endpoint', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) =>
-          Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () =>
-              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/tickets/`)
-                ? [
-                    {
-                      id: 1,
-                      ticket_number: 'TKT-2005',
-                      title: 'Usage dashboard not loading for APAC users',
-                      assignee_name: 'Engineering',
-                      status: 'in-progress',
-                      priority: 'high',
-                      opened_at: '2026-07-15',
-                      links: 1,
-                      connector_name: null, connector_provider: null, department: '', department_display: '', description: '', requester_name: '', requester_email: '', external_url: '', synced_at: null,
-                    },
-                  ]
-                : [],
-          })
-        )
-      );
-
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Tickets' }));
-
-      expect(await screen.findByText(/Usage dashboard not loading for APAC users/)).toBeInTheDocument();
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/tickets/`),
-        expect.objectContaining({ method: 'GET' })
-      );
-    });
-
-    it('shows no tickets (not a stale or hardcoded set) when reached without navigation state', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Tickets' }));
-
-      expect(await screen.findByText('No tickets found')).toBeInTheDocument();
-    });
-  });
-
-  describe('Calendar Events Feed (real events, same wiring as Activities)', () => {
-    it('fetches and renders this account\'s own calendar events, from its own nested endpoint', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) =>
-          Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () =>
-              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/calendar-events/`)
-                ? [
-                    {
-                      id: 1,
-                      title: 'Usage Review',
-                      description: 'Review the APAC division\'s usage uptick',
-                      type: 'review',
-                      event_date: '2026-07-15',
-                      start_time: '10:00:00',
-                      end_time: '10:30:00',
-                      attendee_count: 2,
-                    },
-                  ]
-                : [],
-          })
-        )
-      );
-
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Calendar Events' }));
-
-      expect(await screen.findByText('Usage Review')).toBeInTheDocument();
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/calendar-events/`),
-        expect.objectContaining({ method: 'GET' })
-      );
-    });
-
-    it('shows no calendar events (not a stale or hardcoded set) when reached without navigation state', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: 'Calendar Events' }));
-
-      expect(await screen.findByText('No calendar events')).toBeInTheDocument();
-    });
-  });
-
-  describe('Organizations tab (an Account can belong to more than one Customer)', () => {
-    // `account.orgs` already rides along on the nav-state AccountRow
-    // (see mapAccountToAccountRow) — this tab fetches nothing of its
-    // own, unlike Contacts/Pipelines below.
-    it('renders every organization this account is linked to, straight off the nav-state AccountRow', async () => {
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Organizations/ }));
-
-      expect(await screen.findByText('Kraft Heinz')).toBeInTheDocument();
-      expect(screen.getByText('Revenact ID 9')).toBeInTheDocument();
-    });
-
-    it('lists every linked organization, not just the first, when the account belongs to more than one', async () => {
-      const multiOrgAccount = {
-        ...apacDivision,
-        orgs: [{ id: 9, name: 'Kraft Heinz' }, { id: 12, name: 'Mondelez International' }],
-      };
-      renderAccountDetails({ account: multiOrgAccount });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Organizations/ }));
-
-      expect(await screen.findByText('Kraft Heinz')).toBeInTheDocument();
-      expect(screen.getByText('Mondelez International')).toBeInTheDocument();
-    });
-
-    it('shows a fallback message (not real data) when reached without navigation state', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Organizations/ }));
-
-      expect(
-        await screen.findByText(/Reload this page from a real Accounts tab link/)
-      ).toBeInTheDocument();
-    });
-
-    it('clicking an organization card navigates to its Organization Details page', async () => {
-      const store = configureStore({
-    reducer: { customers: customersReducer, auth: authReducer, copilotSessions: copilotSessionsReducer },
-    preloadedState: {
-      auth: {
-        user: {
-          id: 1,
-          email: 'alice@acme.io',
-          name: 'Alice',
-          avatar: '',
-          role: 'admin' as const,
-          role_id: 1,
-          role_name: 'Admin',
-          permissions: ALL_CAPABILITIES,
-          function: 'cs' as const, function_display: 'Customer Success', reports_to: null,
-          organisation: {
-            id: 1,
-            name: 'Acme Inc',
-            slug: 'acme-inc',
-            currency: 'USD' as const,
-            currency_display: 'US Dollar ($)',
-            default_lifecycle_stage: '',
-            ai_agent_enabled: true,
-            ai_agent_tone: 'professional' as const,
-            ai_agent_tone_display: 'Professional',
-          },
-          is_active: true,
-        },
-        accessToken: 'token',
-        refreshToken: 'refresh',
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      },
-    },
-  });
-      render(
-        <Provider store={store}>
-          <MemoryRouter initialEntries={[{ pathname: '/accounts/17', state: { account: apacDivision } }]}>
-            <Routes>
-              <Route path="/accounts/:id" element={<AccountDetails />} />
-              <Route path="/organizations/:id" element={<div>ORG PAGE</div>} />
-            </Routes>
-          </MemoryRouter>
-        </Provider>
-      );
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Organizations/ }));
-      await user.click(await screen.findByText('Kraft Heinz'));
-
-      expect(await screen.findByText('ORG PAGE')).toBeInTheDocument();
-    });
-  });
-
-  describe('Contacts tab (real Contacts, own nested endpoint — a sibling tab, not an ActivityFeed filter)', () => {
-    it('fetches and renders this account\'s own contacts, from its own nested endpoint', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) =>
-          Promise.resolve({
-            ok: true,
-            status: 200,
-            json: async () =>
-              url.includes(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/contacts/`)
-                ? [
-                    {
-                      id: 1,
-                      name: 'Priya Nair',
-                      role: 'economic_buyer',
-                      role_display: 'Economic Buyer',
-                      email: 'priya.nair@kraftheinz.com',
-                      phone: '+1 (312) 555-0202',
-                      status: 'active',
-                      sentiment: 'positive',
-                      last_contacted_at: '2026-08-31T00:00:00Z',
-                      companies: [{ id: 9, name: 'Kraft Heinz' }],
-                      account_name: 'APAC Division',
-                      sentiment_source: 'manual' as const, sentiment_computed_at: null,
-                    },
-                  ]
-                : [],
-          })
-        )
-      );
-
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
-
-      expect(await screen.findByText('Priya Nair')).toBeInTheDocument();
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining(`/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/contacts/`),
-        expect.objectContaining({ method: 'GET' })
-      );
-    });
-
-    it('shows no contacts (not a stale or hardcoded set) when reached without navigation state', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
-
-      expect(await screen.findByText('No contacts found.')).toBeInTheDocument();
-    });
-
-    it('disables "Add Contact" when reached without navigation state (no real account id to post against)', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
-      await screen.findByText('No contacts found.');
-
-      expect(screen.getByRole('button', { name: 'Add Contact' })).toBeDisabled();
-    });
-
-    const priyaNair = {
-      id: 1,
-      name: 'Priya Nair',
-      role: 'economic_buyer',
-      role_display: 'Economic Buyer',
-      email: 'priya.nair@kraftheinz.com',
-      phone: '+1 (312) 555-0202',
-      status: 'active',
-      sentiment: 'positive',
-      last_contacted_at: '2026-08-31T00:00:00Z',
-      companies: [{ id: 9, name: 'Kraft Heinz' }],
-      account_name: 'APAC Division',
-      sentiment_source: 'manual' as const, sentiment_computed_at: null,
-    };
-    const lukasVermeer = {
-      ...priyaNair,
-      id: 2,
-      name: 'Lukas Vermeer',
-      role_display: 'Finance Manager',
-      email: 'lukas.vermeer@kraftheinz.com',
-    };
-    const contactsUrl = `/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/contacts/`;
-
-    async function openContactsTab(fetchMock: ReturnType<typeof vi.fn>) {
-      vi.stubGlobal('fetch', fetchMock);
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
-      await screen.findByText('Priya Nair');
-      return user;
-    }
-
-    it('filters the already-loaded contacts client-side as you type', async () => {
-      const fetchMock = vi.fn((url: string) =>
-        Promise.resolve({
-          ok: true,
-          status: 200,
-          json: async () => (url.includes(contactsUrl) ? [priyaNair, lukasVermeer] : []),
-        })
-      );
-      const user = await openContactsTab(fetchMock);
-      expect(screen.getByText('Lukas Vermeer')).toBeInTheDocument();
-
-      await user.type(screen.getByPlaceholderText('Search contacts by name, role or email...'), 'priya');
-
-      expect(screen.queryByText('Lukas Vermeer')).not.toBeInTheDocument();
-      expect(screen.getByText('Priya Nair')).toBeInTheDocument();
-    });
-
-    it('adding a contact posts to the account-level nested endpoint', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'POST' && url.endsWith(contactsUrl)) {
-          return Promise.resolve({
-            ok: true,
-            status: 201,
-            json: async () => ({ ...priyaNair, id: 99, name: 'New Person' }),
-          });
-        }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: async () => (url.includes(contactsUrl) ? [priyaNair] : []),
-        });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Add Contact' }));
-      await user.type(screen.getByLabelText('Name *'), 'New Person');
-      await user.type(screen.getByLabelText('Email *'), 'new.person@kraftheinz.com');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Contact' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining(contactsUrl),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-    });
-
-    it('editing a contact PATCHes /api/v1/contacts/<id>/ and updates it in place', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'PATCH' && url.endsWith('/contacts/1/')) {
-          const body = JSON.parse(options!.body!);
-          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...priyaNair, ...body }) });
-        }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: async () => (url.includes(contactsUrl) ? [priyaNair] : []),
-        });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Actions for Priya Nair' }));
-      await user.click(screen.getByRole('button', { name: 'Edit Contact' }));
-      const nameInput = screen.getByLabelText('Name *');
-      await user.clear(nameInput);
-      await user.type(nameInput, 'Priya Nair-Kapoor');
-      await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/contacts/1/'),
-          expect.objectContaining({ method: 'PATCH' })
-        )
-      );
-      expect(await screen.findByText('Priya Nair-Kapoor')).toBeInTheDocument();
-    });
-
-    it('deleting a contact DELETEs /api/v1/contacts/<id>/ and removes the row', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'DELETE' && url.endsWith('/contacts/1/')) {
-          return Promise.resolve({ ok: true, status: 204, json: async () => null });
-        }
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: async () => (url.includes(contactsUrl) ? [priyaNair] : []),
-        });
-      });
-      const user = await openContactsTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Actions for Priya Nair' }));
-      await user.click(screen.getByRole('button', { name: 'Delete Contact' }));
-      await user.click(screen.getByRole('button', { name: 'Delete' }));
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/contacts/1/'),
-          expect.objectContaining({ method: 'DELETE' })
-        )
-      );
-      expect(screen.queryByText('Priya Nair')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('Pipelines tab (real Opportunities/Risks, own nested endpoints — a sibling tab, not an ActivityFeed filter)', () => {
-    const opportunitiesUrl = `/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/opportunities/`;
-    const risksUrl = `/customers/${apacDivision.orgId}/accounts/${apacDivision.revenactId}/risks/`;
-
-    const seatExpansion = {
-      id: 1,
-      title: 'Seat Expansion — Q3 Rollout',
-      mrr: '16000.00',
-      stage: 'discovery',
-      stage_display: 'Discovery',
-      priority: 'medium',
-      priority_display: 'Medium',
-      department: '' as const, department_display: '',
-      companies: [{ id: 9, name: 'Kraft Heinz' }],
-      account_name: 'APAC Division',
-    };
-    const regionalRisk = {
-      id: 1,
-      title: 'Regional Expansion Proposal Risk',
-      mrr: '17000.00',
-      stage: 'open',
-      stage_display: 'Open',
-      priority: 'medium',
-      priority_display: 'Medium',
-      department: '' as const, department_display: '',
-      companies: [{ id: 9, name: 'Kraft Heinz' }],
-      account_name: 'APAC Division',
-    };
-
-    it('fetches and renders this account\'s own opportunities and risks, from their own nested endpoints', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn((url: string) => {
-          if (url.includes(opportunitiesUrl)) {
-            return Promise.resolve({ ok: true, status: 200, json: async () => [seatExpansion] });
-          }
-          if (url.includes(risksUrl)) {
-            return Promise.resolve({ ok: true, status: 200, json: async () => [regionalRisk] });
-          }
-          return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-        })
-      );
-
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
-
-      expect(await screen.findByText('Seat Expansion — Q3 Rollout')).toBeInTheDocument();
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining(opportunitiesUrl),
-        expect.objectContaining({ method: 'GET' })
-      );
-
-      await user.click(screen.getByRole('button', { name: /^Risks/ }));
-      expect(await screen.findByText('Regional Expansion Proposal Risk')).toBeInTheDocument();
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringContaining(risksUrl),
-        expect.objectContaining({ method: 'GET' })
-      );
-    });
-
-    it('shows no opportunities (not a stale or hardcoded set) when reached without navigation state', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
-
-      expect(await screen.findByText('No opportunities found.')).toBeInTheDocument();
-    });
-
-    it('disables "Add Opportunity" when reached without navigation state (no real account id to post against)', async () => {
-      renderAccountDetails();
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
-      await screen.findByText('No opportunities found.');
-
-      expect(screen.getByRole('button', { name: 'Add Opportunity' })).toBeDisabled();
-    });
-
-    async function openPipelinesTab(fetchMock: ReturnType<typeof vi.fn>) {
-      vi.stubGlobal('fetch', fetchMock);
-      renderAccountDetails({ account: apacDivision });
-      const user = userEvent.setup();
-      await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
-      await screen.findByText('Seat Expansion — Q3 Rollout');
-      return user;
-    }
-
-    it('adding an opportunity posts to the account-level nested endpoint, with no Account picker shown', async () => {
-      let opportunitiesData: unknown[] = [seatExpansion];
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'POST' && url.endsWith(opportunitiesUrl)) {
-          const created = { ...seatExpansion, id: 99, title: 'New Opp' };
-          opportunitiesData = [...opportunitiesData, created];
-          return Promise.resolve({ ok: true, status: 201, json: async () => created });
-        }
-        if (url.includes(opportunitiesUrl)) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => opportunitiesData });
-        }
-        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: 'Add Opportunity' }));
-      // Already scoped to one specific account (accountId is fixed) —
-      // no Company/Account picker to interact with, unlike the
-      // Organization Details page's own Pipelines tab.
-      expect(screen.queryByLabelText('Company *')).not.toBeInTheDocument();
-      expect(screen.queryByLabelText('Account (optional)')).not.toBeInTheDocument();
-      await user.type(screen.getByLabelText('Title *'), 'New Opp');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Opportunity' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining(opportunitiesUrl),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-      expect(await screen.findByText('New Opp')).toBeInTheDocument();
-    });
-
-    it('editing an opportunity PATCHes /api/v1/opportunities/<id>/ and updates it in place', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'PATCH' && url.endsWith('/opportunities/1/')) {
-          const body = JSON.parse(options!.body!);
-          return Promise.resolve({ ok: true, status: 200, json: async () => ({ ...seatExpansion, ...body }) });
-        }
-        if (url.includes(opportunitiesUrl)) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [seatExpansion] });
-        }
-        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByText('Seat Expansion — Q3 Rollout'));
-      const titleInput = screen.getByLabelText('Title *');
-      await user.clear(titleInput);
-      await user.type(titleInput, 'Renamed Opportunity');
-      await user.click(screen.getByRole('button', { name: 'Save changes' }));
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/opportunities/1/'),
-          expect.objectContaining({ method: 'PATCH' })
-        )
-      );
-      expect(await screen.findByText('Renamed Opportunity')).toBeInTheDocument();
-    });
-
-    it('deleting an opportunity from its edit modal DELETEs /api/v1/opportunities/<id>/ and removes the row', async () => {
-      const fetchMock = vi.fn((url: string, options?: { method?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'DELETE' && url.endsWith('/opportunities/1/')) {
-          return Promise.resolve({ ok: true, status: 204, json: async () => null });
-        }
-        if (url.includes(opportunitiesUrl)) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [seatExpansion] });
-        }
-        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByText('Seat Expansion — Q3 Rollout'));
-      await user.click(screen.getByRole('button', { name: 'Delete' }));
-      const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
-      await user.click(confirmButtons[confirmButtons.length - 1]);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining('/opportunities/1/'),
-          expect.objectContaining({ method: 'DELETE' })
-        )
-      );
-      expect(screen.queryByText('Seat Expansion — Q3 Rollout')).not.toBeInTheDocument();
-    });
-
-    it('switching to the Risks sub-tab shows risks instead, and Add Risk posts to the account-level nested endpoint', async () => {
-      let risksData: unknown[] = [regionalRisk];
-      const fetchMock = vi.fn((url: string, options?: { method?: string; body?: string }) => {
-        const method = options?.method ?? 'GET';
-        if (method === 'POST' && url.endsWith(risksUrl)) {
-          const created = { ...regionalRisk, id: 99, title: 'New Risk' };
-          risksData = [...risksData, created];
-          return Promise.resolve({ ok: true, status: 201, json: async () => created });
-        }
-        if (url.includes(opportunitiesUrl)) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => [seatExpansion] });
-        }
-        if (url.includes(risksUrl)) {
-          return Promise.resolve({ ok: true, status: 200, json: async () => risksData });
-        }
-        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
-      });
-      const user = await openPipelinesTab(fetchMock);
-
-      await user.click(screen.getByRole('button', { name: /^Risks/ }));
-      expect(await screen.findByText('Regional Expansion Proposal Risk')).toBeInTheDocument();
-      expect(screen.queryByText('Seat Expansion — Q3 Rollout')).not.toBeInTheDocument();
-
-      await user.click(screen.getByRole('button', { name: 'Add Risk' }));
-      expect(screen.queryByLabelText('Company *')).not.toBeInTheDocument();
-      await user.type(screen.getByLabelText('Title *'), 'New Risk');
-      const submitButton = screen
-        .getAllByRole('button', { name: 'Add Risk' })
-        .find((btn) => btn.closest('form'))!;
-      await user.click(submitButton);
-
-      await waitFor(() =>
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining(risksUrl),
-          expect.objectContaining({ method: 'POST' })
-        )
-      );
-      expect(await screen.findByText('New Risk')).toBeInTheDocument();
-    });
-  });
-});
-
-describe('AccountDetails reads the account endpoint to fill in nav-state gaps (pulse + owner function)', () => {
-  const detailPath = (row: AccountRow) => `/customers/${row.orgId}/accounts/${row.revenactId}/`;
-  const detailBody = (row: AccountRow) => ({
-    id: row.revenactId,
-    customers: [{ id: row.orgId, name: row.orgName }],
-    name: row.name,
-    domain: '',
-    industry: '',
-    address: '',
-    email: '',
-    phone: '',
-    owner: { id: 7, name: 'Mei Tanaka', function: 'analytics', function_display: 'Analytics' },
-    created_at: '',
-    updated_at: '',
-    lifecycle_stage: 'onboarding',
-    health_score: '6.2',
-    health_category: 'average',
-    pulse: [],
-    ai_pulse_score: '',
-    ai_pulse_reason: '',
-    account_pulse: { value: '3.2', label: 'Watch', category: 3, breakdown: [] },
-    nps_score: null,
-    csat_score: null,
-    renewal_date: null,
-    arr: '0',
-  });
-
-  it('shows the nav-state row (no signal, no function) until the read lands, then merges account_pulse and owner.function in', async () => {
-    const rowWithGaps: AccountRow = { ...apacDivision, accountPulse: null, ownerFunction: null, ownerId: 7, owner: 'Mei Tanaka' };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        String(url).endsWith(detailPath(rowWithGaps))
-          ? Promise.resolve({ ok: true, status: 200, json: async () => detailBody(rowWithGaps) })
-          : Promise.resolve({ ok: true, status: 200, json: async () => [] })
-      )
-    );
-
-    renderAccountDetails({ account: rowWithGaps });
-
-    // Meanwhile: the nav-state row's null pulse/function still show (the
-    // owner's bare name, with no function, appears in both the owner tile
-    // and the pinned attributes).
-    expect(screen.getByText('No signal')).toBeInTheDocument();
-    expect(screen.getAllByText('Mei Tanaka').length).toBeGreaterThan(0);
-
-    // Once the read lands: the real pulse and function show.
-    expect(await screen.findByText('Watch')).toBeInTheDocument();
-    expect(await screen.findByText('Mei Tanaka · Analytics')).toBeInTheDocument();
-  });
-
-  it('leaves the nav-state row as it was when the read fails', async () => {
-    const rowWithGaps: AccountRow = { ...apacDivision, accountPulse: null, ownerFunction: null, ownerId: 7, owner: 'Mei Tanaka' };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) =>
-        String(url).endsWith(detailPath(rowWithGaps))
-          ? Promise.resolve({ ok: false, status: 500, json: async () => ({ detail: 'Server error.' }) })
-          : Promise.resolve({ ok: true, status: 200, json: async () => [] })
-      )
-    );
-
-    renderAccountDetails({ account: rowWithGaps });
-
-    await screen.findByText('APAC Division');
-    expect(screen.getByText('No signal')).toBeInTheDocument();
-    expect(screen.getAllByText('Mei Tanaka').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Mei Tanaka · Analytics')).not.toBeInTheDocument();
-  });
-
-  it('does not read the account endpoint, and keeps the nav-state row, when reached without navigation state', async () => {
-    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => [] }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderAccountDetails();
-    await screen.findByText('9.5');
-
-    expect(fetchMock).not.toHaveBeenCalledWith(expect.stringMatching(/\/customers\/\d+\/accounts\/\d+\/$/), expect.anything());
-  });
-});
-
-describe('AccountDetails with no openable organisation (orgId 0)', () => {
-  it('does not fire the contacts/opportunities/risks/canvases reads against /customers/0/…, and shows their empty state', async () => {
-    const noOrgAccount: AccountRow = { ...apacDivision, orgId: 0 };
-    const fetchMock = vi.fn(() => Promise.resolve({ ok: true, status: 200, json: async () => [] }));
-    vi.stubGlobal('fetch', fetchMock);
-
-    renderAccountDetails({ account: noOrgAccount });
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: /^Contacts/ }));
-    expect(await screen.findByText('No contacts found.')).toBeInTheDocument();
-
-    await user.click(await screen.findByRole('button', { name: /^Pipelines/ }));
-    expect(await screen.findByText('No opportunities found.')).toBeInTheDocument();
-
-    await user.click(await screen.findByRole('button', { name: /^Canvas List/ }));
-
-    // The four reads Details.tsx itself fires on mount (contacts,
-    // opportunities, risks, canvases) never went out against orgId 0 — unlike
-    // ActivityFeed's own per-tab reads (activities, emails, ...), which are
-    // its own concern, not this page's, and out of this fix's scope.
-    for (const endpoint of ['/contacts/', '/opportunities/', '/risks/', '/canvases/']) {
-      expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining(`/customers/0/accounts/17${endpoint}`), expect.anything());
-    }
-  });
-});
-
-describe('AccountDetails owner tile', () => {
-  it('assigns an owner with a handover note, like an organisation', async () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetViewport();
     resetMembersCache();
-    const calls: { url: string; init?: RequestInit }[] = [];
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string, init?: RequestInit) => {
-        calls.push({ url: String(url), init });
-        const ok = (body: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => body });
-        if (String(url).includes('/auth/members/')) {
-          return ok([{ id: 2, name: 'Carl CSM', function: 'cs' }, { id: 5, name: 'Priya Nair', function: 'engineering' }]);
-        }
-        if (init?.method === 'PATCH') {
-          return ok({ id: 17, name: 'APAC Division', owner: { id: 5, name: 'Priya Nair', function: 'engineering' }, customers: [{ id: 9, name: 'Kraft Heinz' }] });
-        }
-        return ok([]);
-      }),
-    );
-    const user = userEvent.setup();
-    renderAccountDetails({ account: apacDivision });
-
-    expect(screen.getByText('Nobody yet')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Assign' }));
-    await user.selectOptions(await screen.findByLabelText('New account owner'), '5');
-    await user.type(screen.getByLabelText('Handover note'), 'Priya runs APAC now.');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
-
-    await waitFor(() => expect(screen.getByText('Priya Nair · Engineering')).toBeInTheDocument());
-    const patch = calls.find((c) => c.init?.method === 'PATCH');
-    expect(patch?.url).toContain('/customers/9/accounts/17/');
-    expect(JSON.parse(String(patch?.init?.body))).toEqual({ owner_id: 5, handover_note: 'Priya runs APAC now.' });
-    expect(screen.queryByLabelText('New account owner')).not.toBeInTheDocument();
+    document.body.style.overflow = '';
+    delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   });
-});
 
-describe('AccountDetails Company View', () => {
-  it("shows the account owner and the parent organisation's department owners and knowledge", { timeout: 15000 }, async () => {
-    resetMembersCache();
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((url: string) => {
-        const ok = (body: unknown) => Promise.resolve({ ok: true, status: 200, json: async () => body });
-        const u = String(url);
-        if (u.includes('/auth/members/')) return ok([{ id: 2, name: 'Carl CSM', function: 'cs' }, { id: 5, name: 'Priya Nair', function: 'engineering' }]);
-        if (u.includes('/customers/9/responsible/')) {
-          return ok({
-            customer_id: 9,
-            account_owner: { id: 2, name: 'Carl CSM', function: 'cs' },
-            responsible: [
-              { function: 'cs', function_display: 'Customer Success', user: { id: 2, name: 'Carl CSM' } },
-              { function: 'engineering', function_display: 'Engineering', user: { id: 5, name: 'Priya Nair' } },
-              { function: 'sales', function_display: 'Sales', user: null },
-            ],
-          });
-        }
-        if (u.includes('/brief/'))
-          return ok({ use_cases: [], stakeholders: [], open_threads: [], sources: [], hidden_sources: 0, generated_at: null, generated_by: null, gaps: [] });
-        if (u.includes('/customers/9/contributions/')) {
-          return ok([{ id: 1, customer_id: 9, customer_name: 'Kraft Heinz', author: { id: 5, name: 'Priya Nair' }, function: 'engineering', function_display: 'Engineering', body: 'SSO drops sessions on token refresh.', created_at: '2026-09-13T08:00:00Z', updated_at: '2026-09-13T08:00:00Z' }]);
-        }
-        // Not stubbed here: the page's own read of this endpoint (to fill
-        // in pulse/owner-function gaps) fails, leaving the nav-state row's
-        // own owner/function — exactly this test's own point.
-        if (/\/customers\/9\/accounts\/17\/$/.test(u)) return Promise.resolve({ ok: false, status: 404, json: async () => ({ detail: 'Not found.' }) });
-        return ok([]);
-      }),
+  it('lands by the URL id alone in three requests: the row, the record and the story', async () => {
+    const spy = stubAccountPage();
+    renderAccountPage();
+    await landed();
+    expect(within(header()).getByText('Carl CSM').closest('p')).toHaveTextContent('Carl CSM · Live · Touched 33d ago');
+    expect(within(header()).getByText('Renewal overdue')).toBeInTheDocument();
+    expect(within(header()).getByRole('link', { name: 'Pizza Hut' })).toHaveAttribute('href', '/organizations/7?account=12');
+    expect(within(header()).getByRole('link', { name: 'Yum Brands' })).toHaveAttribute('href', '/organizations/9?account=12');
+    expect(within(header()).getByRole('button', { name: 'ARR $69.6K. Show commercial details' })).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Needs attention' })).toBeInTheDocument();
+    await waitFor(() => expect(itemKeys()).toEqual(['email:141', 'call:112', 'ticket:188', 'task:105', 'health:103']));
+    for (const item of document.querySelectorAll('[data-story-item]')) expect(item).not.toHaveTextContent('Pizza EMEA');
+    expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true');
+    expect([...requestPaths(spy)].sort()).toEqual(['GET /accounts/12/', 'GET /accounts/12/story/', 'GET /accounts/portfolio/']);
+    expect(accountStoryQueries(spy)[0].toString()).toBe('limit=30');
+  });
+
+  it('has the seven tabs, no account chips, and none of the removed parts', async () => {
+    stubAccountPage();
+    renderAccountPage();
+    await landed();
+    const tablist = screen.getByRole('tablist', { name: 'Account sections' });
+    expect(within(tablist).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Story',
+      'Details',
+      'People',
+      'Deals & risks',
+      'Files',
+      'Custom objects',
+      'Canvases',
+    ]);
+    expect(screen.queryByRole('group', { name: 'Filter by account' })).not.toBeInTheDocument();
+    for (const gone of [/Company View/, /Enable new 360 UI/, /Ask Copilot/, /Success Plans/, /coming soon/i, /Integrating Salesforce Data/, /Canvas List/]) {
+      expect(screen.queryByText(gone)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole('tab', { name: 'Organizations' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Knowledge' })).not.toBeInTheDocument();
+  });
+
+  it('keeps the tab in the URL, with arrows moving it, and never reads the story twice', async () => {
+    const spy = stubAccountPage({ lists: ACCOUNT_LISTS });
+    renderAccountPage();
+    await landed();
+    await waitFor(() => expect(itemKeys()).toHaveLength(5));
+    await userEvent.click(screen.getByRole('tab', { name: 'Details' }));
+    expect(where().searchParams.get('tab')).toBe('details');
+    await userEvent.keyboard('{ArrowRight}');
+    expect(where().searchParams.get('tab')).toBe('people');
+    expect(screen.getByRole('tab', { name: 'People' })).toHaveFocus();
+    await userEvent.click(screen.getByRole('tab', { name: 'Story' }));
+    expect(where().search).toBe('');
+    expect(accountStoryQueries(spy)).toHaveLength(1);
+  });
+
+  it('opens on the tab the URL names, reading only what it shows', async () => {
+    const spy = stubAccountPage({ lists: ACCOUNT_LISTS });
+    renderAccountPage('/accounts/12?tab=canvases');
+    await landed();
+    expect(screen.getByRole('tab', { name: 'Canvases' })).toHaveAttribute('aria-selected', 'true');
+    expect(await screen.findByRole('link', { name: 'EMEA buying group' })).toHaveAttribute('href', '/canvas/301');
+    expect(accountStoryQueries(spy)).toHaveLength(0);
+  });
+
+  it('reads an unknown tab as the Story', async () => {
+    stubAccountPage();
+    renderAccountPage('/accounts/12?tab=knowledge');
+    await landed();
+    expect(screen.getByRole('tab', { name: 'Story' })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('says the account is not found when the viewer may not open it', async () => {
+    stubAccountPage({ row: null });
+    renderAccountPage();
+    expect(await screen.findByText('Account not found')).toBeInTheDocument();
+    expect(screen.getByText('It may have been removed, or you may not have access to it.')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Back to accounts' })).toHaveAttribute('href', '/accounts/list');
+    expect(screen.queryByRole('tablist')).not.toBeInTheDocument();
+  });
+
+  it('says the account is not found for an id that is not a number, without asking the server', async () => {
+    const spy = stubAccountPage();
+    renderAccountPage('/accounts/acc-1');
+    expect(await screen.findByText('Account not found')).toBeInTheDocument();
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it('says so when the row cannot be read, and Try again reads it again', async () => {
+    stubAccountPage({ failPortfolio: 1 });
+    renderAccountPage();
+    expect(await screen.findByText('Try later.')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await landed()).toBeInTheDocument();
+  });
+
+  it('a tile jumps to its Details panel and focuses it', async () => {
+    stubAccountPage({ lists: ACCOUNT_LISTS });
+    renderAccountPage();
+    await landed();
+    await userEvent.click(screen.getByRole('button', { name: 'ARR $69.6K. Show commercial details' }));
+    expect(where().searchParams.get('tab')).toBe('details');
+    await waitFor(() => expect(document.querySelector('[data-panel="commercial"]')).toHaveFocus());
+  });
+
+  it('Health opens the account pulse', async () => {
+    stubAccountPage();
+    renderAccountPage();
+    await landed();
+    await userEvent.click(screen.getByRole('button', { name: 'Health 4.9, Average. Show the account pulse' }));
+    const pulse = screen.getByRole('region', { name: 'Account pulse' });
+    expect(await within(pulse).findByText('AI pulse')).toBeInTheDocument();
+    expect(pulse).toHaveTextContent('Account pulse: At risk · 2.4 / 5');
+  });
+
+  it('Edit saves through the first organisation, and the page reads the account again', async () => {
+    const spy = stubAccountPage();
+    renderAccountPage();
+    await landed();
+    const edit = within(header()).getByRole('button', { name: 'Edit' });
+    await waitFor(() => expect(edit).toBeEnabled());
+    await userEvent.click(edit);
+    expect(screen.getByRole('heading', { name: 'Edit Pizza EMEA' })).toBeInTheDocument();
+    const name = screen.getByLabelText(/^Name/);
+    await userEvent.clear(name);
+    await userEvent.type(name, 'Pizza Europe');
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    expect(await landed('Pizza Europe')).toBeInTheDocument();
+    expect(patches(spy)).toEqual([['/customers/7/accounts/12/', expect.objectContaining({ name: 'Pizza Europe' })]]);
+  });
+
+  it('Edit on an account with no organisation the viewer may open saves on the account itself', async () => {
+    const spy = stubAccountPage({ row: initechApac });
+    renderAccountPage('/accounts/14');
+    await landed('Initech APAC');
+    const edit = within(header()).getByRole('button', { name: 'Edit' });
+    await waitFor(() => expect(edit).toBeEnabled());
+    await userEvent.click(edit);
+    await userEvent.click(screen.getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(patches(spy)).toEqual([['/accounts/14/', expect.objectContaining({ name: 'Initech APAC' })]]));
+  });
+
+  it('hands the account over from Details with a note, and the name row follows', async () => {
+    const spy = stubAccountPage({ lists: ACCOUNT_LISTS });
+    renderAccountPage('/accounts/12?tab=details');
+    await landed();
+    await userEvent.click(await screen.findByRole('button', { name: 'Hand over' }));
+    await waitFor(() => expect(screen.getByRole('option', { name: 'Alice · Customer Success' })).toBeInTheDocument());
+    await userEvent.selectOptions(screen.getByLabelText('New account owner'), '1');
+    await userEvent.type(screen.getByLabelText('Handover note'), 'Covering while Carl is away');
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(within(header()).getByText('Alice')).toBeInTheDocument());
+    expect(patches(spy)).toEqual([['/accounts/12/', { owner_id: 1, handover_note: 'Covering while Carl is away' }]]);
+  });
+
+  it('⋯ adds a contact and a task on the account, and People and the Story show them', async () => {
+    const spy = stubAccountPage({ lists: ACCOUNT_LISTS });
+    renderAccountPage();
+    await landed();
+    await waitFor(() => expect(itemKeys()).toHaveLength(5));
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza EMEA' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Add contact' }));
+    await userEvent.type(screen.getByLabelText(/^Name/), 'Robin Ops');
+    await userEvent.type(screen.getByLabelText(/^Email/), 'robin@pizzahut.example');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add Contact' }).find((button) => button.closest('form'))!);
+    await waitFor(() => expect(postBodies(spy, '/accounts/12/contacts/')).toHaveLength(1));
+    await userEvent.click(screen.getByRole('tab', { name: 'People' }));
+    expect(await screen.findByRole('link', { name: 'Robin Ops' })).toHaveAttribute('href', '/contacts/901');
+
+    await userEvent.click(screen.getByRole('tab', { name: 'Story' }));
+    await userEvent.click(screen.getByRole('button', { name: 'More actions for Pizza EMEA' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'New task' }));
+    const dialog = screen.getByRole('dialog', { name: 'New task' });
+    expect(dialog).toHaveAccessibleDescription('On Pizza EMEA');
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Task title' }), 'Book the retraining');
+    fireEvent.change(within(dialog).getByLabelText('Due date'), { target: { value: '2026-10-01' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save task' }));
+    await waitFor(() => expect(itemKeys()).toContain('task:902'));
+    expect(postBodies(spy, '/accounts/12/tasks/')).toHaveLength(1);
+  });
+
+  it('reads every other tab by the account alone, never through an organisation', async () => {
+    const spy = stubAccountPage({ lists: ACCOUNT_LISTS, definitions: [LINE_ITEMS], records: LINE_ITEM_RECORDS });
+    renderAccountPage();
+    await landed();
+    for (const name of ['People', 'Deals & risks', 'Files', 'Custom objects']) {
+      await userEvent.click(screen.getByRole('tab', { name }));
+    }
+    // Asserted while its panel shows: a visited tab stays mounted but hidden.
+    expect(await screen.findByRole('heading', { name: 'Seat licence' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('tab', { name: 'Canvases' }));
+    expect(await screen.findByRole('link', { name: 'EMEA buying group' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(requestPaths(spy)).toEqual(
+        expect.arrayContaining([
+          'GET /accounts/12/contacts/',
+          'GET /accounts/12/opportunities/',
+          'GET /accounts/12/risks/',
+          'GET /accounts/12/files/',
+          'GET /accounts/12/calls/',
+          'GET /custom-objects/definitions/',
+          'GET /custom-objects/records/',
+          'GET /accounts/12/canvases/',
+        ]),
+      ),
     );
-    const user = userEvent.setup();
-    renderAccountDetails({ account: { ...apacDivision, owner: 'Mei Tanaka', ownerId: 7, ownerFunction: 'analytics' } });
+    expect(requestPaths(spy).filter((path) => path.includes('/customers/'))).toEqual([]);
+  });
 
-    await user.click(await screen.findByRole('button', { name: /^Company View/ }));
-    expect(await screen.findByText(/Who answers for APAC Division/)).toBeInTheDocument();
-    expect(screen.getByText('knowledge of Kraft Heinz', { exact: false })).toBeInTheDocument();
-    // The account's own owner, then the organisation's.
-    expect(screen.getByText('Mei Tanaka · Analytics')).toBeInTheDocument();
-    expect(screen.getByText('Organisation owner')).toBeInTheDocument();
-    expect((await screen.findAllByText('Carl CSM · Customer Success')).length).toBeGreaterThan(0);
-    // Department owners and knowledge come from the organisation.
-    expect(await screen.findByLabelText('Engineering owner')).toHaveValue('5');
-    expect(await screen.findByText('SSO drops sessions on token refresh.')).toBeInTheDocument();
+  it('never links an organisation the viewer may not open', async () => {
+    stubAccountPage({ row: initechApac });
+    renderAccountPage('/accounts/14?tab=details');
+    await landed('Initech APAC');
+    expect(document.querySelector('[data-part="part-of"]')).toBeNull();
+    expect(screen.getByRole('region', { name: 'Knowledge' })).toHaveTextContent('there is none for this account that you can open');
+    expect(document.querySelectorAll('a[href^="/organizations/"]')).toHaveLength(0);
+  });
+
+  it('on phones: the name row, a strip of tiles, then the scrolling tabs', async () => {
+    stubAccountPage();
+    renderAccountPage('/accounts/12', { width: 375 });
+    await landed();
+    expect(within(header()).getByRole('button', { name: /^ARR/ }).parentElement).toHaveClass('snap-x', 'overflow-x-auto');
+    const tablist = screen.getByRole('tablist', { name: 'Account sections' });
+    expect(tablist).toHaveClass('overflow-x-auto');
+    expect(header().compareDocumentPosition(tablist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

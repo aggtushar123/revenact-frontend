@@ -4,8 +4,8 @@ import { useAppDispatch, useAppSelector, useCapability } from '../../../hooks';
 import type { Account } from '../../../features/customers/customersSlice';
 import { canDeleteFile, FILE_ACCEPT } from '../../../features/files/fileFormat';
 import { deleteFile, downloadAttachment, fetchFiles, uploadFile, type Attachment, type FileParent } from '../../../features/files/filesSlice';
-import { listScope } from '../../../lib/listScope';
 import { awaitingAccount, byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
+import { resolveScope, scopeSlot, type ScopeProps } from '../../../features/organizations/detailScope';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { ErrorBlock } from '../portfolio/PortfolioSections';
 import { BUTTON, FOCUS } from '../portfolio/styles';
@@ -14,31 +14,37 @@ import { AccountNames } from './accountNames';
 import { AddPaused, ListSkeleton, ScopedEmpty } from './ListParts';
 import { LIST, SECTION_HEADING } from './listStyles';
 
-/** Files (spec 2026-09-27 §4): the organization's own files and every
- *  visible account's, each tagged, narrowed by the account chip. Uploading
- *  (the button or a drop) while an account is chosen attaches to that
- *  account. Downloads go through the session: the API never exposes a URL a
- *  plain link could open. */
-export function FilesSection({
-  customerId,
-  account,
-  accounts,
-  isSm,
-  onShowAll,
-}: {
-  customerId: number;
-  /** The chip: '' All, 'none' the organization itself, or an account id. */
+/** The page's own account as a file parent, built once: on the account page
+ *  it is both what's read and, absent an account chip, where uploads land. */
+function pageAccountTarget(kind: 'organization' | 'account', scopeId: number): FileParent | null {
+  return kind === 'account' ? { entityType: 'account', customerId: null, accountId: scopeId } : null;
+}
+
+type FilesSectionProps = ScopeProps & {
+  /** The chip: '' All, 'none' the organization itself, or an account id. Always '' on an account's page. */
   account: string;
   accounts: Account[];
   isSm: boolean;
   onShowAll: () => void;
-}) {
+};
+
+/** Files (spec 2026-09-27 §4; account spec §2.9): the organization's own
+ *  files and every visible account's, each tagged and narrowed by the account
+ *  chip, or one account's own. Uploading (the button or a drop) attaches to
+ *  the chosen account, or the page's account. Downloads go through the
+ *  session: the API never exposes a URL a plain link could open. */
+export function FilesSection(props: FilesSectionProps) {
+  const { account, accounts, isSm, onShowAll } = props;
+  const scope = resolveScope(props);
+  const kind = scope.kind;
+  const scopeId = scope.id;
+  const pageAccountName = scope.kind === 'account' ? scope.name : null;
   const dispatch = useAppDispatch();
-  const { items, isLoading, error, uploading, uploadError, scope } = useAppSelector((state) => state.files);
+  const { items, isLoading, error, uploading, uploadError, scope: slot } = useAppSelector((state) => state.files);
   const me = useAppSelector((state) => state.auth.user);
   const isAdmin = useCapability('manage_org_settings');
-  // The shared slot holds this organization's files (not another's).
-  const loaded = scope === listScope(customerId);
+  // The shared slot holds this page's files (not another's).
+  const loaded = slot === scopeSlot({ kind, id: scopeId });
   const [attempt, setAttempt] = useState(0);
   const [description, setDescription] = useState('');
   const [dragging, setDragging] = useState(false);
@@ -49,14 +55,16 @@ export function FilesSection({
   const descriptionId = useId();
   const pausedId = useId();
 
-  // Before paint, as People does.
-  useLayoutEffect(() => {
-    void dispatch(fetchFiles({ entityType: 'organization', customerId }));
-  }, [dispatch, customerId, attempt]);
-
   const target = chosenAccount(accounts, account);
   const paused = awaitingAccount(accounts, account);
-  const parent: FileParent = target ? { entityType: 'account', customerId, accountId: target.id } : { entityType: 'organization', customerId };
+  const parent: FileParent =
+    pageAccountTarget(kind, scopeId) ?? (target ? { entityType: 'account', customerId: scopeId, accountId: target.id } : { entityType: 'organization', customerId: scopeId });
+
+  // Before paint, as People does.
+  useLayoutEffect(() => {
+    void dispatch(fetchFiles(pageAccountTarget(kind, scopeId) ?? { entityType: 'organization', customerId: scopeId }));
+  }, [dispatch, kind, scopeId, attempt]);
+
   const shown = byAccount(items, account);
   const failed = error !== null && !isLoading;
 
@@ -129,7 +137,12 @@ export function FilesSection({
             <h2 id={headingId} className={SECTION_HEADING}>
               Files
             </h2>
-            <p className="text-[13px] text-ink-muted">Up to 25 MB each. New files go on {target?.name ?? 'the organization'}.</p>
+            <p className="text-[13px] text-ink-muted">
+              {/* A truthy check, not `??`: an account's own page names it ''
+               *  until its row lands, and `''` is not "no name" the way
+               *  `undefined` is. */}
+              Up to 25 MB each. New files go on {pageAccountName || target?.name || 'the organization'}.
+            </p>
           </div>
           <div className={isSm ? 'flex items-end gap-2' : 'flex flex-col gap-2'}>
             <div className="flex flex-col gap-1">

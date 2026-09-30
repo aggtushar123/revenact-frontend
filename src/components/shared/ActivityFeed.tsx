@@ -88,13 +88,14 @@ export interface ActivityFeedProps {
   /** Tailwind class for the health dot in ActivitiesTab */
   healthColor?: string;
   /** Pre-selects one of FILTER_ITEMS on mount instead of the default
-   * 'All' — the standalone Surveys page's own row-click navigates here
-   * with `location.state.activityFilter: 'Surveys'` (see
-   * organizations/Details.tsx and accounts/Details.tsx, which read
-   * that and pass it through) so landing on this company's own Details
-   * page opens straight to its Surveys history instead of the general
-   * feed. Any other unimplemented value just falls through to the
-   * usual "coming soon" placeholder, same as typing one in by hand. */
+   * 'All'. Used to be fed from the standalone Surveys page's row-click,
+   * which navigated here with `location.state.activityFilter:
+   * 'Surveys'`; organizations/Details.tsx and accounts/Details.tsx no
+   * longer read any navigation state (accounts spec 2026-09-29 §2, and
+   * the org page before it), so nothing sets this prop today — left in
+   * place for a later cleanup pass (plan decision 17). Any value passed
+   * in falls through to the usual "coming soon" placeholder unless it
+   * names an implemented filter. */
   initialFilter?: string;
 }
 

@@ -1,5 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import { apiFetch, ApiError } from '../../lib/apiClient';
+import { accountBase } from '../../lib/accountPaths';
 import { listScope, parentScope } from '../../lib/listScope';
 import type { Analysis } from '../contacts/contactsTypes';
 import type { Attachment, FileParent } from '../files/filesSlice';
@@ -52,9 +53,12 @@ export interface LogCallInput {
 }
 
 export function callsPath({ entityType, customerId, accountId }: FileParent): string {
-  return entityType === 'organization'
-    ? `/customers/${customerId}/calls/`
-    : `/customers/${customerId}/accounts/${accountId}/calls/`;
+  if (entityType === 'organization') {
+    if (customerId == null) throw new Error('callsPath: an organisation read needs a customerId.');
+    return `/customers/${customerId}/calls/`;
+  }
+  if (accountId == null) throw new Error('callsPath: an account read needs an accountId.');
+  return `${accountBase(accountId, customerId)}/calls/`;
 }
 
 interface CallsState {
@@ -150,7 +154,8 @@ const callsSlice = createSlice({
         state.saving = false;
         // Only into the list it belongs to: its own, or its organization's roll-up.
         const { customerId } = action.meta.arg;
-        if (state.scope !== parentScope(action.meta.arg) && state.scope !== listScope(customerId)) return;
+        const rollUp = customerId !== null && state.scope === listScope(customerId);
+        if (state.scope !== parentScope(action.meta.arg) && !rollUp) return;
         state.items = [action.payload, ...state.items].sort((a, b) => b.occurred_at.localeCompare(a.occurred_at));
       })
       .addCase(logCall.rejected, (state, action) => {

@@ -503,7 +503,10 @@ const EMPTY_BRIEF = {
   gaps: [],
 };
 
-function json(status: number, body: unknown) {
+/** A fetch Response shaped enough for these stubs: `ok`/`status`/`json`/`blob`.
+ *  Shared by every page's stub (testPortfolio's own `json` stays local — it
+ *  predates this one and is identical, not worth churning). */
+export function json(status: number, body: unknown) {
   return {
     ok: status >= 200 && status < 300,
     status,
@@ -512,7 +515,8 @@ function json(status: number, body: unknown) {
   };
 }
 
-function bodyOf(init?: RequestInit): Record<string, unknown> {
+/** A stubbed request's body, whichever shape it was sent in. */
+export function bodyOf(init?: RequestInit): Record<string, unknown> {
   if (init?.body instanceof FormData) return Object.fromEntries(init.body.entries());
   return init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {};
 }

@@ -3,7 +3,6 @@ import { render, screen, within } from '@testing-library/react';
 import { configureStore } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
 import customersReducer from '../../../features/customers/customersSlice';
-import { accountNavRow } from '../../../features/accounts/accountNavState';
 import { accountPatches, accountPortfolioQueries, globexNa, initechApac, pizzaEmea, stubAccountsPortfolio } from '../../../features/accounts/testPortfolio';
 import { parseParams } from '../../../features/organizations/portfolioParams';
 import type { AppDispatch } from '../../../store';
@@ -35,9 +34,9 @@ describe('ACCOUNT_KIND', () => {
     expect(ACCOUNT_KIND.cardSubtitle(initechApac)).toBe('Unassigned');
   });
 
-  it('links to the account page with the row that page reads', () => {
+  it('links to the account page by its id alone', () => {
     expect(ACCOUNT_KIND.href(pizzaEmea)).toBe('/accounts/12');
-    expect(ACCOUNT_KIND.linkState(pizzaEmea)).toEqual({ account: accountNavRow(pizzaEmea) });
+    expect(ACCOUNT_KIND.linkState(pizzaEmea)).toBeUndefined();
   });
 
   it('has no archive, no churn form and nothing hidden for churn', () => {

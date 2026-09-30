@@ -111,7 +111,7 @@ Two-line cards, the opened row as a bottom sheet, and 44px targets. Layouts for 
    - **Pulse:** "AI n · CSM n", the dots, "pulses disagree".
 
    A tile jumps to its Details panel. On phones the tiles become a snapping strip.
-4. **Tabs:** Story (default) · Details · People · Deals & risks · Files. This is a real tablist, with the active tab in the URL (`?tab=`). There are no account chips.
+4. **Tabs:** Story (default) · Details · People · Deals & risks · Files · Custom objects · Canvases. This is a real tablist, with the active tab in the URL (`?tab=`). There are no account chips.
 5. **Story:**
    - **Needs attention**, shown only when something needs it:
      - renewal overdue, or due within 30 days
@@ -123,13 +123,16 @@ Two-line cards, the opened row as a bottom sheet, and 44px targets. Layouts for 
 6. **Details:**
    - The four panels from §1, with Edit details.
    - The CSAT breakdown.
+   - The account's AI attributes (`AIAttributesPanel` with the account id), as on the organisation page's Details.
    - "Knowledge for this account lives on Pizza Hut's page", with a link for each linked organisation.
 7. **People:** the account's contacts as list items. A name opens `/contacts/:id`, and the list has a summary line and search.
 8. **Deals & risks:** the Opportunities / Risks switch and its list items, as on the organisation page. Adds go to this account.
 9. **Files:** Files and Calls sections, as on the organisation page. Uploads and logged calls go to this account.
+9a. **Custom objects:** the account's custom object records (the existing `CustomObjectsTab`, which already reads by account id), restyled as list items. The tab's count comes from the tab itself.
+9b. **Canvases:** the account's canvases (the existing `CanvasListTab` data), restyled as list items; New canvas opens `/canvas/create` for this account. Read through `GET /accounts/<id>/canvases/`.
 10. **Removed:**
-    - Company View, the Organizations tab (its links move to the name row) and the pinned-attributes panel.
-    - The Custom Objects, Success Plans and Canvas List placeholders. These come back as tabs when real.
+    - Company View (its knowledge lives on each linked organisation's Knowledge tab, linked from Details), the Organizations tab (its links move to the name row) and the pinned-attributes panel (its AI attributes move to Details).
+    - The Success Plans placeholder. It comes back as a tab when real.
     - Every dead control.
 11. **Phones:** the name row, a strip of tiles you swipe, the tabs (scrolling), then full-width content.
 
@@ -138,7 +141,7 @@ Two-line cards, the opened row as a bottom sheet, and 44px targets. Layouts for 
   - Returns items, counts and attention, in the organisation story's shapes and with its params (filters, sources, search, cursor).
   - An account scope for the story code (`resolve_account_scope`) gives a 404 when the viewer cannot open the account, whether or not it exists. Each source then applies its own record rule: mail by mailbox owner and chain, tickets by department, notes and tasks by their personal rules.
   - Only records with `account_id` = this account are included.
-- **The `/accounts/<id>/…` endpoints** (contacts, opportunities, risks, files, calls, surveys, tasks, notes) serve the tabs and the create flows. An account filter or field is added only where one is missing.
+- **The `/accounts/<id>/…` endpoints** (contacts, opportunities, risks, files, calls, surveys, tasks, notes, canvases) serve the tabs and the create flows. An account filter or field is added only where one is missing.
 
 ## 3. Ask Revenact on Accounts (delivery 3)
 
@@ -182,5 +185,8 @@ Each delivery goes through subagent-driven development, with a review per task, 
 ## Out of scope
 - Archive and churn for accounts.
 - Account-level company knowledge.
-- Custom Objects, Success Plans and Canvases as account tabs (they return when real).
+- Success Plans as an account tab (it returns when real).
 - Scenarios (deferred by the owner, 2026-09-29).
+
+## Revisions
+- 2026-09-30 (owner): the old account page's Custom Objects and Canvas List were real, not placeholders, and its pinned panel held real AI attributes. They stay: Custom objects and Canvases tabs, AI attributes on Details, and a flat `/accounts/<id>/canvases/` route.

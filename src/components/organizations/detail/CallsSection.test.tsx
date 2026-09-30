@@ -16,7 +16,10 @@ import {
 import { makeDetailStore } from '../../../pages/organizations/testDetail';
 import { CallsSection } from './CallsSection';
 
-type Props = ComponentProps<typeof CallsSection>;
+// The organisation page always names its page with `customerId` (never
+// `scope`, the account page's own prop): narrowed here so a partial props
+// object can still be spread onto the union `CallsSection` now takes.
+type Props = Extract<ComponentProps<typeof CallsSection>, { customerId: number }>;
 const BASE: Props = { customerId: 7, account: '', accounts: ACCOUNTS, isSm: true, active: true, version: 0, onLogged: () => {}, onShowAll: () => {} };
 
 function renderCalls(props: Partial<Props> = {}, lists: OrganizationLists = ORGANIZATION_LISTS) {

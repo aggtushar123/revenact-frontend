@@ -179,10 +179,11 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 | Component | Where |
 |---|---|
 | Portfolio rows and board (`components/organizations/portfolio/`) | `/organizations/list`: `AccountRow` (a rounded item, not a table row; a two-line card below `sm`), `AccountDetails` (six panels, part of the row), `SummaryTiles`, `PortfolioToolbar`/`FiltersPanel`/`PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `AccountSheet`. `/organizations/board`: `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`. They read a portfolio kind (`PortfolioKindContext`, Organizations by default), so `/accounts/list` and `/accounts/board` use them too, with `ACCOUNT_KIND` and `components/accounts/portfolio/AccountPanels`. See "Portfolio rows and board" below |
+| Account page (`components/accounts/detail/`) | `/accounts/:id`: `AccountHeader`, `AccountTiles` (the shared `DetailTiles`, Health opening `AccountPulseBreakdown`), `AccountDetailsTab`, `CanvasesTab`, `useAccount`, `useAccountPageParams`; the organization page's detail parts (`StoryTab`, `PeopleTab`, `DealsTab`, `FilesCallsTab`, `DetailTabs`) given an account `scope`. See "Account page" below |
 | Contacts list and profile (`components/contacts/`) | `/contacts`: `ContactsToolbar` (summary line, search, organisation, account, sentiment and role filters in the URL, + Add), `ContactList` of `ContactListItem`s (never a table row; Load more), `ContactProfile` (sentiment and why, then `HistoryItems`: calls newest first, emails, tickets). See "Contacts" below |
 | `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by Pipelines |
 | Dashboard tables | `AccountHealthDetailTable`, `RenewalQueueTable`, `ActivityDetailedTable`, `GoingDarkTable`, `SwingTable` |
-| `PinnedAttributes` | Label and value pairs typed as text, truncated, dot, owner or pulse |
+| `PinnedAttributes` *(unused — no route renders it; kept for a later cleanup PR, see §4.4 of docs/04-app-flow.md)* | Label and value pairs typed as text, truncated, dot, owner or pulse |
 | `EntityAvatar` | Company logo, else deterministic initials in one of five semantic hues |
 | `PresenceStrip` | Session participants, maximum five |
 
@@ -520,12 +521,54 @@ Everything in the section above holds, with these differences:
 - An account none of whose organisations the viewer may open shows no Edit
   details and no Move to…, since both need its organisation's id. Bulk edits
   still reach it.
-- The name, and the sheet's and side panel's "Open account page", pass the
-  row to `/accounts/:id` in `location.state`, where the account page (to be
-  redesigned in delivery 2) reads it.
+- The name, and the sheet's and side panel's "Open account page", open
+  `/accounts/:id` by its id alone: the account page reads everything from
+  the URL.
 - The top bar is the framed one: "Accounts", List | Board keeping the query,
   the actions slot, and no avatar. The rail slot stays empty until Ask
   (delivery 3).
+
+### Account page (`/accounts/:id`)
+
+The account's story: the organization page below, scoped to one account
+(spec `docs/superpowers/specs/2026-09-29-accounts-redesign-design.md` §2),
+read from the URL id alone. An id that is not a number, or one the viewer
+may not open, shows "Account not found" with "Back to accounts". Rules
+specific to it, enforced by `components/accounts/detail/houseRules.test.ts`
+(which also scans `pages/accounts/Details.tsx`, `shared/CustomObjectsTab.tsx`,
+`shared/CanvasListTab.tsx` and `shared/OwnerTile.tsx`):
+
+- Frame: the organization page's bleed frame, the transparent top bar with
+  "‹ Accounts", and the rail slot kept empty until Ask (delivery 3).
+- Name row (`AccountHeader`): initials, the name at 22px, "owner · lifecycle ·
+  Touched Nd ago" at 13px and the signal tag; then "Part of" with one link per
+  linked organisation the viewer may open (`/organizations/:id?account=<id>`;
+  a hidden one is never named or counted); Edit (icon-only below sm) and ⋯
+  (Add contact, Log a call, New task).
+- Tiles (`AccountTiles`): Health (ring and trend; opens the account pulse, its
+  five signals, with a note that an account's health has no rubric), ARR (the
+  workspace's currency), Renewal (runway; jumps to Commercial) and Pulse (jumps
+  to Voice of the customer). A grid of four from sm, a snapping strip below.
+- Tabs: Story, Details, People, Deals & risks, Files, Custom objects and
+  Canvases (`?tab=story|details|people|deals|files|objects|canvases`). No
+  account chips and no account tags: every record is this account's.
+- Story: the organization page's Story on the account's story. Needs attention
+  has no Knowledge row and its renewal row goes to Commercial; Feedback's
+  "Manage surveys" opens `/surveys`.
+- Details: the owner (Assign / Hand over with a note), the four
+  `AccountPanels` with Edit details on the heading row, "CSAT responses" (the
+  organization page's band bars over the account's answered CSAT surveys), the
+  AI attributes, and Knowledge: a link to each openable organisation's
+  Knowledge tab, or a line saying there is none the viewer can open.
+- People, Deals & risks and Files: the organization page's lists, read and
+  saved on the account alone.
+- Custom objects and Canvases are list items, never tables: a summary line
+  ("N records · M objects", "N canvases"); a section per object with Add
+  record, an item per record (its first field as the title, the others by
+  name), Edit and Delete per item; a canvas links to its editor, and New
+  canvas opens `/canvas/create?accountId=<id>`.
+- Phones: the name row, a strip of tiles, the tabs scrolling sideways, then
+  full-width content.
 
 ### Organization page (`/organizations/:id`)
 
@@ -693,9 +736,9 @@ button.
 
 ### Composite
 
-`ActivityFeed` (the account page only, since the organization page's Story
-replaced it there) is the largest shared component: five top tabs (Activity
-Feed, Headlines, Overview, Files, CallSense) and thirteen filter chips. `MentionTextarea`
+`ActivityFeed`, once the largest shared component (five top tabs and
+thirteen filter chips), is now dead code: both detail pages use the Story
+instead (removing it is a follow-up, §4.4 of the app-flow doc). `MentionTextarea`
 is a textarea with an `@` completion listbox supporting people and function
 mentions.
 
@@ -940,7 +983,7 @@ Ranked by leverage. Each is a task in the
 | 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass`, also used by the Ask rail on the Dashboard and Organizations, is the one sanctioned exception) |
 | 9 | `Login.css` requests Inter, which is never loaded | Falls through to the system stack |
 | 10 | Dead files: `App.css` is never imported, the `counter` slice and the seeded `tasks` slice are unused | Template leftovers |
-| 11 | Navbar and the account page's ActivityFeed have controls with no handlers | Search, Plus, Help, Message, feed search, "Add Action", title chevrons |
+| 11 | Navbar has controls with no handlers | Search, Plus, Help, Message, title chevrons |
 
 ---
 

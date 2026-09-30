@@ -227,10 +227,11 @@ export function CanvasEditor() {
   // their `contact_id` to a live name/role/sentiment, and so
   // CanvasSidebar has a real palette to drag from.
   useEffect(() => {
-    if (customerId === undefined) return;
+    // An account alone (the account page's New canvas) reads its people
+    // through /accounts/<id>/contacts/; with an organisation, as before.
     if (accountId !== undefined) {
       dispatch(fetchContactsForAccount({ customerId, accountId }));
-    } else {
+    } else if (customerId !== undefined) {
       dispatch(fetchContactsForCustomer(customerId));
     }
   }, [dispatch, customerId, accountId]);
@@ -264,7 +265,7 @@ export function CanvasEditor() {
 
   const placedContactIds = new Set(nodes.map((n) => (n.data as { contact_id: number }).contact_id));
 
-  if (!routeId && customerId === undefined) {
+  if (!routeId && customerId === undefined && accountId === undefined) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-base text-[13px] text-danger">
         No company was chosen for this canvas — go back and pick one.

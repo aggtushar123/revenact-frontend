@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import type { Node, Edge } from '@xyflow/react';
 import type { UserFunction } from '../auth/authSlice';
 import { apiFetch, ApiError } from '../../lib/apiClient';
+import { accountBase } from '../../lib/accountPaths';
 import { listScope } from '../../lib/listScope';
 import type { User, CurrencyCode } from '../auth/authSlice';
 import type { ContactHistory, ContactsPage, ContactsSummary } from '../contacts/contactsTypes';
@@ -937,6 +938,10 @@ interface CustomersState {
   entityCanvases: Canvas[];
   entityCanvasesLoading: boolean;
   entityCanvasesError: string | null;
+  /** The last fetchCanvasesForCustomer/ForAccount asked for: a slower,
+   *  earlier read (another Customer's or Account's) never lands after a
+   *  newer one already has — same guard as `filesSlice`'s `requestId`. */
+  entityCanvasesRequestId?: string;
   /** Every Canvas the caller's organisation owns — the standalone
    * Canvas gallery, unpaginated, same reasoning as `surveys` above. */
   canvases: Canvas[];
@@ -1136,11 +1141,11 @@ export const createAccount = createAsyncThunk<
 
 export const updateAccount = createAsyncThunk<
   Account,
-  { customerId: number; id: number } & AccountWritePayload,
+  { customerId?: number | null; id: number } & AccountWritePayload,
   { rejectValue: string }
 >('customers/updateAccount', async ({ customerId, id, ...data }, { rejectWithValue }) => {
   try {
-    return await apiFetch<Account>(`/customers/${customerId}/accounts/${id}/`, {
+    return await apiFetch<Account>(`${accountBase(id, customerId)}/`, {
       method: 'PATCH',
       body: data,
     });
@@ -1271,12 +1276,19 @@ export const fetchTasksForCustomer = createAsyncThunk<
 
 // Powers ActivityFeed's "Tasks" filter on the standalone Account
 // page — every account-level Task for one Account.
+// `customerId` is only optional when `accountId` is given — an
+// organisation-level task (no account) always needs its organisation, so
+// that shape can't compile without one. See accountOnlyPaths.test.ts.
+type CreateTaskParent =
+  | { customerId?: number | null; accountId: number }
+  | { customerId: number; accountId?: undefined };
+
 export const createTask = createAsyncThunk<
   Task,
-  { customerId: number; accountId?: number; title: string; due_date: string; priority: Task['priority']; assignee_id?: number | null },
+  CreateTaskParent & { title: string; due_date: string; priority: Task['priority']; assignee_id?: number | null },
   { rejectValue: string }
 >('customers/createTask', async ({ customerId, accountId, ...body }, { rejectWithValue }) => {
-  const path = accountId ? `/customers/${customerId}/accounts/${accountId}/tasks/` : `/customers/${customerId}/tasks/`;
+  const path = accountId ? `${accountBase(accountId, customerId)}/tasks/` : `/customers/${customerId}/tasks/`;
   try {
     return await apiFetch<Task>(path, { method: 'POST', body });
   } catch (err) {
@@ -1316,12 +1328,18 @@ export const fetchNotesForCustomer = createAsyncThunk<
 
 // Powers ActivityFeed's "Notes" filter on the standalone Account
 // page — every account-level Note for one Account.
+// Same "customerId required only without an account" shape as
+// CreateTaskParent above.
+type CreateNoteParent =
+  | { customerId?: number | null; accountId: number }
+  | { customerId: number; accountId?: undefined };
+
 export const createNote = createAsyncThunk<
   Note,
-  { customerId: number; accountId?: number; title: string; body: string },
+  CreateNoteParent & { title: string; body: string },
   { rejectValue: string }
 >('customers/createNote', async ({ customerId, accountId, ...body }, { rejectWithValue }) => {
-  const path = accountId ? `/customers/${customerId}/accounts/${accountId}/notes/` : `/customers/${customerId}/notes/`;
+  const path = accountId ? `${accountBase(accountId, customerId)}/notes/` : `/customers/${customerId}/notes/`;
   try {
     return await apiFetch<Note>(path, { method: 'POST', body });
   } catch (err) {
@@ -1490,15 +1508,13 @@ export const fetchContactsForCustomer = createAsyncThunk<
 // account-level Contact for one Account.
 export const fetchContactsForAccount = createAsyncThunk<
   Contact[],
-  { customerId: number; accountId: number },
+  { customerId?: number | null; accountId: number },
   { rejectValue: string }
 >(
   'customers/fetchContactsForAccount',
   async ({ customerId, accountId }, { rejectWithValue }) => {
     try {
-      return await apiFetch<Contact[]>(
-        `/customers/${customerId}/accounts/${accountId}/contacts/`
-      );
+      return await apiFetch<Contact[]>(`${accountBase(accountId, customerId)}/contacts/`);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not load contacts.';
       return rejectWithValue(message);
@@ -1613,13 +1629,13 @@ export const createContactForCustomer = createAsyncThunk<
 // props it already has for exactly this reason).
 export const createContactForAccount = createAsyncThunk<
   Contact,
-  { customerId: number; accountId: number } & ContactWritePayload & { name: string; email: string },
+  { customerId?: number | null; accountId: number } & ContactWritePayload & { name: string; email: string },
   { rejectValue: string }
 >(
   'customers/createContactForAccount',
   async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
     try {
-      return await apiFetch<Contact>(`/customers/${customerId}/accounts/${accountId}/contacts/`, {
+      return await apiFetch<Contact>(`${accountBase(accountId, customerId)}/contacts/`, {
         method: 'POST',
         body: data,
       });
@@ -1955,15 +1971,13 @@ export const fetchOpportunitiesForCustomer = createAsyncThunk<
 // account-level Opportunity for one Account.
 export const fetchOpportunitiesForAccount = createAsyncThunk<
   Opportunity[],
-  { customerId: number; accountId: number },
+  { customerId?: number | null; accountId: number },
   { rejectValue: string }
 >(
   'customers/fetchOpportunitiesForAccount',
   async ({ customerId, accountId }, { rejectWithValue }) => {
     try {
-      return await apiFetch<Opportunity[]>(
-        `/customers/${customerId}/accounts/${accountId}/opportunities/`
-      );
+      return await apiFetch<Opportunity[]>(`${accountBase(accountId, customerId)}/opportunities/`);
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not load opportunities.';
       return rejectWithValue(message);
@@ -2001,16 +2015,13 @@ export const createOpportunityForCustomer = createAsyncThunk<
 // reasoning as createOpportunityForCustomer above.
 export const createOpportunityForAccount = createAsyncThunk<
   Opportunity,
-  { customerId: number; accountId: number } & OpportunityWritePayload & { title: string },
+  { customerId?: number | null; accountId: number } & OpportunityWritePayload & { title: string },
   { rejectValue: string }
 >(
   'customers/createOpportunityForAccount',
   async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
     try {
-      return await apiFetch<Opportunity>(
-        `/customers/${customerId}/accounts/${accountId}/opportunities/`,
-        { method: 'POST', body: data }
-      );
+      return await apiFetch<Opportunity>(`${accountBase(accountId, customerId)}/opportunities/`, { method: 'POST', body: data });
     } catch (err) {
       const message = err instanceof ApiError ? err.message : 'Could not add opportunity.';
       return rejectWithValue(message);
@@ -2034,11 +2045,11 @@ export const fetchRisksForCustomer = createAsyncThunk<Risk[], number, { rejectVa
 
 export const fetchRisksForAccount = createAsyncThunk<
   Risk[],
-  { customerId: number; accountId: number },
+  { customerId?: number | null; accountId: number },
   { rejectValue: string }
 >('customers/fetchRisksForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
   try {
-    return await apiFetch<Risk[]>(`/customers/${customerId}/accounts/${accountId}/risks/`);
+    return await apiFetch<Risk[]>(`${accountBase(accountId, customerId)}/risks/`);
   } catch (err) {
     const message = err instanceof ApiError ? err.message : 'Could not load risks.';
     return rejectWithValue(message);
@@ -2062,13 +2073,13 @@ export const createRiskForCustomer = createAsyncThunk<
 
 export const createRiskForAccount = createAsyncThunk<
   Risk,
-  { customerId: number; accountId: number } & RiskWritePayload & { title: string },
+  { customerId?: number | null; accountId: number } & RiskWritePayload & { title: string },
   { rejectValue: string }
 >(
   'customers/createRiskForAccount',
   async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
     try {
-      return await apiFetch<Risk>(`/customers/${customerId}/accounts/${accountId}/risks/`, {
+      return await apiFetch<Risk>(`${accountBase(accountId, customerId)}/risks/`, {
         method: 'POST',
         body: data,
       });
@@ -2099,11 +2110,11 @@ export const fetchSurveysForCustomer = createAsyncThunk<
 // account-level Survey for one Account.
 export const fetchSurveysForAccount = createAsyncThunk<
   Survey[],
-  { customerId: number; accountId: number },
+  { customerId?: number | null; accountId: number },
   { rejectValue: string }
 >('customers/fetchSurveysForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
   try {
-    return await apiFetch<Survey[]>(`/customers/${customerId}/accounts/${accountId}/surveys/`);
+    return await apiFetch<Survey[]>(`${accountBase(accountId, customerId)}/surveys/`);
   } catch (err) {
     const message = err instanceof ApiError ? err.message : 'Could not load surveys.';
     return rejectWithValue(message);
@@ -2134,11 +2145,11 @@ export const fetchCanvasesForCustomer = createAsyncThunk<
 // account-level Canvas for one Account.
 export const fetchCanvasesForAccount = createAsyncThunk<
   Canvas[],
-  { customerId: number; accountId: number },
+  { customerId?: number | null; accountId: number },
   { rejectValue: string }
 >('customers/fetchCanvasesForAccount', async ({ customerId, accountId }, { rejectWithValue }) => {
   try {
-    return await apiFetch<Canvas[]>(`/customers/${customerId}/accounts/${accountId}/canvases/`);
+    return await apiFetch<Canvas[]>(`${accountBase(accountId, customerId)}/canvases/`);
   } catch (err) {
     const message = err instanceof ApiError ? err.message : 'Could not load canvases.';
     return rejectWithValue(message);
@@ -2166,7 +2177,7 @@ export const createSurveyForCustomer = createAsyncThunk<
 
 export const createSurveyForAccount = createAsyncThunk<
   Survey,
-  { customerId: number; accountId: number } & SurveyWritePayload & {
+  { customerId?: number | null; accountId: number } & SurveyWritePayload & {
       survey_type: Survey['survey_type'];
       sent_at: string;
     },
@@ -2175,7 +2186,7 @@ export const createSurveyForAccount = createAsyncThunk<
   'customers/createSurveyForAccount',
   async ({ customerId, accountId, ...data }, { rejectWithValue }) => {
     try {
-      return await apiFetch<Survey>(`/customers/${customerId}/accounts/${accountId}/surveys/`, {
+      return await apiFetch<Survey>(`${accountBase(accountId, customerId)}/surveys/`, {
         method: 'POST',
         body: data,
       });
@@ -3091,31 +3102,39 @@ const customersSlice = createSlice({
         state.canvases = state.canvases.filter((c) => c.id !== action.payload);
         state.entityCanvases = state.entityCanvases.filter((c) => c.id !== action.payload);
       })
-      .addCase(fetchCanvasesForCustomer.pending, (state) => {
+      .addCase(fetchCanvasesForCustomer.pending, (state, action) => {
         state.entityCanvasesLoading = true;
         state.entityCanvasesError = null;
+        state.entityCanvasesRequestId = action.meta.requestId;
         // Same "clear on pending" convention as fetchSurveysForCustomer
         // above — avoids a stale previous entity's canvases flashing.
         state.entityCanvases = [];
       })
       .addCase(fetchCanvasesForCustomer.fulfilled, (state, action) => {
+        // A slower, earlier read (this or fetchCanvasesForAccount's) landing
+        // after a newer one already has: never overwrite it.
+        if (action.meta.requestId !== state.entityCanvasesRequestId) return;
         state.entityCanvasesLoading = false;
         state.entityCanvases = action.payload;
       })
       .addCase(fetchCanvasesForCustomer.rejected, (state, action) => {
+        if (action.meta.requestId !== state.entityCanvasesRequestId) return;
         state.entityCanvasesLoading = false;
         state.entityCanvasesError = action.payload ?? 'Could not load canvases.';
       })
-      .addCase(fetchCanvasesForAccount.pending, (state) => {
+      .addCase(fetchCanvasesForAccount.pending, (state, action) => {
         state.entityCanvasesLoading = true;
         state.entityCanvasesError = null;
+        state.entityCanvasesRequestId = action.meta.requestId;
         state.entityCanvases = [];
       })
       .addCase(fetchCanvasesForAccount.fulfilled, (state, action) => {
+        if (action.meta.requestId !== state.entityCanvasesRequestId) return;
         state.entityCanvasesLoading = false;
         state.entityCanvases = action.payload;
       })
       .addCase(fetchCanvasesForAccount.rejected, (state, action) => {
+        if (action.meta.requestId !== state.entityCanvasesRequestId) return;
         state.entityCanvasesLoading = false;
         state.entityCanvasesError = action.payload ?? 'Could not load canvases.';
       })

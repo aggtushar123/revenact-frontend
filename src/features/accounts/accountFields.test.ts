@@ -11,7 +11,6 @@ import {
   organisationText,
   type AccountFieldId,
 } from './accountFields';
-import { accountNavRow } from './accountNavState';
 import { ACCOUNT_PARAMS } from './portfolioParams';
 import { globexNa, initechApac, pizzaEmea } from './testPortfolio';
 
@@ -83,57 +82,5 @@ describe('the account parameters', () => {
     expect(p.sort).toBe('-arr');
     expect(p.group).toBe('health');
     expect(parseParams(new URLSearchParams('sort=risk&group=renewal'), 'health', ACCOUNT_PARAMS)).toMatchObject({ sort: 'risk', group: 'renewal' });
-  });
-});
-
-describe('the row the account page reads', () => {
-  it('carries the real account, its first openable organisation and every linked one', () => {
-    const row = accountNavRow(pizzaEmea);
-    expect(row).toMatchObject({
-      id: '12',
-      revenactId: 12,
-      name: 'Pizza EMEA',
-      orgId: 7,
-      orgName: 'Pizza Hut',
-      orgs: [
-        { id: 7, name: 'Pizza Hut' },
-        { id: 9, name: 'Yum Brands' },
-      ],
-      owner: 'Carl CSM',
-      ownerId: 2,
-      lifecycleStage: 'Live',
-      healthCategory: 'average',
-      nps: '-80',
-      npsValue: -80,
-      csat: '62%',
-      csatValue: 62,
-      arr: 69600,
-      mrr: 5800,
-      renewal: '9 Aug 2026',
-      domain: 'emea.pizzahut.example',
-      industry: 'Restaurants',
-      aiPulseScore: 'High Risk',
-      aiPulseReason: 'Usage fell after the admin left.',
-      pulse: [1, 2, 2],
-    });
-    expect(row.health.val).toBe(4.9);
-  });
-
-  it('reads as the old mapper did when nothing is known', () => {
-    expect(accountNavRow(initechApac)).toMatchObject({
-      orgId: 0,
-      orgName: '',
-      orgs: [],
-      owner: 'Unassigned',
-      ownerId: null,
-      avatar: '—',
-      nps: '0',
-      csat: 'N/A',
-      aiPulseScore: '—',
-      aiPulseReason: '-',
-      renewal: '-',
-      domain: undefined,
-      logo: '',
-    });
   });
 });

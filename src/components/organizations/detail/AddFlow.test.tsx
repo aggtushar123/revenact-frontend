@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
 import type { AddKind } from '../../../features/organizations/storyKinds';
-import { postBodies, stubOrganizationPage } from '../../../features/organizations/testStory';
+import { postBodies, requestPaths, stubOrganizationPage } from '../../../features/organizations/testStory';
 import { makeDetailStore } from '../../../pages/organizations/testDetail';
 import { AddFlow } from './AddFlow';
 
@@ -151,6 +151,26 @@ describe('AddFlow (spec §1.6 "+ Add")', () => {
     expect(onClose).toHaveBeenCalledOnce();
     expect(onAdded).not.toHaveBeenCalled();
     expect(postBodies(spy, '/customers/7/tasks/')).toEqual([]);
+  });
+
+  it('never posts to a "customerId undefined" route when neither id is given (the prop union makes this uncallable from real code; this locks the runtime guard in)', async () => {
+    const spy = stubOrganizationPage();
+    const onAdded = vi.fn();
+    render(
+      <Provider store={makeDetailStore()}>
+        <MemoryRouter>
+          {/* @ts-expect-error — exercising the state the prop union now rules out at compile time. */}
+          <AddFlow what="task" isSm onAdded={onAdded} onClose={vi.fn()} />
+        </MemoryRouter>
+      </Provider>,
+    );
+    const dialog = screen.getByRole('dialog', { name: 'New task' });
+    await userEvent.type(within(dialog).getByRole('textbox', { name: 'Task title' }), 'Book the retraining');
+    fireEvent.change(within(dialog).getByLabelText('Due date'), { target: { value: '2026-10-01' } });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Save task' }));
+    await waitFor(() => expect(within(dialog).getByRole('alert')).toBeInTheDocument());
+    expect(onAdded).not.toHaveBeenCalled();
+    expect(requestPaths(spy).some((path) => path.includes('undefined'))).toBe(false);
   });
 
   it.each(['call', 'task', 'note', 'survey'] as AddKind[])(

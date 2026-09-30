@@ -61,8 +61,8 @@ describe('Accounts portfolio', () => {
     await waitFor(() => expect(accountPatches(spy)).toEqual([{ customerId: 7, id: 12, body: { lifecycle_stage: 'churn' } }]));
     expect(await within(column('churn')).findByRole('link', { name: 'Pizza EMEA' })).toBeInTheDocument();
 
-    // 6. Its name opens the account page with the row that page reads.
+    // 6. Its name opens the account page by its id alone.
     await userEvent.click(within(column('churn')).getByRole('link', { name: 'Pizza EMEA' }));
-    expect(await screen.findByTestId('account-page')).toHaveTextContent('Pizza EMEA · organization 7');
+    expect(await screen.findByTestId('account-page')).toHaveTextContent('Account page 12');
   });
 });

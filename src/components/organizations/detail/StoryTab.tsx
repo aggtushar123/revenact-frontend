@@ -2,47 +2,43 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { Account } from '../../../features/customers/customersSlice';
 import { chosenAccount } from '../../../features/organizations/accountScope';
-import { hasStoryFilters, type DetailParams, type DetailTab } from '../../../features/organizations/detailParams';
+import { hasStoryFilters, type DetailTab, type StoryParams } from '../../../features/organizations/detailParams';
+import { resolveScope, type DetailScope } from '../../../features/organizations/detailScope';
 import type { PanelKey } from '../../../features/organizations/portfolioFields';
 import type { AddKind } from '../../../features/organizations/storyKinds';
 import type { StoryItem } from '../../../features/organizations/storyTypes';
 import { QUIET } from '../portfolio/styles';
-import { AddFlow } from './AddFlow';
+import { AddFlow, type AddFlowParent } from './AddFlow';
 import { AttentionBlock } from './AttentionBlock';
 import { EmailThread } from './EmailThread';
 import { StoryStream } from './StoryStream';
 import { StoryToolbar } from './StoryToolbar';
 import type { StoryState } from './useStory';
 
-/** The Story tab (spec §1.6): Needs attention, the toolbar, then the stream.
- *  Filters live in the URL (through `onUpdate`); "+ Add" and an opened email
- *  are sheets over the page. */
-export function StoryTab({
-  orgId,
-  story,
-  params,
-  accounts,
-  isSm,
-  active,
-  onUpdate,
-  onAdded,
-  onOpenTab,
-  onJump,
-}: {
-  orgId: number;
+type StoryTabProps = ({ orgId: number; scope?: undefined } | { scope: DetailScope; orgId?: undefined }) & {
   story: StoryState;
-  params: DetailParams;
+  params: StoryParams;
   accounts: Account[];
   isSm: boolean;
   /** Whether the Story tab is the one showing. A hidden tab closes its
    *  sheets (browser Back to another tab must not leave one open over it). */
   active: boolean;
-  onUpdate: (patch: Partial<DetailParams>, options?: { replace?: boolean }) => void;
+  onUpdate: (patch: Partial<StoryParams>, options?: { replace?: boolean }) => void;
   /** A record was added through + Add; the page reloads what shows it. */
   onAdded: (what: AddKind) => void;
-  onOpenTab: (tab: DetailTab) => void;
+  /** Where Needs attention's questions row goes (the organization page's Knowledge). */
+  onOpenTab?: (tab: DetailTab) => void;
   onJump: (panel: PanelKey) => void;
-}) {
+};
+
+/** The Story tab (organisation spec §1.6; account spec §2.5): Needs
+ *  attention, the toolbar, then the stream. Filters live in the URL (through
+ *  `onUpdate`); "+ Add" and an opened email are sheets over the page. On an
+ *  organization (`orgId`) + Add saves on the chosen account chip or the
+ *  organization; on one account (`scope`) it always saves on that account. */
+export function StoryTab(props: StoryTabProps) {
+  const { story, params, accounts, isSm, active, onUpdate, onAdded, onOpenTab, onJump } = props;
+  const scope = resolveScope({ customerId: props.orgId, scope: props.scope });
   const [adding, setAdding] = useState<AddKind | null>(null);
   const [email, setEmail] = useState<StoryItem | null>(null);
   const [notice, setNotice] = useState('');
@@ -52,9 +48,12 @@ export function StoryTab({
   }
   // An account the organization does not have (a stale or hand-edited
   // ?account=) is no place to save: + Add saves on the organization.
-  const chosen = chosenAccount(accounts, params.account);
-  const accountId = chosen?.id;
-  const accountName = chosen?.name;
+  const chosen = scope.kind === 'account' ? undefined : chosenAccount(accounts, params.account);
+  const accountName = scope.kind === 'account' ? scope.name : chosen?.name;
+  // Same shape AddFlow itself now requires (never neither id): this
+  // account's own page, or the organization with whichever account (if any)
+  // is chosen.
+  const addFlowParent: AddFlowParent = scope.kind === 'account' ? { accountId: scope.id } : chosen ? { customerId: scope.id, accountId: chosen.id } : { customerId: scope.id };
   const onSearch = useCallback((q: string) => onUpdate({ q }, { replace: true }), [onUpdate]);
 
   return (
@@ -67,6 +66,7 @@ export function StoryTab({
           onFilter={(group) => onUpdate({ group, q: '', sources: [] })}
           onOpenTab={onOpenTab}
           onJump={onJump}
+          renewalPanel={scope.kind === 'account' ? 'commercial' : 'contract'}
         />
       ) : null}
       <StoryToolbar
@@ -85,10 +85,12 @@ export function StoryTab({
         }}
       />
       {params.group === 'feedback' ? (
-        // Surveys are edited, expired and deleted on the Surveys page, filtered to this organization.
+        // Surveys are edited, expired and deleted on the Surveys page: filtered
+        // to this organization, or whole for an account (it filters by
+        // organization only, and an account may have several).
         <p className="flex flex-wrap items-center gap-2 text-[13px] text-ink-muted">
           <span>Edit, expire or delete a survey on the Surveys page.</span>
-          <Link to={`/surveys?customer=${orgId}`} className={`${QUIET} border border-line`}>
+          <Link to={scope.kind === 'organization' ? `/surveys?customer=${scope.id}` : '/surveys'} className={`${QUIET} border border-line`}>
             Manage surveys
           </Link>
         </p>
@@ -105,8 +107,7 @@ export function StoryTab({
       {active && adding ? (
         <AddFlow
           what={adding}
-          customerId={orgId}
-          accountId={accountId}
+          {...addFlowParent}
           accountName={accountName}
           isSm={isSm}
           onClose={() => setAdding(null)}
@@ -119,7 +120,7 @@ export function StoryTab({
       ) : null}
       {active && email?.link.thread_id ? (
         <EmailThread
-          orgId={orgId}
+          orgId={scope}
           threadId={email.link.thread_id}
           openedId={email.id}
           title={email.title}

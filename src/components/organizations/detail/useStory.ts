@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchStory } from '../../../features/organizations/storyApi';
+import type { StoryTarget } from '../../../features/organizations/detailScope';
+import { fetchStoryAt, storyPath } from '../../../features/organizations/storyApi';
 import type { StoryItem, StoryResponse } from '../../../features/organizations/storyTypes';
 import { errorMessage } from '../portfolio/usePortfolio';
 
@@ -22,11 +23,14 @@ export interface StoryState {
   retry: () => void;
 }
 
-/** The story, cursor-paged (spec §2 "Paging"). `version` reloads it (after
+/** The story, cursor-paged (spec §2 "Paging"): an organisation's (a bare id)
+ *  or one account's (a scope). Keyed by its endpoint, so a scope object made
+ *  afresh each render never reads again. `version` reloads it (after
  *  "+ Add"); `enabled` is off while another tab is open. */
-export function useStory(orgId: number, query: string, version: number, enabled: boolean): StoryState {
+export function useStory(target: StoryTarget, query: string, version: number, enabled: boolean): StoryState {
+  const path = storyPath(target);
   const [attempt, setAttempt] = useState(0);
-  const key = `${orgId}?${query}#${version}#${attempt}`;
+  const key = `${path}?${query}#${version}#${attempt}`;
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [more, setMore] = useState<More | null>(null);
   // Bumped whenever the read changes or unmounts, so a page two that lands
@@ -37,7 +41,7 @@ export function useStory(orgId: number, query: string, version: number, enabled:
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
-    fetchStory(orgId, query).then(
+    fetchStoryAt(path, query).then(
       (data) => {
         if (!cancelled) setLoaded({ key, data, items: data.items, next: data.next_cursor });
       },
@@ -50,15 +54,11 @@ export function useStory(orgId: number, query: string, version: number, enabled:
       generation.current += 1;
       inFlight.current = false;
     };
-  }, [enabled, key, orgId, query]);
+  }, [enabled, key, path, query]);
 
   const current = loaded && 'data' in loaded ? loaded : null;
-  // The latest `current`, so `loadMore` reads it through a ref instead of
-  // closing over it: a fresh page one landing (or a page being appended)
-  // changes `current`'s identity on every load, and closing over it would
-  // recreate `loadMore` just as often. `key`/`orgId`/`query` are enough to
-  // define this callback's identity — they change only when the read itself
-  // changes, synced in an effect below so no render ever reads a stale value.
+  // The latest `current`, read through a ref so `loadMore` keeps one
+  // identity while pages land (see the organisation page's history).
   const currentRef = useRef(current);
   useEffect(() => {
     currentRef.current = current;
@@ -71,7 +71,7 @@ export function useStory(orgId: number, query: string, version: number, enabled:
     inFlight.current = true;
     setMore({ key, loading: true, error: null });
     try {
-      const page = await fetchStory(orgId, query, latest.next);
+      const page = await fetchStoryAt(path, query, latest.next);
       if (generation.current !== token) return;
       setLoaded((prev) =>
         prev && 'data' in prev && prev.key === key
@@ -85,7 +85,7 @@ export function useStory(orgId: number, query: string, version: number, enabled:
     } finally {
       if (generation.current === token) inFlight.current = false;
     }
-  }, [key, orgId, query]);
+  }, [key, path, query]);
 
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 

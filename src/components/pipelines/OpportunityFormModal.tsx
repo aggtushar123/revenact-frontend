@@ -133,7 +133,7 @@ export function OpportunityFormModal({
     e.preventDefault();
     setError(null);
 
-    if (!isEdit && customerId === undefined && !selectedCompanyId) {
+    if (!isEdit && customerId === undefined && accountId === undefined && !selectedCompanyId) {
       setError('Pick a company.');
       return;
     }
@@ -159,6 +159,11 @@ export function OpportunityFormModal({
         } else {
           await dispatch(createOpportunityForCustomer({ customerId, ...data })).unwrap();
         }
+        onSaved?.();
+      } else if (customerId === undefined && accountId !== undefined) {
+        // The account page: no organisation id, the flat account route.
+        // Like the scoped branch below, the caller reads its list again.
+        await dispatch(createOpportunityForAccount({ accountId, ...data })).unwrap();
         onSaved?.();
       } else if (selectedAccountId) {
         // The standalone board's own Add — createOpportunity's own
@@ -208,7 +213,7 @@ export function OpportunityFormModal({
                 {opportunity.account_name ? ` • ${opportunity.account_name}` : ''}
               </p>
             </div>
-          ) : customerId === undefined ? (
+          ) : customerId === undefined && accountId === undefined ? (
             <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
               <option value="">Select a company…</option>
               {(companies ?? []).map((c) => (

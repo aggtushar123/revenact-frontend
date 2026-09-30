@@ -59,6 +59,8 @@ describe('Sidebar Communications group', () => {
     expect(await within(group).findByRole('button', { name: 'Gmail' })).toBeInTheDocument();
     expect(within(group).queryByRole('button', { name: 'Slack' })).not.toBeInTheDocument();
 
+    // A 44px touch target below sm, not the 32px `h-8` it used to be stuck at.
+    expect(within(group).getByRole('button', { name: 'Show all sources' })).toHaveClass('min-h-11', 'sm:min-h-8');
     await userEvent.click(within(group).getByRole('button', { name: 'Show all sources' }));
     expect(within(group).getByRole('button', { name: 'Slack' })).toBeInTheDocument();
     expect(within(group).getByRole('button', { name: 'Calls' })).toBeInTheDocument();

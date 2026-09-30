@@ -1,9 +1,15 @@
-import { useId, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useId, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../../hooks';
-import { deleteContact, fetchContactsForCustomer, type Account, type Contact } from '../../../features/customers/customersSlice';
-import { listScope } from '../../../lib/listScope';
+import {
+  deleteContact,
+  fetchContactsForAccount,
+  fetchContactsForCustomer,
+  type Account,
+  type Contact,
+} from '../../../features/customers/customersSlice';
 import { awaitingAccount, byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
+import { resolveScope, scopeSlot, type ScopeProps } from '../../../features/organizations/detailScope';
 import { peopleSummary } from '../../../features/organizations/listSummaries';
 import { ContactFormModal } from '../../contacts/ContactFormModal';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -14,41 +20,45 @@ import { AddPaused, ListSearch, ListSkeleton, NoMatch, ScopedEmpty, SummaryLine 
 import { LIST } from './listStyles';
 import { PersonItem } from './PersonItem';
 
-/** People (spec 2026-09-27 §2): a list item per person the organization's
- *  roll-up holds, narrowed by the account chip, with a one-line summary and
- *  search. Add, Edit and Delete are the existing flows; with an account
- *  chosen, Add saves on it. Read when the tab first opens. */
-export function PeopleTab({
-  customerId,
-  account,
-  accounts,
-  isSm,
-  onShowAll,
-}: {
-  customerId: number;
-  /** The chip: '' All, 'none' the organization itself, or an account id. */
+type PeopleTabProps = ScopeProps & {
+  /** The chip: '' All, 'none' the organization itself, or an account id. Always '' on an account's page. */
   account: string;
   accounts: Account[];
   isSm: boolean;
   /** Clears the chip (the empty state's Show all accounts). */
   onShowAll: () => void;
-}) {
+};
+
+/** People (spec 2026-09-27 §2; account spec §2.7): a list item per person —
+ *  the organization's roll-up narrowed by the account chip, or one account's
+ *  own — with a one-line summary and search. Add, Edit and Delete are the
+ *  existing flows; Add saves on the chosen account, or on the page's account.
+ *  Read when the tab first opens. */
+export function PeopleTab(props: PeopleTabProps) {
+  const { account, accounts, isSm, onShowAll } = props;
+  const scope = resolveScope(props);
+  const kind = scope.kind;
+  const scopeId = scope.id;
   const dispatch = useAppDispatch();
   const { contacts, contactsLoading, contactsError, contactsFor } = useAppSelector((state) => state.customers);
-  // The shared slot holds this organization's people (not another's, left
-  // behind or on its way).
-  const loaded = contactsFor === listScope(customerId);
+  // The shared slot holds this page's people (not another's, left behind or on its way).
+  const loaded = contactsFor === scopeSlot({ kind, id: scopeId });
   const [attempt, setAttempt] = useState(0);
   const [q, setQ] = useState('');
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Contact | null>(null);
   const [deleting, setDeleting] = useState<Contact | null>(null);
 
+  const readPeople = useCallback(() => {
+    if (kind === 'account') void dispatch(fetchContactsForAccount({ accountId: scopeId }));
+    else void dispatch(fetchContactsForCustomer(scopeId));
+  }, [dispatch, kind, scopeId]);
+
   // Read before paint: the read marks the shared slot loading at once, so
   // neither this list nor the chips show people another page left there.
   useLayoutEffect(() => {
-    void dispatch(fetchContactsForCustomer(customerId));
-  }, [dispatch, customerId, attempt]);
+    readPeople();
+  }, [readPeople, attempt]);
 
   const inScope = useMemo(() => byAccount(contacts, account), [contacts, account]);
   const shown = useMemo(() => {
@@ -106,10 +116,10 @@ export function PeopleTab({
 
         {adding ? (
           <ContactFormModal
-            customerId={customerId}
-            accountId={target?.id}
+            customerId={kind === 'organization' ? scopeId : undefined}
+            accountId={kind === 'account' ? scopeId : target?.id}
             onClose={() => setAdding(false)}
-            onSaved={() => void dispatch(fetchContactsForCustomer(customerId))}
+            onSaved={readPeople}
           />
         ) : null}
         {editing ? <ContactFormModal contact={editing} onClose={() => setEditing(null)} onSaved={() => {}} /> : null}

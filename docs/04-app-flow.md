@@ -65,7 +65,7 @@ closing it on unmount or token change.
 | `/dashboard/support/{tickets,topics}` | `AreaLayout` (area: support) wrapping `TicketOverviewContainer`, `AITrendingTopics` | auth |
 | `/health`, `/dashboard/advance/*` | `Keep`/`LegacyRedirect` → the equivalent `/dashboard/...` route, query string preserved (`src/pages/dashboard/redirects.tsx`, mapping in `areas.ts`'s `LEGACY`) | auth |
 | `/organizations/{list,board,:id}` | `List`, `Board`, `OrganizationDetails` | auth |
-| `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard` (the Accounts portfolio), `AccountDetails` | auth |
+| `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard` (the Accounts portfolio), `AccountDetails` (the account's story, read by the URL id alone) | auth |
 | `/contacts`, `/contacts/:id` | `ContactsPage`: the list with its summary line and filters (`q`, `customer`, `account`, `sentiment`, `role` in the URL), and the chosen person's profile beside it (`GET /contacts/`, `GET /contacts/<id>/`, `GET /contacts/<id>/history/`); on phones the person is its own screen with a back link. `/contacts/list` redirects to `/contacts`, keeping its query string; `/contacts/<non-numeric>` shows the not-found state. `ContactsAskLayout` wraps this route in one `AskProvider` (surface `contacts`, delivery 2 of the Ask spec, own preference key `revenact_contacts_ask`): a question posts `context: {surface:'contacts', view:'list', filters}` or `{view:'person', contact, focus}`; the chip names the filtered organisation/account, sentiment and role (or a quoted search term), or the open person's name and place, with "Sentiment" appended while `focus:'sentiment'`. "Why this sentiment?" under a person's sentiment line drafts "Why is <first name>'s sentiment <word>?" with that focus and opens the rail without sending. A `400` under `context.contact` reads "You can't ask about this person here."; under `context.filters`, "You can't ask about this list. Clear the filters and ask again." History reopens a Contacts conversation on `/contacts/:id` (a person) or `/contacts?<filters>` (a list) | auth |
 | `/pipelines/{list,board}` | `PipelinesPage` | auth |
 | `/communications` | `CommunicationsPage`, arranged as an inbox with its own top bar (no Navbar): the inbox card (folders for the four kinds of waiting with counts, Needs-you and Mine-only switches, a list grouped by month, the open item in place, with a `ReplyBox` under it: Draft with Copilot fills it from the thread and the account's history and lists the sources used; Send reply on an email row sends from the person's mailbox via `POST /communications/emails/<id>/reply/`); on `?source=mailbox:<provider>` the card is `MailboxView` instead, the person's own mail whole (Inbox/Drafts/Sent/Done/Muted with counts, Priority and Unread switches, Starred/Important/Spam/Trash and the categories, a Categories block of what is waiting, the list by month, the open message with star/done/mute and a reply that sends from the mailbox); and the shared Copilot rail (`components/copilot/CopilotRail`, with Next event above it and the picked source as context; New chat, History and a hide switch live in the top bar) | auth |
@@ -420,32 +420,57 @@ readers by the same write-time snapshot rule as the Dashboard's; see
 4. Edit details reads `GET /customers/<organisation>/accounts/<id>/` and opens
    `AccountFormModal`. Add reads `GET /customers/` for its organisation picker.
    The page reloads after either.
-5. An account's name opens `/accounts/:id` and passes the row (`accountNavRow`)
-   through `location.state.account`. The account page's tabs mirror the
-   organisation page and add Organizations.
+5. An account's name opens `/accounts/:id` by its id alone (no navigation
+   state).
+6. `/accounts/:id` is the account's story
+   (`docs/superpowers/specs/2026-09-29-accounts-redesign-design.md` §2). It
+   lands in three requests: `GET /accounts/portfolio/?ids={id}&limit=1` (the
+   list's own row: the name row, the tiles, the four Details panels and the
+   currency), `GET /accounts/{id}/` (the owner and their function, the account
+   pulse and the edit form) and `GET /accounts/{id}/story/` (the Story; no
+   `account` is sent). An id that is not a number, or one with no row (the
+   viewer may not open it), says "Account not found". The tabs, in the URL as
+   `?tab=`, are Story, Details, People, Deals & risks, Files, Custom objects
+   and Canvases; each other tab reads its data when first opened and stays
+   mounted: People `GET /accounts/{id}/contacts/`, Deals & risks
+   `…/opportunities/` and `…/risks/`, Files `…/files/` and `…/calls/`, Details
+   `…/surveys/` (the CSAT bands) and `GET /attributes/values/?account={id}`,
+   Custom objects `GET /custom-objects/definitions/` then
+   `…/records/?definition={d}&account={id}`, Canvases `…/canvases/`. Every
+   create goes to `/accounts/{id}/…` (contacts, opportunities, risks, files,
+   calls, surveys, tasks, notes); none needs an organisation id.
+7. Edit opens `AccountFormModal`, which PATCHes
+   `/customers/{first openable organisation}/accounts/{id}/`, or
+   `/accounts/{id}/` when there is none; the page then reads the row and the
+   story again. Details' owner handover PATCHes
+   `/accounts/{id}/ {owner_id, handover_note}`. ⋯ opens Add contact, Log a call
+   and New task; New canvas opens `/canvas/create?accountId={id}`.
 
-> **Known flaw.** A direct visit or a page refresh on `/accounts/:id` has no
-> navigation state, and the page falls back to the `ACCOUNTS_DATA` mock, showing
-> a fabricated account. The Navbar header does the same. This is the last real
-> mock dependency in the app. Fix is task A1 in the Implementation Plan.
+### 4.4 Activity feed (unused)
 
-### 4.4 Activity feed
+**Dead:** the old account page's feed. Both detail pages (an organization's,
+§4.3, and an account's, §4.2) now use the Story instead (§4.2 step 5, §4.3
+step 6) — no route renders `ActivityFeed` or `PinnedAttributes` any more.
+Removing them is a follow-up (accounts spec 2026-09-29 §2.10's "Removed",
+and the owner's 2026-09-30 ruling). For what replaced it — filters, sources,
+search, + Add, the day-grouped stream — see the Story tab in §4.2/§4.3 and
+`src/components/organizations/detail/StoryTab.tsx`/`StoryToolbar.tsx`.
 
-The account page's (`/accounts/:id`) feed. The organization page replaced it
-with the Story (§ Organizations, step 5). Five top tabs and thirteen filter
-chips.
+The table below describes `ActivityFeed` as it was before the Story
+replaced it; it is history, not a live surface.
 
-| Filter | State |
+| Filter | State (when this page was live) |
 |---|---|
 | All, Activities, Emails, Tasks, Notes, Tickets, Calendar Events, Surveys, Sessions | Real |
 | Slack | Inline `SLACK_DATA` mock |
 | Pulse, Conversations, Revenact Support | "coming soon" |
 
-Emails open a thread panel with a quick reply, and Compose sends through the
-signed-in person's own connected mailbox. Tasks and notes can be created inline.
-Files upload with validation and download through an authenticated blob request.
-CallSense logs a call with an optional transcript, which the backend summarises
-and classifies immediately.
+Emails opened a thread panel with a quick reply, and Compose sent through the
+signed-in person's own connected mailbox. Tasks and notes could be created
+inline. Files uploaded with validation and downloaded through an
+authenticated blob request. CallSense logged a call with an optional
+transcript, which the backend summarised and classified immediately — all of
+which the Story's own + Add and Files/Calls tabs carry forward.
 
 ### 4.5 Pipelines
 
@@ -944,11 +969,7 @@ as a query parameter because a WebSocket handshake cannot carry a header.
 |---|---|
 | Sidebar: Product Feedbacks, Segments, Project Management | "Under Construction" |
 | Settings: Activities, Connect Widget | Placeholder |
-| Success Plans tab on the account page | "Coming Soon" |
-| Account page feed: Pulse, Conversations, Revenact Support | "coming soon" |
-| Account page feed: search box, "Add Action", filter icon | No handler |
 | Navbar: Search, Plus, Help, Message | No handler |
 | Navbar list-page title chevrons | No menu |
 | Settings sidebar: "Revenact for desktop" | No handler yet |
 | Settings rail: "Next event" | Says nothing is scheduled; no personal calendar feed exists |
-| `/accounts/:id` on refresh | Silently shows mock data |

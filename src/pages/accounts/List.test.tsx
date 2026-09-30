@@ -64,11 +64,11 @@ describe('Accounts list (portfolio)', () => {
     expect(accountPortfolioQueries(spy).some((query) => query.get('organisation') === '7' && query.get('sort') === '-risk')).toBe(true);
   });
 
-  it("opens an account's page from its name, carrying the row that page reads", async () => {
+  it("opens an account's page from its name, by its id alone", async () => {
     stubAccountsPortfolio();
     renderAccounts('/accounts/list');
     await userEvent.click(await screen.findByRole('link', { name: 'Pizza EMEA' }));
-    expect(await screen.findByTestId('account-page')).toHaveTextContent('Pizza EMEA · organization 7');
+    expect(await screen.findByTestId('account-page')).toHaveTextContent('Account page 12');
     expect(where().pathname).toBe('/accounts/12');
   });
 

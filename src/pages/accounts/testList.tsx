@@ -3,15 +3,18 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import authReducer from '../../features/auth/authSlice';
+import callsReducer from '../../features/calls/callsSlice';
 import customersReducer from '../../features/customers/customersSlice';
+import filesReducer from '../../features/files/filesSlice';
 import notificationsReducer from '../../features/notifications/notificationsSlice';
 import { Navbar } from '../../components/layout/Navbar';
 import { ALL_CAPABILITIES } from '../../test/capabilities';
 import { SlotHost } from '../../test/SlotHost';
 import { setViewport } from '../../test/viewport';
 import { Board } from './Board';
+import { AccountDetails } from './Details';
 import { List } from './List';
 
 // Test-only. Both Accounts routes on the real auth, customers and
@@ -23,16 +26,21 @@ export function Where() {
   return <p data-testid="where">{`${location.pathname}${location.search}`}</p>;
 }
 
-/** Stands in for /accounts/:id (Details.tsx), saying which row it was handed. */
+/** Stands in for /accounts/:id (Details.tsx), saying which id it was sent to. */
 function AccountPage() {
-  const location = useLocation();
-  const account = (location.state as { account?: { name: string; orgId: number } } | null)?.account;
-  return <p data-testid="account-page">{account ? `${account.name} · organization ${account.orgId}` : 'No account state'}</p>;
+  const { id } = useParams();
+  return <p data-testid="account-page">{`Account page ${id}`}</p>;
 }
 
 function makeStore() {
   return configureStore({
-    reducer: { customers: customersReducer, auth: authReducer, notifications: notificationsReducer },
+    reducer: {
+      customers: customersReducer,
+      auth: authReducer,
+      notifications: notificationsReducer,
+      files: filesReducer,
+      calls: callsReducer,
+    },
     preloadedState: {
       auth: {
         user: {
@@ -70,10 +78,13 @@ function makeStore() {
   });
 }
 
-/** Both Accounts views (and the pages they link to) on the real store and
- *  router. `nav` adds the real Navbar, whose List/Board tabs switch views
- *  carrying the query. */
-export function renderAccounts(url: string, { width = 1440, nav = false }: { width?: number; nav?: boolean } = {}) {
+/** Both Accounts views, and the account page (the real one with `realPage`,
+ *  else a stand-in), on the real store and router. `nav` adds the real
+ *  Navbar, whose List/Board tabs switch views carrying the query. */
+export function renderAccounts(
+  url: string,
+  { width = 1440, nav = false, realPage = false }: { width?: number; nav?: boolean; realPage?: boolean } = {},
+) {
   setViewport(width);
   const store = makeStore();
   render(
@@ -104,12 +115,12 @@ export function renderAccounts(url: string, { width = 1440, nav = false }: { wid
               path="/accounts/:id"
               element={
                 <>
-                  <AccountPage />
+                  {realPage ? <AccountDetails /> : <AccountPage />}
                   <Where />
                 </>
               }
             />
-            <Route path="/organizations/:id" element={<p>Organization page</p>} />
+            <Route path="/organizations/:id" element={<><p>Organization page</p><Where /></>} />
           </Routes>
         </SlotHost>
       </MemoryRouter>

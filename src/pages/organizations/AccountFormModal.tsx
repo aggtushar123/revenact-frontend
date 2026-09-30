@@ -125,7 +125,8 @@ export function AccountFormModal({
         // from the standalone Accounts page, which doesn't fix one).
         await dispatch(
           updateAccount({
-            customerId: customerId ?? account.customers[0]?.id ?? 0,
+            // No openable organisation: the flat /accounts/<id>/ (backend #75).
+            customerId: customerId ?? account.customers[0]?.id,
             id: account.id,
             ...data,
           })

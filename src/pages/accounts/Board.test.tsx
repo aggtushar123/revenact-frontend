@@ -101,7 +101,7 @@ describe('Accounts board (portfolio)', () => {
     expect(within(panel).getByRole('heading', { name: 'Voice of the customer' })).toBeInTheDocument();
     expect(within(panel).getByRole('button', { name: 'Edit details' })).toBeInTheDocument();
     await userEvent.click(within(panel).getByRole('link', { name: 'Open account page' }));
-    expect(await screen.findByTestId('account-page')).toHaveTextContent('Pizza EMEA · organization 7');
+    expect(await screen.findByTestId('account-page')).toHaveTextContent('Account page 12');
   });
 
   it('turns moving off when grouped by owner', async () => {
