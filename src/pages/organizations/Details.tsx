@@ -1,16 +1,9 @@
-import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useId, useMemo, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../hooks';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
 import { fetchAccountsForCustomer, type Account } from '../../features/customers/customersSlice';
-import {
-  ACCOUNT_TABS,
-  DETAIL_TABS,
-  detailPanelId,
-  detailTabId,
-  storyFilters,
-  type DetailTab,
-} from '../../features/organizations/detailParams';
+import { ACCOUNT_TABS, DETAIL_TABS, storyFilters } from '../../features/organizations/detailParams';
 import { parseOrganizationId, type DetailNames } from '../../features/organizations/detailAskContext';
 import { bulkUpdate } from '../../features/organizations/portfolioApi';
 import { storyQuery } from '../../features/organizations/storyApi';
@@ -19,6 +12,7 @@ import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 import { OrganizationFormModal } from '../../components/organizations/OrganizationFormModal';
 import { AccountChips } from '../../components/organizations/detail/AccountChips';
 import { DealsTab } from '../../components/organizations/detail/DealsTab';
+import { DetailColumn, DetailLoadFailed, DetailNotFound, DetailTabPanels, RefreshFailed } from '../../components/organizations/detail/DetailPage';
 import { DetailsTab } from '../../components/organizations/detail/DetailsTab';
 import { DetailTabs } from '../../components/organizations/detail/DetailTabs';
 import { FilesCallsTab } from '../../components/organizations/detail/FilesCallsTab';
@@ -33,9 +27,8 @@ import { useOrganization } from '../../components/organizations/detail/useOrgani
 import { usePanelJump } from '../../components/organizations/detail/usePanelJump';
 import { useStory } from '../../components/organizations/detail/useStory';
 import { useChipCounts } from '../../components/organizations/detail/useChipCounts';
-import { EmptyState, ErrorBlock } from '../../components/organizations/portfolio/PortfolioSections';
+import { useDetailVersions, useVisitedTabs } from '../../components/organizations/detail/useDetailPage';
 import { errorMessage } from '../../components/organizations/portfolio/usePortfolio';
-import { FOCUS, QUIET } from '../../components/organizations/portfolio/styles';
 import { AccountFormModal } from './AccountFormModal';
 import { useReportDetailNames } from './ask/detailNames';
 import { OrganizationsFrame } from './OrganizationsFrame';
@@ -55,17 +48,8 @@ async function archiveOrganization(id: number): Promise<void> {
   if (failure) throw failure;
 }
 
-/** The page's column: the full width inside the frame's gutter (owner,
- *  2026-09-27). The cap binds only past about 1920px, where lines would
- *  otherwise stretch. Header, tiles, tabs and every panel share its edges. */
-const PAGE_COLUMN = 'mx-auto w-full max-w-[1800px]';
-
-function Centered({ children }: { children: ReactNode }) {
-  return (
-    <OrganizationsFrame bleed>
-      <div className={`${PAGE_COLUMN} py-6`}>{children}</div>
-    </OrganizationsFrame>
-  );
+function NotFound() {
+  return <DetailNotFound title="Organization not found" backTo="/organizations/list" backLabel="Back to organizations" />;
 }
 
 /** The page is keyed by the route's id, so moving to another organization
@@ -73,7 +57,10 @@ function Centered({ children }: { children: ReactNode }) {
  *  one show under the next one's header. */
 export function Details() {
   const { id } = useParams<{ id: string }>();
-  return <OrganizationPage key={id} id={id} />;
+  const orgId = parseOrganizationId(id);
+  // Not a number: nothing to ask the server.
+  if (orgId === null) return <NotFound />;
+  return <OrganizationPage key={orgId} orgId={orgId} />;
 }
 
 /** /organizations/:id, the organization's story (spec 2026-09-26, delivery 1):
@@ -82,48 +69,40 @@ export function Details() {
  *  four requests; every other tab reads its data when first opened. Ask sits
  *  beside it (delivery 3): OrganizationsAskLayout draws the frame and the
  *  rail, and the page reports its names for the question's chip. */
-function OrganizationPage({ id }: { id: string | undefined }) {
-  const orgId = parseOrganizationId(id);
+function OrganizationPage({ orgId }: { orgId: number }) {
   const isSm = useMediaQuery(SM);
   const dispatch = useAppDispatch();
   const { params, update } = useDetailParams();
   const idBase = useId();
 
-  const [version, setVersion] = useState(0);
-  const [storyVersion, setStoryVersion] = useState(0);
-  const [callsVersion, setCallsVersion] = useState(0);
-  const reloadHeader = useCallback(() => setVersion((v) => v + 1), []);
+  const { version, storyVersion, callsVersion, reloadHeader, reloadStory, onAdded } = useDetailVersions();
   const org = useOrganization(orgId, version);
 
-  // A tab mounts when first opened and then stays mounted, hidden while
-  // another is shown: People, Deals and Knowledge read on mount, so
-  // unmounting one would read it again and blank it on the way back, and the
-  // story keeps its place. Tracked during render, so the tab mounts in the
-  // same render that selects it.
-  const [visited, setVisited] = useState<ReadonlySet<DetailTab>>(() => new Set([params.tab]));
-  if (!visited.has(params.tab)) setVisited(new Set(visited).add(params.tab));
-  const story = useStory(orgId ?? 0, storyQuery(storyFilters(params)), storyVersion, orgId !== null && visited.has('story'));
+  // People, Deals and Knowledge read on mount, so each stays mounted once
+  // opened (useVisitedTabs).
+  const visited = useVisitedTabs(params.tab);
+  const story = useStory(orgId, storyQuery(storyFilters(params)), storyVersion, visited.has('story'));
 
   const { accountsForCustomer, accountsLoading, accountsError, accountsCustomerId } = useAppSelector((state) => state.customers);
   // The accounts slot is global: until it holds this organization's list,
   // the page shows it loading rather than another organization's accounts.
-  const accountsOurs = orgId !== null && accountsCustomerId === orgId;
+  const accountsOurs = accountsCustomerId === orgId;
   const accounts = accountsOurs ? accountsForCustomer : NO_ACCOUNTS;
   const accountsBusy = accountsLoading || !accountsOurs;
   const accountsFailure = accountsOurs ? accountsError : null;
   const [accountsAttempt, setAccountsAttempt] = useState(0);
   useEffect(() => {
-    if (orgId !== null) dispatch(fetchAccountsForCustomer(orgId));
+    dispatch(fetchAccountsForCustomer(orgId));
   }, [dispatch, orgId, accountsAttempt]);
 
   // The chips' numbers follow the tab (spec 2026-09-27 §1).
-  const chipCounts = useChipCounts(params.tab, story.data?.counts.by_account ?? null, accounts, orgId ?? 0);
+  const chipCounts = useChipCounts(params.tab, story.data?.counts.by_account ?? null, accounts, orgId);
 
   // The Ask chip's names: "Pizza Hut · EMEA" (spec §3).
   const orgName = org.row?.name ?? null;
   const names = useMemo<DetailNames | null>(
     () =>
-      orgId !== null && orgName !== null
+      orgName !== null
         ? { organization: orgId, name: orgName, accounts: Object.fromEntries(accounts.map((account) => [account.id, account.name])) }
         : null,
     [orgId, orgName, accounts],
@@ -141,34 +120,14 @@ function OrganizationPage({ id }: { id: string | undefined }) {
   const openDetails = useCallback(() => update({ tab: 'details' }), [update]);
   const jumpTo = usePanelJump(params.tab === 'details', org.row !== null, openDetails);
 
-  if (orgId === null || org.notFound) {
-    return (
-      <Centered>
-        <EmptyState
-          title="Organization not found"
-          detail="It may have been removed, or you may not have access to it."
-          action={
-            <Link to="/organizations/list" className={`${QUIET} border border-line`}>
-              Back to organizations
-            </Link>
-          }
-        />
-      </Centered>
-    );
-  }
-  if (org.error && !org.row) {
-    return (
-      <Centered>
-        <ErrorBlock message={org.error} onRetry={org.retry} />
-      </Centered>
-    );
-  }
+  if (org.notFound) return <NotFound />;
+  if (org.error && !org.row) return <DetailLoadFailed message={org.error} onRetry={org.retry} />;
 
   const row = org.row;
   const tab = params.tab;
   return (
     <OrganizationsFrame bleed>
-      <div data-part="column" className={`${PAGE_COLUMN} flex flex-col gap-3 pb-6`}>
+      <DetailColumn>
         {row ? (
           <section data-part="header" aria-label="Organization summary" className="flex flex-col gap-3">
             <OrganizationHeader
@@ -189,12 +148,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
 
         {row && org.error ? (
           // A reload (after an edit, archive or churn) failed: the last row stays.
-          <div role="alert" className="flex flex-wrap items-center gap-2 rounded-xl bg-surface px-3 py-2 text-[13px] text-danger">
-            <span>Could not refresh this organization: {org.error}</span>
-            <button type="button" onClick={org.retry} className={QUIET}>
-              Try again
-            </button>
-          </div>
+          <RefreshFailed what="organization" error={org.error} onRetry={org.retry} />
         ) : null}
 
         {/* On every tab, so nothing jumps (owner, 2026-09-28); dimmed on
@@ -213,17 +167,9 @@ function OrganizationPage({ id }: { id: string | undefined }) {
 
         <DetailTabs idBase={idBase} active={tab} onChange={(next) => update({ tab: next })} />
 
-        {DETAIL_TABS.filter(({ key }) => key === tab || visited.has(key)).map(({ key }) => (
-          <div
-            key={key}
-            role="tabpanel"
-            id={detailPanelId(idBase, key)}
-            aria-labelledby={detailTabId(idBase, key)}
-            hidden={key !== tab}
-            tabIndex={0}
-            className={`min-w-0 rounded-sm ${FOCUS}`}
-          >
-            {key === 'story' ? (
+        <DetailTabPanels idBase={idBase} tabs={DETAIL_TABS} active={tab} visited={visited}>
+          {(key) =>
+            key === 'story' ? (
               <StoryTab
                 orgId={orgId}
                 story={story}
@@ -232,12 +178,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
                 isSm={isSm}
                 active={tab === 'story'}
                 onUpdate={update}
-                onAdded={(what) => {
-                  setStoryVersion((v) => v + 1);
-                  // Files keeps CallSense mounted once opened: a call logged
-                  // here reads its list again.
-                  if (what === 'call') setCallsVersion((v) => v + 1);
-                }}
+                onAdded={onAdded}
                 onOpenTab={(next) => update({ tab: next })}
                 onJump={jumpTo}
               />
@@ -278,13 +219,13 @@ function OrganizationPage({ id }: { id: string | undefined }) {
                 active={tab === 'files'}
                 callsVersion={callsVersion}
                 // The call is in the calls list already; the story reads again.
-                onCallLogged={() => setStoryVersion((v) => v + 1)}
+                onCallLogged={reloadStory}
                 onShowAll={showAll}
               />
-            )}
-          </div>
-        ))}
-      </div>
+            )
+          }
+        </DetailTabPanels>
+      </DetailColumn>
 
       {editing && org.customer ? (
         <OrganizationFormModal
@@ -292,7 +233,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
           onSaved={() => {
             // Needs attention (the renewal) comes with the story.
             reloadHeader();
-            setStoryVersion((v) => v + 1);
+            reloadStory();
           }}
           onClose={() => setEditing(false)}
         />
@@ -325,7 +266,7 @@ function OrganizationPage({ id }: { id: string | undefined }) {
             setAccountsAttempt((n) => n + 1);
             // The chips list only the accounts the story counts, so the
             // story counts again to take the new one in.
-            setStoryVersion((v) => v + 1);
+            reloadStory();
           }}
           onClose={() => setAddingAccount(false)}
         />
