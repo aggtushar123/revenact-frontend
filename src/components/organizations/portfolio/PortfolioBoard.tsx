@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type UIEvent } from 'react';
+import { useCallback, useRef, useState, type ReactNode, type UIEvent } from 'react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { FilterOptions, LifecycleValue, PortfolioRow, PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
 import { BoardColumn } from './BoardColumn';
-import { boardColumns, useOverlayActive, withMove, type BoardMove } from './boardMove';
+import { PAUSED, useBoardMoves, useFrameInputs } from './boardFrame';
+import { boardColumns, withMove, type BoardMove } from './boardMove';
 import { usePortfolioKind } from './portfolioKind';
 import { EmptyBook, ErrorBlock } from './PortfolioSections';
 import { SECTION_PAGE_SIZE, type PortfolioState } from './usePortfolio';
@@ -14,7 +15,6 @@ const PANEL_GAP = 12;
 /** How long a tab's smooth scroll may take before swipes are followed again
  *  even if it never arrived (the user swiped mid-way). */
 const JUMP_MS = 1000;
-const PAUSED = 'Moving is paused until the board reloads.';
 
 export interface PortfolioBoardProps<R extends PortfolioRowBase = PortfolioRow> {
   /** The Board's params (boardParams): `group` is never '' here. */
@@ -91,97 +91,25 @@ export function PortfolioBoard<R extends PortfolioRowBase>({
   onMoveSettled,
 }: PortfolioBoardProps<R>) {
   const kind = usePortfolioKind();
-  const [dragging, setDragging] = useState<R | null>(null);
-  const [active, setActive] = useState<string | null>(null);
-  const [focusId, setFocusId] = useState<number | null>(null);
-  const [handed, setHanded] = useState<{ token: number; keys: string[] } | null>(null);
-  const panels = useRef(new Map<string, HTMLElement>());
-  const jumping = useRef<{ key: string; until: number } | null>(null);
-  // The header counts show the move until the frame's own reload lands.
-  const countsMoved = useOverlayActive(move?.token ?? null, portfolio.loadedKey);
   const { data, error } = portfolio;
-
-  // The columns belong to the frame on screen. While a new frame loads (a
-  // group, filter or sort change, or a reload), `data` is still the old one,
-  // so the columns keep the inputs that frame was read with: no column reads
-  // `group=<new>&group_value=<old key>`, or enables on a stale count. They
-  // move on together once the new frame lands. Adjusted during render.
-  const current = { params, version, columnBumps };
-  const [frameInputs, setFrameInputs] = useState(current);
   const fresh = !portfolio.loading && !error;
-  if (
-    fresh &&
-    (frameInputs.params !== params || frameInputs.version !== version || frameInputs.columnBumps !== columnBumps)
-  ) {
-    setFrameInputs(current);
-  }
-  const inputs = fresh ? current : frameInputs;
+  const inputs = useFrameInputs({ params, version, columnBumps }, fresh);
 
   const group = inputs.params.group || 'lifecycle';
   const canMove = group === 'lifecycle';
   const columns = data ? boardColumns(group, data.groups, kind.churnVisible(inputs.params)) : [];
   const reads = (key: string) => columns.some((spec) => spec.key === key && spec.count > 0 && !spec.dropOnly);
-
-  // A saved move settles when the frame's reload has landed and each of its
-  // two columns has handed over to its own fresh page (or reads nothing).
-  const columnDone = (key: string) => (handed !== null && handed.token === move?.token && handed.keys.includes(key)) || !reads(key);
-  const settled =
-    move?.saved === true && fresh && !countsMoved && columnDone(move.from) && columnDone(move.to);
-  useEffect(() => {
-    if (settled && move) onMoveSettled(move.token);
-  }, [settled, move, onMoveSettled]);
-
-  const onHandedOver = useCallback((key: string, token: number) => {
-    setHanded((was) =>
-      was?.token === token ? (was.keys.includes(key) ? was : { token, keys: [...was.keys, key] }) : { token, keys: [key] },
-    );
-  }, []);
-
-  // Stable, so the memoised cards don't all re-render on every board render.
-  const moveCard = useCallback(
-    (row: R, to: LifecycleValue, fromMenu = false) => {
-      setDragging(null);
-      // A Move to… choice (keyboard or touch): the card remounts in its new
-      // column and focus follows it there. A mouse drag leaves focus alone,
-      // and a kind's churn form (Organizations) takes focus itself.
-      if (fromMenu && !(to === 'churn' && kind.churnByModal)) setFocusId(row.id);
-      onMove(row, to);
-    },
-    [onMove, kind],
-  );
-  const endDrag = useCallback(() => setDragging(null), []);
-
-  // Focus is held on the moved card until its move settles (or fails, or is
-  // reset): the move is then gone. Adjusted during render.
-  const [focusFor, setFocusFor] = useState<number | null>(null);
-  if (focusId !== null && move !== null && focusFor !== move.token) setFocusFor(move.token);
-  if (focusId !== null && move === null && focusFor !== null) {
-    setFocusId(null);
-    setFocusFor(null);
-  }
-
-  // The user moving focus somewhere else themselves releases it.
-  useEffect(() => {
-    if (focusId === null) return;
-    const onFocusIn = (event: FocusEvent) => {
-      const target = event.target as Element | null;
-      if (!target?.closest(`[data-card-id="${focusId}"]`)) setFocusId(null);
-    };
-    document.addEventListener('focusin', onFocusIn);
-    return () => document.removeEventListener('focusin', onFocusIn);
-  }, [focusId]);
-
-  // A drag the card never hears the end of (dropped outside the window, or
-  // its card unmounted mid-drag by a reload) must not leave `dragging` set.
-  useEffect(() => {
-    if (!dragging) return;
-    window.addEventListener('dragend', endDrag);
-    window.addEventListener('drop', endDrag);
-    return () => {
-      window.removeEventListener('dragend', endDrag);
-      window.removeEventListener('drop', endDrag);
-    };
-  }, [dragging, endDrag]);
+  // A kind's churn form (Organizations) takes focus itself.
+  const keepsFocus = useCallback((to: LifecycleValue) => !(to === 'churn' && kind.churnByModal), [kind]);
+  const { dragging, startDrag, endDrag, moveCard, focusId, onHandedOver, countsMoved } = useBoardMoves<R, LifecycleValue>({
+    move,
+    frameKey: portfolio.loadedKey,
+    fresh,
+    reads,
+    onMove,
+    onMoveSettled,
+    keepsFocus,
+  });
 
   if (!data && error) return <ErrorBlock message={error} onRetry={portfolio.retry} />;
   if (!data) return <BoardSkeleton isSm={isSm} narrow={narrow} />;
@@ -199,20 +127,104 @@ export function PortfolioBoard<R extends PortfolioRowBase>({
   }
 
   const shown = columns.map((spec) => (countsMoved ? withMove(spec, move) : spec));
-  const activeKey = active !== null && shown.some((spec) => spec.key === active) ? active : (shown[0]?.key ?? null);
+  // A saved move settles only once the frame reloads, so while that reload
+  // is failing, moving stays off: say why, on the alert and on each control.
+  const paused = error !== null && move !== null;
+
+  const renderColumn = (index: number, panelRef?: (element: HTMLElement | null) => void) => {
+    const spec = columns[index];
+    return (
+      <BoardColumn
+        key={spec.key}
+        spec={shown[index]}
+        query={toApiQuery(inputs.params, { group_value: spec.key, limit: String(SECTION_PAGE_SIZE) })}
+        enabled={spec.count > 0 && !spec.dropOnly}
+        version={inputs.version + (inputs.columnBumps[spec.key] ?? 0)}
+        currency={currency}
+        isSm={isSm}
+        narrow={narrow}
+        canMove={canMove}
+        saving={saving}
+        pausedNote={paused ? PAUSED : null}
+        move={move}
+        filtered={filtered}
+        openId={openId}
+        focusId={focusId}
+        dragging={dragging}
+        onOpen={onOpen}
+        onMove={moveCard}
+        onDragStart={startDrag}
+        onDragEnd={endDrag}
+        onHandedOver={onHandedOver}
+        onRowsLoaded={onRowsLoaded}
+        onShowChurned={onShowChurned}
+        onAdd={canMove ? onAdd : undefined}
+        panelRef={panelRef}
+      />
+    );
+  };
+
+  return (
+    <BoardLayout
+      isSm={isSm}
+      busy={portfolio.loading}
+      error={error}
+      paused={paused}
+      onRetry={portfolio.retry}
+      tabs={shown.map((spec) => ({ key: spec.key, label: spec.label, count: spec.dropOnly ? null : spec.count }))}
+      renderColumn={renderColumn}
+    />
+  );
+}
+
+/** The body every board shares once its frame has landed: the stale-frame
+ *  alert, then from `sm` the columns in a row that scrolls sideways (each
+ *  scrolls on its own); below `sm` full-width panels that snap, with a
+ *  strip of column tabs that follows the swipes. `renderColumn` draws the
+ *  column at `index`, given the panel ref the tabs scroll to (phones). */
+export function BoardLayout({
+  isSm,
+  busy,
+  error,
+  paused,
+  onRetry,
+  tabs,
+  renderColumn,
+}: {
+  isSm: boolean;
+  busy: boolean;
+  /** The frame's reload failed: the board shows the last result. */
+  error: string | null;
+  /** …while a saved move waits on it, so moving is off. */
+  paused: boolean;
+  onRetry: () => void;
+  /** One per column; `count` null shows none (a drop-only column). */
+  tabs: { key: string; label: string; count: number | null }[];
+  renderColumn: (index: number, panelRef?: (element: HTMLElement | null) => void) => ReactNode;
+}) {
+  const [active, setActive] = useState<string | null>(null);
+  // The panels the tabs scroll to, by key: filled by the columns' ref
+  // callbacks, read in the tabs' click handler (one Map for the board's life).
+  const [panels] = useState(() => new Map<string, HTMLElement>());
+  const jumping = useRef<{ key: string; until: number } | null>(null);
+  const setPanel = (key: string, element: HTMLElement | null) => {
+    if (element) panels.set(key, element);
+    else panels.delete(key);
+  };
+  const activeKey = active !== null && tabs.some((tab) => tab.key === active) ? active : (tabs[0]?.key ?? null);
 
   // `at` is the click's event timeStamp, the clock the scroll events use.
   const jump = (key: string, at: number) => {
     setActive(key);
     jumping.current = { key, until: at + JUMP_MS };
     const reduce = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    panels.current.get(key)?.scrollIntoView?.({ behavior: reduce ? 'auto' : 'smooth', inline: 'start', block: 'nearest' });
+    panels.get(key)?.scrollIntoView?.({ behavior: reduce ? 'auto' : 'smooth', inline: 'start', block: 'nearest' });
   };
 
   const onScroll = (event: UIEvent<HTMLDivElement>) => {
     const el = event.currentTarget;
     if (el.clientWidth === 0) return;
-    const key = shown[Math.round(el.scrollLeft / (el.clientWidth + PANEL_GAP))]?.key;
+    const key = tabs[Math.round(el.scrollLeft / (el.clientWidth + PANEL_GAP))]?.key;
     // A tab's smooth scroll passes the panels between: ignore them until it
     // arrives, so aria-current doesn't flicker through every stage.
     const pending = jumping.current;
@@ -223,78 +235,40 @@ export function PortfolioBoard<R extends PortfolioRowBase>({
     if (key && key !== activeKey) setActive(key);
   };
 
-  // A saved move settles only once the frame reloads, so while that reload
-  // is failing, moving stays off: say why, on the alert and on each control.
-  const paused = error !== null && move !== null;
   const staleError = error ? (
     <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
       {error} Showing the last result.{paused ? ` ${PAUSED}` : ''}
-      <button type="button" onClick={portfolio.retry} className={QUIET}>
+      <button type="button" onClick={onRetry} className={QUIET}>
         Try again
       </button>
     </p>
   ) : null;
 
-  const columnEls = columns.map((spec, index) => (
-    <BoardColumn
-      key={spec.key}
-      spec={shown[index]}
-      query={toApiQuery(inputs.params, { group_value: spec.key, limit: String(SECTION_PAGE_SIZE) })}
-      enabled={spec.count > 0 && !spec.dropOnly}
-      version={inputs.version + (inputs.columnBumps[spec.key] ?? 0)}
-      currency={currency}
-      isSm={isSm}
-      narrow={narrow}
-      canMove={canMove}
-      saving={saving}
-      pausedNote={paused ? PAUSED : null}
-      move={move}
-      filtered={filtered}
-      openId={openId}
-      focusId={focusId}
-      dragging={dragging}
-      onOpen={onOpen}
-      onMove={moveCard}
-      onDragStart={setDragging}
-      onDragEnd={endDrag}
-      onHandedOver={onHandedOver}
-      onRowsLoaded={onRowsLoaded}
-      onShowChurned={onShowChurned}
-      onAdd={canMove ? onAdd : undefined}
-      panelRef={
-        isSm
-          ? undefined
-          : (element) => {
-              if (element) panels.current.set(spec.key, element);
-              else panels.current.delete(spec.key);
-            }
-      }
-    />
-  ));
+  const columnEls = tabs.map((tab, index) => renderColumn(index, isSm ? undefined : (element) => setPanel(tab.key, element)));
 
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" aria-busy={portfolio.loading}>
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" aria-busy={busy}>
       {staleError}
       {isSm ? (
         <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto pb-2">{columnEls}</div>
       ) : (
         <>
           <nav aria-label="Board columns" className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1">
-            {shown.map((spec) => (
+            {tabs.map((tab) => (
               <button
-                key={spec.key}
+                key={tab.key}
                 type="button"
-                aria-current={spec.key === activeKey ? 'true' : undefined}
-                onClick={(event) => jump(spec.key, event.timeStamp)}
+                aria-current={tab.key === activeKey ? 'true' : undefined}
+                onClick={(event) => jump(tab.key, event.timeStamp)}
                 className={`inline-flex min-h-11 shrink-0 items-center gap-1 rounded-full px-3 text-[13px] ${
-                  spec.key === activeKey ? 'bg-accent-dim font-semibold text-ink' : 'text-ink-muted hover:bg-subtle active:bg-line-subtle'
+                  tab.key === activeKey ? 'bg-accent-dim font-semibold text-ink' : 'text-ink-muted hover:bg-subtle active:bg-line-subtle'
                 } ${FOCUS}`}
               >
-                {spec.label}
-                {spec.dropOnly ? null : (
+                {tab.label}
+                {tab.count === null ? null : (
                   <>
                     {' '}
-                    <span className="font-mono-brand tabular-nums text-[11px]">{spec.count}</span>
+                    <span className="font-mono-brand tabular-nums text-[11px]">{tab.count}</span>
                   </>
                 )}
               </button>

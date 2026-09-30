@@ -9,16 +9,20 @@ import type {
   PortfolioRowBase,
 } from '../../../features/organizations/portfolioTypes';
 
-/** One account moving between lifecycle columns. `token` is unique per
+/** One record moving between stage columns: an account between lifecycle
+ *  columns, a Pipelines item between stage columns. `token` is unique per
  *  move, so an overlay can tell a new move from one it has already seen. */
-export interface BoardMove<R extends PortfolioRowBase = PortfolioRow> {
+export interface StageMove<R, K extends string = string> {
   token: number;
   row: R;
-  from: LifecycleValue;
-  to: LifecycleValue;
+  from: K;
+  to: K;
   /** The PATCH has succeeded; the move now waits for its reloads to land. */
   saved?: boolean;
 }
+
+/** One account moving between lifecycle columns. */
+export type BoardMove<R extends PortfolioRowBase = PortfolioRow> = StageMove<R, LifecycleValue>;
 
 export interface BoardColumnSpec {
   /** The group key: the column's `group_value`. */
@@ -53,23 +57,45 @@ export function boardColumns(group: GroupKey, groups: PortfolioGroup[], churnVis
   });
 }
 
+/** A column header's count and `field` money with a move applied: one
+ *  record (worth `amount`) out of `from`, into `to`. Shared by every board. */
+export function withMovedTotals<F extends string, S extends { key: string; count: number } & Record<F, number>>(
+  spec: S,
+  move: { from: string; to: string } | null,
+  field: F,
+  amount: number,
+): S {
+  if (!move) return spec;
+  const sign = spec.key === move.from ? -1 : spec.key === move.to ? 1 : 0;
+  if (sign === 0) return spec;
+  return { ...spec, count: Math.max(0, spec.count + sign), [field]: spec[field] + sign * amount };
+}
+
+/** A column's cards with a move applied: the moved card leaves every column
+ *  but its new one, where it sits on top, once, as `restage` reads it in its
+ *  new stage. Shared by every board. */
+export function withMovedItem<R extends { id: number }>(
+  rows: R[],
+  key: string,
+  move: StageMove<R> | null,
+  restage: (row: R, to: string) => R,
+): R[] {
+  if (!move) return rows;
+  const others = rows.filter((row) => row.id !== move.row.id);
+  if (key !== move.to) return others;
+  return [restage(move.row, move.to), ...others];
+}
+
 /** A column header's figures with a move applied: one account (and its
  *  ARR) out of `from`, into `to`. */
 export function withMove(spec: BoardColumnSpec, move: BoardMove<PortfolioRowBase> | null): BoardColumnSpec {
   if (!move || spec.dropOnly) return spec;
-  const arr = move.row.arr ?? 0;
-  if (spec.key === move.from) return { ...spec, count: Math.max(0, spec.count - 1), arr: spec.arr - arr };
-  if (spec.key === move.to) return { ...spec, count: spec.count + 1, arr: spec.arr + arr };
-  return spec;
+  return withMovedTotals(spec, move, 'arr', move.row.arr ?? 0);
 }
 
-/** A column's cards with a move applied: the moved card leaves every column
- *  but its new one, where it sits on top, once, showing its new stage. */
+/** A column's cards with a move applied, the moved card showing its new stage. */
 export function withMovedRow<R extends PortfolioRowBase>(rows: R[], key: string, move: BoardMove<R> | null): R[] {
-  if (!move) return rows;
-  const others = rows.filter((row) => row.id !== move.row.id);
-  if (key !== move.to) return others;
-  return [{ ...move.row, lifecycle: { value: move.to, label: LIFECYCLE_LABELS[move.to] } }, ...others];
+  return withMovedItem(rows, key, move, (row, to) => ({ ...row, lifecycle: { value: to as LifecycleValue, label: LIFECYCLE_LABELS[to as LifecycleValue] } }));
 }
 
 /** Whether a read (the frame, or one column) should still show the move

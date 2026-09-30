@@ -16,3 +16,6 @@ export const PRIMARY = `inline-flex min-h-11 sm:min-h-9 items-center gap-1.5 rou
 
 /** Numbers and ids: DM Mono with tabular figures. */
 export const MONO = 'font-mono-brand tabular-nums';
+
+/** A board column header's icon button ("+", Hide): 44px below sm. */
+export const COLUMN_ICON_BUTTON = `inline-flex min-h-11 min-w-11 sm:min-h-8 sm:min-w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-subtle hover:text-ink active:bg-line-subtle ${FOCUS}`;
