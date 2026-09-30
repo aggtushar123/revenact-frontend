@@ -15,22 +15,17 @@ function renderTab(props: Partial<React.ComponentProps<typeof CanvasListTab>> = 
   render(
     <Provider store={makeDetailStore()}>
       <MemoryRouter>
-        <CanvasListTab canvases={[]} isLoading={false} error="Could not load canvases." {...props} />
+        <CanvasListTab canvases={[]} isLoading={false} error="Could not load canvases." onRetry={() => {}} {...props} />
       </MemoryRouter>
     </Provider>,
   );
 }
 
 describe('CanvasListTab error state', () => {
-  it('renders the error with no Try again button when onRetry is not given', () => {
-    renderTab();
-    expect(screen.getByRole('alert')).toHaveTextContent('Could not load canvases.');
-    expect(screen.queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
-  });
-
-  it('renders Try again when onRetry is given, and clicking it calls onRetry', async () => {
+  it('renders the error with Try again, which calls onRetry', async () => {
     const onRetry = vi.fn();
     renderTab({ onRetry });
+    expect(screen.getByRole('alert')).toHaveTextContent('Could not load canvases.');
     const button = screen.getByRole('button', { name: 'Try again' });
     await userEvent.click(button);
     expect(onRetry).toHaveBeenCalledTimes(1);

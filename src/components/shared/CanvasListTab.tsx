@@ -18,10 +18,8 @@ export interface CanvasListTabProps {
   customerId?: number;
   /** The account a new canvas goes on (the account page passes only this). */
   accountId?: number;
-  /** The retry button renders only when this is given — the old
-   *  Organization Details page still mounts this tab without it, and
-   *  that page can't refetch a list it doesn't own the loading of. */
-  onRetry?: () => void;
+  /** Reads the list again after a failed read (the error's Try again). */
+  onRetry: () => void;
 }
 
 /** "Updated 2 days ago": the leading number in DM Mono (house rule: numbers
