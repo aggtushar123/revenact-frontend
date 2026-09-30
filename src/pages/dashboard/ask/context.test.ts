@@ -29,4 +29,15 @@ describe('withFocus', () => {
     expect(withFocus(list, { kind: 'sentiment' })).toEqual(list);
     expect(withFocus(DASH, { kind: 'sentiment' })).toMatchObject({ focus: null });
   });
+
+  it("gives an account's page only a story focus, and the Accounts List and Board none", () => {
+    const page = { surface: 'accounts', view: 'detail', account: 12, focus: null } as const;
+    const list = { surface: 'accounts', view: 'list', filters: { owner: '2' } } as const;
+    expect(withFocus(page, { kind: 'email', id: 141 })).toEqual({ ...page, focus: { kind: 'email', id: 141 } });
+    expect(withFocus(page, { kind: 'companies', ids: [12] })).toEqual(page);
+    expect(withFocus(page, { kind: 'sentiment' })).toEqual(page);
+    // The server drops a focus on these views: the client never sends one.
+    expect(withFocus(list, { kind: 'companies', ids: [12] })).toEqual(list);
+    expect(withFocus(list, { kind: 'email', id: 141 })).not.toHaveProperty('focus');
+  });
 });

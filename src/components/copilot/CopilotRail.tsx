@@ -9,7 +9,7 @@
 // grounds the answer in.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronDown, Clock, LayoutDashboard, MessageSquare, Network, Plus, Search, Users, X } from 'lucide-react';
+import { ChevronDown, Clock, Layers, LayoutDashboard, MessageSquare, Network, Plus, Search, Users, X } from 'lucide-react';
 import { AskRevenactBox } from '../shared/AskRevenactBox';
 import { fetchConversation, fetchConversations } from '../../pages/copilot/copilotApi';
 import { MessageSources } from '../../pages/copilot/MessageSources';
@@ -319,13 +319,13 @@ export function HistoryPopover({ onClose, onOpen }: { onClose: () => void; onOpe
                           <Network className="w-3 h-3 shrink-0" aria-hidden="true" />
                         ) : c.origin.surface === 'contacts' ? (
                           <Users className="w-3 h-3 shrink-0" aria-hidden="true" />
+                        ) : c.origin.surface === 'accounts' ? (
+                          <Layers className="w-3 h-3 shrink-0" aria-hidden="true" />
                         ) : (
                           <LayoutDashboard className="w-3 h-3 shrink-0" aria-hidden="true" />
                         )}
                         <span className="sr-only">
-                          {c.origin.surface === 'organizations' || c.origin.surface === 'contacts'
-                            ? 'Started on '
-                            : 'Started on the dashboard: '}
+                          {c.origin.surface === 'dashboard' ? 'Started on the dashboard: ' : 'Started on '}
                         </span>
                         {' '}
                         <span className="truncate">{originTag(c)}</span>

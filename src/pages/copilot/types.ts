@@ -231,9 +231,23 @@ export interface AccountDetailOrigin {
 }
 
 /** Every structured context a question can carry, told apart by `surface`
- *  (and, on Organizations and Contacts, by `view`). */
-export type SurfaceContext = DashboardContext | OrganizationsContext | OrganizationDetailContext | ContactsListContext | ContactsPersonContext;
-export type SurfaceOrigin = DashboardOrigin | OrganizationsOrigin | OrganizationDetailOrigin | ContactsListOrigin | ContactsPersonOrigin;
+ *  (and, on Organizations, Contacts and Accounts, by `view`). */
+export type SurfaceContext =
+  | DashboardContext
+  | OrganizationsContext
+  | OrganizationDetailContext
+  | ContactsListContext
+  | ContactsPersonContext
+  | AccountsListContext
+  | AccountDetailContext;
+export type SurfaceOrigin =
+  | DashboardOrigin
+  | OrganizationsOrigin
+  | OrganizationDetailOrigin
+  | ContactsListOrigin
+  | ContactsPersonOrigin
+  | AccountsListOrigin
+  | AccountDetailOrigin;
 export type SurfaceName = SurfaceContext['surface'];
 
 /** A record an answer was built from. A snapshot taken when the

@@ -95,4 +95,29 @@ describe('refusalMessage', () => {
       "You can't ask about this list. Clear the filters and ask again.",
     );
   });
+
+  it('reads an Accounts refusal by the context it was asked in', () => {
+    const page = { surface: 'accounts', view: 'detail', account: 12, focus: { kind: 'email', id: 141 } } as const;
+    const list = { surface: 'accounts', view: 'list', filters: { organisation: '9' } } as const;
+    const bad = (context: unknown) => new ApiError(400, { context }, 'Bad');
+    expect(refusalMessage(bad({ account: ['Not an account you can open.'] }), page)).toBe('You can no longer ask about this account.');
+    expect(refusalMessage(bad({ focus: ['Not a story item you can open.'] }), page)).toBe(
+      'You can no longer ask about this item. Ask about the account instead.',
+    );
+    expect(refusalMessage(bad({ filters: { organisation: ['Not an organisation you can open.'] } }), list)).toBe(
+      "You can't ask about this list. Clear the filters and ask again.",
+    );
+    expect(refusalMessage(new ApiError(500, {}, 'Oops'), page)).toBeNull();
+  });
+
+  it("keeps the organisation page's own account refusal, and a Dashboard focus 400 is no refusal", () => {
+    const org = { surface: 'organizations', view: 'detail', organization: 7, account: 31, focus: null } as const;
+    expect(refusalMessage(new ApiError(400, { context: { account: ['x'] } }, 'Bad'), org)).toBe(
+      'You can no longer ask about this account. Choose All and ask again.',
+    );
+    expect(refusalMessage(new ApiError(400, { context: { account: ['x'] } }, 'Bad'))).toBe(
+      'You can no longer ask about this account. Choose All and ask again.',
+    );
+    expect(refusalMessage(new ApiError(400, { context: { focus: { key: ['Not an item on your list.'] } } }, 'Bad'))).toBeNull();
+  });
 });
