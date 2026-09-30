@@ -36,7 +36,7 @@ describe('PipelineSections', () => {
     const negotiation = await screen.findByRole('button', { name: /^Negotiation/ });
     expect(negotiation).toHaveTextContent('Negotiation · 1 · $2.0K');
     expect(negotiation).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: /^Discovery/ })).toHaveTextContent('Discovery · 1 · $300');
+    expect(screen.getByRole('button', { name: /^Discovery/ })).toHaveTextContent('Discovery · 1 · $300.0');
     expect(await screen.findByText('EMEA seats')).toBeInTheDocument();
     const column = pipelineQueries(spy, 'opportunities').find((query) => query.get('group_value') === 'negotiation');
     expect(column?.get('limit')).toBe('25');

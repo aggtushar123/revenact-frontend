@@ -55,4 +55,18 @@ describe('usePipelineBook', () => {
     expect(result.current.total).toBeNull();
     expect(pipelineQueries(spy, 'opportunities')).toHaveLength(1);
   });
+
+  it("does not re-send the probe on a sort change alone, since sort can't change a count", async () => {
+    const spy = stubPipelines();
+    const { result, rerender } = renderHook(({ query }) => usePipelineBook(OPPORTUNITIES_KIND, params(query), 'list', 0), {
+      initialProps: { query: 'owner=3&group=none' },
+    });
+    await waitFor(() => expect(result.current.total).toBe(3));
+    const probe = pipelineQueries(spy, 'opportunities').find((query) => query.get('limit') === '1');
+    expect(probe?.get('sort')).toBeNull();
+    const callsBefore = pipelineQueries(spy, 'opportunities').length;
+    rerender({ query: 'owner=3&group=none&sort=title' });
+    await waitFor(() => expect(pipelineQueries(spy, 'opportunities').length).toBeGreaterThan(callsBefore));
+    expect(pipelineQueries(spy, 'opportunities').filter((query) => query.get('limit') === '1')).toHaveLength(1);
+  });
 });

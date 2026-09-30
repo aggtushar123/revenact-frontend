@@ -18,10 +18,14 @@ export const PIPELINE_SECTION_SIZE = 25;
  *  says "N opportunities"), and never less than N. */
 export type PipelineBook = PagedBook<PipelineRow, PipelinePage>;
 
-/** M's query, or null when nothing but the stages narrows the book. */
+/** M's query, or null when nothing but the stages narrows the book. Sort
+ *  never changes a count, so it is dropped here (as Organizations' probe
+ *  sends none): otherwise a sort change alone would reload the probe. */
 function totalQuery(params: PipelineParams, view: PipelineView): string | null {
   if (!hasPipelineFilters({ ...params, stage: [] })) return null;
-  return pipelineApiQuery({ ...params, ...EMPTY_PIPELINE_FILTERS, stage: params.stage, group: '' }, view, { limit: '1' });
+  const query = new URLSearchParams(pipelineApiQuery({ ...params, ...EMPTY_PIPELINE_FILTERS, stage: params.stage, group: '' }, view, { limit: '1' }));
+  query.delete('sort');
+  return query.toString();
 }
 
 /** The page's frame read of the kind's book (the tiles, groups, filter
