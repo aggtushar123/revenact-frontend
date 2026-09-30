@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useState } from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { PipelineParentChoice } from '../../../features/pipelines/pipelineApi';
 import { stubPipelines } from '../../../features/pipelines/testPipelines';
@@ -86,5 +86,43 @@ describe('ParentPicker', () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 500, json: async () => ({ detail: 'Server error' }) })));
     render(<Harness />);
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not search organizations and accounts.');
+  });
+
+  it('keeps the newer search\'s results when an older one answers after it', async () => {
+    const real = stubPipelines();
+    let release: () => void = () => {};
+    const held = new Promise<void>((resolve) => (release = resolve));
+    const searchOf = (input: RequestInfo | URL) => new URL(String(input)).searchParams.get('search');
+    const spy = vi.fn((input: RequestInfo | URL, init?: RequestInit) =>
+      searchOf(input) === 'i' ? held.then(() => real(input, init)) : real(input, init),
+    );
+    vi.stubGlobal('fetch', spy);
+    render(<Harness />);
+    await screen.findByRole('group', { name: 'Organizations' });
+    const box = screen.getByRole('searchbox', { name: 'Belongs to' });
+    await userEvent.type(box, 'i');
+    await waitFor(() => expect(spy.mock.calls.some(([input]) => searchOf(input) === 'i')).toBe(true));
+    await userEvent.type(box, 'nit');
+    await waitFor(() => expect(screen.queryByRole('group', { name: 'Organizations' })).toBeNull());
+    expect(within(screen.getByRole('group', { name: 'Accounts' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Initech APAC']);
+    // The older "i" (Pizza Hut and both accounts) answers last, and is dropped.
+    await act(async () => {
+      release();
+      await held;
+    });
+    await waitFor(() => expect(real.mock.calls.filter(([input]) => searchOf(input) === 'i')).toHaveLength(2));
+    await act(async () => {});
+    expect(screen.queryByRole('group', { name: 'Organizations' })).toBeNull();
+    expect(within(screen.getByRole('group', { name: 'Accounts' })).getAllByRole('button').map((b) => b.textContent)).toEqual(['Initech APAC']);
+  });
+
+  it('reads out how many organizations and accounts a search found, and marks the box required', async () => {
+    stubPipelines();
+    render(<Harness />);
+    const count = await screen.findByText('2 organizations, 2 accounts');
+    expect(count).toHaveAttribute('aria-live', 'polite');
+    expect(screen.getByRole('searchbox', { name: 'Belongs to' })).toHaveAttribute('aria-required', 'true');
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Belongs to' }), 'glob');
+    expect(await screen.findByText('1 organization, 0 accounts')).toBeInTheDocument();
   });
 });

@@ -6,6 +6,8 @@ import { FOCUS, QUIET } from '../../organizations/portfolio/styles';
 
 const OPTION = `flex w-full min-h-11 sm:min-h-9 flex-col items-start justify-center rounded-lg px-3 py-1.5 text-left hover:bg-subtle active:bg-line-subtle ${FOCUS}`;
 
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`;
+
 type Read = { search: string; matches: PipelineParentMatches | null; failed: boolean };
 
 /** Add's "where it belongs" (spec §1 Add): any organisation or account the
@@ -64,6 +66,8 @@ export function ParentPicker({ value, onChange }: { value: PipelineParentChoice 
   // The last search that answered stays up while the next one is read.
   const matches = read?.matches ?? null;
   const none = matches !== null && matches.organisations.length === 0 && matches.accounts.length === 0;
+  // Read out when a search answers; the lists themselves are silent.
+  const counted = matches && !none ? `${plural(matches.organisations.length, 'organization')}, ${plural(matches.accounts.length, 'account')}` : '';
   return (
     <div>
       <label htmlFor={id} className="mb-1 block text-[13px] font-semibold text-ink-muted">
@@ -84,9 +88,13 @@ export function ParentPicker({ value, onChange }: { value: PipelineParentChoice 
           onChange={(event) => setText(event.target.value)}
           placeholder="Search organizations and accounts"
           autoComplete="off"
+          aria-required="true"
           className={`w-full min-h-11 sm:min-h-9 rounded-lg border border-line bg-subtle pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint hover:border-line-strong ${FOCUS}`}
         />
       </div>
+      <p role="status" aria-live="polite" className="sr-only">
+        {counted}
+      </p>
       <div className="mt-1 max-h-60 overflow-y-auto" aria-busy={!read || read.search !== search}>
         {read?.failed ? (
           <p role="alert" className="px-3 py-2 text-[13px] text-danger">
