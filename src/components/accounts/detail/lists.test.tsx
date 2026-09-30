@@ -105,6 +105,31 @@ describe('the lists on one account', () => {
     expect(first).not.toHaveTextContent('Pizza EMEA');
   });
 
+  it('Files: names no one with a malformed sentence while the account\'s row (and its name) has not landed yet', async () => {
+    stubAccountPage({ lists: ACCOUNT_LISTS });
+    const LOADING: DetailScope = { kind: 'account', id: 12, name: '' };
+    renderOnAccount(<FilesSection scope={LOADING} account="" accounts={[]} isSm onShowAll={vi.fn()} />);
+    await waitFor(() => expect(ids('data-file')).toEqual(['81', '82']));
+    expect(screen.queryByText(/New files go on \.$/)).not.toBeInTheDocument();
+    expect(screen.queryByText('New files go on .')).not.toBeInTheDocument();
+  });
+
+  it('Calls: the Log a call sheet names no one with a malformed sentence while the account\'s name has not landed yet', async () => {
+    stubAccountPage({ lists: ACCOUNT_LISTS });
+    const LOADING: DetailScope = { kind: 'account', id: 12, name: '' };
+    renderOnAccount(
+      <CallsSection scope={LOADING} account="" accounts={[]} isSm active version={0} onLogged={vi.fn()} onShowAll={vi.fn()} />,
+    );
+    await waitFor(() => expect(ids('data-call')).toEqual(['12', '13']));
+    await userEvent.click(screen.getByRole('button', { name: 'Log a call' }));
+    const dialog = screen.getByRole('dialog', { name: 'Log a call' });
+    // Not "On " with nothing (or just trailing whitespace) after it.
+    expect(dialog.getAttribute('aria-describedby')).toBeTruthy();
+    const description = document.getElementById(dialog.getAttribute('aria-describedby')!);
+    expect(description?.textContent?.trim()).not.toBe('On');
+    expect(description?.textContent).toMatch(/^On \S/);
+  });
+
   it('Calls reads the account\'s calls and logs one on it', async () => {
     const spy = stubAccountPage({ lists: ACCOUNT_LISTS });
     const onLogged = vi.fn();

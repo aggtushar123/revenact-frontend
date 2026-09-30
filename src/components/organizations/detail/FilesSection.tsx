@@ -138,7 +138,10 @@ export function FilesSection(props: FilesSectionProps) {
               Files
             </h2>
             <p className="text-[13px] text-ink-muted">
-              Up to 25 MB each. New files go on {pageAccountName ?? target?.name ?? 'the organization'}.
+              {/* A truthy check, not `??`: an account's own page names it ''
+               *  until its row lands, and `''` is not "no name" the way
+               *  `undefined` is. */}
+              Up to 25 MB each. New files go on {pageAccountName || target?.name || 'the organization'}.
             </p>
           </div>
           <div className={isSm ? 'flex items-end gap-2' : 'flex flex-col gap-2'}>
