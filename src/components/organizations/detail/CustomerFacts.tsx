@@ -26,7 +26,7 @@ function Fact({ term, children }: { term: string; children: ReactNode }) {
   );
 }
 
-function CsatSpread({ breakdown }: { breakdown: CsatBreakdown }) {
+export function CsatSpread({ breakdown }: { breakdown: CsatBreakdown }) {
   const { responses, bands } = breakdown;
   return (
     <div className="flex flex-col gap-1.5">
