@@ -51,6 +51,7 @@ react-ts-app/
 │   │   ├── layout/             ← Sidebar, Navbar
 │   │   ├── shared/             ← Multi-domain components (ActivityFeed, PinnedAttributes, Summary)
 │   │   ├── accounts/portfolio/ ← AccountPanels, accountKind (ACCOUNT_KIND) for the Accounts list and board
+│   │   ├── accounts/detail/    ← the account page: AccountHeader, AccountTiles, AccountPulseBreakdown, AccountDetailsTab, CanvasesTab, useAccount
 │   │   ├── contacts/           ← ContactsToolbar, ContactList(Item), ContactProfile, HistoryItems, ContactFormModal
 │   │   ├── dashboard/charts/   ← Shared Recharts chart components (AI Trending)
 │   │   └── organizations/      ← Org domain components; portfolio/ holds the list page's (see below)
@@ -108,7 +109,7 @@ react-ts-app/
 │   ├── (index)                → Redirects to /accounts/list
 │   ├── list                   → Portfolio (List.tsx on GET /accounts/portfolio/, ACCOUNT_KIND)
 │   ├── board                  → Board (Board.tsx: PortfolioBoard on GET /accounts/portfolio/)
-│   └── :id                    → Account Details page
+│   └── :id                    → Account page (Details.tsx: the account's story, on GET /accounts/{id}/story/)
 ├── copilot                    → Copilot AI module (Home / Chat / Cockpit)
 ├── scenarios/create           → Visual scenario flow builder
 ├── settings/
@@ -329,7 +330,7 @@ inside `OrganizationsFrame` (the dashboard's body, with the Ask rail in its `rai
 | `components/organizations/portfolio/*` | `AccountRow`, `rowParts`, `AccountDetails`, `AccountSheet`, `SummaryTiles`, `PortfolioToolbar`, `FiltersPanel`, `PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `useSelection`, `usePins`, `usePortfolioParams`; for the board `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`, `useBoardMove`, `boardMove`, `useEndSentinel` |
 | `features/organizations/testPortfolio.ts`, `pages/organizations/testList.tsx` | Fixtures, `buildPortfolio`, `stubPortfolio`; `renderOrganizations(url, {width, nav, ask})`, `renderList`, `renderBoard`; `src/test/intersection.ts` (fake IntersectionObserver) |
 | `components/organizations/portfolio/portfolioKind.ts`, `organizationKind.ts` | The portfolio kind the shared components read from `PortfolioKindContext` (endpoint, params, words, links, row line, panels, how a move saves); `ORGANIZATION_KIND` is the default |
-| `features/accounts/*`, `components/accounts/portfolio/*` | The Accounts kind: `portfolioTypes`, `portfolioApi`, `ACCOUNT_PARAMS`, the 24-field `accountFields`, `accountNavRow`, `AccountPanels`, `ACCOUNT_KIND`; `features/accounts/testPortfolio.ts` and `pages/accounts/testList.tsx` (`renderAccounts`) for tests |
+| `features/accounts/*`, `components/accounts/portfolio/*` | The Accounts kind: `portfolioTypes`, `portfolioApi`, `ACCOUNT_PARAMS`, the 24-field `accountFields`, `accountPageParams`, `csat`, `AccountPanels`, `ACCOUNT_KIND`; `features/accounts/testPortfolio.ts`, `features/accounts/testAccountPage.ts` (`stubAccountPage`) and `pages/accounts/testDetail.tsx` (`renderAccountPage`), and `pages/accounts/testList.tsx` (`renderAccounts`) for tests |
 
 #### Board View (`pages/organizations/Board.tsx`)
 The portfolio as columns (spec §1 "Board", owner decisions 2026-09-26), in
@@ -387,11 +388,10 @@ delivery 1). It draws itself in `OrganizationsFrame` (no rail until delivery 3).
 
 ### 4. Accounts (`pages/accounts/Details.tsx`)
 
-Account-level detail page linked from Org Details.
-- Same layout as Organizations Details but scoped to a single account
-- Renders its own `AccountMetricsBanner` (defined in the same file) for stakeholder diagnostics (Health, Account Pulse, NPS, CSAT, ARR)
-- Recycles `PinnedAttributes` and `ActivityFeed` from `shared/`
-- Injects `ACCOUNT_ID_MAP` and `accountActivityData` at runtime for account-scoped feed data
+The account's story (spec 2026-09-29 §2), read by the URL id alone.
+- `useAccount` reads the portfolio row (`GET /accounts/portfolio/?ids=`) and the record (`GET /accounts/<id>/`); `useAccountPageParams` keeps `?tab=` and the story's filters.
+- The organization page's detail parts render with `scope={{kind: 'account', id, name}}` (`features/organizations/detailScope.ts`): the Story on `/accounts/<id>/story/`, People, Deals & risks and Files on `/accounts/<id>/…`; the account thunks take no organisation id (`lib/accountPaths.ts`).
+- Its own parts are in `components/accounts/detail/`; Custom objects and Canvases are the restyled `shared/CustomObjectsTab` and `shared/CanvasListTab`.
 
 ---
 
@@ -578,12 +578,10 @@ App.tsx
   │     └── People, Deals & risks, Knowledge, Files: shared/ContactsTab, shared/PipelinesTab,
   │           CompanyViewTab + activity/HeadlinesTab, activity/FilesTab + activity/CallSenseTab
   │
-  ├── pages/accounts/Details.tsx
-  │     ├── components/shared/PinnedAttributes
-  │     ├── components/shared/ActivityFeed
-  │     │     └── components/organizations/activity/*Tab (x9)
-  │     │           └── CallSenseTab → features/tasks/tasksSlice (dispatch addTask)
-  │     └── (activityData, accountsData, accountActivityData)
+  ├── pages/accounts/Details.tsx  (GET /accounts/portfolio/?ids=, /accounts/{id}/, /accounts/{id}/story/)
+  │     ├── components/accounts/detail/* (AccountHeader, AccountTiles, AccountDetailsTab, CanvasesTab, useAccount)
+  │     ├── organizations/detail/* with an account scope (StoryTab, PeopleTab, DealsTab, FilesCallsTab, DetailTabs)
+  │     └── shared/CustomObjectsTab, shared/CanvasListTab, shared/OwnerTile, shared/AIAttributesPanel
   │
   ├── pages/organizations/List.tsx  (GET /organizations/portfolio/)
   │     ├── OrganizationsAskLayout (AskProvider, organizations surface) → OrganizationsFrame (rail slot: AskRail)
