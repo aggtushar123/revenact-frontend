@@ -8,7 +8,7 @@ import type { PanelKey } from '../../../features/organizations/portfolioFields';
 import type { AddKind } from '../../../features/organizations/storyKinds';
 import type { StoryItem } from '../../../features/organizations/storyTypes';
 import { QUIET } from '../portfolio/styles';
-import { AddFlow } from './AddFlow';
+import { AddFlow, type AddFlowParent } from './AddFlow';
 import { AttentionBlock } from './AttentionBlock';
 import { EmailThread } from './EmailThread';
 import { StoryStream } from './StoryStream';
@@ -49,8 +49,11 @@ export function StoryTab(props: StoryTabProps) {
   // An account the organization does not have (a stale or hand-edited
   // ?account=) is no place to save: + Add saves on the organization.
   const chosen = scope.kind === 'account' ? undefined : chosenAccount(accounts, params.account);
-  const accountId = scope.kind === 'account' ? scope.id : chosen?.id;
   const accountName = scope.kind === 'account' ? scope.name : chosen?.name;
+  // Same shape AddFlow itself now requires (never neither id): this
+  // account's own page, or the organization with whichever account (if any)
+  // is chosen.
+  const addFlowParent: AddFlowParent = scope.kind === 'account' ? { accountId: scope.id } : chosen ? { customerId: scope.id, accountId: chosen.id } : { customerId: scope.id };
   const onSearch = useCallback((q: string) => onUpdate({ q }, { replace: true }), [onUpdate]);
 
   return (
@@ -104,8 +107,7 @@ export function StoryTab(props: StoryTabProps) {
       {active && adding ? (
         <AddFlow
           what={adding}
-          customerId={scope.kind === 'organization' ? scope.id : undefined}
-          accountId={accountId}
+          {...addFlowParent}
           accountName={accountName}
           isSm={isSm}
           onClose={() => setAdding(null)}

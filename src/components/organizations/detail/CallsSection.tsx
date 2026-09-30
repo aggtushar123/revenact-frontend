@@ -9,7 +9,7 @@ import { callsSummary } from '../../../features/organizations/listSummaries';
 import { dayLabel, groupByDay, localDay } from '../../../features/organizations/storyDays';
 import { ErrorBlock } from '../portfolio/PortfolioSections';
 import { BUTTON } from '../portfolio/styles';
-import { AddFlow } from './AddFlow';
+import { AddFlow, type AddFlowParent } from './AddFlow';
 import { CallItem } from './CallItem';
 import { AccountNames } from './accountNames';
 import { AddPaused, ListSkeleton, ScopedEmpty, SummaryLine } from './ListParts';
@@ -58,6 +58,10 @@ export function CallsSection(props: CallsSectionProps) {
 
   const target = chosenAccount(accounts, account);
   const paused = awaitingAccount(accounts, account);
+  // Same shape AddFlow itself now requires (never neither id): this
+  // account's own page, or the organization with whichever account (if any)
+  // is chosen.
+  const addFlowParent: AddFlowParent = kind === 'account' ? { accountId: scopeId } : target ? { customerId: scopeId, accountId: target.id } : { customerId: scopeId };
   const shown = useMemo(() => byAccount(items, account), [items, account]);
   const days = useMemo(() => groupByDay(shown.map((call) => ({ ...call, all_day: false }))), [shown]);
   const today = localDay(new Date());
@@ -116,9 +120,10 @@ export function CallsSection(props: CallsSectionProps) {
         {active && logging ? (
           <AddFlow
             what="call"
-            customerId={kind === 'organization' ? scopeId : undefined}
-            accountId={kind === 'account' ? scopeId : target?.id}
-            accountName={pageAccountName ?? target?.name}
+            {...addFlowParent}
+            // A truthy check, not `??`: an account's own page names it '' until
+            // its row lands, and `''` is not "no name" the way `undefined` is.
+            accountName={pageAccountName || target?.name}
             isSm={isSm}
             onClose={() => setLogging(false)}
             onAdded={() => {
