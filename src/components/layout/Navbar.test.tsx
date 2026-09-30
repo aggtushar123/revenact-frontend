@@ -245,6 +245,7 @@ function renderNavbar(
           <Route path="/profile" element={<div>Profile Marker</div>} />
           <Route path="/login" element={<div>Login Marker</div>} />
           <Route path="/organizations/:id" element={<div>Details Marker</div>} />
+          <Route path="/accounts/list" element={<div>Accounts Marker</div>} />
           <Route path="/accounts/:id" element={<div>Account Details Marker</div>} />
           <Route path="/contacts/:id" element={<div>Contact Details Marker</div>} />
         </Routes>
@@ -346,61 +347,40 @@ describe('Navbar on an organization page (/organizations/:id)', () => {
   });
 });
 
-// Minimal but real-shaped AccountRow — see mapToAccountRow.test.ts for
-// the full field list. Only what Navbar's own header actually reads
-// (name/orgName/logo) needs realistic values here.
-const apacDivision = {
-  orgId: 9,
-  id: '17',
-  name: 'APAC Division',
-  orgName: 'Kraft Heinz',
-  logo: 'https://logo.clearbit.com/kraftheinz.com',
-  revenactId: 17,
-  pulse: [],
-  aiPulseScore: '—',
-  aiPulseReason: '-',
-  owner: 'Unassigned',
-  avatar: '—',
-  health: { val: 5, clr: 'bg-[var(--warning)]' },
-  healthCategory: 'average' as const,
-  nps: '0',
-  npsValue: 0,
-  csat: 'N/A',
-  csatValue: 0,
-  lifecycleStage: 'Onboarding',
-  mrr: 0,
-  arr: 0,
-  renewal: '-',
-};
-
-describe('Navbar account breadcrumb (/accounts/:id)', () => {
+describe('Navbar on an account page (/accounts/:id)', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it('shows the real account/org name from navigation state (a click-through from a real Accounts tab)', () => {
-    // organizations/Details.tsx's AccountsTab passes the real AccountRow
-    // through navigate()'s state when a row is clicked — see that file.
-    renderNavbar({ pathname: '/accounts/17', state: { account: apacDivision } });
-
-    expect(screen.getByRole('heading', { name: 'APAC Division' })).toBeInTheDocument();
-    expect(screen.getByText('Kraft Heinz')).toBeInTheDocument();
+  it('wears the framed bar: a way back to Accounts, the actions slot, no avatar', () => {
+    const setSlot = vi.fn();
+    renderNavbar('/accounts/17', null, null, [], setSlot);
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('h-16', 'shrink-0', 'flex', 'items-center', 'gap-3', 'px-4');
+    for (const cls of ['bg-surface', 'border-b', 'shadow-sm']) expect(header).not.toHaveClass(cls);
+    const back = within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Accounts' });
+    expect(back).toHaveAttribute('href', '/accounts/list');
+    expect(setSlot).toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(header!.querySelector('[data-nav-actions-slot]')).not.toBeNull();
+    expect(screen.queryByAltText('Alice Admin')).not.toBeInTheDocument();
   });
 
-  it('falls back to the mock data when reached without navigation state (a direct URL visit or refresh)', () => {
+  it('leaves the name to the page and ignores navigation state (there is no mock account)', () => {
+    renderNavbar({ pathname: '/accounts/17', state: { account: { name: 'APAC Division', orgName: 'Kraft Heinz' } } });
+    expect(screen.queryByText('APAC Division')).not.toBeInTheDocument();
+    expect(screen.queryByText('Kraft Heinz')).not.toBeInTheDocument();
+    expect(document.querySelector('header img')).toBeNull();
+  });
+
+  it('takes you back to the list', async () => {
     renderNavbar('/accounts/17');
-
-    expect(screen.queryByRole('heading', { name: 'APAC Division' })).not.toBeInTheDocument();
-    // Whatever ACCOUNTS_DATA[0] is — not asserting its exact name here,
-    // just that *some* account header renders instead of the header
-    // falling through to the generic path-based title.
-    expect(screen.queryByText('Accounts', { selector: 'h1' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('link', { name: 'Accounts' }));
+    expect(await screen.findByText('Accounts Marker')).toBeInTheDocument();
   });
 
-  it('does not show an account header on /accounts/list (not a numeric id)', () => {
+  it('shows no breadcrumb on /accounts/list', () => {
     renderNavbar('/accounts/list');
-
-    expect(screen.queryByRole('heading', { name: 'APAC Division' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument();
   });
 });
 

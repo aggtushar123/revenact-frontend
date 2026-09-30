@@ -3,7 +3,7 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import authReducer from '../../features/auth/authSlice';
 import customersReducer from '../../features/customers/customersSlice';
 import notificationsReducer from '../../features/notifications/notificationsSlice';
@@ -23,11 +23,10 @@ export function Where() {
   return <p data-testid="where">{`${location.pathname}${location.search}`}</p>;
 }
 
-/** Stands in for /accounts/:id (Details.tsx), saying which row it was handed. */
+/** Stands in for /accounts/:id (Details.tsx), saying which id it was sent to. */
 function AccountPage() {
-  const location = useLocation();
-  const account = (location.state as { account?: { name: string; orgId: number } } | null)?.account;
-  return <p data-testid="account-page">{account ? `${account.name} · organization ${account.orgId}` : 'No account state'}</p>;
+  const { id } = useParams();
+  return <p data-testid="account-page">{`Account page ${id}`}</p>;
 }
 
 function makeStore() {
@@ -109,7 +108,7 @@ export function renderAccounts(url: string, { width = 1440, nav = false }: { wid
                 </>
               }
             />
-            <Route path="/organizations/:id" element={<p>Organization page</p>} />
+            <Route path="/organizations/:id" element={<><p>Organization page</p><Where /></>} />
           </Routes>
         </SlotHost>
       </MemoryRouter>

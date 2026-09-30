@@ -45,6 +45,10 @@ describe('DashboardLayout', () => {
     // own px-4 pb-4 already gutters them (fix round 1, 2026-09-30).
     '/accounts/list',
     '/accounts/board',
+    // …and an account's page, the organization page's bleed frame (accounts
+    // spec 2026-09-29 §2.1).
+    '/accounts/12',
+    '/accounts/12/',
   ])('adds no padding around %s', (url) => {
     const main = renderAt(url);
     expect(main).toHaveClass('p-0');
@@ -52,9 +56,7 @@ describe('DashboardLayout', () => {
   });
 
   it('keeps the padding on other pages', () => {
-    // /accounts/:id is not in the Organizations frame, unlike the list and
-    // board above (fix round 1, 2026-09-30).
-    const main = renderAt('/accounts/12');
+    const main = renderAt('/pipelines/board');
     expect(main).toHaveClass('p-2', 'md:p-3', 'lg:p-4');
   });
 
