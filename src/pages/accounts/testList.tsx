@@ -82,9 +82,10 @@ function makeStore() {
 /** Both Accounts views, and the account page (the real one with `realPage`,
  *  else a stand-in), on the real store and router. `nav` adds the real
  *  Navbar, whose List/Board tabs switch views carrying the query. `ask` puts
- *  the three routes under AccountsAskLayout, as App.tsx does. */
+ *  the three routes under AccountsAskLayout, as App.tsx does. `url` may
+ *  carry navigation state (a History handover). */
 export function renderAccounts(
-  url: string,
+  url: string | { pathname: string; search?: string; state?: unknown },
   {
     width = 1440,
     nav = false,
