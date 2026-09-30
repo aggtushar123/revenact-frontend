@@ -15,6 +15,7 @@ import { OrganizationsAskLayout } from './pages/organizations/ask/OrganizationsA
 import { AccountsAskLayout } from './pages/accounts/ask/AccountsAskLayout';
 import { AccountDetails } from './pages/accounts/Details';
 import { List as AccountsList } from './pages/accounts/List';
+import { List as PipelinesList } from './pages/pipelines/List';
 import { Board as AccountsBoard } from './pages/accounts/Board';
 import { CopilotIndex } from './pages/copilot/Index';
 import CommunicationsPage from './pages/communications/CommunicationsPage';
@@ -287,7 +288,7 @@ function App() {
 
           <Route path="pipelines">
             <Route index element={<Navigate to="list" replace />} />
-            <Route path="list" element={<PipelinesPage view="list" />} />
+            <Route path="list" element={<PipelinesList />} />
             <Route path="board" element={<PipelinesPage view="board" />} />
           </Route>
 

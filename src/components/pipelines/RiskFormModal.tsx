@@ -36,6 +36,10 @@ interface RiskFormModalProps {
    * the Account picker below (already inside one specific account's
    * own context). */
   accountId?: number;
+  /** Add-only: replaces the Company select with the caller's own "where it
+   * belongs" field (the Pipelines page's server-searched picker), which
+   * sets `customerId` or `accountId` above as the viewer picks. */
+  parentField?: ReactNode;
   onClose: () => void;
   /** Edit-only: shows a "Delete" button that hands off to the caller,
    * same separation as OpportunityFormModal's own. */
@@ -57,6 +61,7 @@ export function RiskFormModal({
   companies,
   customerId,
   accountId,
+  parentField,
   onClose,
   onDeleteRequest,
   onSaved,
@@ -112,7 +117,7 @@ export function RiskFormModal({
     setError(null);
 
     if (!isEdit && customerId === undefined && accountId === undefined && !selectedCompanyId) {
-      setError('Pick a company.');
+      setError(parentField ? 'Pick where it belongs.' : 'Pick a company.');
       return;
     }
 
@@ -187,6 +192,8 @@ export function RiskFormModal({
                 {risk.account_name ? ` • ${risk.account_name}` : ''}
               </p>
             </div>
+          ) : parentField ? (
+            parentField
           ) : customerId === undefined && accountId === undefined ? (
             <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
               <option value="">Select a company…</option>

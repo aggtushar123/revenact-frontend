@@ -51,6 +51,10 @@ describe('DashboardLayout', () => {
     '/accounts/12',
     '/accounts/12/',
     '/accounts/abc',
+    // The Pipelines list and board, framed like Accounts' (pipelines spec
+    // 2026-09-30 §1).
+    '/pipelines/list',
+    '/pipelines/board',
   ])('adds no padding around %s', (url) => {
     const main = renderAt(url);
     expect(main).toHaveClass('p-0');
@@ -58,7 +62,7 @@ describe('DashboardLayout', () => {
   });
 
   it('keeps the padding on other pages', () => {
-    const main = renderAt('/pipelines/board');
+    const main = renderAt('/users');
     expect(main).toHaveClass('p-2', 'md:p-3', 'lg:p-4');
   });
 

@@ -24,6 +24,8 @@ import { notificationRead, allRead } from '../../features/notifications/notifica
 import { AREAS } from '../../pages/dashboard/areas';
 import { sharedSearch } from '../../pages/dashboard/shared/useDashboardFilters';
 import { NavActionsSlotContext } from '../../layouts/navActionsSlot';
+import { SM, useMediaQuery } from '../../lib/useMediaQuery';
+import { PipelineKindSwitch } from '../pipelines/portfolio/PipelineKindSwitch';
 
 export function Navbar() {
   const location = useLocation();
@@ -37,6 +39,7 @@ export function Navbar() {
   const accountMenuRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const { setSlot } = useContext(NavActionsSlotContext);
+  const isSm = useMediaQuery(SM);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -86,7 +89,11 @@ export function Navbar() {
   const isAccountDetail = /^\/accounts\/(?!list\/?$|board\/?$)[^/]+\/?$/.test(location.pathname);
   const isSettings = location.pathname.startsWith('/settings');
   const isAccountSettings = location.pathname.startsWith('/account-settings');
-  const isPipelines = location.pathname.startsWith('/pipelines');
+  // The Pipelines list and board wear the Organizations frame (pipelines spec
+  // 2026-09-30 §1): the transparent bar, "Pipelines", List | Board carrying
+  // the query, Opportunities | Risks from sm (the page shows it below sm),
+  // the actions slot (empty until delivery 2's Ask) and no avatar.
+  const isPipelinesView = /^\/pipelines\/(list|board)\/?$/.test(location.pathname);
   const isDashboard = location.pathname.startsWith('/dashboard');
   // The Organizations list and board wear the dashboard's frame (portfolio
   // spec §1, owner decisions 2026-09-26): the transparent top bar, the
@@ -100,7 +107,7 @@ export function Navbar() {
   // person open on it share one page, titled here; the page draws the rest.
   // A trailing slash still reads as the same route (fix round 1, 2026-09-28).
   const isContacts = /^\/contacts(\/\d+)?\/?$/.test(location.pathname);
-  const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts || isAccountsView || isAccountDetail;
+  const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts || isAccountsView || isAccountDetail || isPipelinesView;
   const dashboardSharedSearch = sharedSearch(location.search);
 
 
@@ -290,28 +297,31 @@ export function Navbar() {
               ))}
             </nav>
           </div>
-        ) : isPipelines ? (
-          <>
-            <div className="flex items-center gap-1.5 cursor-pointer hover:bg-subtle py-1.5 px-2 -ml-2 rounded-md transition-colors">
-              <h1 className="text-[17px] font-bold text-ink tracking-tight">Pipelines</h1>
-              <ChevronDown className="w-3.5 h-3.5 text-ink-muted stroke-[2.5px] mt-[1px]" />
-            </div>
-
-            <nav className="flex items-center gap-8 h-full mt-0.5 ml-2">
-              <NavLink
-                to="/pipelines/list"
-                className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-accent text-accent opacity-90' : 'border-transparent text-ink-muted hover:text-ink'}`}
-              >
-                List
-              </NavLink>
-              <NavLink
-                to="/pipelines/board"
-                className={({ isActive }) => `h-full flex items-center border-b-[3px] font-bold text-[13px] px-1 pt-1 transition-colors ${isActive ? 'border-accent text-accent opacity-90' : 'border-transparent text-ink-muted hover:text-ink'}`}
-              >
-                Board
-              </NavLink>
+        ) : isPipelinesView ? (
+          <div className="flex items-center gap-4 h-full">
+            <h1 className="text-[17px] font-bold text-ink tracking-tight">Pipelines</h1>
+            <nav aria-label="Pipelines views" className="flex items-center gap-4 h-full">
+              {[
+                { to: '/pipelines/list', label: 'List' },
+                { to: '/pipelines/board', label: 'Board' },
+              ].map((view) => (
+                <NavLink
+                  key={view.to}
+                  // The two views share their URL state (kind, filters, sort,
+                  // group), so switching tabs keeps it.
+                  to={{ pathname: view.to, search: location.search }}
+                  className={({ isActive }) =>
+                    `h-full inline-flex items-center text-[13px] font-semibold border-b-2 transition-colors duration-[var(--dur-fast)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
+                      isActive ? 'border-accent text-ink' : 'border-transparent text-ink-muted hover:text-ink'
+                    }`
+                  }
+                >
+                  {view.label}
+                </NavLink>
+              ))}
             </nav>
-          </>
+            {isSm ? <PipelineKindSwitch variant="bar" /> : null}
+          </div>
         ) : isSettings ? (
           <>
             <div className="flex items-center gap-1.5 cursor-pointer hover:bg-subtle py-1.5 px-2 -ml-2 rounded-md transition-colors">

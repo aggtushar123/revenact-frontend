@@ -44,6 +44,9 @@ export function DashboardLayout() {
   // regex left the not-found page double-guttered, matching Navbar.tsx's
   // own `isAccountDetail`).
   const isAccountsView = /^\/accounts\/[^/]+\/?$/.test(location.pathname);
+  // The Pipelines list and board wear the Organizations frame too (pipelines
+  // spec 2026-09-30 §1), whose own px-4 pb-4 gutters them.
+  const isPipelinesView = /^\/pipelines\/(list|board)\/?$/.test(location.pathname);
   // The Navbar's actions slot, which a page below (the dashboard) portals into.
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const slotValue = useMemo(() => ({ slot, setSlot }), [slot]);
@@ -79,7 +82,7 @@ export function DashboardLayout() {
         <Sidebar />
         <div className="flex-1 flex flex-col relative w-full h-full overflow-hidden rv-canvas">
           {!isScenarios && !isCopilot && !isCommunications && <Navbar />}
-          <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications || isDashboard || isOrgView || isContacts || isAccountsView) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
+          <main className={`flex-1 overflow-hidden h-full flex flex-col ${(isScenarios || isSettings || isAccountSettings || isCopilot || isCommunications || isDashboard || isOrgView || isContacts || isAccountsView || isPipelinesView) ? 'p-0' : 'p-2 md:p-3 lg:p-4'}`}>
             <Outlet />
           </main>
         </div>
