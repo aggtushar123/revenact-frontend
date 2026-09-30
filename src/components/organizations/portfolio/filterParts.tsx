@@ -1,9 +1,9 @@
 // The Filters sheet's frame and fields, shared by every portfolio's panel
 // (Organizations, Accounts, Pipelines), with the select class they share.
 import { useEffect, useId, useRef, type ReactNode, type RefObject } from 'react';
-import { ArrowDown, ArrowUp, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Download, Plus, X } from 'lucide-react';
 import { trapTab } from '../../../lib/focusTrap';
-import { FOCUS } from './styles';
+import { FOCUS, PRIMARY } from './styles';
 
 export const FILTER_SELECT = `min-h-11 sm:min-h-9 rounded-lg border border-line bg-surface px-2 text-[13px] text-ink hover:border-line-strong disabled:opacity-50 ${FOCUS}`;
 
@@ -100,6 +100,39 @@ export function GroupSortFields({
         </button>
       </span>
     </>
+  );
+}
+
+/** The Filters sheet's phone-only footer: Export then "Add {noun}", shared
+ *  by every portfolio (Organizations, Accounts, Pipelines) rather than
+ *  hand-rolled per panel. From `sm` the toolbar carries these instead. */
+export function FilterSheetFooter({
+  onExport,
+  exporting,
+  onAdd,
+  addLabel,
+}: {
+  onExport: () => void;
+  exporting: boolean;
+  onAdd: () => void;
+  addLabel: string;
+}) {
+  return (
+    <div className="flex flex-col gap-2 border-t border-line-subtle pt-4">
+      <button
+        type="button"
+        onClick={onExport}
+        disabled={exporting}
+        className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line text-[13px] font-semibold text-ink hover:bg-subtle disabled:opacity-50 ${FOCUS}`}
+      >
+        <Download className="w-4 h-4" aria-hidden="true" />
+        {exporting ? 'Exporting…' : 'Export'}
+      </button>
+      <button type="button" onClick={onAdd} className={`${PRIMARY} min-h-11 justify-center`}>
+        <Plus className="w-4 h-4" aria-hidden="true" />
+        {addLabel}
+      </button>
+    </div>
   );
 }
 

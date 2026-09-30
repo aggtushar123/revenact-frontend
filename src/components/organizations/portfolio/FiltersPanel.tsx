@@ -1,12 +1,10 @@
 import { useId, useRef, type RefObject } from 'react';
-import { Download, Plus } from 'lucide-react';
 import { HEALTH_BANDS, toggleIn, type PortfolioParams } from '../../../features/organizations/portfolioParams';
 import { HEALTH_LABEL, NPS_BANDS, NPS_LABEL, RENEWAL_WINDOWS, windowLabel } from '../../../features/organizations/portfolioLabels';
 import type { FilterOptions, GroupKey, LifecycleValue, NpsBand } from '../../../features/organizations/portfolioTypes';
 import type { GroupOption } from '../../../features/organizations/portfolioGroups';
-import { Check, FILTER_SELECT, FilterGroup, FilterSheet, GroupSortFields, Radio } from './filterParts';
+import { Check, FILTER_SELECT, FilterGroup, FilterSheet, FilterSheetFooter, GroupSortFields, Radio } from './filterParts';
 import { usePortfolioKind } from './portfolioKind';
-import { FOCUS } from './styles';
 
 // Kept importable from here, where the pages and tests already find them.
 export { BOARD_GROUP_OPTIONS, GROUP_OPTIONS, type GroupOption } from '../../../features/organizations/portfolioGroups';
@@ -163,27 +161,7 @@ export function FiltersPanel({
         </FilterGroup>
       ) : null}
 
-      {!isSm ? (
-        <div className="flex flex-col gap-2 border-t border-line-subtle pt-4">
-          <button
-            type="button"
-            onClick={onExport}
-            disabled={exporting}
-            className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg border border-line text-[13px] font-semibold text-ink hover:bg-subtle disabled:opacity-50 ${FOCUS}`}
-          >
-            <Download className="w-4 h-4" aria-hidden="true" />
-            {exporting ? 'Exporting…' : 'Export'}
-          </button>
-          <button
-            type="button"
-            onClick={onAdd}
-            className={`inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg bg-accent text-[13px] font-semibold text-on-accent hover:bg-accent-hover ${FOCUS}`}
-          >
-            <Plus className="w-4 h-4" aria-hidden="true" />
-            {`Add ${kind.noun.one}`}
-          </button>
-        </div>
-      ) : null}
+      {!isSm ? <FilterSheetFooter onExport={onExport} exporting={exporting} onAdd={onAdd} addLabel={`Add ${kind.noun.one}`} /> : null}
     </FilterSheet>
   );
 }
