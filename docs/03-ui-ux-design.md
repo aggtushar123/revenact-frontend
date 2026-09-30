@@ -546,8 +546,12 @@ specific to it, enforced by `components/accounts/detail/houseRules.test.ts`
 
 - Frame: the organization page's bleed frame, the transparent top bar with
   "‹ Accounts", and the Ask rail `AccountsAskLayout` draws above it (delivery
-  3, `bleed` on this route): the page does not yet call `useReportAccountName`,
-  so a live chip reads "This account" until it does.
+  3, `bleed` on this route): the page calls `useReportAccountName` from its
+  own row, so a live chip names the account ("Pizza EMEA") once the row
+  lands, "This account" until then; the server's own `label` on a sent
+  question always wins. Each story item's meta line ends with a quiet "Ask
+  about this" (`StoryItemRow`, shared with the organization page below),
+  which narrows one question to that item and is spent by the send.
 - Name row (`AccountHeader`): initials, the name at 22px, "owner · lifecycle ·
   Touched Nd ago" at 13px and the signal tag; then "Part of" with one link per
   linked organisation the viewer may open (`/organizations/:id?account=<id>`;
