@@ -117,6 +117,20 @@ describe('Deals & risks (spec 2026-09-27 §3)', () => {
     expect(screen.queryByRole('group', { name: 'View' })).not.toBeInTheDocument();
   });
 
+  it('leaves Closed Lost out of the pipeline MRR, and starts its board column collapsed (pipelines spec §1)', async () => {
+    const lost = { ...ORGANIZATION_LISTS.opportunities![1], id: 63, title: 'Lost pilot', mrr: '900.00', stage: 'closed_lost' as const, stage_display: 'Closed Lost' };
+    renderDeals({}, { ...ORGANIZATION_LISTS, opportunities: [...ORGANIZATION_LISTS.opportunities!, lost] });
+    await waitFor(() => expect(deals()).toEqual(['61', '62', '63']));
+    expect(summary()).toHaveTextContent('3 opportunities · $1,500.00 pipeline MRR · 1 high priority · 0 closed won');
+    await userEvent.click(screen.getByRole('button', { name: 'Board' }));
+    expect(screen.getByText('EMEA seat expansion')).toBeInTheDocument();
+    expect(screen.queryByText('Lost pilot')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Show Closed Lost' }));
+    expect(screen.getByText('Lost pilot')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Hide Closed Lost' }));
+    expect(screen.queryByText('Lost pilot')).not.toBeInTheDocument();
+  });
+
   it('shows a failed read with Try again', async () => {
     const spy = stubOrganizationPage({ lists: ORGANIZATION_LISTS });
     let fail = true;

@@ -34,7 +34,8 @@ export function peopleSummary(people: Contact[]): SummaryPart[] {
 export function opportunitiesSummary(rows: Opportunity[], currency: CurrencyCode): SummaryPart[] {
   return [
     { value: String(rows.length), label: plural(rows.length, 'opportunity', 'opportunities') },
-    { value: formatMoney(sumMrr(rows), currency), label: 'pipeline MRR' },
+    // Closed Lost is out of the pipeline (pipelines spec 2026-09-30 §1).
+    { value: formatMoney(sumMrr(rows.filter((row) => row.stage !== 'closed_lost')), currency), label: 'pipeline MRR' },
     { value: String(rows.filter((row) => row.priority === 'high').length), label: 'high priority' },
     { value: String(rows.filter((row) => row.stage === 'closed_won').length), label: 'closed won' },
   ];
