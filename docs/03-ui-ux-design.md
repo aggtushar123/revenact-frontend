@@ -594,9 +594,10 @@ because a pipeline item has no health, lifecycle or ARR:
   form), "Part of" the organisation or account as a link (and an account's
   organisation), MRR in the workspace's currency, the stage tag, priority,
   department ("Whole company" when blank), the date line ("Closes in 12d",
-  "Overdue 5d" in danger, "No date"; risks "Due in 12d"; a closed item past its
-  date "Expected 5 Sep 2026") and at most one signal (Overdue, else High
-  priority on an open item, which then stands in for the priority tag). In a
+  "Overdue 5d" in danger, "No date"; risks "Due in 12d"; a closed item, its
+  date past or ahead, "Expected 5 Sep 2026" or a risk's "Due by 5 Sep 2026")
+  and at most one signal (Overdue, else High priority on an open item, which
+  then stands in for the priority tag). In a
   narrow column the facts wrap under the title; targets are 44px on phones.
 - Group by stage (the default on both views), close / due month (Overdue,
   the months, No date), organisation or account, owner (named people, "Not

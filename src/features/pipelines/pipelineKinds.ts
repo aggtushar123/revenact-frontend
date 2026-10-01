@@ -54,7 +54,7 @@ export interface PipelineKind {
   dateLabel: string;
   /** "Closes in 12d" / "Due in 12d". */
   dateVerb: string;
-  /** A closed item past its date: "Expected 5 Sep 2026" / "Was due 5 Sep 2026". */
+  /** A closed item's date, past or ahead: "Expected 5 Sep 2026" / "Due by 5 Sep 2026". */
   pastLabel: string;
   sortDateLabel: string;
   monthLabel: string;
@@ -93,7 +93,7 @@ export const RISKS_KIND: PipelineKind = {
   collapsedStages: [],
   dateLabel: 'Due by',
   dateVerb: 'Due',
-  pastLabel: 'Was due',
+  pastLabel: 'Due by',
   sortDateLabel: 'Due date',
   monthLabel: 'Due month',
   tiles: { open: 'MRR at risk', within: 'Due', done: 'Mitigated this quarter' },
@@ -158,11 +158,13 @@ export function parentHref(parent: PipelineRow['parent']): string {
 }
 
 /** The date line (spec §1): "Closes in 12d", "Overdue 5d", "No date"
- *  (risks "Due in 12d"); "Closes today" at 0; a closed item past its date
- *  says when it was expected (plan Decision 4). */
+ *  (risks "Due in 12d"); "Closes today" at 0; a closed item, whether its
+ *  date has passed or not, names the date (plan Decision 4), so it never
+ *  reads as if it will still close. */
 export function dateText(kind: PipelineKind, date: PipelineRow['date'], open: boolean): string {
   if (date.value === null || date.days === null) return 'No date';
-  if (date.days < 0) return open ? `Overdue ${-date.days}d` : `${kind.pastLabel} ${formatDate(date.value)}`;
+  if (!open) return `${kind.pastLabel} ${formatDate(date.value)}`;
+  if (date.days < 0) return `Overdue ${-date.days}d`;
   if (date.days === 0) return `${kind.dateVerb} today`;
   return `${kind.dateVerb} in ${date.days}d`;
 }

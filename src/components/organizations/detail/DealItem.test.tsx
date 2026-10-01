@@ -76,7 +76,7 @@ describe('DealItem (spec 2026-09-27 §3)', () => {
       </Provider>,
     );
     expect(screen.getByText('Expected 5 Sep 2026')).toHaveClass('text-ink-muted');
-    expect(screen.getByText('Was due 5 Sep 2026')).toHaveClass('text-ink-muted');
+    expect(screen.getByText('Due by 5 Sep 2026')).toHaveClass('text-ink-muted');
     expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
   });
 });

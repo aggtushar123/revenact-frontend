@@ -41,7 +41,14 @@ describe('the two Pipelines kinds', () => {
     expect(dateText(OPPORTUNITIES_KIND, { value: '2026-09-30', days: 0 }, true)).toBe('Closes today');
     expect(dateText(RISKS_KIND, { value: '2026-10-20', days: 20 }, true)).toBe('Due in 20d');
     expect(dateText(OPPORTUNITIES_KIND, { value: '2026-09-05', days: -25 }, false)).toBe('Expected 5 Sep 2026');
-    expect(dateText(RISKS_KIND, { value: '2026-09-05', days: -25 }, false)).toBe('Was due 5 Sep 2026');
+    expect(dateText(RISKS_KIND, { value: '2026-09-05', days: -25 }, false)).toBe('Due by 5 Sep 2026');
+  });
+
+  it('names the date of a closed item whose date is today or still ahead, never as if it will close', () => {
+    expect(dateText(OPPORTUNITIES_KIND, { value: '2026-10-12', days: 12 }, false)).toBe('Expected 12 Oct 2026');
+    expect(dateText(OPPORTUNITIES_KIND, { value: '2026-09-30', days: 0 }, false)).toBe('Expected 30 Sep 2026');
+    expect(dateText(RISKS_KIND, { value: '2026-10-20', days: 20 }, false)).toBe('Due by 20 Oct 2026');
+    expect(dateText(RISKS_KIND, { value: '2026-09-30', days: 0 }, false)).toBe('Due by 30 Sep 2026');
   });
 
   it('counts whole calendar days, across a daylight-saving change', () => {
@@ -80,6 +87,10 @@ describe('the two Pipelines kinds', () => {
     expect(dealDateLine({ ...opportunityRecord(emeaSeats), expected_close: undefined }, '2026-09-30')).toEqual({ text: 'No date', overdue: false });
     expect(dealDateLine({ ...opportunityRecord(globexUplift), stage: 'closed_lost' }, '2026-09-30')).toEqual({
       text: 'Expected 25 Sep 2026',
+      overdue: false,
+    });
+    expect(dealDateLine({ ...riskRecord(adminLeft), stage: 'mitigated' }, '2026-09-30')).toEqual({
+      text: 'Due by 20 Oct 2026',
       overdue: false,
     });
   });
