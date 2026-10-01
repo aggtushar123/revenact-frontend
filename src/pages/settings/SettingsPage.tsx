@@ -131,10 +131,11 @@ export function SettingsPage() {
           ) : activeSubTab === 'Pipeline' ? (
             <>
               {/* Opportunities/Risks — the Pipelines board's own two
-                  entities, same sub-tab convention as that board itself
-                  (pages/pipelines/PipelinesPage.tsx) rather than one
-                  combined list, which would collide on field names
-                  (stage/priority/mrr exist, distinctly, on both). */}
+                  entities, same sub-tab convention as the Pipelines
+                  portfolio itself (pages/pipelines/List.tsx and
+                  Board.tsx) rather than one combined list, which would
+                  collide on field names (stage/priority/mrr exist,
+                  distinctly, on both). */}
               <div className="px-8 pb-3 flex items-center gap-4 border-b border-line-subtle shrink-0">
                 <button
                   onClick={() => setPipelineEntity('Opportunities')}

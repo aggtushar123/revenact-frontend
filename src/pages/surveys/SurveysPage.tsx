@@ -26,9 +26,10 @@ const STATUS_LABEL_COLOR: Record<Survey['status'], string> = {
 
 // Structurally lighter than Health/Lifecycle — no currency dimension,
 // so no COUNT/MRR-style toggle needed. Rollup cards are computed
-// client-side from the same unpaginated `surveys` list PipelinesPage's
-// own "Pipelines Overview" banner uses for its totals — no separate
-// stats endpoint (see SurveyListView's own docstring on the backend).
+// client-side from the same unpaginated `surveys` list held for this
+// page — no separate stats endpoint (see SurveyListView's own docstring
+// on the backend; unlike this page's rollups, the Pipelines portfolio's
+// tiles are computed server-side, from `summary`).
 export function SurveysPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -49,8 +50,7 @@ export function SurveysPage() {
     dispatch(fetchSurveys(customerId ?? undefined));
   }, [dispatch, customerId]);
   useEffect(() => {
-    // The company pickers (Log Survey, and the organization filter) — same
-    // source as PipelinesPage's own Add Opportunity/Add Risk.
+    // The company pickers (Log Survey, and the organization filter).
     dispatch(fetchCustomers());
   }, [dispatch]);
 

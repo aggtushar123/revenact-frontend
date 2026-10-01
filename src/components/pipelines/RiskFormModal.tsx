@@ -11,15 +11,7 @@ import {
 } from '../../features/customers/customersSlice';
 import type { Risk } from '../../features/customers/customersSlice';
 import { companyLabel } from '../../features/customers/formatters';
-
-// Matches Risk.Stage on the backend exactly (services/customers/
-// models.py) — the board's own 4 Risk Kanban columns, in the same order.
-const STAGE_OPTIONS: { value: Risk['stage']; label: string }[] = [
-  { value: 'open', label: 'Open' },
-  { value: 'mitigated', label: 'Mitigated' },
-  { value: 'realised', label: 'Realised' },
-  { value: 'abandoned', label: 'Abandoned' },
-];
+import { RISK_STAGES } from '../../features/pipelines/pipelineKinds';
 
 interface RiskFormModalProps {
   /** Present for Edit, omitted for Add. */
@@ -33,25 +25,30 @@ interface RiskFormModalProps {
    * `companies` prop. */
   companies?: { id: number; name: string }[];
   /** Add-only: a fixed Customer to create the new risk under — set when
-   * opened from the Organization/Account Details page's own Pipelines
-   * tab (see PipelinesTab.tsx), skipping the Company picker entirely,
+   * opened from the Organization/Account Details page's own Deals & risks
+   * tab (see DealsTab.tsx), skipping the Company picker entirely,
    * same as OpportunityFormModal's own `customerId` prop. Ignored for
    * Edit. */
   customerId?: number;
   /** Add-only: set together with a fixed `customerId` when opened from
-   * the standalone Account page's own Pipelines tab — creates an
+   * the standalone Account page's own Deals & risks tab — creates an
    * account-level Risk instead of an organisation-level one, and hides
    * the Account picker below (already inside one specific account's
    * own context). */
   accountId?: number;
+  /** Add-only: replaces the Company select with the caller's own "where it
+   * belongs" field (the Pipelines portfolio's — List and Board's —
+   * server-searched picker), which sets `customerId` or `accountId`
+   * above as the viewer picks. */
+  parentField?: ReactNode;
   onClose: () => void;
   /** Edit-only: shows a "Delete" button that hands off to the caller,
    * same separation as OpportunityFormModal's own. */
   onDeleteRequest?: () => void;
-  /** Called after a successful *create* only, and only when this modal
-   * is scoped to a fixed `customerId`/`accountId` — same "caller
-   * refetches, the standalone board's own Add doesn't need it"
-   * reasoning as OpportunityFormModal's own `onSaved`. */
+  /** Called after every successful save (an add or an edit), so the caller
+   * can read its own list again: the Deals & risks tab after a scoped add,
+   * the Pipelines portfolio (List and Board) after any add or edit (plan
+   * 2026-10-01 Decision 8). */
   onSaved?: () => void;
 }
 
@@ -66,6 +63,7 @@ export function RiskFormModal({
   companies,
   customerId,
   accountId,
+  parentField,
   onClose,
   onDeleteRequest,
   onSaved,
@@ -77,6 +75,7 @@ export function RiskFormModal({
   const [mrr, setMrr] = useState(risk?.mrr ?? '');
   const [stage, setStage] = useState<Risk['stage']>(risk?.stage ?? defaultStage ?? 'open');
   const [priority, setPriority] = useState<Risk['priority']>(risk?.priority ?? 'medium');
+  const [dueBy, setDueBy] = useState(risk?.due_by ?? '');
   const myFunction = useAppSelector((s) => s.auth.user?.function ?? '');
   const [department, setDepartment] = useState<UserFunction | ''>(risk?.department ?? myFunction);
   const [selectedCompanyId, setSelectedCompanyId] = useState(customerId ? String(customerId) : '');
@@ -120,20 +119,20 @@ export function RiskFormModal({
     setError(null);
 
     if (!isEdit && customerId === undefined && accountId === undefined && !selectedCompanyId) {
-      setError('Pick a company.');
+      setError(parentField ? 'Pick where it belongs.' : 'Pick a company.');
       return;
     }
 
     setIsSaving(true);
-    const data = { title: title.trim(), mrr: mrr.trim() || '0', stage, priority, department };
+    const data = { title: title.trim(), mrr: mrr.trim() || '0', stage, priority, department, due_by: dueBy || null };
     try {
       if (isEdit) {
-        // No onSaved() — updateRisk's own extraReducers already patch
-        // every list this Risk could be showing in.
+        // updateRisk's own extraReducers patch every list this Risk could be
+        // showing in; onSaved() below reloads a page's own book.
         await dispatch(updateRisk({ id: risk.id, ...data })).unwrap();
       } else if (customerId !== undefined) {
         // Scoped to a fixed Customer/Account (the Details page's own
-        // Pipelines tab) — createRiskForCustomer/createRiskForAccount
+        // Deals & risks tab) — createRiskForCustomer/createRiskForAccount
         // don't patch Redux themselves, so the caller refetches via
         // onSaved() below.
         if (accountId !== undefined) {
@@ -145,11 +144,9 @@ export function RiskFormModal({
         } else {
           await dispatch(createRiskForCustomer({ customerId, ...data })).unwrap();
         }
-        onSaved?.();
       } else if (customerId === undefined && accountId !== undefined) {
         // The account page: no organisation id, the flat account route.
         await dispatch(createRiskForAccount({ accountId, ...data })).unwrap();
-        onSaved?.();
       } else if (selectedAccountId) {
         // The standalone board's own Add — createRisk's own
         // extraReducers already unshift straight into `risks`, no
@@ -158,6 +155,7 @@ export function RiskFormModal({
       } else {
         await dispatch(createRisk({ customerId: Number(selectedCompanyId), ...data })).unwrap();
       }
+      onSaved?.();
       onClose();
     } catch (err) {
       setError(
@@ -196,6 +194,8 @@ export function RiskFormModal({
                 {risk.account_name ? ` • ${risk.account_name}` : ''}
               </p>
             </div>
+          ) : parentField ? (
+            parentField
           ) : customerId === undefined && accountId === undefined ? (
             <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
               <option value="">Select a company…</option>
@@ -210,7 +210,7 @@ export function RiskFormModal({
           {/* A Risk can be organisation-level or belong to one
               specific Account — hidden for Edit (can't move between
               parents) and when `accountId` is already fixed (the
-              standalone Account page's own Pipelines tab — already
+              standalone Account page's own Deals & risks tab — already
               inside one specific account, nothing to pick). */}
           {!isEdit && accountId === undefined && effectiveCompanyId !== undefined && (
             <SelectField label="Account (optional)" value={selectedAccountId} onChange={setSelectedAccountId}>
@@ -241,12 +241,14 @@ export function RiskFormModal({
           </SelectField>
 
           <SelectField label="Stage" value={stage} onChange={(v) => setStage(v as Risk['stage'])}>
-            {STAGE_OPTIONS.map((opt) => (
+            {RISK_STAGES.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </SelectField>
+
+          <DateField label="Due by" value={dueBy} onChange={setDueBy} />
 
           {error && (
             <div className="flex items-center gap-2 text-[12px] text-danger">
@@ -355,6 +357,24 @@ function SelectField({
       >
         {children}
       </select>
+    </div>
+  );
+}
+
+function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const id = useId();
+  return (
+    <div>
+      <label htmlFor={id} className="block text-[12px] font-semibold text-ink-muted mb-1">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3 py-2 bg-subtle border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent transition-all"
+      />
     </div>
   );
 }

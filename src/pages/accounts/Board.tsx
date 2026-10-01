@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { X } from 'lucide-react';
 import { useOrgCurrency } from '../../hooks';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
 import { exportAccountPortfolio, fetchAccountPortfolio } from '../../features/accounts/portfolioApi';
@@ -9,12 +8,12 @@ import { ACCOUNT_KIND } from '../../components/accounts/portfolio/accountKind';
 import { AccountSheet } from '../../components/organizations/portfolio/AccountSheet';
 import { AccountSidePanel } from '../../components/organizations/portfolio/AccountSidePanel';
 import type { BoardMove } from '../../components/organizations/portfolio/boardMove';
+import { DismissibleAlert } from '../../components/organizations/portfolio/DismissibleAlert';
 import { FilterChips } from '../../components/organizations/portfolio/FilterChips';
 import { PortfolioBoard } from '../../components/organizations/portfolio/PortfolioBoard';
 import { PortfolioKindContext } from '../../components/organizations/portfolio/portfolioKind';
 import { PortfolioToolbar } from '../../components/organizations/portfolio/PortfolioToolbar';
 import { SummaryTiles } from '../../components/organizations/portfolio/SummaryTiles';
-import { FOCUS } from '../../components/organizations/portfolio/styles';
 import { useBoardMove } from '../../components/organizations/portfolio/useBoardMove';
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
@@ -23,8 +22,6 @@ import { useBoardRail } from '../organizations/ask/useBoardRail';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
 import { useReportAccountsOptions } from './ask/accountsNames';
 import { useAccountEditing } from './useAccountEditing';
-
-const DISMISS = `inline-flex w-11 h-11 sm:w-8 sm:h-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-subtle active:bg-line-subtle ${FOCUS}`;
 
 /** /accounts/board: the Accounts portfolio as columns (spec 2026-09-29 §1
  *  "Board"), the Organizations board's components with ACCOUNT_KIND. The
@@ -194,22 +191,8 @@ function AccountsBoard() {
               searchRef.current?.focus();
             }}
           />
-          {notice ? (
-            <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
-              {notice}
-              <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className={DISMISS}>
-                <X className="w-4 h-4" aria-hidden="true" />
-              </button>
-            </p>
-          ) : null}
-          {board.error ? (
-            <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
-              {board.error}
-              <button type="button" onClick={board.dismissError} aria-label="Dismiss" className={DISMISS}>
-                <X className="w-4 h-4" aria-hidden="true" />
-              </button>
-            </p>
-          ) : null}
+          {notice ? <DismissibleAlert message={notice} onDismiss={() => setNotice(null)} /> : null}
+          {board.error ? <DismissibleAlert message={board.error} onDismiss={board.dismissError} /> : null}
           <p role="status" aria-live="polite" className="sr-only">
             {board.notice ?? ''}
           </p>

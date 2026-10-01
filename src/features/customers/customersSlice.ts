@@ -483,7 +483,7 @@ export interface ContactWritePayload {
 
 // Mirrors revenact-backend's OpportunitySerializer field-for-field —
 // see docs/API_CONTRACTS.md -> customers -> Opportunity. `stage` is
-// the standalone Pipelines board's own 6 Kanban columns; `avatar`-style
+// the standalone Pipelines board's own 7 Kanban columns; `avatar`-style
 // `orgColor`/`orgInitials` from the old mock aren't fields here at all
 // — EntityAvatar derives both from `companies`/`account_name` on the
 // frontend, same as every other entity's avatar in this codebase.
@@ -495,7 +495,7 @@ export interface Opportunity {
   title: string;
   mrr: string;
   stage: 'discovery' | 'qualification' | 'solution_validation' | 'proposal_price_review' |
-    'negotiation' | 'closed_won';
+    'negotiation' | 'closed_won' | 'closed_lost';
   stage_display: string;
   priority: 'high' | 'medium' | 'low';
   priority_display: string;
@@ -508,6 +508,11 @@ export interface Opportunity {
   account_name: string | null;
   /** The account it is on; null on the organization itself. */
   account_id?: number | null;
+  /** Expected close, YYYY-MM-DD, or null ("No date"). The API always sends
+   *  it (since 2026-09-30); optional because older fixtures omit it. */
+  expected_close?: string | null;
+  /** When the stage last changed (creation included). Read-only. */
+  stage_changed_at?: string;
 }
 
 // The fields the Add/Edit Opportunity form actually exposes.
@@ -517,12 +522,13 @@ export interface OpportunityWritePayload {
   stage?: Opportunity['stage'];
   priority?: Opportunity['priority'];
   department?: UserFunction | '';
+  expected_close?: string | null;
 }
 
 // Mirrors revenact-backend's RiskSerializer field-for-field — see
 // docs/API_CONTRACTS.md -> customers -> Risk. Field-for-field identical
 // to Opportunity above except `stage`, which is the board's own 4 Risk
-// Kanban columns rather than Opportunity's 6.
+// Kanban columns rather than Opportunity's 7.
 export interface Risk {
   id: number;
   title: string;
@@ -540,6 +546,11 @@ export interface Risk {
   account_name: string | null;
   /** The account it is on; null on the organization itself. */
   account_id?: number | null;
+  /** Due by, YYYY-MM-DD, or null ("No date"). The API always sends it
+   *  (since 2026-09-30); optional because older fixtures omit it. */
+  due_by?: string | null;
+  /** When the stage last changed (creation included). Read-only. */
+  stage_changed_at?: string;
 }
 
 // The fields the Add/Edit Risk form actually exposes.
@@ -549,6 +560,7 @@ export interface RiskWritePayload {
   stage?: Risk['stage'];
   priority?: Risk['priority'];
   department?: UserFunction | '';
+  due_by?: string | null;
 }
 
 // Mirrors revenact-backend's SurveySerializer field-for-field — see
@@ -1950,7 +1962,7 @@ export const deleteCanvas = createAsyncThunk<number, number, { rejectValue: stri
   }
 );
 
-// Powers the Organization Details page's own Pipelines tab — every
+// Powers the Organization Details page's own Deals & risks tab — every
 // Opportunity rolled up for one Customer (organisation-level and every
 // one of its Accounts' — see CustomerOpportunityListView's own
 // docstring), same reasoning as fetchContactsForCustomer above.
@@ -1967,7 +1979,7 @@ export const fetchOpportunitiesForCustomer = createAsyncThunk<
   }
 });
 
-// Powers the standalone Account page's own Pipelines tab — every
+// Powers the standalone Account page's own Deals & risks tab — every
 // account-level Opportunity for one Account.
 export const fetchOpportunitiesForAccount = createAsyncThunk<
   Opportunity[],
@@ -1986,7 +1998,7 @@ export const fetchOpportunitiesForAccount = createAsyncThunk<
 );
 
 // Adds an organization-level Opportunity under `customerId` — used by
-// the Organization Details page's own Pipelines tab. No extraReducers
+// the Organization Details page's own Deals & risks tab. No extraReducers
 // case, same "caller refetches" reasoning as createContactForCustomer
 // — this thunk doesn't know whether the caller is a scoped Details-page
 // tab (`pipelineOpportunities`) or something else, so it can't safely
@@ -2011,7 +2023,7 @@ export const createOpportunityForCustomer = createAsyncThunk<
 );
 
 // Adds an account-level Opportunity under `accountId` — used by the
-// standalone Account page's own Pipelines tab. Same "caller refetches"
+// standalone Account page's own Deals & risks tab. Same "caller refetches"
 // reasoning as createOpportunityForCustomer above.
 export const createOpportunityForAccount = createAsyncThunk<
   Opportunity,
@@ -2312,7 +2324,7 @@ const customersSlice = createSlice({
       state.selectedCustomerError = null;
     },
     // Same reasoning as clearContacts above, for the Organization/
-    // Account Details page's own Pipelines tab.
+    // Account Details page's own Deals & risks tab.
     clearPipelineData(state) {
       state.pipelineOpportunities = [];
       state.pipelineOpportunitiesFor = null;
@@ -2918,7 +2930,7 @@ const customersSlice = createSlice({
       })
       // createOpportunityForCustomer/createOpportunityForAccount's own
       // rejections are shown inline in the form instead — no .rejected
-      // case needed, and no .fulfilled case either: PipelinesTab
+      // case needed, and no .fulfilled case either: DealsTab
       // refetches its own `pipelineOpportunities` after a successful
       // create (see createOpportunityForCustomer's own docstring).
       .addCase(fetchRisks.pending, (state) => {

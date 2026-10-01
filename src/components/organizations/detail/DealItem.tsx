@@ -1,17 +1,24 @@
 import { useOrgCurrency } from '../../../hooks';
 import type { Opportunity, Risk } from '../../../features/customers/customersSlice';
 import { formatMoney } from '../../../features/customers/formatters';
+import { localDay } from '../../../features/organizations/storyDays';
+import { dealDateLine } from '../../../features/pipelines/pipelineKinds';
 import { PRIORITY_COLORS } from '../../pipelines/kanbanConfig';
+import { DateLine, PipelineSignal } from '../../pipelines/portfolio/itemParts';
 import { FOCUS } from '../portfolio/styles';
 import { AccountTag } from './ListParts';
 import { META } from './listStyles';
 
+const OVERDUE = { kind: 'overdue', label: 'Overdue' } as const;
+
 /** One opportunity or risk (spec 2026-09-27 §3): the title and its MRR,
- *  then stage, priority, department and the account tag. The whole item
- *  opens the record's existing edit form. Priority is the only colour: it
- *  carries severity. */
-export function DealItem({ deal, onOpen }: { deal: Opportunity | Risk; onOpen: () => void }) {
+ *  then stage, priority, department, the account tag and (pipelines spec
+ *  2026-09-30 §1) the date line with the Overdue signal. The whole item
+ *  opens the record's existing edit form. Priority and Overdue are the only
+ *  colours: they carry severity. `today` is the viewer's (tests pin it). */
+export function DealItem({ deal, onOpen, today = localDay(new Date()) }: { deal: Opportunity | Risk; onOpen: () => void; today?: string }) {
   const currency = useOrgCurrency();
+  const date = dealDateLine(deal, today);
   return (
     <li data-deal={deal.id}>
       <button
@@ -30,6 +37,8 @@ export function DealItem({ deal, onOpen }: { deal: Opportunity | Risk; onOpen: (
           <span className={`rounded-full border px-2 py-0.5 ${PRIORITY_COLORS[deal.priority]}`}>{deal.priority_display} priority</span>
           <span>{deal.department ? deal.department_display : 'Whole company'}</span>
           <AccountTag record={deal} />
+          <DateLine text={date.text} overdue={date.overdue} />
+          {date.overdue ? <PipelineSignal signal={OVERDUE} /> : null}
         </span>
       </button>
     </li>

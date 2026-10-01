@@ -45,4 +45,38 @@ describe('DealItem (spec 2026-09-27 §3)', () => {
     await userEvent.click(button);
     expect(onOpen).toHaveBeenCalledOnce();
   });
+
+  it('adds the date line, and marks an open item past its date Overdue (pipelines spec §1)', () => {
+    render(
+      <Provider store={makeDetailStore()}>
+        <ul>
+          <DealItem deal={{ ...OPPORTUNITIES[0], expected_close: '2026-09-25' }} onOpen={vi.fn()} today="2026-09-30" />
+          <DealItem deal={{ ...RISKS[0], due_by: '2026-10-20' }} onOpen={vi.fn()} today="2026-09-30" />
+          <DealItem deal={OPPORTUNITIES[1]} onOpen={vi.fn()} today="2026-09-30" />
+        </ul>
+      </Provider>,
+    );
+    expect(screen.getByText('Overdue 5d')).toHaveClass('text-danger');
+    expect(screen.getByText('Overdue')).toHaveClass('bg-danger-dim');
+    expect(screen.getByText('Due in 20d')).toBeInTheDocument();
+    expect(screen.getByText('No date')).toBeInTheDocument();
+  });
+
+  it('names the date a closed item passed, with no Overdue', () => {
+    render(
+      <Provider store={makeDetailStore()}>
+        <ul>
+          <DealItem
+            deal={{ ...OPPORTUNITIES[1], stage: 'closed_lost', stage_display: 'Closed Lost', expected_close: '2026-09-05' }}
+            onOpen={vi.fn()}
+            today="2026-09-30"
+          />
+          <DealItem deal={{ ...RISKS[0], stage: 'mitigated', stage_display: 'Mitigated', due_by: '2026-09-05' }} onOpen={vi.fn()} today="2026-09-30" />
+        </ul>
+      </Provider>,
+    );
+    expect(screen.getByText('Expected 5 Sep 2026')).toHaveClass('text-ink-muted');
+    expect(screen.getByText('Due by 5 Sep 2026')).toHaveClass('text-ink-muted');
+    expect(screen.queryByText('Overdue')).not.toBeInTheDocument();
+  });
 });

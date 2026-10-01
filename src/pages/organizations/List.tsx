@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useAppSelector, useOrgCurrency } from '../../hooks';
 import { apiFetch } from '../../lib/apiClient';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
@@ -6,6 +6,7 @@ import type { Customer } from '../../features/customers/customersSlice';
 import { useMembers } from '../../features/knowledge/useMembers';
 import { LIFECYCLE_TARGETS, ownerTargets } from '../../features/organizations/bulkTargets';
 import { bulkUpdate, exportPortfolio } from '../../features/organizations/portfolioApi';
+import { ORGANIZATION_NOUN } from '../../features/organizations/portfolioLabels';
 import { hasFilters, toApiQuery, type PortfolioParams } from '../../features/organizations/portfolioParams';
 import type { BulkAction, PortfolioRow } from '../../features/organizations/portfolioTypes';
 import { OrganizationFormModal } from '../../components/organizations/OrganizationFormModal';
@@ -17,13 +18,13 @@ import { AccountSheet } from '../../components/organizations/portfolio/AccountSh
 import { FilterChips } from '../../components/organizations/portfolio/FilterChips';
 import { PortfolioSections } from '../../components/organizations/portfolio/PortfolioSections';
 import { PortfolioToolbar } from '../../components/organizations/portfolio/PortfolioToolbar';
-import { SelectionBar, type BulkReport } from '../../components/organizations/portfolio/SelectionBar';
+import { SelectionBar } from '../../components/organizations/portfolio/SelectionBar';
 import { SummaryTiles } from '../../components/organizations/portfolio/SummaryTiles';
 import { usePins } from '../../components/organizations/portfolio/usePins';
 import type { PortfolioRowRenderer } from '../../components/organizations/portfolio/PortfolioSections';
 import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
-import { useSelection } from '../../components/organizations/portfolio/useSelection';
+import { usePortfolioBulk } from '../../components/organizations/portfolio/usePortfolioBulk';
 import { useReportPortfolioOptions } from './ask/portfolioOptions';
 import { useAskFocusOnOpen } from './ask/useAskFocus';
 import { OrganizationsFrame } from './OrganizationsFrame';
@@ -61,56 +62,26 @@ export function List() {
   const portfolio = usePortfolio(params, version, onRowsLoaded);
   const { pins, toggle: togglePin } = usePins();
   const members = useMembers();
-  const selection = useSelection();
-  const { prune, clear: clearSelection } = selection;
   const searchRef = useRef<HTMLInputElement>(null);
-  const grouped = params.group !== '';
-
-  // One selection rule (spec §1): a different list landing (`loadedQuery`
-  // changed: a filter, sort or group change) resets the selection. Grouped,
-  // there is no one full row set to prune against (the frame is a limit=1
-  // read), so it clears. Ungrouped, it prunes to the new page one's rows.
-  // A reload of the same query (the version bump after a bulk action, Edit
-  // details or Try again) keeps it, so the ids a bulk action failed on stay
-  // selected for a retry, even ones from a Show-more page. The last bulk
-  // report goes with it either way. Adjusted during render, not in an effect.
-  const { loadedQuery } = portfolio;
-  const [seenQuery, setSeenQuery] = useState(loadedQuery);
-  const [report, setReport] = useState<BulkReport | null>(null);
-  if (seenQuery !== loadedQuery) {
-    setSeenQuery(loadedQuery);
-    if (grouped) clearSelection();
-    else prune(portfolio.rows.map((row) => row.id));
-    setReport(null);
-  }
-  // Read by runBulk after its await: the query that is loaded by then.
-  const loadedQueryRef = useRef(loadedQuery);
-  useLayoutEffect(() => {
-    loadedQueryRef.current = loadedQuery;
-  });
 
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [churning, setChurning] = useState<Targets | null>(null);
   const [archiving, setArchiving] = useState<Targets | null>(null);
-  const [exporting, setExporting] = useState(false);
-  const [actionRunning, setActionRunning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  // Phones: the toolbar's Select toggle shows the checkboxes without a
-  // long press. Turning it off ends selection mode, clearing the selection.
-  const [selectMode, setSelectMode] = useState(false);
-  const selecting = selection.selecting || (selectMode && !isSm);
-  // On whenever selection mode is, however it started (toggle or long press);
-  // turning it off always ends the mode and clears the selection.
-  const toggleSelectMode = () => {
-    if (selecting) {
-      selection.clear();
-      setReport(null);
-      setSelectMode(false);
-    } else {
-      setSelectMode(true);
-    }
-  };
+  // The selection, bulk edits and exports: the portfolios' shared rules.
+  const { selection, selecting, toggleSelectMode, endSelection, report, exporting, actionRunning, activity, runExport, runBulk } =
+    usePortfolioBulk<BulkAction, number | string | null>({
+      book: portfolio,
+      grouped: params.group !== '',
+      isSm,
+      noun: ORGANIZATION_NOUN,
+      nameOf,
+      bulk: bulkUpdate,
+      exportRows: exportPortfolio,
+      reload,
+      setNotice,
+    });
 
   const currency = portfolio.data?.currency ?? orgCurrency;
   const options = portfolio.data?.filters ?? null;
@@ -130,42 +101,6 @@ export function List() {
       setNotice(errorMessage(err, 'Could not open this organization for editing.'));
     }
   }, []);
-
-  const runExport = async (query: string) => {
-    setExporting(true);
-    setNotice(null);
-    try {
-      await exportPortfolio(query);
-    } catch (err) {
-      setNotice(errorMessage(err, 'Could not export organizations.'));
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const runBulk = async (action: BulkAction, value: number | string | null) => {
-    const ids = [...selection.selected];
-    const startQuery = loadedQueryRef.current;
-    setActionRunning(true);
-    setReport(null);
-    try {
-      const result = await bulkUpdate({ ids, action, value });
-      setReport({
-        updated: result.updated.length,
-        failed: result.failed.map((failure) => ({ ...failure, name: nameOf(failure.id) })),
-      });
-      // Failures stay selected, so they can be retried, unless a different
-      // list landed meanwhile (the query changed while this ran): these ids
-      // may no longer be listed, so nothing stays selected.
-      if (loadedQueryRef.current === startQuery) selection.replace(result.failed.map((failure) => failure.id));
-      else selection.clear();
-    } catch (err) {
-      setReport({ updated: 0, failed: [], error: errorMessage(err, 'Could not update these organizations.') });
-    } finally {
-      setActionRunning(false);
-      reload();
-    }
-  };
 
   const targets = (): Targets => {
     const ids = [...selection.selected];
@@ -262,7 +197,7 @@ export function List() {
           count={selection.selected.size}
           owners={ownerTargets(members)}
           lifecycles={LIFECYCLE_TARGETS}
-          activity={actionRunning ? 'applying' : exporting ? 'exporting' : null}
+          activity={activity}
           loading={portfolio.loading}
           report={report}
           onSetOwner={(id) => void runBulk('set_owner', id)}
@@ -272,11 +207,7 @@ export function List() {
           }
           onArchive={() => setArchiving(targets())}
           onChurn={() => setChurning(targets())}
-          onClose={() => {
-            selection.clear();
-            setReport(null);
-            setSelectMode(false);
-          }}
+          onClose={endSelection}
         />
       </div>
 

@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { CheckSquare, Download, Pin, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { useCallback, useRef, useState, type RefObject } from 'react';
+import { Pin } from 'lucide-react';
 import type { ColumnId } from '../tableData';
 import type { PortfolioParams } from '../../../features/organizations/portfolioParams';
 import type { FilterOptions } from '../../../features/organizations/portfolioTypes';
 import { FiltersPanel, GroupSortControls, type GroupOption } from './FiltersPanel';
 import { PinFieldsMenu } from './PinFieldsMenu';
 import { usePortfolioKind } from './portfolioKind';
-import { BUTTON, FOCUS } from './styles';
+import { BUTTON } from './styles';
+import { FiltersTrigger, SelectToggle, ToolbarActions, ToolbarSearch } from './toolbarParts';
+import { useSearchText } from './useSearchText';
 
 const LABEL = 'Search by name or Revenact ID';
 
@@ -54,19 +56,8 @@ export function PortfolioToolbar({
 }) {
   const kind = usePortfolioKind();
   // The box shows what is typed; the URL gets it 300ms after typing stops.
-  // A chip or "Clear all" changing the URL resets the box (adjusted during
-  // render, not in an effect).
-  const [text, setText] = useState(params.search);
-  const [synced, setSynced] = useState(params.search);
-  if (params.search !== synced) {
-    setSynced(params.search);
-    setText(params.search);
-  }
-  useEffect(() => {
-    if (text.trim() === params.search) return;
-    const timeout = window.setTimeout(() => update({ search: text.trim() }), 300);
-    return () => window.clearTimeout(timeout);
-  }, [text, params.search, update]);
+  const commitSearch = useCallback((search: string) => update({ search }), [update]);
+  const [text, setText] = useSearchText(params.search, commitSearch);
 
   const [open, setOpen] = useState<'filters' | 'pins' | null>(null);
   const close = useCallback(() => setOpen(null), []);
@@ -76,47 +67,18 @@ export function PortfolioToolbar({
 
   return (
     <div className="relative flex flex-wrap items-center gap-2">
-      <label className="relative min-w-0 flex-1 sm:min-w-[12rem] sm:max-w-sm">
-        <span className="sr-only">{LABEL}</span>
-        <Search className="pointer-events-none absolute left-3 top-1/2 w-4 h-4 -translate-y-1/2 text-ink-faint" aria-hidden="true" />
-        <input
-          ref={searchRef}
-          type="search"
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          placeholder={isSm ? LABEL : 'Search'}
-          className={`w-full min-h-11 sm:min-h-9 rounded-lg border border-line bg-surface pl-9 pr-3 text-[13px] text-ink placeholder:text-ink-faint hover:border-line-strong ${FOCUS}`}
-        />
-      </label>
+      <ToolbarSearch label={LABEL} searchRef={searchRef} value={text} onChange={setText} isSm={isSm} />
 
       {isSm ? <GroupSortControls params={params} update={update} groupOptions={groupOptions} /> : null}
 
-      <button
-        ref={filtersTriggerRef}
-        type="button"
-        aria-expanded={open === 'filters'}
-        aria-haspopup="dialog"
+      <FiltersTrigger
+        triggerRef={filtersTriggerRef}
+        open={open === 'filters'}
         onClick={() => setOpen(open === 'filters' ? null : 'filters')}
-        className={BUTTON}
-      >
-        <SlidersHorizontal className="w-4 h-4" aria-hidden="true" />
-        Filters
-        {count > 0 ? (
-          <span className="rounded-full bg-accent px-1.5 font-mono-brand tabular-nums text-[11px] text-on-accent">{count}</span>
-        ) : null}
-      </button>
+        count={count}
+      />
 
-      {!isSm && onToggleSelectMode ? (
-        <button
-          type="button"
-          aria-pressed={selectMode}
-          onClick={onToggleSelectMode}
-          className={`${BUTTON} ${selectMode ? 'bg-accent-dim' : ''}`}
-        >
-          <CheckSquare className="w-4 h-4" aria-hidden="true" />
-          Select
-        </button>
-      ) : null}
+      {!isSm && onToggleSelectMode ? <SelectToggle pressed={selectMode} onClick={onToggleSelectMode} /> : null}
 
       {isSm ? (
         <>
@@ -126,18 +88,7 @@ export function PortfolioToolbar({
               Pin fields
             </button>
           ) : null}
-          <button type="button" onClick={onExport} disabled={exporting} className={BUTTON}>
-            <Download className="w-4 h-4" aria-hidden="true" />
-            {exporting ? 'Exporting…' : 'Export'}
-          </button>
-          <button
-            type="button"
-            onClick={onAdd}
-            className={`inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-accent px-3 text-[13px] font-semibold text-on-accent hover:bg-accent-hover active:opacity-90 ${FOCUS}`}
-          >
-            <Plus className="w-4 h-4" aria-hidden="true" />
-            {`Add ${kind.noun.one}`}
-          </button>
+          <ToolbarActions onExport={onExport} exporting={exporting} onAdd={onAdd} addLabel={`Add ${kind.noun.one}`} />
         </>
       ) : null}
 

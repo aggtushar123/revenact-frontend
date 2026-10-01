@@ -3,16 +3,24 @@
 // (Task 13). Fast refresh doesn't apply to this module, same precedent as
 // rowParts.tsx and AccountDetails.tsx.
 /* eslint-disable react-refresh/only-export-components */
-import { useId, useState, type ReactNode } from 'react';
+import { useCallback, useId, useState, type ReactNode } from 'react';
 import { ChevronRight, Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
-import { capitalise } from '../../../features/organizations/portfolioLabels';
+import { capitalise, type PortfolioNoun } from '../../../features/organizations/portfolioLabels';
 import { toApiQuery, type PortfolioParams } from '../../../features/organizations/portfolioParams';
-import type { FilterOptions, PortfolioGroup, PortfolioRow, PortfolioRowBase } from '../../../features/organizations/portfolioTypes';
+import type {
+  FilterOptions,
+  PortfolioGroup,
+  PortfolioPage,
+  PortfolioRow,
+  PortfolioRowBase,
+} from '../../../features/organizations/portfolioTypes';
 import { ErrorState } from '../../../pages/dashboard/shared/DataState';
 import { usePortfolioKind } from './portfolioKind';
-import { SECTION_PAGE_SIZE, usePagedPortfolio, type PortfolioState } from './usePortfolio';
+import type { PagedBook } from './usePagedBook';
+import { usePagedRead, type Paged } from './usePagedRead';
+import { SECTION_PAGE_SIZE, type PortfolioState } from './usePortfolio';
 import { FOCUS, QUIET } from './styles';
 
 export function sectionStartsOpen(index: number, total: number): boolean {
@@ -24,14 +32,15 @@ export function sectionStartsOpen(index: number, total: number): boolean {
  *  in flight (spec §1's "disabled while loading" rule). */
 export type PortfolioRowRenderer<R extends PortfolioRowBase = PortfolioRow> = (row: R, state: { loading: boolean }) => ReactNode;
 
-export function RowSkeleton({ count }: { count: number }) {
-  const kind = usePortfolioKind();
+/** Item-shaped loading placeholders, with no page's words: an avatar
+ *  circle first unless `avatar` is false (a Pipelines item has none). */
+export function ItemSkeleton({ count, label, avatar = true }: { count: number; label: string; avatar?: boolean }) {
   return (
-    <div role="status" aria-label={`Loading ${kind.noun.many}`}>
+    <div role="status" aria-label={label}>
       <ul aria-hidden="true" className="flex flex-col gap-1.5">
         {Array.from({ length: Math.max(1, count) }, (_, i) => (
           <li key={i} className="flex items-center gap-3 rounded-xl bg-surface px-3 py-2.5">
-            <span className="h-10 w-10 animate-pulse rounded-full bg-subtle" />
+            {avatar ? <span className="h-10 w-10 animate-pulse rounded-full bg-subtle" /> : null}
             <span className="flex flex-1 flex-col gap-1.5">
               <span className="block h-3 w-40 animate-pulse rounded bg-subtle" />
               <span className="block h-2.5 w-28 animate-pulse rounded bg-subtle" />
@@ -43,6 +52,12 @@ export function RowSkeleton({ count }: { count: number }) {
       </ul>
     </div>
   );
+}
+
+/** The portfolio kind's row placeholders ("Loading organizations"). */
+export function RowSkeleton({ count, label }: { count: number; label?: string }) {
+  const kind = usePortfolioKind();
+  return <ItemSkeleton count={count} label={label ?? `Loading ${kind.noun.many}`} />;
 }
 
 /** Retry renders only when `onRetry` is given — some callers (a shared tab
@@ -72,6 +87,48 @@ export function EmptyState({ title, detail, action }: { title: string; detail: s
   );
 }
 
+/** A book with nothing in it: filters that match nothing (with Clear
+ *  filters), or an empty book in the page's own words (with Add). */
+export function EmptyBook({
+  filtered,
+  noun,
+  title,
+  detail,
+  onClearFilters,
+  onAdd,
+}: {
+  filtered: boolean;
+  noun: PortfolioNoun;
+  /** The unfiltered state's words. */
+  title: string;
+  detail: string;
+  onClearFilters: () => void;
+  onAdd: () => void;
+}) {
+  return filtered ? (
+    <EmptyState
+      title={`No ${noun.many} match these filters`}
+      detail="Remove a filter, or clear them all."
+      action={
+        <button type="button" onClick={onClearFilters} className={`${QUIET} border border-line`}>
+          Clear filters
+        </button>
+      }
+    />
+  ) : (
+    <EmptyState
+      title={title}
+      detail={detail}
+      action={
+        <button type="button" onClick={onAdd} className={`${QUIET} bg-accent text-on-accent hover:bg-accent-hover`}>
+          <Plus className="w-4 h-4" aria-hidden="true" />
+          {`Add ${noun.one}`}
+        </button>
+      }
+    />
+  );
+}
+
 export function MoreButton({
   next,
   loading,
@@ -96,17 +153,32 @@ export function MoreButton({
   );
 }
 
-function Section<R extends PortfolioRowBase>({
+/** What a grouped section's header reads. */
+export interface SectionGroup {
+  key: string;
+  label: string;
+  count: number;
+}
+
+/** A book page with its groups (a portfolio's or a Pipelines kind's). */
+export type SectionsPage<R, G extends SectionGroup> = Paged<R> & { count: number; groups: G[] };
+
+function Section<R, P extends SectionsPage<R, G>, G extends SectionGroup>({
+  read,
+  noun,
   group,
   groupsKey,
-  params,
+  query,
   version,
-  currency,
+  money,
   defaultOpen,
   renderRow,
   onRowsLoaded,
+  skeleton,
 }: {
-  group: PortfolioGroup;
+  read: (query: string) => Promise<P>;
+  noun: PortfolioNoun;
+  group: G;
   /** The joined keys of every group currently shown, so this section's
    *  `open` state can be reset below when the *set* of groups changes (a
    *  filter change can shift which index this group sits at, or shift the
@@ -114,12 +186,15 @@ function Section<R extends PortfolioRowBase>({
    *  component instance (its own `key` — this group's key alone — didn't
    *  change). Merely opening/closing this one section does not change it. */
   groupsKey: string;
-  params: PortfolioParams;
+  /** This section's own read. */
+  query: string;
   version: number;
-  currency: CurrencyCode;
+  /** The header's total, already formatted in the workspace currency. */
+  money: string;
   defaultOpen: boolean;
-  renderRow: PortfolioRowRenderer<R>;
+  renderRow: (row: R, state: { loading: boolean }) => ReactNode;
   onRowsLoaded: (rows: R[]) => void;
+  skeleton: (count: number) => ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   // Re-applies the start-open rule whenever the group set changes, adjusted
@@ -132,12 +207,7 @@ function Section<R extends PortfolioRowBase>({
     setOpen(defaultOpen);
   }
   const bodyId = useId();
-  const page = usePagedPortfolio<R, FilterOptions>(
-    toApiQuery(params, { group_value: group.key, limit: String(SECTION_PAGE_SIZE) }),
-    open,
-    version,
-    onRowsLoaded,
-  );
+  const page = usePagedRead<R, P>(read, noun, query, open, version, onRowsLoaded);
   return (
     <section>
       <h2>
@@ -157,7 +227,7 @@ function Section<R extends PortfolioRowBase>({
             {' · '}
             <span className="font-mono-brand tabular-nums">{group.count}</span>
             {' · '}
-            <span className="font-mono-brand tabular-nums">{formatCompactMoney(group.arr, currency)}</span>
+            <span className="font-mono-brand tabular-nums">{money}</span>
           </span>
         </button>
       </h2>
@@ -171,7 +241,7 @@ function Section<R extends PortfolioRowBase>({
               </button>
             </p>
           ) : page.loading && page.rows.length === 0 ? (
-            <RowSkeleton count={Math.min(3, group.count)} />
+            skeleton(Math.min(3, group.count))
           ) : (
             <ul className="flex flex-col gap-1.5" aria-busy={page.loading}>
               {page.rows.map((row) => renderRow(row, { loading: page.loading }))}
@@ -190,8 +260,102 @@ function Section<R extends PortfolioRowBase>({
   );
 }
 
-/** The list body: grouped sections (each with its own pages) or one flat
- *  list, plus the loading, empty and error states spec §1 asks for. */
+/** A book's list body, for any page: grouped sections (each with its own
+ *  pages, read through `read` with `sectionQuery`) or one flat list, plus
+ *  the loading, empty and error states spec §1 asks for. The page supplies
+ *  its words, its empty state, its placeholders and each group's total. */
+export function PagedSections<R, P extends SectionsPage<R, G>, G extends SectionGroup>({
+  book,
+  read,
+  noun,
+  grouped,
+  listHeading,
+  sectionQuery,
+  version,
+  groupMoney,
+  renderRow,
+  onRowsLoaded,
+  empty,
+  skeleton,
+}: {
+  book: PagedBook<R, P>;
+  read: (query: string) => Promise<P>;
+  noun: PortfolioNoun;
+  grouped: boolean;
+  /** The flat list's own (visually hidden) heading. */
+  listHeading: string;
+  sectionQuery: (groupKey: string) => string;
+  version: number;
+  groupMoney: (group: G) => string;
+  renderRow: (row: R, state: { loading: boolean }) => ReactNode;
+  onRowsLoaded: (rows: R[]) => void;
+  /** Shown when the book is empty (EmptyBook, in the page's words). */
+  empty: ReactNode;
+  skeleton: (count: number) => ReactNode;
+}) {
+  const { data, error } = book;
+  if (!data && error) return <ErrorBlock message={error} onRetry={book.retry} />;
+  if (!data) return skeleton(6);
+  if (data.count === 0) return empty;
+
+  // `error` is a stale-but-still-shown re-fetch failure (spec §1: keep the
+  // last good list rather than blank it) and already ends in its own period
+  // (e.g. "Could not load organizations."), so appending a sentence needs
+  // its own leading capital, not a second period run on from the first.
+  const staleError = error ? (
+    <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
+      {error} Showing the last result.
+      <button type="button" onClick={book.retry} className={QUIET}>
+        Try again
+      </button>
+    </p>
+  ) : null;
+
+  if (!grouped) {
+    return (
+      <div aria-busy={book.loading}>
+        {/* The flat list's own heading, so an opened row's panels (h3) sit
+            under it rather than under the last summary tile's. */}
+        <h2 className="sr-only">{listHeading}</h2>
+        {staleError}
+        <ul className="flex flex-col gap-1.5">{book.rows.map((row) => renderRow(row, { loading: book.loading }))}</ul>
+        <MoreButton
+          next={book.next}
+          loading={book.loadingMore}
+          error={book.moreError}
+          label={`Show more ${noun.many}`}
+          onClick={() => void book.loadMore()}
+        />
+      </div>
+    );
+  }
+
+  const groupsKey = data.groups.map((group) => group.key).join('|');
+
+  return (
+    <div className="flex flex-col gap-4" aria-busy={book.loading}>
+      {staleError}
+      {data.groups.map((group, index) => (
+        <Section<R, P, G>
+          key={group.key}
+          read={read}
+          noun={noun}
+          group={group}
+          groupsKey={groupsKey}
+          query={sectionQuery(group.key)}
+          version={version}
+          money={groupMoney(group)}
+          defaultOpen={sectionStartsOpen(index, data.groups.length)}
+          renderRow={renderRow}
+          onRowsLoaded={onRowsLoaded}
+          skeleton={skeleton}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** The portfolio kind's list body (Organizations, Accounts). */
 export function PortfolioSections<R extends PortfolioRowBase>({
   params,
   version,
@@ -220,87 +384,30 @@ export function PortfolioSections<R extends PortfolioRowBase>({
   onAdd: () => void;
 }) {
   const kind = usePortfolioKind();
-  const { data, error } = portfolio;
-  if (!data && error) return <ErrorBlock message={error} onRetry={portfolio.retry} />;
-  if (!data) return <RowSkeleton count={6} />;
-
-  if (data.count === 0) {
-    return filtered ? (
-      <EmptyState
-        title={`No ${kind.noun.many} match these filters`}
-        detail="Remove a filter, or clear them all."
-        action={
-          <button type="button" onClick={onClearFilters} className={`${QUIET} border border-line`}>
-            Clear filters
-          </button>
-        }
-      />
-    ) : (
-      <EmptyState
-        title={`No ${kind.noun.many} yet`}
-        detail={`Add an ${kind.noun.one} to start your portfolio.`}
-        action={
-          <button type="button" onClick={onAdd} className={`${QUIET} bg-accent text-on-accent hover:bg-accent-hover`}>
-            <Plus className="w-4 h-4" aria-hidden="true" />
-            {`Add ${kind.noun.one}`}
-          </button>
-        }
-      />
-    );
-  }
-
-  // `error` is a stale-but-still-shown re-fetch failure (spec §1: keep the
-  // last good list rather than blank it) and already ends in its own period
-  // (e.g. "Could not load organizations."), so appending a sentence needs
-  // its own leading capital, not a second period run on from the first.
-  const staleError = error ? (
-    <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
-      {error} Showing the last result.
-      <button type="button" onClick={portfolio.retry} className={QUIET}>
-        Try again
-      </button>
-    </p>
-  ) : null;
-
-  if (params.group === '') {
-    return (
-      <div aria-busy={portfolio.loading}>
-        {/* The flat list's own heading, so an opened row's panels (h3) sit
-            under it rather than under the last summary tile's. */}
-        <h2 className="sr-only">{`${capitalise(kind.noun.many)} list`}</h2>
-        {staleError}
-        <ul className="flex flex-col gap-1.5">
-          {portfolio.rows.map((row) => renderRow(row, { loading: portfolio.loading }))}
-        </ul>
-        <MoreButton
-          next={portfolio.next}
-          loading={portfolio.loadingMore}
-          error={portfolio.moreError}
-          label={`Show more ${kind.noun.many}`}
-          onClick={() => void portfolio.loadMore()}
-        />
-      </div>
-    );
-  }
-
-  const groupsKey = data.groups.map((group) => group.key).join('|');
-
+  const read = useCallback((q: string) => kind.fetch(q) as Promise<PortfolioPage<R, FilterOptions>>, [kind]);
   return (
-    <div className="flex flex-col gap-4" aria-busy={portfolio.loading}>
-      {staleError}
-      {data.groups.map((group, index) => (
-        <Section
-          key={group.key}
-          group={group}
-          groupsKey={groupsKey}
-          params={params}
-          version={version}
-          currency={currency}
-          defaultOpen={sectionStartsOpen(index, data.groups.length)}
-          renderRow={renderRow}
-          onRowsLoaded={onRowsLoaded}
+    <PagedSections<R, PortfolioPage<R, FilterOptions>, PortfolioGroup>
+      book={portfolio}
+      read={read}
+      noun={kind.noun}
+      grouped={params.group !== ''}
+      listHeading={`${capitalise(kind.noun.many)} list`}
+      sectionQuery={(groupKey) => toApiQuery(params, { group_value: groupKey, limit: String(SECTION_PAGE_SIZE) })}
+      version={version}
+      groupMoney={(group) => formatCompactMoney(group.arr, currency)}
+      renderRow={renderRow}
+      onRowsLoaded={onRowsLoaded}
+      empty={
+        <EmptyBook
+          filtered={filtered}
+          noun={kind.noun}
+          title={`No ${kind.noun.many} yet`}
+          detail={`Add an ${kind.noun.one} to start your portfolio.`}
+          onClearFilters={onClearFilters}
+          onAdd={onAdd}
         />
-      ))}
-    </div>
+      }
+      skeleton={(count) => <RowSkeleton count={count} />}
+    />
   );
 }

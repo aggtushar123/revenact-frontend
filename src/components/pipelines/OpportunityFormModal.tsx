@@ -11,17 +11,7 @@ import {
 } from '../../features/customers/customersSlice';
 import type { Opportunity } from '../../features/customers/customersSlice';
 import { companyLabel } from '../../features/customers/formatters';
-
-// Matches Opportunity.Stage on the backend exactly (services/customers/
-// models.py) — the board's own 6 Kanban columns, in the same order.
-const STAGE_OPTIONS: { value: Opportunity['stage']; label: string }[] = [
-  { value: 'discovery', label: 'Discovery' },
-  { value: 'qualification', label: 'Qualification' },
-  { value: 'solution_validation', label: 'Solution Validation' },
-  { value: 'proposal_price_review', label: 'Proposal / Price Review' },
-  { value: 'negotiation', label: 'Negotiation' },
-  { value: 'closed_won', label: 'Closed Won' },
-];
+import { OPPORTUNITY_STAGES } from '../../features/pipelines/pipelineKinds';
 
 interface OpportunityFormModalProps {
   /** Present for Edit, omitted for Add. */
@@ -37,33 +27,32 @@ interface OpportunityFormModalProps {
   companies?: { id: number; name: string }[];
   /** Add-only: a fixed Customer to create the new opportunity under —
    * set when opened from the Organization/Account Details page's own
-   * Pipelines tab (see PipelinesTab.tsx), skipping the Company picker
+   * Deals & risks tab (see DealsTab.tsx), skipping the Company picker
    * entirely, same as ContactFormModal's own `customerId` prop.
    * Ignored for Edit. */
   customerId?: number;
   /** Add-only: set together with a fixed `customerId` when opened from
-   * the standalone Account page's own Pipelines tab — creates an
+   * the standalone Account page's own Deals & risks tab — creates an
    * account-level Opportunity instead of an organisation-level one,
    * and hides the Account picker below (already inside one specific
    * account's own context). */
   accountId?: number;
+  /** Add-only: replaces the Company select with the caller's own "where it
+   * belongs" field (the Pipelines portfolio's — List and Board's —
+   * server-searched picker), which sets `customerId` or `accountId`
+   * above as the viewer picks. */
+  parentField?: ReactNode;
   onClose: () => void;
   /** Edit-only: shows a "Delete" button that hands off to the caller
-   * (PipelinesPage.tsx opens its own ConfirmDialog for it) rather than
-   * this modal deleting directly — same separation as the standalone
-   * Contact Details page's own Edit/Delete. */
+   * (DealsTab.tsx and the Pipelines portfolio's own PipelineModals.tsx
+   * each open their own ConfirmDialog for it) rather than this modal
+   * deleting directly — same separation as the standalone Contact
+   * Details page's own Edit/Delete. */
   onDeleteRequest?: () => void;
-  /** Called after a successful *create* only, and only when this modal
-   * is scoped to a fixed `customerId`/`accountId` (the Details page's
-   * own Pipelines tab) — createOpportunityForCustomer/
-   * createOpportunityForAccount don't know which scoped list
-   * (`pipelineOpportunities`) to patch, so the caller refetches its own
-   * list instead, same "caller refetches" reasoning as
-   * ContactFormModal's own `onSaved`. The standalone board's own Add
-   * (no `customerId`/`accountId` given) uses `createOpportunity`
-   * instead, which already patches Redux directly via its own
-   * extraReducers — `onSaved` is never called then, and both of that
-   * board's own call sites omit the prop entirely. */
+  /** Called after every successful save (an add or an edit), so the caller
+   * can read its own list again: the Deals & risks tab after a scoped add,
+   * the Pipelines portfolio (List and Board) after any add or edit (plan
+   * 2026-10-01 Decision 8). */
   onSaved?: () => void;
 }
 
@@ -78,6 +67,7 @@ export function OpportunityFormModal({
   companies,
   customerId,
   accountId,
+  parentField,
   onClose,
   onDeleteRequest,
   onSaved,
@@ -91,6 +81,7 @@ export function OpportunityFormModal({
     opportunity?.stage ?? defaultStage ?? 'discovery'
   );
   const [priority, setPriority] = useState<Opportunity['priority']>(opportunity?.priority ?? 'medium');
+  const [closeDate, setCloseDate] = useState(opportunity?.expected_close ?? '');
   const myFunction = useAppSelector((s) => s.auth.user?.function ?? '');
   const [department, setDepartment] = useState<UserFunction | ''>(opportunity?.department ?? myFunction);
   const [selectedCompanyId, setSelectedCompanyId] = useState(customerId ? String(customerId) : '');
@@ -134,20 +125,20 @@ export function OpportunityFormModal({
     setError(null);
 
     if (!isEdit && customerId === undefined && accountId === undefined && !selectedCompanyId) {
-      setError('Pick a company.');
+      setError(parentField ? 'Pick where it belongs.' : 'Pick a company.');
       return;
     }
 
     setIsSaving(true);
-    const data = { title: title.trim(), mrr: mrr.trim() || '0', stage, priority, department };
+    const data = { title: title.trim(), mrr: mrr.trim() || '0', stage, priority, department, expected_close: closeDate || null };
     try {
       if (isEdit) {
-        // No onSaved() — updateOpportunity's own extraReducers already
-        // patch every list this Opportunity could be showing in.
+        // updateOpportunity's own extraReducers patch every list this Opportunity
+        // could be showing in; onSaved() below reloads a page's own book.
         await dispatch(updateOpportunity({ id: opportunity.id, ...data })).unwrap();
       } else if (customerId !== undefined) {
         // Scoped to a fixed Customer/Account (the Details page's own
-        // Pipelines tab) — createOpportunityForCustomer/
+        // Deals & risks tab) — createOpportunityForCustomer/
         // createOpportunityForAccount don't patch Redux themselves, so
         // the caller refetches via onSaved() below.
         if (accountId !== undefined) {
@@ -159,12 +150,10 @@ export function OpportunityFormModal({
         } else {
           await dispatch(createOpportunityForCustomer({ customerId, ...data })).unwrap();
         }
-        onSaved?.();
       } else if (customerId === undefined && accountId !== undefined) {
         // The account page: no organisation id, the flat account route.
         // Like the scoped branch below, the caller reads its list again.
         await dispatch(createOpportunityForAccount({ accountId, ...data })).unwrap();
-        onSaved?.();
       } else if (selectedAccountId) {
         // The standalone board's own Add — createOpportunity's own
         // extraReducers already unshift straight into `opportunities`,
@@ -173,6 +162,7 @@ export function OpportunityFormModal({
       } else {
         await dispatch(createOpportunity({ customerId: Number(selectedCompanyId), ...data })).unwrap();
       }
+      onSaved?.();
       onClose();
     } catch (err) {
       setError(
@@ -213,6 +203,8 @@ export function OpportunityFormModal({
                 {opportunity.account_name ? ` • ${opportunity.account_name}` : ''}
               </p>
             </div>
+          ) : parentField ? (
+            parentField
           ) : customerId === undefined && accountId === undefined ? (
             <SelectField label="Company" value={selectedCompanyId} onChange={setSelectedCompanyId} required>
               <option value="">Select a company…</option>
@@ -227,7 +219,7 @@ export function OpportunityFormModal({
           {/* An Opportunity can be organisation-level or belong to
               one specific Account — hidden for Edit (can't move
               between parents) and when `accountId` is already fixed
-              (the standalone Account page's own Pipelines tab —
+              (the standalone Account page's own Deals & risks tab —
               already inside one specific account, nothing to pick). */}
           {!isEdit && accountId === undefined && effectiveCompanyId !== undefined && (
             <SelectField label="Account (optional)" value={selectedAccountId} onChange={setSelectedAccountId}>
@@ -258,12 +250,14 @@ export function OpportunityFormModal({
           </SelectField>
 
           <SelectField label="Stage" value={stage} onChange={(v) => setStage(v as Opportunity['stage'])}>
-            {STAGE_OPTIONS.map((opt) => (
+            {OPPORTUNITY_STAGES.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </SelectField>
+
+          <DateField label="Expected close" value={closeDate} onChange={setCloseDate} />
 
           {error && (
             <div className="flex items-center gap-2 text-[12px] text-danger">
@@ -372,6 +366,24 @@ function SelectField({
       >
         {children}
       </select>
+    </div>
+  );
+}
+
+function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  const id = useId();
+  return (
+    <div>
+      <label htmlFor={id} className="block text-[12px] font-semibold text-ink-muted mb-1">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="date"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3 py-2 bg-subtle border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent transition-all"
+      />
     </div>
   );
 }

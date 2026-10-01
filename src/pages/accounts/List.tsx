@@ -1,8 +1,7 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { useOrgCurrency } from '../../hooks';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
-import { ACCOUNT_LIFECYCLE_TARGETS } from '../../features/accounts/accountFields';
+import { ACCOUNT_LIFECYCLE_TARGETS, ACCOUNT_NOUN } from '../../features/accounts/accountFields';
 import { bulkUpdateAccounts, exportAccountPortfolio } from '../../features/accounts/portfolioApi';
 import type { AccountBulkAction, AccountFilterOptions, AccountPortfolioRow } from '../../features/accounts/portfolioTypes';
 import { useMembers } from '../../features/knowledge/useMembers';
@@ -12,22 +11,20 @@ import { AccountPanels } from '../../components/accounts/portfolio/AccountPanels
 import { ACCOUNT_KIND } from '../../components/accounts/portfolio/accountKind';
 import { AccountRow } from '../../components/organizations/portfolio/AccountRow';
 import { AccountSheet } from '../../components/organizations/portfolio/AccountSheet';
+import { DismissibleAlert } from '../../components/organizations/portfolio/DismissibleAlert';
 import { FilterChips } from '../../components/organizations/portfolio/FilterChips';
 import { PortfolioKindContext } from '../../components/organizations/portfolio/portfolioKind';
 import { PortfolioSections, type PortfolioRowRenderer } from '../../components/organizations/portfolio/PortfolioSections';
 import { PortfolioToolbar } from '../../components/organizations/portfolio/PortfolioToolbar';
-import { SelectionBar, type BulkReport } from '../../components/organizations/portfolio/SelectionBar';
+import { SelectionBar } from '../../components/organizations/portfolio/SelectionBar';
 import { SummaryTiles } from '../../components/organizations/portfolio/SummaryTiles';
-import { FOCUS } from '../../components/organizations/portfolio/styles';
-import { errorMessage, usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
+import { usePortfolio } from '../../components/organizations/portfolio/usePortfolio';
 import { usePortfolioParams } from '../../components/organizations/portfolio/usePortfolioParams';
-import { useSelection } from '../../components/organizations/portfolio/useSelection';
+import { usePortfolioBulk } from '../../components/organizations/portfolio/usePortfolioBulk';
 import { AccountFormModal } from '../organizations/AccountFormModal';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
 import { useReportAccountsOptions } from './ask/accountsNames';
 import { useAccountEditing } from './useAccountEditing';
-
-const DISMISS = `inline-flex w-11 h-11 sm:w-8 sm:h-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:text-ink hover:bg-subtle active:bg-line-subtle ${FOCUS}`;
 
 /** /accounts/list: the Accounts portfolio (spec 2026-09-29 §1), the
  *  Organizations list's components with ACCOUNT_KIND. Rows, groups, tiles
@@ -66,44 +63,19 @@ function AccountsList() {
 
   const portfolio = usePortfolio<AccountPortfolioRow, AccountFilterOptions>(params, version, onRowsLoaded);
   const members = useMembers();
-  const selection = useSelection();
-  const { prune, clear: clearSelection } = selection;
   const searchRef = useRef<HTMLInputElement>(null);
-  const grouped = params.group !== '';
-
-  // The Organizations list's selection rule: a different list landing
-  // (`loadedQuery` changed) clears it when grouped and prunes it to page one
-  // when flat; a reload of the same query keeps it, so failed ids stay
-  // selected for a retry. Adjusted during render, not in an effect.
-  const { loadedQuery } = portfolio;
-  const [seenQuery, setSeenQuery] = useState(loadedQuery);
-  const [report, setReport] = useState<BulkReport | null>(null);
-  if (seenQuery !== loadedQuery) {
-    setSeenQuery(loadedQuery);
-    if (grouped) clearSelection();
-    else prune(portfolio.rows.map((row) => row.id));
-    setReport(null);
-  }
-  // Read by runBulk after its await: the query that is loaded by then.
-  const loadedQueryRef = useRef(loadedQuery);
-  useLayoutEffect(() => {
-    loadedQueryRef.current = loadedQuery;
-  });
-
-  const [exporting, setExporting] = useState(false);
-  const [actionRunning, setActionRunning] = useState(false);
-  // Phones: the toolbar's Select toggle shows the checkboxes without a long press.
-  const [selectMode, setSelectMode] = useState(false);
-  const selecting = selection.selecting || (selectMode && !isSm);
-  const endSelection = () => {
-    selection.clear();
-    setReport(null);
-    setSelectMode(false);
-  };
-  const toggleSelectMode = () => {
-    if (selecting) endSelection();
-    else setSelectMode(true);
-  };
+  const { selection, selecting, toggleSelectMode, endSelection, report, exporting, actionRunning, activity, runExport, runBulk } =
+    usePortfolioBulk<AccountBulkAction, number | string | null>({
+      book: portfolio,
+      grouped: params.group !== '',
+      isSm,
+      noun: ACCOUNT_NOUN,
+      nameOf,
+      bulk: bulkUpdateAccounts,
+      exportRows: exportAccountPortfolio,
+      reload,
+      setNotice,
+    });
 
   const currency = portfolio.data?.currency ?? orgCurrency;
   const options = portfolio.data?.filters ?? null;
@@ -118,40 +90,6 @@ function AccountsList() {
     [],
   );
   const closeSheet = useCallback(() => setOpenRow(null), []);
-
-  const runExport = async (query: string) => {
-    setExporting(true);
-    setNotice(null);
-    try {
-      await exportAccountPortfolio(query);
-    } catch (err) {
-      setNotice(errorMessage(err, 'Could not export accounts.'));
-    } finally {
-      setExporting(false);
-    }
-  };
-
-  const runBulk = async (action: AccountBulkAction, value: number | string | null) => {
-    const ids = [...selection.selected];
-    const startQuery = loadedQueryRef.current;
-    setActionRunning(true);
-    setReport(null);
-    try {
-      const result = await bulkUpdateAccounts({ ids, action, value });
-      setReport({
-        updated: result.updated.length,
-        failed: result.failed.map((failure) => ({ ...failure, name: nameOf(failure.id) })),
-      });
-      // Failures stay selected for a retry, unless a different list landed meanwhile.
-      if (loadedQueryRef.current === startQuery) selection.replace(result.failed.map((failure) => failure.id));
-      else selection.clear();
-    } catch (err) {
-      setReport({ updated: 0, failed: [], error: errorMessage(err, 'Could not update these accounts.') });
-    } finally {
-      setActionRunning(false);
-      reload();
-    }
-  };
 
   const applyFilter = (patch: Partial<PortfolioParams>) => {
     update(patch);
@@ -226,14 +164,7 @@ function AccountsList() {
             searchRef.current?.focus();
           }}
         />
-        {notice ? (
-          <p role="alert" className="flex items-center gap-2 text-[13px] text-danger">
-            {notice}
-            <button type="button" onClick={() => setNotice(null)} aria-label="Dismiss" className={DISMISS}>
-              <X className="w-4 h-4" aria-hidden="true" />
-            </button>
-          </p>
-        ) : null}
+        {notice ? <DismissibleAlert message={notice} onDismiss={() => setNotice(null)} /> : null}
         <div className="@container">
           <PortfolioSections
             params={params}
@@ -252,7 +183,7 @@ function AccountsList() {
           owners={ownerTargets(members)}
           lifecycles={ACCOUNT_LIFECYCLE_TARGETS}
           keepChurn
-          activity={actionRunning ? 'applying' : exporting ? 'exporting' : null}
+          activity={activity}
           loading={portfolio.loading}
           report={report}
           onSetOwner={(id) => void runBulk('set_owner', id)}

@@ -241,7 +241,7 @@ function renderNavbar(
           <Route path="/dashboard" element={<div>Dashboard Marker</div>} />
           <Route path="/organizations/list" element={<div>Organizations Marker</div>} />
           <Route path="/organizations/board" element={<div>Organizations Marker</div>} />
-          <Route path="/pipelines/board" element={<div>Pipelines Marker</div>} />
+          <Route path="/users" element={<div>Users Marker</div>} />
           <Route path="/profile" element={<div>Profile Marker</div>} />
           <Route path="/login" element={<div>Login Marker</div>} />
           <Route path="/organizations/:id" element={<div>Details Marker</div>} />
@@ -261,14 +261,14 @@ describe('Navbar account menu', () => {
   });
 
   it('is closed by default', () => {
-    renderNavbar('/pipelines/board');
+    renderNavbar('/users');
     expect(screen.queryByText('My Profile')).not.toBeInTheDocument();
     expect(screen.queryByText('Sign out')).not.toBeInTheDocument();
   });
 
   it('opens on avatar click and shows the real logged-in user', async () => {
     const user = userEvent.setup();
-    renderNavbar('/pipelines/board');
+    renderNavbar('/users');
 
     await user.click(screen.getByAltText('Alice Admin'));
 
@@ -280,7 +280,7 @@ describe('Navbar account menu', () => {
 
   it('navigates to /profile and closes the menu', async () => {
     const user = userEvent.setup();
-    renderNavbar('/pipelines/board');
+    renderNavbar('/users');
 
     await user.click(screen.getByAltText('Alice Admin'));
     await user.click(screen.getByText('My Profile'));
@@ -295,7 +295,7 @@ describe('Navbar account menu', () => {
       vi.fn().mockResolvedValue({ ok: true, status: 205, json: async () => null })
     );
     const user = userEvent.setup();
-    renderNavbar('/pipelines/board');
+    renderNavbar('/users');
 
     await user.click(screen.getByAltText('Alice Admin'));
     await user.click(screen.getByText('Sign out'));
@@ -305,12 +305,12 @@ describe('Navbar account menu', () => {
 
   it('closes when clicking outside the menu', async () => {
     const user = userEvent.setup();
-    renderNavbar('/pipelines/board');
+    renderNavbar('/users');
 
     await user.click(screen.getByAltText('Alice Admin'));
     expect(screen.getByText('My Profile')).toBeInTheDocument();
 
-    await user.click(screen.getByText('Pipelines Marker'));
+    await user.click(screen.getByText('Users Marker'));
 
     await waitFor(() => expect(screen.queryByText('My Profile')).not.toBeInTheDocument());
   });
@@ -570,7 +570,7 @@ describe('Navbar actions on the dashboard', () => {
 
   it('keeps the other pages as they were, with no slot', () => {
     const setSlot = vi.fn();
-    renderNavbar('/pipelines/board', null, null, [], setSlot);
+    renderNavbar('/users', null, null, [], setSlot);
     expect(document.querySelectorAll(DECORATIVE)).toHaveLength(4);
     expect(setSlot).not.toHaveBeenCalledWith(expect.any(HTMLElement));
     expect(document.querySelector('header')).toHaveClass('h-[64px]', 'border-b', 'bg-surface', 'shadow-sm', 'px-6');

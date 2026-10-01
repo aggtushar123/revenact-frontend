@@ -9,7 +9,6 @@ import { pizzaHutCustomer, stubOrganizationPage } from '../../../features/organi
 import { makeDetailStore, renderOrganizationPage } from '../../../pages/organizations/testDetail';
 import { resetViewport } from '../../../test/viewport';
 import { ContactsTab } from '../../shared/ContactsTab';
-import { PipelinesTab } from '../../shared/PipelinesTab';
 import { CallSenseTab } from '../activity/CallSenseTab';
 import { HeadlinesTab } from '../activity/HeadlinesTab';
 import { CompanyViewTab } from '../CompanyViewTab';
@@ -31,15 +30,6 @@ function renderWithStore(ui: ReactNode) {
 }
 
 const INSET = ['max-w-7xl', 'mx-auto', 'p-6', 'overflow-y-auto', 'h-full'];
-const PIPELINE_PROPS = {
-  opportunities: [],
-  opportunitiesLoading: false,
-  opportunitiesError: null,
-  risks: [],
-  risksLoading: false,
-  risksError: null,
-  customerId: 7,
-};
 
 const headline: Headline = {
   id: 1,
@@ -68,7 +58,7 @@ describe('alignment on the organization page', () => {
     resetViewport();
   });
 
-  describe('People and Deals & risks render flush, other routes keep their inset', () => {
+  describe('People renders flush, other routes keep their inset', () => {
     it('ContactsTab: embedded has no scroll area, padding or max width; the default is unchanged', () => {
       const { container, unmount } = renderWithStore(<ContactsTab contacts={[]} isLoading={false} error={null} customerId={7} embedded />);
       const root = container.firstElementChild as HTMLElement;
@@ -80,19 +70,6 @@ describe('alignment on the organization page', () => {
 
       const plain = renderWithStore(<ContactsTab contacts={[]} isLoading={false} error={null} customerId={7} />).container
         .firstElementChild as HTMLElement;
-      expect(plain).toHaveClass('h-full', 'overflow-y-auto', 'p-6', 'pt-2');
-      expect(plain.children[0]).toHaveClass('max-w-7xl', 'mx-auto');
-      expect(plain.children[1]).toHaveClass('max-w-7xl', 'mx-auto');
-    });
-
-    it('PipelinesTab: embedded has no scroll area, padding or max width; the default is unchanged', () => {
-      const { container, unmount } = renderWithStore(<PipelinesTab {...PIPELINE_PROPS} embedded />);
-      const root = container.firstElementChild as HTMLElement;
-      for (const cls of INSET) expect(root).not.toHaveClass(cls);
-      for (const child of root.children) expect(child).not.toHaveClass('max-w-7xl');
-      unmount();
-
-      const plain = renderWithStore(<PipelinesTab {...PIPELINE_PROPS} />).container.firstElementChild as HTMLElement;
       expect(plain).toHaveClass('h-full', 'overflow-y-auto', 'p-6', 'pt-2');
       expect(plain.children[0]).toHaveClass('max-w-7xl', 'mx-auto');
       expect(plain.children[1]).toHaveClass('max-w-7xl', 'mx-auto');

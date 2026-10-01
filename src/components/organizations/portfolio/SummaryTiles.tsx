@@ -1,4 +1,4 @@
-import { useId, useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
 import { signed } from '../../../features/organizations/portfolioFields';
@@ -6,100 +6,14 @@ import type { PortfolioParams } from '../../../features/organizations/portfolioP
 import type { HealthBand, NpsBand, PortfolioSummary } from '../../../features/organizations/portfolioTypes';
 import { HEALTH_LABEL, NPS_BANDS, NPS_LABEL, RENEWAL_WINDOWS, type RenewalWindow } from '../../../features/organizations/portfolioLabels';
 import { usePortfolioKind } from './portfolioKind';
-import { FOCUS } from './styles';
+import { MONO } from './styles';
+import { FilterButton, Switch, Tile, TileButton, TilesSkeleton } from './tileParts';
 
 const BANDS: HealthBand[] = ['good', 'average', 'poor'];
 const BAND_DOT: Record<HealthBand, string> = { good: 'bg-success', average: 'bg-warning', poor: 'bg-danger' };
 const NPS_BAR: Record<NpsBand, string> = { promoter: 'bg-success', passive: 'bg-line-strong', detractor: 'bg-danger' };
 
-/** A group named by its heading, not a region: five tiles as landmarks
- *  would crowd a screen reader's landmark list. */
-function Tile({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
-  const headingId = useId();
-  return (
-    <div role="group" aria-labelledby={headingId} className="min-w-[15rem] shrink-0 snap-start rounded-xl bg-surface p-3 sm:min-w-0">
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <h2 id={headingId} className="text-[11px] font-semibold uppercase tracking-wider text-ink-muted">
-          {title}
-        </h2>
-        {action}
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function Switch<T extends string>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div role="group" aria-label={label} className="flex rounded-md bg-subtle p-0.5">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          aria-pressed={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={`min-h-11 sm:min-h-6 rounded px-1.5 text-[11px] font-semibold ${FOCUS} ${
-            value === option.value ? 'bg-surface text-ink shadow-sm' : 'text-ink-muted hover:text-ink'
-          }`}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function FilterButton({
-  pressed,
-  onClick,
-  compact = false,
-  children,
-}: {
-  pressed: boolean;
-  onClick: () => void;
-  compact?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={pressed}
-      onClick={onClick}
-      className={`flex w-full min-w-0 min-h-11 ${compact ? 'sm:min-h-6' : 'sm:min-h-7'} items-center justify-between gap-2 rounded-md px-1.5 text-[11px] hover:bg-subtle active:bg-line-subtle ${FOCUS} ${
-        pressed ? 'bg-subtle font-semibold text-ink' : 'text-ink-muted'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
 const only = <T,>(values: T[], value: T) => values.length === 1 && values[0] === value;
-const mono = 'font-mono-brand tabular-nums';
-
-function Skeleton() {
-  return (
-    <div role="status" aria-label="Loading summary" className="flex gap-3 overflow-hidden sm:grid sm:grid-cols-2 @min-[50rem]:grid-cols-5">
-      {Array.from({ length: 5 }, (_, i) => (
-        <div key={i} aria-hidden="true" className="min-w-[15rem] shrink-0 rounded-xl bg-surface p-3 sm:min-w-0">
-          <span className="block h-2.5 w-16 animate-pulse rounded bg-subtle" />
-          <span className="mt-3 block h-5 w-20 animate-pulse rounded bg-subtle" />
-          <span className="mt-3 block h-2 w-full animate-pulse rounded bg-subtle" />
-        </div>
-      ))}
-    </div>
-  );
-}
 
 /** The five summary tiles (spec §1). Numbers come from the server for the
  *  current filters, and every segment filters the list on click. On phones
@@ -131,7 +45,7 @@ export function SummaryTiles({
     else if (span === '180') setSpan(kind.renewalWindow);
   }
   if (!summary) {
-    if (!failed) return <Skeleton />;
+    if (!failed) return <TilesSkeleton />;
     return (
       <div className="rounded-xl bg-surface p-3">
         <p className="text-[13px] font-semibold text-ink">Summary unavailable</p>
@@ -190,13 +104,13 @@ export function SummaryTiles({
               <span aria-hidden="true" className={`h-2 w-2 rounded-full ${BAND_DOT[band]}`} />
               {HEALTH_LABEL[band]}
             </span>{' '}
-            <span className={`${mono} text-ink`}>{show(bandValue(band))}</span>
+            <span className={`${MONO} text-ink`}>{show(bandValue(band))}</span>
           </FilterButton>
         ))}
       </Tile>
 
       <Tile title="NPS">
-        <p className={`${mono} text-[22px] leading-tight text-ink`}>{signed(nps.score)}</p>
+        <p className={`${MONO} text-[22px] leading-tight text-ink`}>{signed(nps.score)}</p>
         <div aria-hidden="true" className="my-2 flex h-2 overflow-hidden rounded-full bg-line">
           {npsTotal > 0
             ? npsBands.map((b) => <span key={b.band} className={b.bar} style={{ width: `${(b.count / npsTotal) * 100}%` }} />)
@@ -205,7 +119,7 @@ export function SummaryTiles({
         {npsBands.map((b) => (
           <FilterButton key={b.band} pressed={params.nps === b.band} onClick={() => onFilter({ nps: params.nps === b.band ? '' : b.band })}>
             <span>{b.label}</span>{' '}
-            <span className={`${mono} text-ink`}>{b.count}</span>
+            <span className={`${MONO} text-ink`}>{b.count}</span>
           </FilterButton>
         ))}
       </Tile>
@@ -227,18 +141,18 @@ export function SummaryTiles({
                   <span className="block h-full rounded-full bg-ink-muted" style={{ width: `${(stage.count / stageMax) * 100}%` }} />
                 </span>
               )}
-              <span className={`${mono} text-ink`}>{stage.count}</span>
+              <span className={`${MONO} text-ink`}>{stage.count}</span>
             </FilterButton>
           ))}
         </div>
       </Tile>
 
       <Tile title="Accounts · ARR">
-        <p className={`${mono} text-[22px] leading-tight text-ink`}>{summary.accounts}</p>
-        <p className={`${mono} mt-1 text-[13px] text-ink-muted`}>{formatCompactMoney(summary.arr, currency)} ARR</p>
+        <p className={`${MONO} text-[22px] leading-tight text-ink`}>{summary.accounts}</p>
+        <p className={`${MONO} mt-1 text-[13px] text-ink-muted`}>{formatCompactMoney(summary.arr, currency)} ARR</p>
         {summary.unconverted_count > 0 ? (
           <p className="mt-1 text-[11px] text-ink-muted">
-            <span className={mono}>{summary.unconverted_count}</span> without an exchange rate, left out of ARR
+            <span className={MONO}>{summary.unconverted_count}</span> without an exchange rate, left out of ARR
           </p>
         ) : null}
       </Tile>
@@ -254,18 +168,14 @@ export function SummaryTiles({
           />
         }
       >
-        <button
-          type="button"
-          aria-pressed={params.renews_within === span}
-          aria-label={`Renewing within ${span} days: ${renewing}`}
+        <TileButton
+          pressed={params.renews_within === span}
+          label={`Renewing within ${span} days: ${renewing}`}
           onClick={() => onFilter({ renews_within: params.renews_within === span ? '' : span })}
-          className={`-m-1 block w-full rounded-lg p-1 text-left hover:bg-subtle active:bg-line-subtle ${FOCUS} ${
-            params.renews_within === span ? 'bg-subtle' : ''
-          }`}
         >
-          <span className={`${mono} block text-[22px] leading-tight text-ink`}>{renewing}</span>
+          <span className={`${MONO} block text-[22px] leading-tight text-ink`}>{renewing}</span>
           <span className="block text-[11px] text-ink-muted">within {span} days, overdue included</span>
-        </button>
+        </TileButton>
       </Tile>
     </div>
   );

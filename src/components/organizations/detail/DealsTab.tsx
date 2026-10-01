@@ -17,6 +17,7 @@ import {
 import { awaitingAccount, byAccount, chosenAccount, scopeLabel } from '../../../features/organizations/accountScope';
 import { resolveScope, scopeSlot, type ScopeProps } from '../../../features/organizations/detailScope';
 import { opportunitiesSummary, risksSummary } from '../../../features/organizations/listSummaries';
+import { OPPORTUNITIES_KIND } from '../../../features/pipelines/pipelineKinds';
 import { KanbanBoard, PipelineCardContent } from '../../pipelines/KanbanBoard';
 import { OPPORTUNITY_STAGE_COLUMNS, RISK_STAGE_COLUMNS } from '../../pipelines/kanbanConfig';
 import { OpportunityFormModal } from '../../pipelines/OpportunityFormModal';
@@ -31,6 +32,12 @@ import { AddPaused, ListSearch, ListSkeleton, NoMatch, ScopedEmpty, SummaryLine 
 import { LIST } from './listStyles';
 
 type Kind = 'opportunities' | 'risks';
+
+/** Closed Lost starts collapsed, as on the Pipelines Board (pipelines spec §1). */
+const OPPORTUNITY_COLUMNS = OPPORTUNITY_STAGE_COLUMNS.map((column) => ({
+  ...column,
+  collapsible: OPPORTUNITIES_KIND.collapsedStages.includes(column.stage),
+}));
 
 /** The List / Board switch: desktop only, so 36px is its target. */
 const SEGMENT = `inline-flex min-h-9 items-center gap-1.5 rounded-md px-3 text-[13px] font-semibold ${FOCUS}`;
@@ -127,7 +134,7 @@ export function DealsTab(props: DealsTabProps) {
   else if (board) {
     body = isOpps ? (
       <KanbanBoard
-        columns={OPPORTUNITY_STAGE_COLUMNS}
+        columns={OPPORTUNITY_COLUMNS}
         entities={shownOpportunities}
         renderCard={(entity) => PipelineCardContent(entity, currency)}
         onCardClick={setEditingOpportunity}

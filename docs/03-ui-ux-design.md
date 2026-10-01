@@ -178,10 +178,11 @@ An icon with no adjacent text needs an `aria-label`. No emoji as icons, ever.
 
 | Component | Where |
 |---|---|
-| Portfolio rows and board (`components/organizations/portfolio/`) | `/organizations/list`: `AccountRow` (a rounded item, not a table row; a two-line card below `sm`), `AccountDetails` (six panels, part of the row), `SummaryTiles`, `PortfolioToolbar`/`FiltersPanel`/`PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `AccountSheet`. `/organizations/board`: `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`. They read a portfolio kind (`PortfolioKindContext`, Organizations by default), so `/accounts/list` and `/accounts/board` use them too, with `ACCOUNT_KIND` and `components/accounts/portfolio/AccountPanels`. See "Portfolio rows and board" below |
+| Portfolio rows and board (`components/organizations/portfolio/`) | `/organizations/list`: `AccountRow` (a rounded item, not a table row; a two-line card below `sm`), `AccountDetails` (six panels, part of the row), `SummaryTiles`, `PortfolioToolbar`/`FiltersPanel`/`PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `AccountSheet`. `/organizations/board`: `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`. They read a portfolio kind (`PortfolioKindContext`, Organizations by default), so `/accounts/list` and `/accounts/board` use them too, with `ACCOUNT_KIND` and `components/accounts/portfolio/AccountPanels`. The primitives they share with Pipelines (usePagedRead, tileParts, filterParts, ChipRow, MoveToMenu, useSearchText, SelectionActionsBar) live in the same folder. See "Portfolio rows and board" below |
+| Pipelines book (`components/pipelines/portfolio/`) | `/pipelines/list` and `/pipelines/board`: `PipelineItem` (a rounded item: title, Part of, MRR, stage, priority, department, date line, one signal), `PipelineSections`, `PipelineTiles` (with the open-stage strip), `PipelineToolbar`/`PipelineFilters`, `PipelineBoard`/`PipelineColumn`/`PipelineCard`, `PipelineKindSwitch`, `PipelineModals`. Its own kinds (`OPPORTUNITIES_KIND`, `RISKS_KIND`), on the shared portfolio primitives. See "Portfolio rows and board (Pipelines)" below |
 | Account page (`components/accounts/detail/`) | `/accounts/:id`: `AccountHeader`, `AccountTiles` (the shared `DetailTiles`, Health opening `AccountPulseBreakdown`), `AccountDetailsTab`, `CanvasesTab`, `useAccount`, `useAccountPageParams`; the organization page's detail parts (`StoryTab`, `PeopleTab`, `DealsTab`, `FilesCallsTab`, `DetailTabs`) given an account `scope`. See "Account page" below |
 | Contacts list and profile (`components/contacts/`) | `/contacts`: `ContactsToolbar` (summary line, search, organisation, account, sentiment and role filters in the URL, + Add), `ContactList` of `ContactListItem`s (never a table row; Load more), `ContactProfile` (sentiment and why, then `HistoryItems`: calls newest first, emails, tickets). See "Contacts" below |
-| `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by Pipelines |
+| `KanbanBoard` | Generic over stage and item; HTML5 drag events; used by the Deals & risks tabs' board (organisation and account pages) |
 | Dashboard tables | `AccountHealthDetailTable`, `RenewalQueueTable`, `ActivityDetailedTable`, `GoingDarkTable`, `SwingTable` |
 | `PinnedAttributes` *(unused — no route renders it; kept for a later cleanup PR, see §4.4 of docs/04-app-flow.md)* | Label and value pairs typed as text, truncated, dot, owner or pulse |
 | `EntityAvatar` | Company logo, else deterministic initials in one of five semantic hues |
@@ -570,6 +571,51 @@ Everything in the section above holds, with these differences:
   ("Accounts · Owner: Carl CSM"); the server's own `label` on a sent question
   always wins. Opening a row or a card narrows nothing.
 
+### Portfolio rows and board (Pipelines)
+
+`/pipelines/list` and `/pipelines/board` are one book of opportunities or
+risks across organisations and accounts (spec
+`docs/superpowers/specs/2026-09-30-pipelines-redesign-design.md` §1), read
+from `GET /pipelines/{opportunities,risks}/`. They look and behave like the
+Organizations and Accounts portfolios, with their own kinds (`PipelineKind`:
+`OPPORTUNITIES_KIND`, `RISKS_KIND` in `features/pipelines/pipelineKinds.ts`)
+because a pipeline item has no health, lifecycle or ARR:
+
+- The top bar is the framed one: "Pipelines", List | Board keeping the query,
+  and Opportunities | Risks (`?kind=risks`; opportunities when absent). Below
+  `sm` the kind switch is the page's first row instead. The actions slot waits
+  for Ask (delivery 2); there is no rail yet.
+- Five tiles, every figure the server's over every filtered row (the stage
+  filter is the only one they ignore): Open pipeline / MRR at risk (a figure,
+  count · MRR), Closing / Due within 30 or 90 days, Overdue, Won / Mitigated
+  this quarter, and a strip of the open stages. Each but the first sets its
+  filter and clears it when pressed again.
+- An item is never a table row: the title (it opens the Opportunity or Risk
+  form), "Part of" the organisation or account as a link (and an account's
+  organisation), MRR in the workspace's currency, the stage tag, priority,
+  department ("Whole company" when blank), the date line ("Closes in 12d",
+  "Overdue 5d" in danger, "No date"; risks "Due in 12d"; a closed item, its
+  date past or ahead, "Expected 5 Sep 2026" or a risk's "Due by 5 Sep 2026")
+  and at most one signal (Overdue, else High priority on an open item, which
+  then stands in for the priority tag). In a
+  narrow column the facts wrap under the title; targets are 44px on phones.
+- Group by stage (the default on both views), close / due month (Overdue,
+  the months, No date), organisation or account, owner (named people, "Not
+  in your book", Unassigned), department or priority; the List also offers
+  None. Sort by MRR, date, priority, stage or title. Filters: owner,
+  organisation, account, stage (the List's default is the open stages, the
+  Board's every stage), priority, department and the date windows. Everything
+  is in the URL.
+- Selection (the List only) offers Set stage, Set priority, Set department
+  and Set date (a date, or Clear date), each armed and applied with "Apply to
+  N", and Export selected.
+- The Board has a column per stage; Closed Lost starts collapsed ("Show
+  Closed Lost") and stays a drop target. Dragging a card (from `sm`) or its
+  Move to… menu saves the item's stage; a card opens its form.
+- The organisation and account pages' Deals & risks items gain the same date
+  line and the Overdue signal; both forms gain the date ("Expected close" /
+  "Due by") and Closed Lost.
+
 ### Account page (`/accounts/:id`)
 
 The account's story: the organization page below, scoped to one account
@@ -928,7 +974,7 @@ inputs; labelled pagination buttons; the global reduced-motion override.
    indicator on them entirely, and older controls elsewhere have neither.
 2. **No focus trap or focus return in almost any dialog.** Fifteen modals
    plus several other floating ones declare `role="dialog"`
-   (`ComposeEmailModal`, `PlatformOrganisations`, `PipelinesPage`,
+   (`ComposeEmailModal`, `PlatformOrganisations`,
    `EditNodePane`, `OnboardingCarousel`, the shared `CopilotRail`
    history popover, the dashboard's drill panel, the dashboard's Ask sheet) —
    of all of them, only the drill panel (in its sheet below `1024px`) and the
