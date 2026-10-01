@@ -498,10 +498,15 @@ which the Story's own + Add and Files/Calls tabs carry forward.
    new `stage`, then the frame and the two columns it touched read again.
 3. An item or card opens `OpportunityFormModal` / `RiskFormModal`, built from
    its row. Save PATCHes `/opportunities/<id>/` (or `/risks/<id>/`), Delete
-   confirms and DELETEs; Add reads `GET /customers/` for its organisation
-   picker, then `GET /customers/<id>/accounts/`, and POSTs `/opportunities/`
-   (or `/risks/`) with `customer_id` or `account_id`. The page reads its book
-   again after each.
+   confirms and DELETEs. Add first asks where the item belongs:
+   `ParentPicker` searches `GET /customers/?search=` and
+   `GET /accounts/?search=` as the viewer types (only what the server
+   returns, so only what the viewer may open). An organisation keeps the
+   form's optional account step (`GET /customers/<id>/accounts/`) and POSTs
+   `/customers/<id>/opportunities/` or
+   `/customers/<id>/accounts/<id>/opportunities/`; an account POSTs the flat
+   `/accounts/<id>/opportunities/` (risks alike). The parent is in the path,
+   never the body. The page reads its book again after each.
 4. Opportunities | Risks keeps the view and the shared filters and drops
    `stage`, `changed` and `ids`. Ask on Pipelines is delivery 2.
 
