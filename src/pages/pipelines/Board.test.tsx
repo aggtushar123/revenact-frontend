@@ -51,6 +51,17 @@ describe('Pipelines board', () => {
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/pipelines\/board$/);
   });
 
+  it('moves focus to Hide after Show, and to Show after Hide (Show/Hide swap the focused node)', async () => {
+    stubPipelines();
+    renderPipelines('/pipelines/board');
+    const lost = await findColumn('closed_lost');
+    await userEvent.click(within(lost).getByRole('button', { name: 'Show Closed Lost' }));
+    const hideButton = within(lost).getByRole('button', { name: 'Hide Closed Lost' });
+    expect(document.activeElement).toBe(hideButton);
+    await userEvent.click(hideButton);
+    expect(document.activeElement).toBe(within(lost).getByRole('button', { name: 'Show Closed Lost' }));
+  });
+
   it('gives a collapsed column no "+", and a shown one its "+"', async () => {
     stubPipelines();
     renderPipelines('/pipelines/board');
@@ -119,7 +130,7 @@ describe('Pipelines board', () => {
     await within(await findColumn('negotiation')).findByRole('button', { name: 'EMEA seats' });
     await userEvent.click(within(column('negotiation')).getByRole('button', { name: 'Move EMEA seats to…' }));
     await userEvent.click(within(screen.getByRole('menu', { name: 'Move EMEA seats to' })).getByRole('menuitem', { name: 'Closed Won' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't move EMEA seats to Closed Won.");
+    expect(await screen.findByRole('alert')).toHaveTextContent("Couldn't move EMEA seats to Closed Won. Stage is locked.");
     expect(within(column('negotiation')).getByRole('button', { name: 'EMEA seats' })).toBeInTheDocument();
     expect(within(column('closed_won')).queryByRole('button', { name: 'EMEA seats' })).toBeNull();
   });

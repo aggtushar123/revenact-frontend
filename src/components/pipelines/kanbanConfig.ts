@@ -2,10 +2,12 @@ import { companyLabel } from '../../features/customers/formatters';
 import type { Opportunity, Risk } from '../../features/customers/customersSlice';
 import { OPPORTUNITY_STAGES, RISK_STAGES } from '../../features/pipelines/pipelineKinds';
 
-// Plain data/helpers shared by KanbanBoard.tsx and its consumers
-// (PipelinesPage.tsx, PipelinesTab.tsx) — split out from KanbanBoard.tsx
-// itself because a file exporting a component can only export
-// components (react-refresh/only-export-components), not also these.
+// Plain data/helpers shared by KanbanBoard.tsx and its consumers (the
+// Organization/Account Deals & risks tab, DealsTab.tsx and DealItem.tsx;
+// and the Pipelines portfolio's own item parts, itemParts.tsx) — split
+// out from KanbanBoard.tsx itself because a file exporting a component
+// can only export components (react-refresh/only-export-components),
+// not also these.
 
 export const PRIORITY_COLORS = {
   high: 'bg-danger-dim text-danger border-danger/40',

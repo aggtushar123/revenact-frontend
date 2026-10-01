@@ -27,7 +27,7 @@ interface OpportunityFormModalProps {
   companies?: { id: number; name: string }[];
   /** Add-only: a fixed Customer to create the new opportunity under —
    * set when opened from the Organization/Account Details page's own
-   * Pipelines tab (see PipelinesTab.tsx), skipping the Company picker
+   * Deals & risks tab (see DealsTab.tsx), skipping the Company picker
    * entirely, same as ContactFormModal's own `customerId` prop.
    * Ignored for Edit. */
   customerId?: number;
@@ -43,9 +43,10 @@ interface OpportunityFormModalProps {
   parentField?: ReactNode;
   onClose: () => void;
   /** Edit-only: shows a "Delete" button that hands off to the caller
-   * (PipelinesPage.tsx opens its own ConfirmDialog for it) rather than
-   * this modal deleting directly — same separation as the standalone
-   * Contact Details page's own Edit/Delete. */
+   * (DealsTab.tsx and the Pipelines portfolio's own PipelineModals.tsx
+   * each open their own ConfirmDialog for it) rather than this modal
+   * deleting directly — same separation as the standalone Contact
+   * Details page's own Edit/Delete. */
   onDeleteRequest?: () => void;
   /** Called after every successful save (an add or an edit), so the caller
    * can read its own list again: the Deals & risks tab after a scoped add,

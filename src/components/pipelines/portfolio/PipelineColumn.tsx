@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { EyeOff, Plus } from 'lucide-react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
@@ -76,6 +77,20 @@ export function PipelineColumn({
   const page = usePagedRead<PipelineRow, PipelinePage>(kind.fetch, kind.noun, query, enabled, version, onRowsLoaded);
   const show = `Show ${spec.label}`;
   const hide = `Hide ${spec.label}`;
+  const hideRef = useRef<HTMLButtonElement | null>(null);
+  const showRef = useRef<HTMLButtonElement | null>(null);
+  // Hide and Show replace each other's button, so a click always removes
+  // the node focus was on: land it on whichever one takes its place
+  // (skipped on mount, since nothing was collapsed or shown yet).
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    if (collapsed) showRef.current?.focus();
+    else hideRef.current?.focus();
+  }, [collapsed]);
   return (
     <StageColumn<PipelineRow>
       columnKey={spec.key}
@@ -84,7 +99,7 @@ export function PipelineColumn({
       actions={
         <>
           {onToggleCollapsed && !collapsed ? (
-            <button type="button" onClick={onToggleCollapsed} aria-label={hide} title={hide} className={COLUMN_ICON_BUTTON}>
+            <button ref={hideRef} type="button" onClick={onToggleCollapsed} aria-label={hide} title={hide} className={COLUMN_ICON_BUTTON}>
               <EyeOff className="w-4 h-4" aria-hidden="true" />
             </button>
           ) : null}
@@ -97,7 +112,7 @@ export function PipelineColumn({
       }
       placeholder={
         collapsed ? (
-          <button type="button" onClick={onToggleCollapsed} title={show} className={`${QUIET} w-full border border-dashed border-line`}>
+          <button ref={showRef} type="button" onClick={onToggleCollapsed} title={show} className={`${QUIET} w-full border border-dashed border-line`}>
             {show}
           </button>
         ) : null

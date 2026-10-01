@@ -6,14 +6,14 @@ import { PRIORITY_COLORS, pipelineOrgLabel } from './kanbanConfig';
 import type { PipelineCardEntity } from './kanbanConfig';
 import type { CurrencyCode } from '../../features/auth/authSlice';
 
-// Generic Kanban rendering shared by every stage-column board in the
-// app — originally just Opportunity/Risk (the standalone Pipelines
-// board, pages/pipelines/PipelinesPage.tsx, and the embedded Pipelines
-// tab, components/shared/PipelinesTab.tsx), now also the standalone
-// Organizations board (pages/organizations/Board.tsx, grouped by
-// lifecycle_stage instead of a pipeline stage) — same "one shared
-// component, not page-local copies" reasoning as ContactsTab/
-// PipelinesTab themselves. `renderCard` is the only entity-specific
+// Generic Kanban rendering for a stage-column board — built for the
+// standalone Opportunity/Risk board and the embedded Pipelines tab
+// (both since retired or rebuilt: the Pipelines portfolio now reads its
+// own PipelineColumn on the shared StageColumn instead — see
+// pages/pipelines/List.tsx and Board.tsx), now used only by the
+// Organization/Account Details page's own Deals & risks tab
+// (DealsTab.tsx) — same "one shared component, not page-local copies"
+// reasoning as ContactsTab. `renderCard` is the only entity-specific
 // part; column layout, drag-and-drop, and the "N in this column" count
 // are otherwise fully generic. Stage columns/colors/labels for the
 // pipeline case live in ./kanbanConfig instead of here — a file

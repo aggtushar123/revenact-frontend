@@ -2930,7 +2930,7 @@ const customersSlice = createSlice({
       })
       // createOpportunityForCustomer/createOpportunityForAccount's own
       // rejections are shown inline in the form instead — no .rejected
-      // case needed, and no .fulfilled case either: PipelinesTab
+      // case needed, and no .fulfilled case either: DealsTab
       // refetches its own `pipelineOpportunities` after a successful
       // create (see createOpportunityForCustomer's own docstring).
       .addCase(fetchRisks.pending, (state) => {

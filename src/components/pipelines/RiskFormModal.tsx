@@ -25,8 +25,8 @@ interface RiskFormModalProps {
    * `companies` prop. */
   companies?: { id: number; name: string }[];
   /** Add-only: a fixed Customer to create the new risk under — set when
-   * opened from the Organization/Account Details page's own Pipelines
-   * tab (see PipelinesTab.tsx), skipping the Company picker entirely,
+   * opened from the Organization/Account Details page's own Deals & risks
+   * tab (see DealsTab.tsx), skipping the Company picker entirely,
    * same as OpportunityFormModal's own `customerId` prop. Ignored for
    * Edit. */
   customerId?: number;
