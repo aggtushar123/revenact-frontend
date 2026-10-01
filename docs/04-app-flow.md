@@ -508,7 +508,9 @@ which the Story's own + Add and Files/Calls tabs carry forward.
    `/accounts/<id>/opportunities/` (risks alike). The parent is in the path,
    never the body. The page reads its book again after each.
 4. Opportunities | Risks keeps the view and the shared filters and drops
-   `stage`, `changed` and `ids`. Ask on Pipelines is delivery 2.
+   `stage`, `changed` and `ids`, except that a Closing / Due tile's
+   narrowing (`date=30|90` with the kind's open stages) carries over as the
+   other kind's open stages. Ask on Pipelines is delivery 2.
 
 ### 4.5b Feature requests (Brain > Feature Requests)
 

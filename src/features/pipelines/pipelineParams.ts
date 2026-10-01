@@ -153,10 +153,20 @@ export function boardPipelineParams(p: PipelineParams): PipelineParams {
 }
 
 /** The URL for the other kind (plan Decision 5): the shared filters stay;
- *  stage, changed and ids belong to one kind and go. */
+ *  stage, changed and ids belong to one kind and go. One exception: the
+ *  Closing / Due tile writes a 30 or 90 day window with the kind's open
+ *  stages (ruling F3), so that narrowing becomes the new kind's open stages
+ *  rather than leaving the window to take in closed items. */
 export function withKind(search: URLSearchParams, kind: PipelineKindKey): URLSearchParams {
+  const from = parsePipelineParams(search);
+  const fromOpen = PIPELINE_KINDS[from.kind].openStages;
+  const tileNarrowing =
+    (from.date === '30' || from.date === '90') &&
+    from.stage.length === fromOpen.length &&
+    fromOpen.every((stage) => from.stage.includes(stage));
   const next = new URLSearchParams(search);
   for (const key of ['kind', 'stage', 'changed', 'ids']) next.delete(key);
   if (kind !== 'opportunities') next.set('kind', kind);
+  if (tileNarrowing) next.set('stage', PIPELINE_KINDS[kind].openStages.join(','));
   return next;
 }

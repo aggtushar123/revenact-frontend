@@ -95,6 +95,16 @@ describe('the Pipelines URL state', () => {
     expect(withKind(new URLSearchParams('kind=risks&owner=2'), 'opportunities').toString()).toBe('owner=2');
   });
 
+  it("carries a Closing / Due tile's open-stage narrowing over to the other kind, and only that one", () => {
+    const opportunityOpen = OPPORTUNITIES_KIND.openStages.join(',');
+    expect(withKind(new URLSearchParams(`stage=${opportunityOpen}&date=30`), 'risks').toString()).toBe('date=30&kind=risks&stage=open');
+    expect(withKind(new URLSearchParams('kind=risks&stage=open&date=90'), 'opportunities').get('stage')).toBe(opportunityOpen);
+    // Not a tile's narrowing: a chosen stage, or a window the tile never writes.
+    expect(withKind(new URLSearchParams('stage=negotiation&date=30'), 'risks').has('stage')).toBe(false);
+    expect(withKind(new URLSearchParams(`stage=${opportunityOpen}&date=180`), 'risks').has('stage')).toBe(false);
+    expect(withKind(new URLSearchParams(`stage=${opportunityOpen}`), 'risks').has('stage')).toBe(false);
+  });
+
   it('never parses a cursor into the params, so rewriting the URL from them always drops one', () => {
     expect(parse('cursor=40')).not.toHaveProperty('cursor');
     // A stale cursor sitting in the URL never survives a rewrite built from
