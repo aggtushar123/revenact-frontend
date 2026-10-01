@@ -166,7 +166,7 @@ export const RISK_ROWS: PipelineRow[] = [adminLeft, budgetFreeze, championMitiga
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
-const MAX_IDS = 500;
+export const MAX_IDS = 500;
 const SORT_KEYS = ['mrr', 'date', 'priority', 'stage', 'title'];
 const GROUPS = ['stage', 'month', 'parent', 'owner', 'department', 'priority'];
 const DATE_FILTERS = ['30', '90', '180', 'overdue', 'none'];
@@ -181,8 +181,8 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 const DATE_VALUE = 'A date is YYYY-MM-DD, or null to clear it.';
 
 /** Python's `int(raw)`, or null: surrounding spaces allowed, nothing else. */
-const intOrNull = (raw: string | null): number | null => (raw !== null && /^\s*[+-]?\d+\s*$/.test(raw) ? Number(raw) : null);
-const commaList = (raw: string | null) =>
+export const intOrNull = (raw: string | null): number | null => (raw !== null && /^\s*[+-]?\d+\s*$/.test(raw) ? Number(raw) : null);
+export const commaList = (raw: string | null) =>
   (raw ?? '')
     .split(',')
     .map((part) => part.trim())

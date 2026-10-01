@@ -34,9 +34,23 @@ describe('pipelinesServerLabel', () => {
     );
   });
 
-  it("reads anyone outside the asked kind's book with the server's placeholders", () => {
+  it("falls back to the stub's placeholders for a name outside the asked kind's book (the real server refuses the organisation)", () => {
     expect(label('risks', 'list', { owner: '9', organisation: '99' })).toBe('Pipelines · Risks · Organisation: not in your book · Owner: Not in your book');
-    expect(label('opportunities', 'list', { owner: 'unassigned' })).toBe('Pipelines · Opportunities · Owner: Unassigned');
+  });
+
+  it('names the owner buckets directly, even on a book with no such rows', () => {
+    // RISK_ROWS has no unowned and no outside-owned row.
+    expect(label('risks', 'list', { owner: 'unassigned' })).toBe('Pipelines · Risks · Owner: Unassigned');
+    expect(label('risks', 'list', { owner: 'outside' })).toBe('Pipelines · Risks · Owner: Not in your book');
+  });
+
+  it('names a repeated organisation or account once, as the stored filters do', () => {
+    expect(label('opportunities', 'list', { organisation: '7,7', account: '12,12' })).toBe('Pipelines · Opportunities · Organisation: Pizza Hut · Account: Pizza Hut EMEA');
+  });
+
+  it('counts at most 500 chosen ids', () => {
+    const ids = Array.from({ length: 501 }, (_, index) => String(index + 1)).join(',');
+    expect(label('opportunities', 'list', { ids })).toBe('Pipelines · Opportunities · Chosen opportunities (500)');
   });
 });
 

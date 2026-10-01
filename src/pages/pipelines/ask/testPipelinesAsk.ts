@@ -4,10 +4,13 @@ import { FUNCTION_LABELS, type UserFunction } from '../../../features/auth/authS
 import { NO_DEPARTMENT, PIPELINE_KINDS, PRIORITY_CHOICES } from '../../../features/pipelines/pipelineKinds';
 import type { PipelineKindKey, PipelineRow } from '../../../features/pipelines/pipelineTypes';
 import {
+  MAX_IDS,
   OPPORTUNITY_ROWS,
   PICKER_ACCOUNTS,
   PICKER_ORGANISATIONS,
   RISK_ROWS,
+  commaList,
+  intOrNull,
   pipelineFilterOptions,
   stubPipelines,
   type PipelinesStub,
@@ -25,14 +28,11 @@ const DATE_LABELS: Record<PipelineKindKey, { overdue: string; none: string; with
 const DATE_FILTERS = ['30', '90', '180', 'overdue', 'none'];
 const DEPARTMENTS = [...Object.keys(FUNCTION_LABELS), NO_DEPARTMENT];
 
-const commaList = (raw: string | undefined) =>
-  (raw ?? '')
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
-const ints = (raw: string | undefined) => commaList(raw).filter((part) => /^[+-]?\d+$/.test(part)).map(Number);
+const isInt = (id: number | null): id is number => id !== null;
+/** canonical()'s ids: each once, in the order given (`_joined`). */
+const ints = (raw: string | undefined) => [...new Set(commaList(raw ?? null).map(intOrNull).filter(isInt))];
 /** params._choices: the allowed values, in the order given, each once. */
-const choices = (raw: string | undefined, allowed: readonly string[]) => [...new Set(commaList(raw).filter((value) => allowed.includes(value)))];
+const choices = (raw: string | undefined, allowed: readonly string[]) => [...new Set(commaList(raw ?? null).filter((value) => allowed.includes(value)))];
 const sameSet = (a: string[], b: string[]) => new Set(a).size === new Set(b).size && a.every((value) => b.includes(value));
 
 /** Test-only. The `label` the server stores on a Pipelines context, built as
@@ -49,7 +49,7 @@ export function pipelinesServerLabel(context: Record<string, unknown>, books: Re
   const kind = PIPELINE_KINDS[kindKey];
   const filters = (context.filters ?? {}) as Record<string, string | undefined>;
   const allStages = kind.stages.map((stage) => stage.value);
-  const ids = 'ids' in filters ? (filters.ids ?? '').split(',').filter((part) => /^\s*[+-]?\d+\s*$/.test(part)).map(Number) : null;
+  const ids = 'ids' in filters ? (filters.ids ?? '').split(',').slice(0, MAX_IDS).map(intOrNull).filter(isInt) : null;
   const named = choices(filters.stage, allStages);
   const defaults = ids !== null || context.view === 'board' ? allStages : kind.openStages;
   const stages = named.length ? named : defaults;
@@ -72,10 +72,12 @@ export function pipelinesServerLabel(context: Record<string, unknown>, books: Re
   if (orgIds.length) labels.push(`Organisation: ${orgIds.map((id) => organisations.get(id) ?? UNKNOWN).join(', ')}`);
   const accountIds = ints(filters.account);
   if (accountIds.length) labels.push(`Account: ${accountIds.map((id) => accounts.get(id) ?? UNKNOWN).join(', ')}`);
-  if (filters.owner) {
-    const owner = filters.owner === 'unassigned' || filters.owner === 'outside' ? filters.owner : /^\s*[+-]?\d+\s*$/.test(filters.owner) ? String(Number(filters.owner)) : null;
-    if (owner !== null) labels.push(`Owner: ${owners.find((option) => option.value === owner)?.name ?? NOT_IN_BOOK}`);
-  }
+  // _owner_label: the two buckets read as themselves; a person is named
+  // only from the asked kind's book.
+  const ownerId = intOrNull(filters.owner ?? null);
+  if (filters.owner === 'unassigned') labels.push('Owner: Unassigned');
+  else if (filters.owner === 'outside') labels.push(`Owner: ${NOT_IN_BOOK}`);
+  else if (ownerId !== null) labels.push(`Owner: ${owners.find((option) => option.value === String(ownerId))?.name ?? NOT_IN_BOOK}`);
   if (!sameSet(stages, defaults)) labels.push(`Stage: ${stages.map((value) => kind.stages.find((stage) => stage.value === value)!.label).join(', ')}`);
   const priorities = choices(
     filters.priority,
