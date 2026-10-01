@@ -279,7 +279,7 @@ export interface PipelinesOrigin {
 }
 
 /** Every structured context a question can carry, told apart by `surface`
- *  (and, on Organizations, Contacts, Accounts and Pipelines, by `view`). */
+ *  (and, on Organizations, Contacts and Accounts, by `view`). */
 export type SurfaceContext =
   | DashboardContext
   | OrganizationsContext
