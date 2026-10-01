@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { pipelineQueries, recordWrites, stubPipelines } from '../../features/pipelines/testPipelines';
+import { OPPORTUNITY_ROWS, buildPipelinePage, pipelineQueries, recordWrites, stubPipelines } from '../../features/pipelines/testPipelines';
 import { resetViewport } from '../../test/viewport';
 import { renderPipelines } from './testPages';
 
@@ -38,6 +38,22 @@ describe('Pipelines board', () => {
     expect(await within(column('closed_lost')).findByRole('button', { name: 'Hooli pilot' })).toBeInTheDocument();
     await userEvent.click(within(column('closed_lost')).getByRole('button', { name: 'Hide Closed Lost' }));
     expect(within(column('closed_lost')).queryByRole('button', { name: 'Hooli pilot' })).toBeNull();
+  });
+
+  it("says the Board's first read failed, with Try again reading it again", async () => {
+    let failing = true;
+    const spy = stubPipelines({
+      pipeline: (kind, query) => (failing ? { status: 500, body: null } : buildPipelinePage(kind, query, OPPORTUNITY_ROWS)),
+    });
+    renderPipelines('/pipelines/board');
+    expect(await screen.findByText('Request failed (500)')).toBeInTheDocument();
+    expect(columnKeys()).toEqual([]);
+    const reads = pipelineQueries(spy, 'opportunities').length;
+    failing = false;
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await within(await findColumn('negotiation')).findByRole('button', { name: 'EMEA seats' })).toBeInTheDocument();
+    expect(pipelineQueries(spy, 'opportunities').length).toBeGreaterThan(reads);
+    expect(screen.queryByText('Request failed (500)')).toBeNull();
   });
 
   it('keeps Closed Lost out of the URL, and titles its Show and Hide buttons', async () => {

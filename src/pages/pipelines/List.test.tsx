@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { pipelineBulkBodies, pipelineQueries, recordWrites, stubPipelines } from '../../features/pipelines/testPipelines';
+import { emeaSeats, pipelineBulkBodies, pipelineQueries, recordWrites, stubPipelines } from '../../features/pipelines/testPipelines';
 import { resetViewport } from '../../test/viewport';
 import { renderPipelines } from './testPages';
 
@@ -183,6 +183,55 @@ describe('Pipelines list', () => {
     await userEvent.click(within(bar).getByRole('button', { name: 'Clear date' }));
     await userEvent.click(within(bar).getByRole('button', { name: 'Apply to 1' }));
     await waitFor(() => expect(pipelineBulkBodies(spy, 'opportunities')[2]).toEqual({ ids: [42], action: 'set_date', value: null }));
+  });
+
+  it("pages a section past its first 25 with Show more, sending the cursor the server gave", async () => {
+    // 30 open deals in Negotiation, MRR 30..1 so the order is the ids' order.
+    const deals = Array.from({ length: 30 }, (_, index) => ({ ...emeaSeats, id: 100 + index, title: `Deal ${index + 1}`, mrr: 30 - index }));
+    const spy = stubPipelines({ opportunities: deals });
+    renderPipelines('/pipelines/list');
+    const section = (await screen.findByRole('heading', { name: /^Negotiation/ })).closest('section') as HTMLElement;
+    expect(await within(section).findByRole('button', { name: 'Deal 25' })).toBeInTheDocument();
+    expect(within(section).queryByRole('button', { name: 'Deal 26' })).toBeNull();
+    await userEvent.click(within(section).getByRole('button', { name: 'Show more Negotiation' }));
+    expect(await within(section).findByRole('button', { name: 'Deal 30' })).toBeInTheDocument();
+    expect(within(section).getAllByRole('button', { name: /^Deal \d+$/ })).toHaveLength(30);
+    const more = pipelineQueries(spy, 'opportunities').filter((query) => query.has('cursor'));
+    expect(more.map((query) => [query.get('group_value'), query.get('cursor'), query.get('limit')])).toEqual([['negotiation', '25', '25']]);
+    // Every row has landed, so there is no further page to ask for.
+    expect(within(section).queryByRole('button', { name: 'Show more Negotiation' })).toBeNull();
+  });
+
+  it('says a bulk request failed with a 500, keeping the selection for a retry', async () => {
+    const spy = stubPipelines({ bulk: () => ({ status: 500, body: null }) });
+    renderPipelines('/pipelines/list?group=none');
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Select EMEA seats' }));
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select Analytics add-on' }));
+    const bar = screen.getByRole('region', { name: 'Selection' });
+    await waitFor(() => expect(within(bar).getByRole('combobox', { name: 'Set priority' })).toBeEnabled());
+    await userEvent.selectOptions(within(bar).getByRole('combobox', { name: 'Set priority' }), 'low');
+    const readsBefore = pipelineQueries(spy, 'opportunities').length;
+    await userEvent.click(within(bar).getByRole('button', { name: 'Apply to 2' }));
+    await waitFor(() => expect(pipelineBulkBodies(spy, 'opportunities')).toEqual([{ ids: [41, 42], action: 'set_priority', value: 'low' }]));
+    expect(await within(bar).findByText('Request failed (500)')).toHaveClass('text-danger');
+    // The book reads again after the failure; both stay selected.
+    await waitFor(() => expect(pipelineQueries(spy, 'opportunities').length).toBeGreaterThan(readsBefore));
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select EMEA seats' })).toBeEnabled());
+    expect(within(bar).getByText('selected', { exact: false })).toHaveTextContent('2 selected');
+    expect(screen.getByRole('checkbox', { name: 'Select EMEA seats' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Select Analytics add-on' })).toBeChecked();
+  });
+
+  it("says an export failed, in the server's words", async () => {
+    stubPipelines({ exportCsv: () => ({ status: 503, body: { detail: 'Export is unavailable right now.' } }) });
+    URL.createObjectURL = vi.fn(() => 'blob:x');
+    URL.revokeObjectURL = vi.fn();
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    renderPipelines('/pipelines/list?group=none');
+    await userEvent.click(await screen.findByRole('button', { name: 'Export' }));
+    expect(await screen.findByText('Export is unavailable right now.')).toBeInTheDocument();
+    expect(click).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Export' })).toBeEnabled());
   });
 
   it('exports the view, and the selection by ids', async () => {

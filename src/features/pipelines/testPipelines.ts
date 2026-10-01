@@ -443,7 +443,12 @@ export interface PipelinesStub {
   risks?: PipelineRow[];
   /** Answer GET /pipelines/<kind>/ yourself; return `{status, body}` for an error. */
   pipeline?: (kind: PipelineKindKey, query: URLSearchParams) => PipelinePage | { status: number; body: unknown };
-  bulk?: (kind: PipelineKindKey, body: PipelineBulkRequest) => BulkResult;
+  /** Answer a valid POST /pipelines/<kind>/bulk/ yourself: a result, or
+   *  `{status, body}` for an error (a 500's HTML page reads as body null). */
+  bulk?: (kind: PipelineKindKey, body: PipelineBulkRequest) => BulkResult | { status: number; body: unknown };
+  /** Answer GET /pipelines/<kind>/export.csv with an error `{status, body}`;
+   *  return null for the default CSV. */
+  exportCsv?: (kind: PipelineKindKey, query: URLSearchParams) => { status: number; body: unknown } | null;
   /** Answer PATCH /opportunities/<id>/ or /risks/<id>/ yourself (a failure, say). */
   patch?: (kind: PipelineKindKey, id: number, body: Record<string, unknown>) => { status: number; body: unknown };
 }
@@ -589,7 +594,10 @@ export function stubPipelines(stub: PipelinesStub = {}) {
       const out = (stub.pipeline ?? ((k: PipelineKindKey, q: URLSearchParams) => buildPipelinePage(k, q, books[k])))(kind, url.searchParams);
       return 'results' in out ? json(200, out) : json(out.status, out.body);
     }
-    if (/^\/pipelines\/(opportunities|risks)\/export\.csv$/.test(path)) {
+    const exported = /^\/pipelines\/(opportunities|risks)\/export\.csv$/.exec(path);
+    if (exported) {
+      const failure = stub.exportCsv?.(exported[1] as PipelineKindKey, url.searchParams) ?? null;
+      if (failure) return json(failure.status, failure.body);
       return { ok: true, status: 200, json: async () => null, blob: async () => new Blob(['Title,Revenact ID\nEMEA seats,41\n'], { type: 'text/csv' }) };
     }
     const bulk = /^\/pipelines\/(opportunities|risks)\/bulk\/$/.exec(path);
@@ -598,7 +606,10 @@ export function stubPipelines(stub: PipelinesStub = {}) {
       const error = bulkError(kind, body);
       if (error) return json(400, error);
       const request = body as unknown as PipelineBulkRequest;
-      if (stub.bulk) return json(200, stub.bulk(kind, request));
+      if (stub.bulk) {
+        const out = stub.bulk(kind, request);
+        return 'updated' in out ? json(200, out) : json(out.status, out.body);
+      }
       const result: BulkResult = { updated: [], failed: [] };
       for (const id of [...new Set(request.ids)]) {
         const index = books[kind].findIndex((row) => row.id === id);
