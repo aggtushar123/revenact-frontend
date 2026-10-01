@@ -488,7 +488,8 @@ which the Story's own + Add and Files/Calls tabs carry forward.
      no `stage` the server lists the open stages.
    - A `limit=1` frame read gives the tiles, groups, filter options, count and
      currency; each open section reads its own rows with `group_value`; with a
-     filter on, a `limit=1` probe gives M for "N of M opportunities".
+     filter on, a `limit=1` probe gives M for "N of M opportunities" (the
+     same stages and `ids` as N, so both count the same set).
    - Selecting items offers Set stage, priority, department and date through
      `POST /pipelines/<kind>/bulk/`; a failure is named per item and stays
      selected. Export sends the view's query, or `ids`, to

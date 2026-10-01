@@ -13,17 +13,22 @@ export const PIPELINE_PAGE_SIZE = 50;
 export const PIPELINE_SECTION_SIZE = 25;
 
 /** `total` is M in "N of M": the kind's book in the same stages as N (the
- *  URL's, else the view's default ones) with every other filter off. Null
- *  when no filter but the stage choice is on (M would equal N; the page then
- *  says "N opportunities"), and never less than N. */
+ *  URL's, else the view's default ones) and the same `ids` (with `ids` and
+ *  no stage the server lists every stage, so M must name them too, ruling
+ *  F16) with every other filter off. Null when nothing but the stage choice
+ *  and `ids` narrows (M would equal N; the page then says "N
+ *  opportunities"), and never less than N. */
 export type PipelineBook = PagedBook<PipelineRow, PipelinePage>;
 
-/** M's query, or null when nothing but the stages narrows the book. Sort
- *  never changes a count, so it is dropped here (as Organizations' probe
- *  sends none): otherwise a sort change alone would reload the probe. */
+/** M's query, or null when nothing but the stages and ids narrows the
+ *  book. Sort never changes a count, so it is dropped here (as
+ *  Organizations' probe sends none): otherwise a sort change alone would
+ *  reload the probe. */
 function totalQuery(params: PipelineParams, view: PipelineView): string | null {
-  if (!hasPipelineFilters({ ...params, stage: [] })) return null;
-  const query = new URLSearchParams(pipelineApiQuery({ ...params, ...EMPTY_PIPELINE_FILTERS, stage: params.stage, group: '' }, view, { limit: '1' }));
+  if (!hasPipelineFilters({ ...params, stage: [], ids: [] })) return null;
+  const query = new URLSearchParams(
+    pipelineApiQuery({ ...params, ...EMPTY_PIPELINE_FILTERS, stage: params.stage, ids: params.ids, group: '' }, view, { limit: '1' }),
+  );
   query.delete('sort');
   return query.toString();
 }

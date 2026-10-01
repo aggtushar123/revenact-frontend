@@ -40,6 +40,25 @@ describe('usePipelineBook', () => {
     expect(probe?.get('owner')).toBeNull();
   });
 
+  it('keeps ids in the M probe, so with no stage N and M both count every stage of those ids', async () => {
+    const spy = stubPipelines();
+    const { result } = renderHook(() => usePipelineBook(OPPORTUNITIES_KIND, params('ids=41,44&owner=2&group=none'), 'list', 0));
+    await waitFor(() => expect(result.current.rows.map((row) => row.id)).toEqual([41]));
+    // 44 is Closed Won: counted in M because ids lists every stage, as N does.
+    await waitFor(() => expect(result.current.total).toBe(2));
+    const probe = pipelineQueries(spy, 'opportunities').find((query) => query.get('limit') === '1');
+    expect(probe?.get('ids')).toBe('41,44');
+    expect(probe?.get('owner')).toBeNull();
+  });
+
+  it('has no M when ids and stages are the only narrowing, since M would equal N', async () => {
+    const spy = stubPipelines();
+    const { result } = renderHook(() => usePipelineBook(OPPORTUNITIES_KIND, params('ids=41,44&group=none'), 'list', 0));
+    await waitFor(() => expect(result.current.rows.map((row) => row.id).sort()).toEqual([41, 44]));
+    expect(result.current.total).toBeNull();
+    expect(pipelineQueries(spy, 'opportunities')).toHaveLength(1);
+  });
+
   it("counts the Board's M over every stage, as the Board lists them", async () => {
     const spy = stubPipelines();
     const { result } = renderHook(() => usePipelineBook(OPPORTUNITIES_KIND, params('owner=3'), 'board', 0));
