@@ -51,6 +51,14 @@ describe('Pipelines board', () => {
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/pipelines\/board$/);
   });
 
+  it('leaves focus alone on load under StrictMode (the collapsed Show button is not focused)', async () => {
+    stubPipelines();
+    renderPipelines('/pipelines/board', { strict: true });
+    const lost = await findColumn('closed_lost');
+    const show = within(lost).getByRole('button', { name: 'Show Closed Lost' });
+    expect(document.activeElement).not.toBe(show);
+  });
+
   it('moves focus to Hide after Show, and to Show after Hide (Show/Hide swap the focused node)', async () => {
     stubPipelines();
     renderPipelines('/pipelines/board');

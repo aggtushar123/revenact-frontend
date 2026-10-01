@@ -80,17 +80,20 @@ export function PipelineColumn({
   const hideRef = useRef<HTMLButtonElement | null>(null);
   const showRef = useRef<HTMLButtonElement | null>(null);
   // Hide and Show replace each other's button, so a click always removes
-  // the node focus was on: land it on whichever one takes its place
-  // (skipped on mount, since nothing was collapsed or shown yet).
-  const mounted = useRef(false);
+  // the node focus was on: land it on whichever one takes its place. Only
+  // after a click here, never on mount (StrictMode runs mount effects twice,
+  // and focusing would scroll the board to this column).
+  const toggled = useRef(false);
   useEffect(() => {
-    if (!mounted.current) {
-      mounted.current = true;
-      return;
-    }
+    if (!toggled.current) return;
+    toggled.current = false;
     if (collapsed) showRef.current?.focus();
     else hideRef.current?.focus();
   }, [collapsed]);
+  const toggle = () => {
+    toggled.current = true;
+    onToggleCollapsed?.();
+  };
   return (
     <StageColumn<PipelineRow>
       columnKey={spec.key}
@@ -99,7 +102,7 @@ export function PipelineColumn({
       actions={
         <>
           {onToggleCollapsed && !collapsed ? (
-            <button ref={hideRef} type="button" onClick={onToggleCollapsed} aria-label={hide} title={hide} className={COLUMN_ICON_BUTTON}>
+            <button ref={hideRef} type="button" onClick={toggle} aria-label={hide} title={hide} className={COLUMN_ICON_BUTTON}>
               <EyeOff className="w-4 h-4" aria-hidden="true" />
             </button>
           ) : null}
@@ -112,7 +115,7 @@ export function PipelineColumn({
       }
       placeholder={
         collapsed ? (
-          <button ref={showRef} type="button" onClick={onToggleCollapsed} title={show} className={`${QUIET} w-full border border-dashed border-line`}>
+          <button ref={showRef} type="button" onClick={toggle} title={show} className={`${QUIET} w-full border border-dashed border-line`}>
             {show}
           </button>
         ) : null
