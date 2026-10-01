@@ -67,7 +67,7 @@ closing it on unmount or token change.
 | `/organizations/{list,board,:id}` | `List`, `Board`, `OrganizationDetails` | auth |
 | `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard` (the Accounts portfolio), `AccountDetails` (the account's story, read by the URL id alone). `AccountsAskLayout` wraps all three in one `AskProvider` (surface `accounts`, delivery 3 of the Ask spec, own preference key `revenact_accounts_ask`), one conversation lasting from the List into the Board, into an account and back: a question posts `context: {surface:'accounts', view:'list'\|'board', filters}` (set keys only, no focus — the List and the Board send no focus, unlike Organizations' list) or `{view:'detail', account, focus}`. Each story item's "Ask about this" sets `focus: {kind, id}` for that one question, typing "What should I know about this `<kind>`?" without sending. Each page reports its own names to the layout (`accountsNames.ts`'s `useReportAccountsOptions` from the List and the Board, `useReportAccountName` from the account page), so a live chip names the portfolio's filter options or the account's own row before the server has ("Accounts · Owner: Carl CSM", the account's name, or "This account"); a sent question shows the server's own `label`. A `400` under `context.account` reads "You can no longer ask about this account."; under `context.focus`, "You can no longer ask about this item. Ask about the account instead."; under `context.filters`, "You can't ask about this list. Clear the filters and ask again." History reopens `/accounts/list?<filters>` (never `/accounts`, whose redirect drops the query), `/accounts/board?<filters>` or `/accounts/:id` | auth |
 | `/contacts`, `/contacts/:id` | `ContactsPage`: the list with its summary line and filters (`q`, `customer`, `account`, `sentiment`, `role` in the URL), and the chosen person's profile beside it (`GET /contacts/`, `GET /contacts/<id>/`, `GET /contacts/<id>/history/`); on phones the person is its own screen with a back link. `/contacts/list` redirects to `/contacts`, keeping its query string; `/contacts/<non-numeric>` shows the not-found state. `ContactsAskLayout` wraps this route in one `AskProvider` (surface `contacts`, delivery 2 of the Ask spec, own preference key `revenact_contacts_ask`): a question posts `context: {surface:'contacts', view:'list', filters}` or `{view:'person', contact, focus}`; the chip names the filtered organisation/account, sentiment and role (or a quoted search term), or the open person's name and place, with "Sentiment" appended while `focus:'sentiment'`. "Why this sentiment?" under a person's sentiment line drafts "Why is <first name>'s sentiment <word>?" with that focus and opens the rail without sending. A `400` under `context.contact` reads "You can't ask about this person here."; under `context.filters`, "You can't ask about this list. Clear the filters and ask again." History reopens a Contacts conversation on `/contacts/:id` (a person) or `/contacts?<filters>` (a list) | auth |
-| `/pipelines/{list,board}` | `PipelinesPage` | auth |
+| `/pipelines/{list,board}` | `PipelinesList`, `PipelinesBoard` (`pages/pipelines/List.tsx`, `Board.tsx`): one book of opportunities or risks across organisations and accounts, `?kind=risks` for risks; `/pipelines` redirects to the List | auth |
 | `/communications` | `CommunicationsPage`, arranged as an inbox with its own top bar (no Navbar): the inbox card (folders for the four kinds of waiting with counts, Needs-you and Mine-only switches, a list grouped by month, the open item in place, with a `ReplyBox` under it: Draft with Copilot fills it from the thread and the account's history and lists the sources used; Send reply on an email row sends from the person's mailbox via `POST /communications/emails/<id>/reply/`); on `?source=mailbox:<provider>` the card is `MailboxView` instead, the person's own mail whole (Inbox/Drafts/Sent/Done/Muted with counts, Priority and Unread switches, Starred/Important/Spam/Trash and the categories, a Categories block of what is waiting, the list by month, the open message with star/done/mute and a reply that sends from the mailbox); and the shared Copilot rail (`components/copilot/CopilotRail`, with Next event above it and the picked source as context; New chat, History and a hide switch live in the top bar) | auth |
 | `/copilot` | `CopilotIndex`: **the home page**. No Navbar, no frame; the greeting, the ask box, three suggested questions and the skills sit directly on the canvas, with a small Copilot/Cockpit switch top-right. Cockpit sits on the same canvas: My book (counts, value, health rings), Renewals with a window selector and drill-down, and My tasks, where the circle on a row completes the task through `PATCH /tasks/<id>/` (optimistic, reverted with the backend's message on refusal). First item in the sidebar | auth |
 | `/scenarios`, `/scenarios/create`, `/scenarios/:id` | `ScenariosList`, `CreateScenario` | auth |
@@ -479,11 +479,31 @@ which the Story's own + Add and Files/Calls tabs carry forward.
 
 ### 4.5 Pipelines
 
-`/pipelines/board` loads opportunities, risks and customers. Switch between the
-two record kinds, drag a card between stage columns to patch its `stage`, use the
-"+" in a column header to open the form preset to that stage, and narrow with the
-Filters popover (department, priority, stage). What a person sees is already
-scoped server-side by department.
+1. `/pipelines/list` reads `GET /pipelines/{opportunities|risks}/` (the kind
+   from `?kind=`, opportunities when absent):
+   - Its state is in the URL: `kind, search, organisation, account, owner
+     (id|unassigned|outside), stage, priority, department (none = whole
+     company), date (30|90|180|overdue|none), changed (quarter), ids, sort,
+     group`. `group` defaults to stage; `group=none` turns grouping off. With
+     no `stage` the server lists the open stages.
+   - A `limit=1` frame read gives the tiles, groups, filter options, count and
+     currency; each open section reads its own rows with `group_value`; with a
+     filter on, a `limit=1` probe gives M for "N of M opportunities".
+   - Selecting items offers Set stage, priority, department and date through
+     `POST /pipelines/<kind>/bulk/`; a failure is named per item and stays
+     selected. Export sends the view's query, or `ids`, to
+     `GET /pipelines/<kind>/export.csv`.
+2. `/pipelines/board` uses the same state; with no `stage` it asks for every
+   stage. A move is `PATCH /opportunities/<id>/` or `/risks/<id>/` with the
+   new `stage`, then the frame and the two columns it touched read again.
+3. An item or card opens `OpportunityFormModal` / `RiskFormModal`, built from
+   its row. Save PATCHes `/opportunities/<id>/` (or `/risks/<id>/`), Delete
+   confirms and DELETEs; Add reads `GET /customers/` for its organisation
+   picker, then `GET /customers/<id>/accounts/`, and POSTs `/opportunities/`
+   (or `/risks/`) with `customer_id` or `account_id`. The page reads its book
+   again after each.
+4. Opportunities | Risks keeps the view and the shared filters and drops
+   `stage`, `changed` and `ids`. Ask on Pipelines is delivery 2.
 
 ### 4.5b Feature requests (Brain > Feature Requests)
 

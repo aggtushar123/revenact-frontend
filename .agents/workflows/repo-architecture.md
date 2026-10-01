@@ -43,6 +43,7 @@ react-ts-app/
 │   │   ├── attention/          ← attentionApi.ts — plain fetch wrappers (no slice) for the
 │   │   │                          Overview's attention list: fetch, snooze, unsnooze
 │   │   ├── tasks/              ← Tasks slice (create task from CallSense AI actions)
+│   │   ├── pipelines/          ← the Pipelines book: types, API, kinds (OPPORTUNITIES_KIND, RISKS_KIND), URL state, chips
 │   │   └── counter/            ← Legacy counter slice (unused)
 │   ├── layouts/                ← Shell layouts
 │   │   └── DashboardLayout.tsx
@@ -52,6 +53,7 @@ react-ts-app/
 │   │   ├── shared/             ← Multi-domain components (Summary; ActivityFeed and PinnedAttributes are unused — see "Adding a New Activity Tab" below and §4.4 of docs/04-app-flow.md)
 │   │   ├── accounts/portfolio/ ← AccountPanels, accountKind (ACCOUNT_KIND) for the Accounts list and board
 │   │   ├── accounts/detail/    ← the account page: AccountHeader, AccountTiles, AccountPulseBreakdown, AccountDetailsTab, CanvasesTab, useAccount
+│   │   ├── pipelines/          ← OpportunityFormModal, RiskFormModal, KanbanBoard (the Deals & risks board); portfolio/ holds the Pipelines book's parts
 │   │   ├── contacts/           ← ContactsToolbar, ContactList(Item), ContactProfile, HistoryItems, ContactFormModal
 │   │   ├── dashboard/charts/   ← Shared Recharts chart components (AI Trending)
 │   │   └── organizations/      ← Org domain components; portfolio/ holds the list page's (see below)
@@ -64,7 +66,7 @@ react-ts-app/
 │       ├── scenarios/          ← Visual scenario builder (React Flow)
 │       ├── settings/           ← Settings module (data, currency, etc.)
 │       ├── integrations/       ← Integrations catalogue page
-│       ├── pipelines/          ← Pipelines board + list view
+│       ├── pipelines/          ← List and Board (one book of opportunities or risks)
 │       └── dashboard/          ← Analytics dashboards (Health, Ticket, AI Trending)
 ├── index.html
 ├── package.json
@@ -129,9 +131,9 @@ react-ts-app/
 ├── contacts/:id               → ContactsPage, that person chosen
 ├── contacts/list              → Redirects to /contacts
 └── pipelines/
-    ├── (index)                → Redirects to /pipelines/board
-    ├── list                   → Pipelines list view
-    └── board                  → Pipelines kanban board (drag-and-drop)
+    ├── (index)                → Redirects to /pipelines/list
+    ├── list                   → PipelinesList (List.tsx on GET /pipelines/<kind>/, ?kind=risks)
+    └── board                  → PipelinesBoard (Board.tsx: stage columns, moves PATCH the item)
 ```
 
 ---
@@ -332,7 +334,10 @@ inside `OrganizationsFrame` (the dashboard's body, with the Ask rail in its `rai
 | `components/organizations/portfolio/usePagedBook.ts` | `usePagedBook` — a page's frame read (rows only when flat) plus the M probe for "N of M", given any reader; `usePortfolio` and Pipelines' `usePipelineBook` both use it |
 | `components/organizations/portfolio/usePortfolio.ts` | `usePagedPortfolio` (`usePagedRead` wired to the kind's `fetch`/`noun`: one cursor-paged read for the frame, each section, each board column) and `usePortfolio` (`usePagedBook` with the kind's query and `totalQuery`) |
 | `components/organizations/portfolio/PortfolioSections.tsx` | `PagedSections` (grouped sections or one flat list with loading, empty and error states, for any book; Pipelines' `PipelineSections` uses it), `PortfolioSections` (it, in the portfolio kind's words), `EmptyBook`, `ItemSkeleton`/`RowSkeleton`, `EmptyState`, `ErrorBlock`, `MoreButton` |
-| `components/pipelines/portfolio/*` | `itemParts` (signal, date line, stage and priority tags, Part of), `PipelineItem` (one List item), `usePipelineBook` (frame + M in the same stages), `PipelineSections`, `usePipelineParams` |
+| `components/organizations/portfolio/{usePagedRead,tileParts,filterParts,MoveToMenu,useSearchText,SelectionActionsBar}` | The shape-agnostic parts the Organizations, Accounts and Pipelines books share: the cursor-paged read, tiles, the Filters sheet and fields, the Move to… menu, the debounced search box, the selection bar with any choices and a date |
+| `components/organizations/portfolio/{toolbarParts,filterParts,usePortfolioBulk,DismissibleAlert}` | More shared parts: `toolbarParts` (`ToolbarSearch`, `FiltersTrigger`, `SelectToggle`, `ToolbarActions`), `filterParts`'s `FilterSheetFooter`, `usePortfolioBulk` (selection, bulk apply and export, by any portfolio kind), `DismissibleAlert` |
+| `components/organizations/portfolio/{useBoardMove,boardFrame,BoardColumn,PortfolioBoard}` | The board move machinery every board (Organizations, Accounts, Pipelines) shares: `useStageMove` (in `useBoardMove.ts`; `useBoardMove` is now a thin adapter over it for lifecycle), `boardFrame.ts` (frame inputs, drag state, settle timing), `StageColumn`/`CardSkeleton` (with an `avatar` prop; `BoardColumn` is a thin adapter over `StageColumn`), `BoardLayout`/`BoardSkeleton` (in `PortfolioBoard.tsx`) |
+| `features/pipelines/*`, `components/pipelines/portfolio/*` | The Pipelines book: `pipelineTypes`, `pipelineApi`, `pipelineKinds` (`OPPORTUNITIES_KIND`, `RISKS_KIND`, date line, row → form record), `pipelineParams`, `pipelineChips`; `itemParts` (signal, date line, stage and priority tags, Part of), `ParentPicker` (the + Add form's server-searched organisation/account picker, over `/customers/?search=` and `/accounts/?search=`, replacing a static company list — `usePipelineForms` no longer takes `companies`; the forms take an optional `parentField`), `PipelineItem`, `PipelineSections`, `PipelineTiles`, `PipelineToolbar`, `PipelineFilters`, `PipelineBoard`, `PipelineColumn`, `PipelineCard`, `PipelineKindSwitch`, `PipelineModals`, `usePipelineBook`, `usePipelineMove`, `usePipelineForms`, `usePipelineParams`; `features/pipelines/testPipelines.ts` (`stubPipelines`) and `pages/pipelines/testPages.tsx` (`renderPipelines`) for tests |
 | `components/organizations/portfolio/*` | `AccountRow`, `rowParts`, `AccountDetails`, `AccountSheet`, `SummaryTiles`, `PortfolioToolbar`, `FiltersPanel`, `PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `useSelection`, `usePins`, `usePortfolioParams`; for the board `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`, `useBoardMove`, `boardMove`, `useEndSentinel` |
 | `features/organizations/testPortfolio.ts`, `pages/organizations/testList.tsx` | Fixtures, `buildPortfolio`, `stubPortfolio`; `renderOrganizations(url, {width, nav, ask})`, `renderList`, `renderBoard`; `src/test/intersection.ts` (fake IntersectionObserver) |
 | `components/organizations/portfolio/portfolioKind.ts`, `organizationKind.ts` | The portfolio kind the shared components read from `PortfolioKindContext` (endpoint, params, words, links, row line, panels, how a move saves); `ORGANIZATION_KIND` is the default |
@@ -363,7 +368,7 @@ dismissable alert with the server's reason. It hands Churn to
 `useOverlayActive` keeps the optimistic guess on screen until each read's
 fresh page lands. From `sm` an opened card is `AccountSidePanel`, a non-modal
 aside beside the board; below it, the modal `AccountSheet`, with column tabs
-over snapping panels. `KanbanBoard` is no longer used here (Pipelines keeps
+over snapping panels. `KanbanBoard` is no longer used here (the Deals & risks tabs keep
 it). The Accounts board is this board with `ACCOUNT_KIND` (`pages/accounts/Board.tsx`).
 
 #### Details View (`pages/organizations/Details.tsx`)
@@ -383,7 +388,7 @@ delivery 1). It draws itself in `OrganizationsFrame` (no rail until delivery 3).
   `AddFlow` open in a `Sheet`. `AddFlow` reuses `TaskForm`, `NoteForm`, `CallForm`
   and `LogSurveyForm` from `components/organizations/activity/`.
 - **Other tabs:** `DetailsTab` (`AccountsSection`, portfolio `AccountDetails`, `CustomerFacts` + `AIAttributesPanel`),
-  `PeopleTab` (`ContactsTab`), `DealsTab` (`PipelinesTab`), `KnowledgeTab`
+  `PeopleTab` (`ContactsTab`), `DealsTab` (items with the date line and Overdue; `KanbanBoard` from `sm`), `KnowledgeTab`
   (`CompanyViewTab` + `HeadlinesTab`), `FilesCallsTab` (`FilesTab` + `CallSenseTab`).
 - **Tests:** unit tests beside each part in `components/organizations/detail/`, the
   house-rules scan and field coverage there, `Details.test.tsx` (integration with
@@ -550,12 +555,14 @@ Integration catalogue with cards for connecting external tools (HubSpot, Salesfo
 
 ---
 
-### 10. Pipelines (`pages/pipelines/PipelinesPage.tsx`)
+### 10. Pipelines (`pages/pipelines/List.tsx`, `Board.tsx`)
 
-Dual-view (list + kanban board) pipeline management module:
-- Drag-and-drop cards between pipeline stages
-- KPI metrics at top
-- Toggle between list and board views
+One book of opportunities or risks across organisations and accounts (spec
+`docs/superpowers/specs/2026-09-30-pipelines-redesign-design.md`): the
+portfolio design (tiles with an open-stage strip, URL filters, list items
+with Part of and a date line, selection with bulk stage / priority /
+department / date, export) and a stage Board whose moves PATCH the item. See
+`docs/03-ui-ux-design.md` "Portfolio rows and board (Pipelines)".
 
 ---
 
@@ -581,7 +588,7 @@ App.tsx
   │     ├── OrganizationsFrame; components/organizations/detail/* (OrganizationHeader, HeaderTiles,
   │     │     AccountChips, DetailTabs, StoryTab → AttentionBlock, StoryToolbar, StoryStream, EmailThread, AddFlow, Sheet)
   │     ├── Details: detail/AccountsSection + portfolio/AccountDetails + detail/CustomerFacts + shared/AIAttributesPanel
-  │     └── People, Deals & risks, Knowledge, Files: shared/ContactsTab, shared/PipelinesTab,
+  │     └── People, Deals & risks, Knowledge, Files: shared/ContactsTab, detail/DealsTab,
   │           CompanyViewTab + activity/HeadlinesTab, activity/FilesTab + activity/CallSenseTab
   │
   ├── pages/accounts/Details.tsx  (GET /accounts/portfolio/?ids=, /accounts/{id}/, /accounts/{id}/story/)
