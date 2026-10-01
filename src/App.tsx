@@ -16,6 +16,7 @@ import { AccountsAskLayout } from './pages/accounts/ask/AccountsAskLayout';
 import { AccountDetails } from './pages/accounts/Details';
 import { List as AccountsList } from './pages/accounts/List';
 import { List as PipelinesList } from './pages/pipelines/List';
+import { PipelinesAskLayout } from './pages/pipelines/ask/PipelinesAskLayout';
 import { Board as AccountsBoard } from './pages/accounts/Board';
 import { CopilotIndex } from './pages/copilot/Index';
 import CommunicationsPage from './pages/communications/CommunicationsPage';
@@ -288,8 +289,12 @@ function App() {
 
           <Route path="pipelines">
             <Route index element={<Navigate to="list" replace />} />
-            <Route path="list" element={<PipelinesList />} />
-            <Route path="board" element={<PipelinesBoard />} />
+            {/* One Ask conversation above both views and both kinds
+                (pipelines spec 2026-09-30 §3). */}
+            <Route element={<PipelinesAskLayout />}>
+              <Route path="list" element={<PipelinesList />} />
+              <Route path="board" element={<PipelinesBoard />} />
+            </Route>
           </Route>
 
           {/* Company Brain: one real page now (the metric layer). The mock
