@@ -59,12 +59,12 @@ export interface PipelinesNames {
   options: PipelineFilterOptions;
 }
 
-export function isPipelineFocus(focus: AskFocus | PipelineFocus | null | undefined): focus is PipelineFocus {
+export function isPipelineFocus(focus: AskFocus | null | undefined): focus is PipelineFocus {
   return focus != null && (focus.kind === 'opportunity' || focus.kind === 'risk');
 }
 
 /** `focus` when it is an item of `kind`'s own sort, else null. */
-export function pipelineFocusFor(focus: AskFocus | PipelineFocus | null, kind: PipelineKindKey): PipelineFocus | null {
+export function pipelineFocusFor(focus: AskFocus | null, kind: PipelineKindKey): PipelineFocus | null {
   return isPipelineFocus(focus) && focus.kind === PIPELINE_KINDS[kind].item ? focus : null;
 }
 

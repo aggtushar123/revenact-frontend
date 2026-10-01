@@ -120,4 +120,21 @@ describe('refusalMessage', () => {
     );
     expect(refusalMessage(new ApiError(400, { context: { focus: { key: ['Not an item on your list.'] } } }, 'Bad'))).toBeNull();
   });
+
+  it('reads a Pipelines refusal by the item or the list it was asked about', () => {
+    const onRisk = { surface: 'pipelines', kind: 'risks', view: 'board', filters: {}, focus: { kind: 'risk', id: 71 } } as const;
+    const onDeal = { surface: 'pipelines', kind: 'opportunities', view: 'list', filters: {}, focus: { kind: 'opportunity', id: 41 } } as const;
+    const filtered = { surface: 'pipelines', kind: 'opportunities', view: 'list', filters: { account: '12' } } as const;
+    const bad = (context: unknown) => new ApiError(400, { context }, 'Bad');
+    const item = ['Not an opportunity or risk you can open.'];
+    expect(refusalMessage(bad({ focus: item }), onRisk)).toBe('You can no longer ask about this risk.');
+    expect(refusalMessage(bad({ focus: item }), onDeal)).toBe('You can no longer ask about this opportunity.');
+    expect(refusalMessage(bad({ filters: { account: ['Not an account you can open.'] } }), filtered)).toBe(
+      "You can't ask about this list. Clear the filters and ask again.",
+    );
+    expect(refusalMessage(bad({ filters: { organisation: ['Not an organisation you can open.'] } }), filtered)).toBe(
+      "You can't ask about this list. Clear the filters and ask again.",
+    );
+    expect(refusalMessage(new ApiError(500, {}, 'Oops'), onRisk)).toBeNull();
+  });
 });

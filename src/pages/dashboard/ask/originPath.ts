@@ -2,6 +2,7 @@ import { accountsPath } from '../../../features/accounts/askContext';
 import { contactsPath } from '../../../features/contacts/askContext';
 import { organizationsPath } from '../../../features/organizations/askContext';
 import { detailPath } from '../../../features/organizations/detailAskContext';
+import { pipelinesPath } from '../../../features/pipelines/askContext';
 import type { DashboardOrigin, SurfaceOrigin } from '../../copilot/types';
 import { toQuery } from '../shared/useDashboardFilters';
 
@@ -20,9 +21,10 @@ function dashboardPath(origin: DashboardOrigin): string {
 
 /** The page a conversation started on, with its filters: a dashboard view,
  *  the Organizations list or board, an organisation's page with its account
- *  chip, a Contacts person or filtered list, or an Accounts List, Board or
- *  account. */
+ *  chip, a Contacts person or filtered list, an Accounts List, Board or
+ *  account, or a Pipelines view with its kind. */
 export function originPath(origin: SurfaceOrigin): string {
+  if (origin.surface === 'pipelines') return pipelinesPath(origin);
   if (origin.surface === 'accounts') return accountsPath(origin);
   if (origin.surface === 'contacts') return contactsPath(origin);
   if (origin.surface === 'dashboard') return dashboardPath(origin);

@@ -107,10 +107,10 @@ export interface SentimentFocus {
 }
 
 /** Whatever the shared Ask slot narrows the next question to: a dashboard
- *  drill or attention item, an Organizations row, a story item, or a
- *  Contacts person's sentiment. The kinds never overlap, so `kind` tells
- *  them apart. */
-export type AskFocus = DashboardFocus | StoryFocus | SentimentFocus;
+ *  drill or attention item, an Organizations row, a story item, a Contacts
+ *  person's sentiment, or a Pipelines item. The kinds never overlap, so
+ *  `kind` tells them apart. */
+export type AskFocus = DashboardFocus | StoryFocus | SentimentFocus | PipelineFocus;
 
 /** Where a question on one organisation's page was asked (spec 2026-09-26
  *  §3, backend delivery 3). `account` is the account chip, null for every
@@ -279,7 +279,7 @@ export interface PipelinesOrigin {
 }
 
 /** Every structured context a question can carry, told apart by `surface`
- *  (and, on Organizations, Contacts and Accounts, by `view`). */
+ *  (and, on Organizations, Contacts, Accounts and Pipelines, by `view`). */
 export type SurfaceContext =
   | DashboardContext
   | OrganizationsContext
@@ -287,7 +287,8 @@ export type SurfaceContext =
   | ContactsListContext
   | ContactsPersonContext
   | AccountsListContext
-  | AccountDetailContext;
+  | AccountDetailContext
+  | PipelinesContext;
 export type SurfaceOrigin =
   | DashboardOrigin
   | OrganizationsOrigin
@@ -295,7 +296,8 @@ export type SurfaceOrigin =
   | ContactsListOrigin
   | ContactsPersonOrigin
   | AccountsListOrigin
-  | AccountDetailOrigin;
+  | AccountDetailOrigin
+  | PipelinesOrigin;
 export type SurfaceName = SurfaceContext['surface'];
 
 /** A record an answer was built from. A snapshot taken when the
