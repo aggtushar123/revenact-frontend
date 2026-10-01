@@ -93,7 +93,7 @@ export function organizationsLabel(
 ): string {
   const parts = context.labels?.length
     ? ['Organizations', ...context.labels]
-    : ['Organizations', ...filterChips(fromContextFilters(context.filters, context.view), options).map((chip) => chip.label)];
+    : ['Organizations', ...filterChips(fromContextFilters(context.filters ?? {}, context.view), options).map((chip) => chip.label)];
   const focus = focusLabel(context.focus ?? null);
   if (focus) parts.push(focus);
   return parts.join(' · ');

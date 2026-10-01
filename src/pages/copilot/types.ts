@@ -2,6 +2,7 @@
 // docs/API_CONTRACTS.md -> copilot.
 
 import type { StoryKind } from '../../features/organizations/storyTypes';
+import type { PipelineKindKey } from '../../features/pipelines/pipelineTypes';
 
 export type MessageRole = 'user' | 'assistant';
 
@@ -227,6 +228,53 @@ export interface AccountDetailOrigin {
   surface: 'accounts';
   view: 'detail';
   account: number;
+  label: string;
+}
+
+/** The Pipelines book's URL filters as a question carries them (backend
+ *  `pipelines_context.FILTER_KEYS`): only the set keys, in the page's own
+ *  URL spelling. `sort` only when it is not `-mrr`; `group` only when it is
+ *  not `stage`, `none` for the List's "None". */
+export interface PipelinesFilters {
+  search?: string;
+  organisation?: string;
+  account?: string;
+  owner?: string;
+  stage?: string;
+  priority?: string;
+  department?: string;
+  date?: string;
+  changed?: string;
+  ids?: string;
+  sort?: string;
+  group?: string;
+}
+
+/** "Ask about this" on one Pipelines item (spec 2026-09-30 §3): its kind
+ *  matches the page's (`opportunity` on opportunities, `risk` on risks); the
+ *  server refuses (400) an item the asker may not read. */
+export interface PipelineFocus {
+  kind: 'opportunity' | 'risk';
+  id: number;
+}
+
+/** A question asked on the Pipelines List or Board. The server builds
+ *  `label` ("Pipelines · Opportunities · Owner: Carl CSM") and echoes it on
+ *  a stored context, with the validated `focus`. */
+export interface PipelinesContext {
+  surface: 'pipelines';
+  kind: PipelineKindKey;
+  view: OrganizationsView;
+  filters: PipelinesFilters;
+  focus?: PipelineFocus | null;
+  label?: string;
+}
+
+export interface PipelinesOrigin {
+  surface: 'pipelines';
+  kind: PipelineKindKey;
+  view: OrganizationsView;
+  filters: PipelinesFilters;
   label: string;
 }
 

@@ -86,4 +86,14 @@ describe('organizations ask context', () => {
     // Empty labels (nothing was filtered) fall back the same as absent ones.
     expect(organizationsLabel({ ...base, filters: {}, labels: [] })).toBe('Organizations');
   });
+
+  // Ruling F3 (pipelines Ask plan): the label function guards against a
+  // context missing `filters` rather than trusting every caller to supply
+  // one. Without the `filters ?? {}` guard this throws
+  // (`Object.entries(undefined)`).
+  it('does not throw for a context missing filters and no stored labels', () => {
+    const bare = { surface: 'organizations' as const, view: 'list' as const, labels: [] } as unknown as Parameters<typeof organizationsLabel>[0];
+    expect(() => organizationsLabel(bare)).not.toThrow();
+    expect(organizationsLabel(bare)).toBe('Organizations');
+  });
 });
