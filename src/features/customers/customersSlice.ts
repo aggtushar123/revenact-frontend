@@ -1962,7 +1962,7 @@ export const deleteCanvas = createAsyncThunk<number, number, { rejectValue: stri
   }
 );
 
-// Powers the Organization Details page's own Pipelines tab — every
+// Powers the Organization Details page's own Deals & risks tab — every
 // Opportunity rolled up for one Customer (organisation-level and every
 // one of its Accounts' — see CustomerOpportunityListView's own
 // docstring), same reasoning as fetchContactsForCustomer above.
@@ -1979,7 +1979,7 @@ export const fetchOpportunitiesForCustomer = createAsyncThunk<
   }
 });
 
-// Powers the standalone Account page's own Pipelines tab — every
+// Powers the standalone Account page's own Deals & risks tab — every
 // account-level Opportunity for one Account.
 export const fetchOpportunitiesForAccount = createAsyncThunk<
   Opportunity[],
@@ -1998,7 +1998,7 @@ export const fetchOpportunitiesForAccount = createAsyncThunk<
 );
 
 // Adds an organization-level Opportunity under `customerId` — used by
-// the Organization Details page's own Pipelines tab. No extraReducers
+// the Organization Details page's own Deals & risks tab. No extraReducers
 // case, same "caller refetches" reasoning as createContactForCustomer
 // — this thunk doesn't know whether the caller is a scoped Details-page
 // tab (`pipelineOpportunities`) or something else, so it can't safely
@@ -2023,7 +2023,7 @@ export const createOpportunityForCustomer = createAsyncThunk<
 );
 
 // Adds an account-level Opportunity under `accountId` — used by the
-// standalone Account page's own Pipelines tab. Same "caller refetches"
+// standalone Account page's own Deals & risks tab. Same "caller refetches"
 // reasoning as createOpportunityForCustomer above.
 export const createOpportunityForAccount = createAsyncThunk<
   Opportunity,
@@ -2324,7 +2324,7 @@ const customersSlice = createSlice({
       state.selectedCustomerError = null;
     },
     // Same reasoning as clearContacts above, for the Organization/
-    // Account Details page's own Pipelines tab.
+    // Account Details page's own Deals & risks tab.
     clearPipelineData(state) {
       state.pipelineOpportunities = [];
       state.pipelineOpportunitiesFor = null;

@@ -31,14 +31,15 @@ interface RiskFormModalProps {
    * Edit. */
   customerId?: number;
   /** Add-only: set together with a fixed `customerId` when opened from
-   * the standalone Account page's own Pipelines tab — creates an
+   * the standalone Account page's own Deals & risks tab — creates an
    * account-level Risk instead of an organisation-level one, and hides
    * the Account picker below (already inside one specific account's
    * own context). */
   accountId?: number;
   /** Add-only: replaces the Company select with the caller's own "where it
-   * belongs" field (the Pipelines page's server-searched picker), which
-   * sets `customerId` or `accountId` above as the viewer picks. */
+   * belongs" field (the Pipelines portfolio's — List and Board's —
+   * server-searched picker), which sets `customerId` or `accountId`
+   * above as the viewer picks. */
   parentField?: ReactNode;
   onClose: () => void;
   /** Edit-only: shows a "Delete" button that hands off to the caller,
@@ -46,7 +47,8 @@ interface RiskFormModalProps {
   onDeleteRequest?: () => void;
   /** Called after every successful save (an add or an edit), so the caller
    * can read its own list again: the Deals & risks tab after a scoped add,
-   * the Pipelines page after any add or edit (plan 2026-10-01 Decision 8). */
+   * the Pipelines portfolio (List and Board) after any add or edit (plan
+   * 2026-10-01 Decision 8). */
   onSaved?: () => void;
 }
 
@@ -130,7 +132,7 @@ export function RiskFormModal({
         await dispatch(updateRisk({ id: risk.id, ...data })).unwrap();
       } else if (customerId !== undefined) {
         // Scoped to a fixed Customer/Account (the Details page's own
-        // Pipelines tab) — createRiskForCustomer/createRiskForAccount
+        // Deals & risks tab) — createRiskForCustomer/createRiskForAccount
         // don't patch Redux themselves, so the caller refetches via
         // onSaved() below.
         if (accountId !== undefined) {
@@ -208,7 +210,7 @@ export function RiskFormModal({
           {/* A Risk can be organisation-level or belong to one
               specific Account — hidden for Edit (can't move between
               parents) and when `accountId` is already fixed (the
-              standalone Account page's own Pipelines tab — already
+              standalone Account page's own Deals & risks tab — already
               inside one specific account, nothing to pick). */}
           {!isEdit && accountId === undefined && effectiveCompanyId !== undefined && (
             <SelectField label="Account (optional)" value={selectedAccountId} onChange={setSelectedAccountId}>
