@@ -23,6 +23,9 @@ export interface PipelineBoardProps {
   columnBumps: Record<string, number>;
   currency: CurrencyCode;
   isSm: boolean;
+  /** The Ask rail is open beside the board (from `sm`): columns are w-64
+   *  rather than w-72, so more of them fit beside it. */
+  narrow?: boolean;
   filtered: boolean;
   move: PipelineMove | null;
   /** A move is saving or settling: moving is off (one at a time). */
@@ -49,6 +52,7 @@ export function PipelineBoard({
   columnBumps,
   currency,
   isSm,
+  narrow = false,
   filtered,
   move,
   saving,
@@ -83,7 +87,7 @@ export function PipelineBoard({
   );
 
   if (!data && error) return <ErrorBlock message={error} onRetry={book.retry} />;
-  if (!data) return <BoardSkeleton isSm={isSm} narrow={false} />;
+  if (!data) return <BoardSkeleton isSm={isSm} narrow={narrow} />;
   if (data.count === 0) {
     return (
       <EmptyBook
@@ -116,6 +120,7 @@ export function PipelineBoard({
         version={inputs.version + (inputs.columnBumps[spec.key] ?? 0)}
         currency={currency}
         isSm={isSm}
+        narrow={narrow}
         canMove={canMove}
         saving={saving}
         pausedNote={paused ? PAUSED : null}

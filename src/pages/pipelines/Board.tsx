@@ -20,6 +20,13 @@ import { usePipelineForms } from '../../components/pipelines/portfolio/usePipeli
 import { usePipelineMove } from '../../components/pipelines/portfolio/usePipelineMove';
 import { usePipelineParams } from '../../components/pipelines/portfolio/usePipelineParams';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
+import { useBoardRail } from '../organizations/ask/useBoardRail';
+import { useReportPipelineOptions } from './ask/pipelinesNames';
+
+/** A card opens its form, a modal over the rail at every width, so the rail
+ *  never has an open card to close (plan Decision 6): closing the form on a
+ *  viewport change would lose its unsaved edits. */
+const KEEP_FORM = () => {};
 
 /** /pipelines/board (spec 2026-09-30 §1 "Board"): the book as stage
  *  columns. The tiles, toolbar and chips are the List's, on the same URL;
@@ -46,6 +53,9 @@ function PipelinesBoard() {
   const reload = useCallback(() => setVersion((v) => v + 1), []);
   const [notice, setNotice] = useState<string | null>(null);
   const forms = usePipelineForms();
+  // The Ask rail (spec §1 "Board", §3) narrows the columns while it is open,
+  // as on the Accounts Board (useBoardRail).
+  const { railOpen } = useBoardRail(KEEP_FORM);
 
   // A move's frame reload skips the M probe: a stage move can't change M.
   const book = usePipelineBook(kind, params, 'board', version + frameBump, undefined, version);
@@ -73,6 +83,10 @@ function PipelinesBoard() {
   const searchRef = useRef<HTMLInputElement>(null);
   const currency = book.data?.currency ?? orgCurrency;
   const options = book.data?.filters ?? null;
+  // Ask Revenact (spec §3): the chip names owners, organisations and
+  // accounts from this read's options on the Board. Opening a card narrows
+  // nothing (plan Decision 8).
+  useReportPipelineOptions(kind.key, options);
   const failed = !book.data && book.error !== null;
   const chips = pipelineChips(params, options, kind);
 
@@ -136,6 +150,7 @@ function PipelinesBoard() {
             columnBumps={columnBumps}
             currency={currency}
             isSm={isSm}
+            narrow={railOpen}
             filtered={hasPipelineFilters(params)}
             move={board.move}
             saving={board.busy}

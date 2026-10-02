@@ -22,6 +22,8 @@ export interface PipelineColumnProps {
   version: number;
   currency: CurrencyCode;
   isSm: boolean;
+  /** Beside the open Ask rail: w-64 rather than w-72 (from sm). */
+  narrow?: boolean;
   canMove: boolean;
   saving: boolean;
   /** Why moving is off, when it is stuck (the frame reload failed). */
@@ -57,6 +59,7 @@ export function PipelineColumn({
   version,
   currency,
   isSm,
+  narrow = false,
   canMove,
   saving,
   pausedNote = null,
@@ -123,7 +126,7 @@ export function PipelineColumn({
       page={page}
       enabled={enabled}
       count={spec.count}
-      width={collapsed ? 'w-44' : 'w-72'}
+      width={collapsed ? 'w-44' : narrow ? 'w-64' : 'w-72'}
       isSm={isSm}
       canMove={canMove}
       saving={saving}
