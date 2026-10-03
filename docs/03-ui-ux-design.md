@@ -1088,9 +1088,9 @@ the design skill, reproduced so a reviewer can work through it.
    Reading line length 65 to 75 characters.
 4. No card inside a card. No gradient buttons, no purple, no glow, no
    glassmorphism on product surfaces. Exception, by the owner's decision on
-   2026-09-21: Communications (and, by the owner's decisions on 2026-09-24
-   and 2026-09-26, the Ask rail on the Dashboard and on the Organizations
-   list and board, the rail only), whose cards are `.rv-card-glass` /
+   2026-09-21: Communications (and, by the owner's decisions from 2026-09-24
+   on, the Ask rail on the Dashboard, Organizations, Contacts, Accounts and
+   Pipelines, the rail only), whose cards are `.rv-card-glass` /
    `.rv-glass-inner` so the canvas glow shows through, as in the reference
    mail client. The canvas gradients (`--rv-canvas-gradient-1/2`) were
    strengthened in both themes at the same time; that is the intended look
@@ -1125,7 +1125,7 @@ Ranked by leverage. Each is a task in the
 | 5 | Loading states are text lines, not skeletons | Only `HeadlinesTab` shows a text-line affordance; `ChatView` uses a layout-matching skeleton since 2026-09-22 |
 | 6 | `h-screen` in `DashboardLayout` | Rule says `min-h-[100dvh]` |
 | 7 | `rounded-2xl` and `rounded-3xl` outside the scale | Contact detail, Account placeholder |
-| 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass`, also used by the Ask rail on the Dashboard and Organizations, is the one sanctioned exception) |
+| 8 | `backdrop-blur-sm` on placeholder routes | Glassmorphism is banned on product surfaces (Communications' `.rv-card-glass`, also used by the Ask rail on the Dashboard, Organizations, Contacts, Accounts and Pipelines, is the one sanctioned exception) |
 | 9 | `Login.css` requests Inter, which is never loaded | Falls through to the system stack |
 | 10 | Dead files: `App.css` is never imported, the `counter` slice and the seeded `tasks` slice are unused | Template leftovers |
 | 11 | Navbar has controls with no handlers | Search, Plus, Help, Message, title chevrons |
