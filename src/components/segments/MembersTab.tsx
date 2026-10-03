@@ -32,6 +32,7 @@ import { SECTION_PAGE_SIZE } from '../organizations/portfolio/usePortfolio';
 import { useSearchText } from '../organizations/portfolio/useSearchText';
 import { KeptOut } from './KeptOut';
 import { MemberMenu } from './MemberMenu';
+import { tabPanelProps, type TabPanelIds } from './tabPanel';
 
 type MenuFor = (id: number, name: string) => ReactNode;
 const noop = () => {};
@@ -172,6 +173,7 @@ export function MembersTab({
   version,
   onChanged,
   onNotice,
+  panel,
 }: {
   segment: Segment;
   params: SegmentPageParams;
@@ -179,6 +181,9 @@ export function MembersTab({
   version: number;
   onChanged: (state: MemberState) => void;
   onNotice: (message: string | null) => void;
+  /** The page's DetailTabs ids: this is then that tab's panel (no second
+   *  tabpanel around it). */
+  panel?: TabPanelIds;
 }) {
   const [busy, setBusy] = useState(false);
   const stateOf = (id: number): MemberStateValue =>
@@ -200,7 +205,7 @@ export function MembersTab({
   const portfolioKind = (segment.kind === 'customer' ? ORGANIZATION_KIND : ACCOUNT_KIND);
 
   return (
-    <div role="tabpanel" aria-label="Members" className="flex flex-col gap-3">
+    <div role="tabpanel" {...tabPanelProps('Members', panel)} className="flex flex-col gap-3">
       <MembersToolbar segment={segment} params={params} update={update} />
       {segment.kind === 'contact' ? (
         <ContactMemberList segment={segment} params={params} version={version} menu={menu} />

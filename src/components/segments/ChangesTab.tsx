@@ -10,6 +10,7 @@ import { EmptyState, ErrorBlock, ItemSkeleton } from '../organizations/portfolio
 import { FOCUS, MONO } from '../organizations/portfolio/styles';
 import { Switch } from '../organizations/portfolio/tileParts';
 import { errorMessage } from '../organizations/portfolio/usePagedRead';
+import { tabPanelProps, type TabPanelIds } from './tabPanel';
 
 const WINDOWS = CHANGE_WINDOWS.map((days) => ({ value: String(days), label: `${days} days` }));
 
@@ -82,11 +83,14 @@ export function ChangesTab({
   days,
   onDays,
   attributes,
+  panel,
 }: {
   segment: Segment;
   days: ChangeWindow;
   onDays: (days: ChangeWindow) => void;
   attributes: AIAttribute[];
+  /** The page's DetailTabs ids (see MembersTab). */
+  panel?: TabPanelIds;
 }) {
   const [attempt, setAttempt] = useState(0);
   const key = `${segment.id}#${days}#${attempt}`;
@@ -124,7 +128,7 @@ export function ChangesTab({
   const hidden = current && 'data' in current ? current.data.hidden_count : 0;
 
   return (
-    <div role="tabpanel" aria-label="Changes" className="flex flex-col gap-3">
+    <div role="tabpanel" {...tabPanelProps('Changes', panel)} className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-[13px] text-ink-muted">Who entered and who left, newest day first.</p>
         <Switch label="Changes window" options={WINDOWS} value={String(days)} onChange={(value) => onDays(Number(value) as ChangeWindow)} />
