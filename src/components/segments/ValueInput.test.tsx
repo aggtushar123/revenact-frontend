@@ -8,20 +8,21 @@ import { NO_LABELS, type Operator, type RuleLabels } from '../../features/segmen
 import { CARL, DANA, stubSegments } from '../../features/segments/testSegments';
 import { ValueInput, type ValueOptions } from './ValueInput';
 
-function Harness({ kind = 'customer', field, op, initial, labels = NO_LABELS, onNamed = vi.fn() }: {
+function Harness({ kind = 'customer', field, op, initial, labels = NO_LABELS, onNamed = vi.fn(), invalid = false }: {
   kind?: 'customer' | 'account' | 'contact';
   field: string;
   op: Operator;
   initial: DraftValue;
   labels?: RuleLabels;
   onNamed?: ValueOptions['onNamed'];
+  invalid?: boolean;
 }) {
   const [value, setValue] = useState<DraftValue>(initial);
   const condition: DraftCondition = { uid: 'c1', field, op, value };
   const options: ValueOptions = { people: [CARL, DANA], products: [{ id: 3, name: 'Analytics' }], labels, onNamed };
   return (
     <>
-      <ValueInput field={findField(kind, field, [])!} condition={condition} options={options} label="Condition 1 value" invalid={false} onChange={setValue} />
+      <ValueInput field={findField(kind, field, [])!} condition={condition} options={options} label="Condition 1 value" invalid={invalid} onChange={setValue} />
       <output data-testid="value">{JSON.stringify(value ?? 'unset')}</output>
     </>
   );
@@ -66,8 +67,42 @@ describe('ValueInput (plan Decision 2)', () => {
     expect(box).toHaveAttribute('step', '1');
     await userEvent.type(box, '0');
     expect(value()).toBe('"unset"');
+    await userEvent.clear(box);
+    await userEvent.type(box, '1.5');
+    expect(value()).toBe('"unset"');
+    await userEvent.clear(box);
     await userEvent.type(box, '4000');
     expect(value()).toBe('3650');
+  });
+
+  it('sends a days field only whole numbers of 0 or more, with no upper limit', async () => {
+    render(<Harness field="last_touch" op="gt" initial={undefined} />);
+    const box = screen.getByRole('spinbutton', { name: 'Condition 1 value' });
+    await userEvent.type(box, '2.5');
+    expect(value()).toBe('"unset"');
+    await userEvent.clear(box);
+    await userEvent.type(box, '-1');
+    expect(value()).toBe('"unset"');
+    await userEvent.clear(box);
+    await userEvent.type(box, '0');
+    expect(value()).toBe('0');
+    await userEvent.clear(box);
+    await userEvent.type(box, '5000');
+    expect(value()).toBe('5000');
+  });
+
+  it('marks an unfinished organisation picker and "is any of" choice list invalid', () => {
+    const { unmount } = render(<Harness kind="account" field="organisation" op="in" initial={[]} invalid />);
+    expect(screen.getByRole('searchbox', { name: 'Condition 1 value: search' })).toHaveAttribute('aria-invalid', 'true');
+    unmount();
+    render(<Harness field="lifecycle_stage" op="in" initial={[]} invalid />);
+    expect(screen.getByRole('group', { name: 'Condition 1 value' })).toHaveAttribute('aria-invalid', 'true');
+  });
+
+  it('removes an organisation the reader can\'t open from "is any of"', async () => {
+    render(<Harness kind="account" field="organisation" op="in" initial={[7, null]} labels={{ ...NO_LABELS, organisations: { '7': 'Pizza Hut' } }} />);
+    await userEvent.click(screen.getByRole('button', { name: "Remove an organisation you can't open" }));
+    expect(value()).toBe('[7]');
   });
 
   it('takes "is any of" a choice list as checkboxes', async () => {

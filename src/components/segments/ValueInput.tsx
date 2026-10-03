@@ -79,6 +79,15 @@ function WindowDays({ value, label, invalid, onChange }: { value: Scalar; label:
   );
 }
 
+/** A number box's value. A days field takes whole numbers of 0 or more and
+ *  nothing else (the backend refuses the rest), so those read as unset. */
+function numberOf(field: FieldDef, raw: string): Scalar {
+  if (raw === '') return undefined;
+  const number = Number(raw);
+  if (field.type === 'days' && (!Number.isInteger(number) || number < 0)) return undefined;
+  return number;
+}
+
 function ScalarInput({ field, options, value, label, invalid, onChange }: {
   field: FieldDef;
   options: ValueOptions;
@@ -99,7 +108,7 @@ function ScalarInput({ field, options, value, label, invalid, onChange }: {
           min={field.type === 'number' ? undefined : 0}
           max={field.type === 'percent' ? 100 : undefined}
           value={typeof value === 'number' ? value : ''}
-          onChange={(event) => onChange(event.target.value === '' ? undefined : Number(event.target.value))}
+          onChange={(event) => onChange(numberOf(field, event.target.value))}
           className={`${BOX} w-24 ${MONO}`}
         />
         {field.type === 'percent' ? <span className={SUFFIX}>%</span> : field.type === 'days' ? <span className={SUFFIX}>days</span> : null}
@@ -185,7 +194,7 @@ function ManyInput({ field, options, values, label, invalid, onChange }: {
 }) {
   if (field.type === 'choice') {
     return (
-      <fieldset aria-label={label} className="flex flex-wrap gap-x-3">
+      <fieldset aria-label={label} aria-invalid={invalid} className="flex flex-wrap gap-x-3 rounded-lg border border-transparent px-2 aria-[invalid=true]:border-danger">
         {field.choices.map((choice) => (
           <Check
             key={choice.value}
@@ -255,6 +264,7 @@ export function ValueInput({ field, condition, options, label, invalid, onChange
         value={value}
         label={label}
         labels={options.labels}
+        invalid={invalid}
         onNamed={options.onNamed}
         onChange={onChange}
       />

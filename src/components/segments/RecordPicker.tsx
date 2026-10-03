@@ -26,6 +26,7 @@ export function RecordPicker({
   value,
   label,
   labels,
+  invalid,
   onNamed,
   onChange,
 }: {
@@ -34,6 +35,8 @@ export function RecordPicker({
   value: DraftValue;
   label: string;
   labels: RuleLabels;
+  /** An unfinished row: the search box takes the danger border. */
+  invalid: boolean;
   onNamed: ValueOptions['onNamed'];
   onChange: (value: DraftValue) => void;
 }) {
@@ -83,11 +86,12 @@ export function RecordPicker({
           <input
             type="search"
             aria-label={`${label}: search`}
+            aria-invalid={invalid}
             value={text}
             onChange={(event) => setText(event.target.value)}
             placeholder={record === 'customer' ? 'Search organisations' : 'Search accounts'}
             autoComplete="off"
-            className={`${FILTER_SELECT} w-56 placeholder:text-ink-faint`}
+            className={`${FILTER_SELECT} w-56 placeholder:text-ink-faint aria-[invalid=true]:border-danger`}
           />
           {current ? (
             'error' in current ? (
