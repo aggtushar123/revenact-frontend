@@ -844,6 +844,95 @@ Organizations (see "Ask rail", Contacts shape); `ContactsPage`'s own
   often small talk, so a summary (a digest of the whole call) pre-empts it
   rather than the two being concatenated.
 
+### Segments
+
+Spec `docs/superpowers/specs/2026-10-03-segments-design.md` §3 (plan
+`docs/superpowers/plans/2026-10-03-segments-frontend.md`). Three pages in
+`OrganizationsFrame` under the framed bar ("Segments", or "‹ Segments" on a
+segment, its builder and a new one).
+
+- **List (`/segments`).** A switch for All, Mine and Shared with me, a search
+  box and **New segment**, then one rounded row per segment (`SegmentRow`):
+  - the name, with a Workspace or Shared badge and Paused when paused;
+  - the kind and owner under it ("Organisations · You");
+  - the member count, today's change ("+3 / −1") and a 30-day size sparkline
+    (`SizeSparkline`, scaled to its own range), all in DM Mono. A single
+    history point reads as its own label, "Size today: N, no history yet",
+    rather than drawing a line.
+
+  On someone else's segment those three figures are the owner's alone and
+  read "—" (screen readers: "Only the owner sees this figure"). Phones wrap
+  the figures under the name. With no segments, the empty state explains what
+  a segment is and offers New segment and "Filter Organizations, then Save as
+  segment". A reload that fails keeps the last list on screen with "{error}
+  Showing the last result." and Try again, rather than clearing it.
+- **Builder: a modal, not a page** (owner, 2026-10-03; `BuilderDialog`).
+  New segment opens it over the Segments list (`/segments/new`), Edit over the
+  segment's own page (`/segments/:id/edit`, which hands it the segment it has
+  already read), and Save as segment over the list it was pressed on, which
+  stays as it was.
+  - **Frame:** centred from `sm` (up to 1100px wide, 90dvh tall), the whole
+    screen below it. The title and Close sit in its header, Cancel and Save
+    segment in a footer that stays put while the body scrolls. Focus starts in
+    the name; Tab stays inside; Escape, Close and Cancel close it and focus
+    returns to what opened it. A click on the scrim does not close it, so a
+    stray click keeps the draft.
+  - **Editor:** the parts are split by dividers (no panel inside the modal).
+    - **Basics:** the name as a quiet 22px title field, the description as a
+      quiet line under it (each with a small uppercase label), and the kind as
+      three icon tiles (`RadioTile`; fixed once saved).
+    - **Rules** (`RuleEditor`): a sentence, "Include organisations that match
+      All/Any of these conditions", then one row per condition led by
+      "Where", then "and" (All) or "or" (Any). A group is an indented block
+      with a left rule and its own All/Any. The remove button shows on hover
+      or focus where there is a mouse, and always on touch screens. + Add
+      condition and + Add group are disabled at 20. The organisation kind's
+      churned/archived default sits under the rows.
+      Each type has its own input (`ValueInput`): number and percent boxes,
+      days, date or date-window, checkboxes for "is any of", owner and
+      product selects or chips, and a server-searched organisation or account
+      picker (`RecordPicker`). A record the reader can't open shows as an
+      italic "an organisation you can't open".
+    - **Sharing** (`SharingFields`): Only me, Everyone in the workspace or
+      Chosen teammates as icon tiles, with chips for the teammates.
+    - **Alert me on changes:** a switch (a native checkbox underneath) with
+      its explanation as the description.
+  - **Preview** (`PreviewPanel`): a muted block beside the editor from `lg`,
+    pinned while the rules scroll, under it on phones. It leads with the count at 22px
+    ("41 organisations match"), then the totals (no Members figure, which the
+    count already gives), the first ten and "and N more", or "Nothing matches
+    these rules yet." While a newer answer loads, the last one stays, dimmed.
+  - **400s** show at the field they name, and a limit above the form.
+
+  A non-owner sees "Only {owner} can edit this segment" with Open segment and
+  Duplicate to edit.
+- **Segment (`/segments/:id`).**
+  - **Header** (`SegmentHeader`): the name at 22px, the rules as one sentence
+    (`RuleSentence`: fields and values in ink, figures in DM Mono, hidden
+    records in italics), owner and sharing, then Edit, Duplicate, Export CSV
+    and Delete. Edit and Delete are the owner's only.
+  - **Tiles** (`SegmentTiles`): Members, ARR covered, Average health, Average
+    CSAT and Last 7 days. Contacts get only Members and Last 7 days.
+  - **Hidden members.** A shared reader sees "N more members you can't open".
+  - **Members tab** (`MembersTab`):
+    - Organisations and accounts use `AccountRow` (not selectable) with the
+      kind's own search, Group and Sort; contacts use `ContactListItem`.
+    - The owner's row menu has Pin / Unpin and Keep out.
+    - A Kept out disclosure lists what is kept out, with Let back in, ten at a
+      time through the preview (Ruling G2), names sorted within each batch.
+  - **Changes tab** (`ChangesTab`): 7, 30 or 90 days, one rounded item per day
+    with its totals, Entered and Left with the reason, and "+N more". A
+    reason falls back to the raw field key with its `attr:`/`parent.` prefix
+    stripped (e.g. "csat_score" rather than "attr:csat_score").
+- **Save as segment** (`SaveAsSegmentButton`, `components/organizations/
+  portfolio/toolbarParts.tsx`) is one shared button, used beside Filters on
+  the Organizations and Accounts lists and before Add on Contacts. It opens the
+  builder modal over the list (`useSaveAsSegment`), not a new page.
+- **Money** reads compact, e.g. "$512.0K" (the tiles' ARR covered).
+- **Follow-up (G19):** the Delete confirmation still uses `ConfirmDialog`'s
+  older styling rather than the house look; accepted, not fixed in this
+  delivery.
+
 ### Overlays
 
 The Organizations `FiltersPanel` and `PinFieldsMenu`, `ContactRowActionsPopover`,

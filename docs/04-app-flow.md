@@ -68,6 +68,7 @@ closing it on unmount or token change.
 | `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard` (the Accounts portfolio), `AccountDetails` (the account's story, read by the URL id alone). `AccountsAskLayout` wraps all three in one `AskProvider` (surface `accounts`, delivery 3 of the Ask spec, own preference key `revenact_accounts_ask`), one conversation lasting from the List into the Board, into an account and back: a question posts `context: {surface:'accounts', view:'list'\|'board', filters}` (set keys only, no focus — the List and the Board send no focus, unlike Organizations' list) or `{view:'detail', account, focus}`. Each story item's "Ask about this" sets `focus: {kind, id}` for that one question, typing "What should I know about this `<kind>`?" without sending. Each page reports its own names to the layout (`accountsNames.ts`'s `useReportAccountsOptions` from the List and the Board, `useReportAccountName` from the account page), so a live chip names the portfolio's filter options or the account's own row before the server has ("Accounts · Owner: Carl CSM", the account's name, or "This account"); a sent question shows the server's own `label`. A `400` under `context.account` reads "You can no longer ask about this account."; under `context.focus`, "You can no longer ask about this item. Ask about the account instead."; under `context.filters`, "You can't ask about this list. Clear the filters and ask again." History reopens `/accounts/list?<filters>` (never `/accounts`, whose redirect drops the query), `/accounts/board?<filters>` or `/accounts/:id` | auth |
 | `/contacts`, `/contacts/:id` | `ContactsPage`: the list with its summary line and filters (`q`, `customer`, `account`, `sentiment`, `role` in the URL), and the chosen person's profile beside it (`GET /contacts/`, `GET /contacts/<id>/`, `GET /contacts/<id>/history/`); on phones the person is its own screen with a back link. `/contacts/list` redirects to `/contacts`, keeping its query string; `/contacts/<non-numeric>` shows the not-found state. `ContactsAskLayout` wraps this route in one `AskProvider` (surface `contacts`, delivery 2 of the Ask spec, own preference key `revenact_contacts_ask`): a question posts `context: {surface:'contacts', view:'list', filters}` or `{view:'person', contact, focus}`; the chip names the filtered organisation/account, sentiment and role (or a quoted search term), or the open person's name and place, with "Sentiment" appended while `focus:'sentiment'`. "Why this sentiment?" under a person's sentiment line drafts "Why is <first name>'s sentiment <word>?" with that focus and opens the rail without sending. A `400` under `context.contact` reads "You can't ask about this person here."; under `context.filters`, "You can't ask about this list. Clear the filters and ask again." History reopens a Contacts conversation on `/contacts/:id` (a person) or `/contacts?<filters>` (a list) | auth |
 | `/pipelines/{list,board}` | `PipelinesList`, `PipelinesBoard` (`pages/pipelines/List.tsx`, `Board.tsx`): one book of opportunities or risks across organisations and accounts, `?kind=risks` for risks; `/pipelines` redirects to the List. `PipelinesAskLayout` wraps both in one `AskProvider` (surface `pipelines`, key `revenact_pipelines_ask`) — one conversation across both views and both kinds. A question posts `context: {surface:'pipelines', kind, view, filters}`: `filters` is the set URL keys only, `group:'none'` for the List's ungrouped (the Board never sends it), no `focus` key unless one is set. "Ask about this" on a List item or a Board card adds `focus: {kind:'opportunity'\|'risk', id}` for that one question. Each page reports its read's filter options with its kind (`useReportPipelineOptions`), so a live chip can name them before the server has. A `400` under `context.focus` reads "You can no longer ask about this opportunity." (or "…this risk."); under `context.filters`, the same list copy as Organizations and Accounts. History reopens `/pipelines/list?<filters>` or `/pipelines/board?<filters>` (never `/pipelines`, whose redirect drops the query) | auth |
+| `/segments`, `/segments/new`, `/segments/:id`, `/segments/:id/edit` | `SegmentsList`, the builder modal (`NewSegmentRoute`, `EditSegmentRoute` in `Builder.tsx`), `SegmentPage` (`pages/segments/`). The list reads `GET /segments/?scope=&search=`. The builder reads `GET /segments/<id>/` to edit, previews with `POST /segments/preview/` (400 ms after the last change, latest answer wins), and saves with `POST /segments/` or `PATCH /segments/<id>/` (no `kind`, and only the fields that changed); `?kind=` plus a list's own filters starts a new one from Save as segment. The page reads `GET /segments/<id>/`, `GET /segments/<id>/members/` (rows, and a `limit=1` read for the tiles and `hidden_count`), `GET /segments/<id>/changes/?days=` and `GET /segments/<id>/members/export.csv`; `?tab=changes` opens the Changes tab (the `segment_changes` alert's link). A 404 reads "Segment not found" for a missing segment and one not shared with the reader alike | auth |
 | `/communications` | `CommunicationsPage`, arranged as an inbox with its own top bar (no Navbar): the inbox card (folders for the four kinds of waiting with counts, Needs-you and Mine-only switches, a list grouped by month, the open item in place, with a `ReplyBox` under it: Draft with Copilot fills it from the thread and the account's history and lists the sources used; Send reply on an email row sends from the person's mailbox via `POST /communications/emails/<id>/reply/`); on `?source=mailbox:<provider>` the card is `MailboxView` instead, the person's own mail whole (Inbox/Drafts/Sent/Done/Muted with counts, Priority and Unread switches, Starred/Important/Spam/Trash and the categories, a Categories block of what is waiting, the list by month, the open message with star/done/mute and a reply that sends from the mailbox); and the shared Copilot rail (`components/copilot/CopilotRail`, with Next event above it and the picked source as context; New chat, History and a hide switch live in the top bar) | auth |
 | `/copilot` | `CopilotIndex`: **the home page**. No Navbar, no frame; the greeting, the ask box, three suggested questions and the skills sit directly on the canvas, with a small Copilot/Cockpit switch top-right. Cockpit sits on the same canvas: My book (counts, value, health rings), Renewals with a window selector and drill-down, and My tasks, where the circle on a row completes the task through `PATCH /tasks/<id>/` (optimistic, reverted with the backend's message on refusal). First item in the sidebar | auth |
 | `/scenarios`, `/scenarios/create`, `/scenarios/:id` | `ScenariosList`, `CreateScenario` | auth |
@@ -617,6 +618,68 @@ which the Story's own + Add and Files/Calls tabs carry forward.
    made and when it was last used. Revoking asks first and takes effect
    immediately.
 
+### 4.5h Segments
+
+Spec `docs/superpowers/specs/2026-10-03-segments-design.md`. Every read is the
+reader's own: members are computed over what they may open, and a shared
+reader also gets `hidden_count`, a count only.
+
+1. **List.** `/segments` → `GET /segments/` (`scope=mine|shared`, `search=`
+   when set). The owner's nightly figures (`member_count`, `today`, `sparkline`)
+   are null on rows the reader does not own and read "—".
+2. **Build.**
+   - **The modal.** The builder is a modal: `/segments/new` over the list,
+     `/segments/<id>/edit` over the segment's page (nested routes, so the page
+     under it stays loaded), and Save as segment over the list it came from.
+     Closing it returns to the page under it.
+   - **Draft and preview.** The builder keeps the rules as a draft (uids,
+     missing values). Each complete draft is previewed with
+     `POST /segments/preview/ {kind, rules, pinned_ids, excluded_ids}`, 400 ms
+     after the last change; an answer a newer draft superseded is dropped.
+   - **Save.** `POST /segments/`, or `PATCH /segments/<id>/` with only the
+     fields that changed (never `kind`, and a rename alone never resends
+     `rules`), then the segment opens (an edit swaps the saved copy into the
+     page under the modal, without reading it again). `shared_with` is sent only while
+     `sharing` is `people`; an inactive teammate still in the chosen list is
+     dropped before the send, with a note at the field.
+   - **400s.** `{rules}`, `{name}`, `{shared_with}` and `{kind}` show at their
+     fields, and `{detail}` (the 50-segment limit) above the form.
+   - **Someone else's segment.** `/segments/<id>/edit` shows a read-only notice;
+     **Duplicate to edit** POSTs `/segments/<id>/duplicate/` and opens the
+     copy's builder.
+3. **Save as segment.**
+   - The Organizations, Accounts and Contacts lists open the builder modal in
+     place, from `?kind=<kind>&<their own filter query>`
+     (`saveAsSegmentSearch`), with one shared button, `SaveAsSegmentButton`
+     (`components/organizations/portfolio/toolbarParts.tsx`). The list's own
+     URL does not change.
+   - `rulesFromList` turns it into rules: owner, lifecycle, health, product,
+     renewal window, NPS band, organisation, account, sentiment and role.
+     `include_churned=1` becomes "Churned is yes or no".
+   - The search and picked `ids` don't carry over, and a note says so.
+   - Names for the organisations and accounts named come from
+     `GET /organizations/portfolio/?ids=` and `GET /accounts/portfolio/?ids=`.
+4. **Open.**
+   - `/segments/<id>` reads the segment, then the members (the kind's own rows;
+     `search`, `sort` and `group` in the page URL; only `sort`, `group`,
+     `group_value`, `search`, `cursor` and `limit` are sent).
+   - A separate `limit=1` read gives the tiles and `hidden_count`.
+   - **Pin, Unpin, Keep out and Let back in** are
+     `PATCH /segments/<id>/members/<record>/ {state}` (owner only), then the
+     members and tiles reload.
+   - The **Kept out** list is named through the preview, with no rules and
+     those ids as pins, ten at a time (its own `Show more`); names are sorted
+     within each batch of ten, not across the whole list.
+   - **Export CSV** fetches `members/export.csv` with the tab's search and sort.
+   - **Delete** confirms, then DELETEs and returns to the list.
+5. **Changes.** `?tab=changes&days=7|30|90` → `GET /segments/<id>/changes/?days=`.
+   It shows each day's totals, up to 100 names each way and "+N more", and
+   reasons as field names; a reason with no known label falls back to the raw
+   field key with its `attr:` or `parent.` prefix stripped (e.g. "csat_score",
+   not "attr:csat_score").
+6. **Alert.** The nightly step's `segment_changes` notification shows in the
+   bell like any other; clicking it opens `/segments/<id>?tab=changes`.
+
 ### 4.6 Copilot and multiplayer sessions
 
 1. `/copilot`. `HomeView` offers skill cards that prefill a prompt, and a
@@ -1027,7 +1090,7 @@ as a query parameter because a WebSocket handshake cannot carry a header.
 
 | Route or control | What happens |
 |---|---|
-| Sidebar: Product Feedbacks, Segments, Project Management | "Under Construction" |
+| Sidebar: Product Feedbacks, Project Management | "Under Construction" |
 | Settings: Activities, Connect Widget | Placeholder |
 | Navbar: Search, Plus, Help, Message | No handler |
 | Navbar list-page title chevrons | No menu |

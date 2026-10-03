@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import customersReducer from '../../features/customers/customersSlice';
@@ -104,6 +104,12 @@ const sarahChen = {
   account_name: null,
   sentiment_source: 'manual' as const, sentiment_computed_at: null,
 };
+
+/** Stands in for /segments/:id, saying where the bell sent it. */
+function SegmentMarker() {
+  const location = useLocation();
+  return <p data-testid="segment-marker">{`${location.pathname}${location.search}`}</p>;
+}
 
 function renderNavbar(
   initialRoute: string | { pathname: string; state?: unknown } = '/dashboard',
@@ -248,6 +254,7 @@ function renderNavbar(
           <Route path="/accounts/list" element={<div>Accounts Marker</div>} />
           <Route path="/accounts/:id" element={<div>Account Details Marker</div>} />
           <Route path="/contacts/:id" element={<div>Contact Details Marker</div>} />
+          <Route path="/segments/:id" element={<SegmentMarker />} />
         </Routes>
       </MemoryRouter>
     </Provider>
@@ -408,6 +415,29 @@ describe('Navbar on Contacts (spec 2026-09-28 §3)', () => {
   });
 });
 
+describe('Navbar on Segments (segments spec 2026-10-03 §3)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('wears the framed bar on /segments: "Segments", the actions slot, no avatar', () => {
+    const setSlot = vi.fn();
+    renderNavbar('/segments', null, null, [], setSlot);
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('h-16', 'shrink-0', 'flex', 'items-center', 'gap-3', 'px-4');
+    expect(screen.getByRole('heading', { name: 'Segments' })).toBeInTheDocument();
+    expect(setSlot).toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(screen.queryByAltText('Alice Admin')).not.toBeInTheDocument();
+  });
+
+  it.each(['/segments/new', '/segments/7', '/segments/7/edit'])('leads back to the list from %s, in the same frame', (url) => {
+    renderNavbar(url);
+    const back = within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Segments' });
+    expect(back).toHaveAttribute('href', '/segments');
+    expect(document.querySelector('header')).toHaveClass('h-16', 'px-4');
+  });
+});
+
 const unreadInvite: Notification = {
   id: 1,
   kind: 'copilot_invite',
@@ -426,6 +456,17 @@ const readAssignment: Notification = {
   actor: { id: 2, name: 'Carl' },
   is_read: true,
   created_at: '2026-09-05T09:00:00Z',
+};
+
+// Backend PR #84: the nightly step's alert to a segment's owner.
+const segmentAlert: Notification = {
+  id: 3,
+  kind: 'segment_changes',
+  message: 'Renewal risk: 3 entered, 1 left',
+  link: '/segments/7?tab=changes',
+  actor: null,
+  is_read: false,
+  created_at: '2026-10-03T06:00:00Z',
 };
 
 describe('Navbar notification bell', () => {
@@ -502,6 +543,17 @@ describe('Navbar notification bell', () => {
 
     expect(notificationApi.markAllNotificationsRead).toHaveBeenCalled();
     expect(screen.queryByText('1')).not.toBeInTheDocument();
+  });
+
+  it('lists a segment alert by its message and opens that segment on its Changes tab', async () => {
+    const user = userEvent.setup();
+    renderNavbar('/dashboard', null, null, [segmentAlert]);
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    await user.click(screen.getByText('Renewal risk: 3 entered, 1 left'));
+
+    expect(notificationApi.markNotificationRead).toHaveBeenCalledWith(3);
+    expect(await screen.findByTestId('segment-marker')).toHaveTextContent('/segments/7?tab=changes');
   });
 });
 

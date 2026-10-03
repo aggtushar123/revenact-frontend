@@ -33,6 +33,12 @@ export interface AccountRowProps<R extends PortfolioRowBase = PortfolioRow> {
   onToggleSelect: (id: number) => void;
   onLongPress: (id: number) => void;
   onToggleOpen: (row: R) => void;
+  /** False where rows are never selected (a segment's Members tab): no
+   *  checkbox, and a long press does nothing. */
+  selectable?: boolean;
+  /** A row menu (a segment's Pin and Keep out), before the open button.
+   *  Its clicks never reach the row. */
+  menu?: ReactNode;
   /** The opened row, inline (desktop). Phones open a sheet instead. */
   children?: ReactNode;
 }
@@ -54,6 +60,8 @@ export function AccountRow<R extends PortfolioRowBase>({
   onToggleSelect,
   onLongPress,
   onToggleOpen,
+  selectable = true,
+  menu,
   children,
 }: AccountRowProps<R>) {
   const kind = usePortfolioKind();
@@ -78,7 +86,7 @@ export function AccountRow<R extends PortfolioRowBase>({
 
   const startPress = (event: PointerEvent) => {
     // A mouse selects with the checkbox; long-press is for touch and pen.
-    if (event.pointerType === 'mouse' || selectDisabled) return;
+    if (event.pointerType === 'mouse' || selectDisabled || !selectable) return;
     longPressed.current = false;
     cancelPress();
     timer.current = window.setTimeout(() => {
@@ -111,22 +119,24 @@ export function AccountRow<R extends PortfolioRowBase>({
         onPointerCancel={cancelPress}
         className="flex flex-wrap @min-[60rem]:flex-nowrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5 cursor-pointer select-none sm:select-auto"
       >
-        <label
-          onClick={(event) => event.stopPropagation()}
-          className={`shrink-0 items-center justify-center w-11 h-11 -m-2 sm:w-6 sm:h-6 sm:m-0 ${
-            selecting ? 'flex' : 'hidden sm:flex sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100'
-          }`}
-        >
-          <input
-            type="checkbox"
-            checked={selected}
-            disabled={checkboxDisabled}
-            onChange={() => onToggleSelect(row.id)}
-            aria-label={`Select ${row.name}`}
-            title={limitHint}
-            className={`w-4 h-4 cursor-pointer accent-accent ${FOCUS} disabled:cursor-not-allowed disabled:opacity-50`}
-          />
-        </label>
+        {selectable ? (
+          <label
+            onClick={(event) => event.stopPropagation()}
+            className={`shrink-0 items-center justify-center w-11 h-11 -m-2 sm:w-6 sm:h-6 sm:m-0 ${
+              selecting ? 'flex' : 'hidden sm:flex sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100'
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={selected}
+              disabled={checkboxDisabled}
+              onChange={() => onToggleSelect(row.id)}
+              aria-label={`Select ${row.name}`}
+              title={limitHint}
+              className={`w-4 h-4 cursor-pointer accent-accent ${FOCUS} disabled:cursor-not-allowed disabled:opacity-50`}
+            />
+          </label>
+        ) : null}
 
         <HealthRing score={row.health.score} category={row.health.category} />
 
@@ -177,6 +187,12 @@ export function AccountRow<R extends PortfolioRowBase>({
         <span className="order-3 sm:order-none sm:w-36 flex sm:justify-end min-w-0">
           <SignalTag signal={row.signal} />
         </span>
+
+        {menu ? (
+          <span className="shrink-0" onClick={(event) => event.stopPropagation()}>
+            {menu}
+          </span>
+        ) : null}
 
         <button
           type="button"

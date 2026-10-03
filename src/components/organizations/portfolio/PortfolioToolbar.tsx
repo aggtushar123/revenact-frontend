@@ -7,7 +7,7 @@ import { FiltersPanel, GroupSortControls, type GroupOption } from './FiltersPane
 import { PinFieldsMenu } from './PinFieldsMenu';
 import { usePortfolioKind } from './portfolioKind';
 import { BUTTON } from './styles';
-import { FiltersTrigger, SelectToggle, ToolbarActions, ToolbarSearch } from './toolbarParts';
+import { FiltersTrigger, SaveAsSegmentButton, SelectToggle, ToolbarActions, ToolbarSearch } from './toolbarParts';
 import { useSearchText } from './useSearchText';
 
 const LABEL = 'Search by name or Revenact ID';
@@ -36,6 +36,7 @@ export function PortfolioToolbar({
   selectMode = false,
   onToggleSelectMode,
   groupOptions,
+  onSaveAsSegment,
 }: {
   params: PortfolioParams;
   update: (patch: Partial<PortfolioParams>) => void;
@@ -53,6 +54,9 @@ export function PortfolioToolbar({
   onToggleSelectMode?: () => void;
   /** The Group choices; the Board passes BOARD_GROUP_OPTIONS (no "None"). */
   groupOptions?: GroupOption[];
+  /** The List's "Save as segment" (segments spec §3): beside Filters. The
+   *  Board passes none. */
+  onSaveAsSegment?: () => void;
 }) {
   const kind = usePortfolioKind();
   // The box shows what is typed; the URL gets it 300ms after typing stops.
@@ -77,6 +81,8 @@ export function PortfolioToolbar({
         onClick={() => setOpen(open === 'filters' ? null : 'filters')}
         count={count}
       />
+
+      {onSaveAsSegment ? <SaveAsSegmentButton onClick={onSaveAsSegment} /> : null}
 
       {!isSm && onToggleSelectMode ? <SelectToggle pressed={selectMode} onClick={onToggleSelectMode} /> : null}
 

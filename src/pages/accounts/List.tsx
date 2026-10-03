@@ -6,7 +6,7 @@ import { bulkUpdateAccounts, exportAccountPortfolio } from '../../features/accou
 import type { AccountBulkAction, AccountFilterOptions, AccountPortfolioRow } from '../../features/accounts/portfolioTypes';
 import { useMembers } from '../../features/knowledge/useMembers';
 import { ownerTargets } from '../../features/organizations/bulkTargets';
-import { hasFilters, toApiQuery, type PortfolioParams } from '../../features/organizations/portfolioParams';
+import { filterQuery, hasFilters, toApiQuery, type PortfolioParams } from '../../features/organizations/portfolioParams';
 import { AccountPanels } from '../../components/accounts/portfolio/AccountPanels';
 import { ACCOUNT_KIND } from '../../components/accounts/portfolio/accountKind';
 import { AccountRow } from '../../components/organizations/portfolio/AccountRow';
@@ -25,6 +25,7 @@ import { AccountFormModal } from '../organizations/AccountFormModal';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
 import { useReportAccountsOptions } from './ask/accountsNames';
 import { useAccountEditing } from './useAccountEditing';
+import { useSaveAsSegment } from '../segments/useSaveAsSegment';
 
 /** /accounts/list: the Accounts portfolio (spec 2026-09-29 §1), the
  *  Organizations list's components with ACCOUNT_KIND. Rows, groups, tiles
@@ -42,6 +43,7 @@ export function List() {
 function AccountsList() {
   const { params, update, clearFilters } = usePortfolioParams();
   const isSm = useMediaQuery(SM);
+  const [saveAsSegment, saveAsSegmentModal] = useSaveAsSegment('account');
   const orgCurrency = useOrgCurrency();
 
   const [version, setVersion] = useState(0);
@@ -148,6 +150,7 @@ function AccountsList() {
           onExport={() => void runExport(toApiQuery(params))}
           exporting={exporting}
           onAdd={() => forms.openAdd()}
+          onSaveAsSegment={() => saveAsSegment(filterQuery(params))}
           searchRef={searchRef}
           selectMode={selecting}
           onToggleSelectMode={toggleSelectMode}
@@ -212,6 +215,7 @@ function AccountsList() {
           }}
         />
       ) : null}
+      {saveAsSegmentModal}
     </OrganizationsFrame>
   );
 }

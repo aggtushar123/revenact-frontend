@@ -122,6 +122,7 @@ export function renderOrganizations(
           <Routes>
             {ask ? <Route element={<OrganizationsAskLayout />}>{pages}</Route> : pages}
             <Route path="/organizations/:id" element={<p>Organization page</p>} />
+            <Route path="/segments/new" element={<Where />} />
             {ask ? dashboardRoutes(() => <Where />) : null}
           </Routes>
         </SlotHost>

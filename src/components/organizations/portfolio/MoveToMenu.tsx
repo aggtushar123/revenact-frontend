@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { ArrowRightLeft } from 'lucide-react';
 import { FOCUS } from './styles';
 import { useDismiss } from './useDismiss';
@@ -41,9 +41,10 @@ function placeMenu(button: HTMLElement): { upward: boolean; maxHeight: number } 
   return { upward, maxHeight: Math.max(MENU_MIN, Math.min(MENU_MAX, room)) };
 }
 
-/** A card's "Move to…" control (controller ruling R1, browser finding B1):
- *  a compact icon button that opens a real menu of the other stages, so
- *  nothing moves until one is chosen. Arrow Up/Down, Home and End move
+/** A card's "Move to…" control, or any record's short menu (a segment's Pin /
+ *  Keep out). Controller ruling R1, browser finding B1: a compact icon
+ *  button that opens a real menu of the other stages, so nothing moves
+ *  until one is chosen. Arrow Up/Down, Home and End move
  *  between items. Escape and choosing an item close the menu and return
  *  focus to the button. A press outside closes it and leaves focus where the
  *  user put it, and Tab closes it as focus moves on. Opening another card's
@@ -55,12 +56,21 @@ export function MoveToMenu({
   note,
   targets,
   onChoose,
+  label,
+  menuLabel,
+  icon,
 }: {
   name: string;
   disabled: boolean;
   note: string | null;
   targets: { value: string; label: string }[];
   onChoose: (to: string) => void;
+  /** The button's name; default "Move {name} to…". */
+  label?: string;
+  /** The menu's name; default "Move {name} to". */
+  menuLabel?: string;
+  /** The button's icon; default the move arrows. */
+  icon?: ReactNode;
 }) {
   const [openMenu, setOpenMenu] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -106,7 +116,7 @@ export function MoveToMenu({
         disabled={disabled}
         aria-haspopup="menu"
         aria-expanded={openMenu}
-        aria-label={`Move ${name} to…`}
+        aria-label={label ?? `Move ${name} to…`}
         title={disabled && note ? note : undefined}
         onClick={(event) => {
           event.stopPropagation();
@@ -116,13 +126,13 @@ export function MoveToMenu({
         }}
         className={`inline-flex min-h-11 min-w-11 sm:min-h-9 sm:min-w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-subtle hover:text-ink active:bg-line-subtle disabled:opacity-50 ${FOCUS}`}
       >
-        <ArrowRightLeft className="w-4 h-4" aria-hidden="true" />
+        {icon ?? <ArrowRightLeft className="w-4 h-4" aria-hidden="true" />}
       </button>
       {openMenu ? (
         <div
           ref={menuRef}
           role="menu"
-          aria-label={`Move ${name} to`}
+          aria-label={menuLabel ?? `Move ${name} to`}
           onKeyDown={onMenuKeyDown}
           onClick={(event) => event.stopPropagation()}
           style={{ maxHeight: placement.maxHeight }}

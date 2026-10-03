@@ -135,6 +135,7 @@ export function renderAccounts(
           <Routes>
             {ask ? <Route element={<AccountsAskLayout />}>{pages}</Route> : pages}
             <Route path="/organizations/:id" element={<><p>Organization page</p><Where /></>} />
+            <Route path="/segments/new" element={<Where />} />
           </Routes>
         </SlotHost>
       </MemoryRouter>

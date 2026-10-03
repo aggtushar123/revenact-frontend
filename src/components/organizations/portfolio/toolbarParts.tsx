@@ -4,7 +4,7 @@
 // toolbar still owns its own layout, debounce and open/closed state; these
 // are the bits that were byte-for-byte identical between them.
 import type { RefObject } from 'react';
-import { CheckSquare, Download, Plus, Search, SlidersHorizontal } from 'lucide-react';
+import { BookmarkPlus, CheckSquare, Download, Plus, Search, SlidersHorizontal } from 'lucide-react';
 import { BUTTON, FOCUS, PRIMARY } from './styles';
 
 export function ToolbarSearch({
@@ -63,6 +63,18 @@ export function SelectToggle({ pressed, onClick }: { pressed: boolean; onClick: 
     <button type="button" aria-pressed={pressed} onClick={onClick} className={`${BUTTON} ${pressed ? 'bg-accent-dim' : ''}`}>
       <CheckSquare className="w-4 h-4" aria-hidden="true" />
       Select
+    </button>
+  );
+}
+
+/** "Save as segment" (segments spec 2026-10-03 §3): the list's current
+ *  filters as a new segment's rules. Beside Filters on Organizations and
+ *  Accounts, before Add on Contacts. */
+export function SaveAsSegmentButton({ onClick, className = '' }: { onClick: () => void; className?: string }) {
+  return (
+    <button type="button" onClick={onClick} className={`${BUTTON} ${className}`}>
+      <BookmarkPlus className="w-4 h-4" aria-hidden="true" />
+      Save as segment
     </button>
   );
 }

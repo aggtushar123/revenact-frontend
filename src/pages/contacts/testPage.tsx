@@ -5,6 +5,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import { render } from '@testing-library/react';
 import { Provider } from 'react-redux';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import authReducer from '../../features/auth/authSlice';
 import customersReducer from '../../features/customers/customersSlice';
 import { SlotHost } from '../../test/SlotHost';
 import { setViewport } from '../../test/viewport';
@@ -24,7 +25,7 @@ function Where() {
  *  (stubContactsApi, or stubContactsAsk with `ask`). */
 export function renderContactsPage(url = '/contacts', { width = 1440, ask = false }: { width?: number; ask?: boolean } = {}) {
   setViewport(width);
-  const store = configureStore({ reducer: { customers: customersReducer } });
+  const store = configureStore({ reducer: { customers: customersReducer, auth: authReducer } });
   const page = (
     <Route
       path="/contacts/:id?"
@@ -41,6 +42,7 @@ export function renderContactsPage(url = '/contacts', { width = 1440, ask = fals
       <Route path="/contacts/list" element={<ContactsListRedirect />} />
       {ask ? <Route element={<ContactsAskLayout />}>{page}</Route> : page}
       <Route path="/organizations/:id" element={<Where />} />
+      <Route path="/segments/new" element={<Where />} />
     </Routes>
   );
   render(

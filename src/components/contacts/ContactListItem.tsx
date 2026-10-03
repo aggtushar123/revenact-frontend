@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Link, type To } from 'react-router-dom';
 import {
   SENTIMENT_DOT,
@@ -16,15 +17,15 @@ import { FOCUS } from '../organizations/portfolio/styles';
  *  initials, name and role, "Organisation › Account", sentiment in words
  *  and its colour with "n calls" beside it, when they were last
  *  contacted, and whether they are active. The whole item opens their profile. */
-export function ContactListItem({ contact, to, selected }: { contact: Contact; to: To; selected: boolean }) {
+export function ContactListItem({ contact, to, selected, actions }: { contact: Contact; to: To; selected: boolean; actions?: ReactNode }) {
   const place = placeLabel(placeOf(contact));
   const contacted = contact.last_contacted_at ? `Contacted ${formatRelativeTime(contact.last_contacted_at)}` : 'Not contacted yet';
   return (
-    <li data-contact={contact.id}>
+    <li data-contact={contact.id} className={actions ? 'flex items-center pr-1' : undefined}>
       <Link
         to={to}
         aria-current={selected ? 'page' : undefined}
-        className={`flex min-h-11 gap-3 px-3 py-2.5 hover:bg-subtle active:bg-line-subtle ${selected ? 'bg-subtle' : ''} ${FOCUS}`}
+        className={`flex min-h-11 gap-3 px-3 py-2.5 hover:bg-subtle active:bg-line-subtle ${selected ? 'bg-subtle' : ''} ${actions ? 'min-w-0 flex-1' : ''} ${FOCUS}`}
       >
         <span aria-hidden="true" className={`${ROW_ICON} font-mono-brand text-[11px] font-semibold text-ink`}>
           {initials(contact.name)}
@@ -46,6 +47,7 @@ export function ContactListItem({ contact, to, selected }: { contact: Contact; t
           </span>
         </span>
       </Link>
+      {actions}
     </li>
   );
 }

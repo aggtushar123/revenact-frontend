@@ -30,6 +30,7 @@ import { MD, SM, XL, useMediaQuery } from '../../lib/useMediaQuery';
 import { ContactsFrame } from './ContactsFrame';
 import { useReportContactsNames } from './ask/contactsNames';
 import { useAsk } from '../dashboard/ask/useAsk';
+import { useSaveAsSegment } from '../segments/useSaveAsSegment';
 
 const BACK = `-ml-2 inline-flex min-h-11 w-fit items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-ink-muted hover:bg-subtle hover:text-ink active:bg-line-subtle ${FOCUS}`;
 
@@ -47,6 +48,7 @@ const COLUMN = 'mx-auto w-full max-w-[1800px]';
 export function ContactsPage() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const [saveAsSegment, saveAsSegmentModal] = useSaveAsSegment('contact');
   const { id } = useParams();
   const selectedId = id && /^[1-9]\d*$/.test(id) ? Number(id) : null;
   // /contacts/abc: an id no person can have reads as not found, not as "Choose a person".
@@ -131,6 +133,7 @@ export function ContactsPage() {
       isSm={isSm}
       onChange={change}
       onAdd={() => setAdding(true)}
+      onSaveAsSegment={() => saveAsSegment(query)}
     />
   );
   const list = (
@@ -212,6 +215,7 @@ export function ContactsPage() {
       {adding ? (
         <ContactFormModal companies={organisations} onClose={() => setAdding(false)} onSaved={() => setRefresh((n) => n + 1)} />
       ) : null}
+      {saveAsSegmentModal}
     </ContactsFrame>
   );
 }

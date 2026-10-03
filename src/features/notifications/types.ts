@@ -14,7 +14,10 @@ export type NotificationKind =
   | 'customer_assigned'
   | 'account_assigned'
   | 'question_asked'
-  | 'question_answered';
+  | 'question_answered'
+  // A segment's daily alert to its owner: "<name>: 3 entered, 1 left",
+  // linking to /segments/<id>?tab=changes (backend PR #84).
+  | 'segment_changes';
 
 export interface Notification {
   id: number;
