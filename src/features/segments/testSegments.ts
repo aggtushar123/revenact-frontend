@@ -179,6 +179,8 @@ export interface SegmentsStub {
   patch?: (id: number, body: Record<string, unknown>) => Answer;
   preview?: (body: PreviewRequest) => Answer;
   changes?: (id: number, days: number) => Answer;
+  /** PATCH /segments/<id>/members/<record_id>/ (default: the owner's write). */
+  member?: (id: number, recordId: number, state: unknown) => Answer;
   /** Members' `hidden_count` (default 0 for the owner, 2 for anyone else). */
   hidden?: number;
   /** GET /attributes/definitions/ (default none). */
@@ -356,6 +358,7 @@ export function stubSegments(stub: SegmentsStub = {}) {
       if (member && method === 'PATCH') {
         if (!segment.is_owner) return forbidden;
         const recordId = Number(member[1]);
+        if (stub.member) return reply(stub.member(id, recordId, body.state));
         segment.pinned_ids = segment.pinned_ids.filter((pk) => pk !== recordId);
         segment.excluded_ids = segment.excluded_ids.filter((pk) => pk !== recordId);
         if (body.state === 'pinned') segment.pinned_ids = [...segment.pinned_ids, recordId];

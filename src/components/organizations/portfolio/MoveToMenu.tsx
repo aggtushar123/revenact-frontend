@@ -42,8 +42,9 @@ function placeMenu(button: HTMLElement): { upward: boolean; maxHeight: number } 
 }
 
 /** A card's "Move to…" control, or any record's short menu (a segment's Pin /
- *  Keep out). Controller ruling R1, browser finding B1: a compact icon button that opens a real menu of the other stages, so
- *  nothing moves until one is chosen. Arrow Up/Down, Home and End move
+ *  Keep out). Controller ruling R1, browser finding B1: a compact icon
+ *  button that opens a real menu of the other stages, so nothing moves
+ *  until one is chosen. Arrow Up/Down, Home and End move
  *  between items. Escape and choosing an item close the menu and return
  *  focus to the button. A press outside closes it and leaves focus where the
  *  user put it, and Tab closes it as focus moves on. Opening another card's

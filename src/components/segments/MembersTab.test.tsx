@@ -87,6 +87,21 @@ describe('MembersTab (spec §3)', () => {
     expect(requests(spy, 'POST', /^\/segments\/preview\/$/)[0].body).toEqual({ kind: 'customer', rules: { match: 'all', conditions: [] }, pinned_ids: [1] });
   });
 
+  it('shows the server\'s refusal word for word, reloads nothing, and enables the menu again', async () => {
+    const detail = 'A segment can pin at most 500 records, and keep out as many.';
+    const spy = stubSegments({ member: () => ({ status: 400, body: { detail } }) });
+    renderInApp(<Host initial={RENEWAL_RISK} />, { url: '/segments/7' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Actions for Pizza Hut' }));
+    const reads = () => requests(spy, 'GET', /^\/segments\/7\/members\/$/).length;
+    const before = reads();
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Pizza Hut actions' })).getByRole('menuitem', { name: 'Pin' }));
+    expect(await screen.findByTestId('notice')).toHaveTextContent(detail);
+    expect(screen.getByTestId('notice').textContent).toBe(detail);
+    expect(requests(spy, 'PATCH', /^\/segments\/7\/members\/7\/$/)).toHaveLength(1);
+    expect(reads()).toBe(before);
+    expect(screen.getByRole('button', { name: 'Actions for Pizza Hut' })).toBeEnabled();
+  });
+
   it('names kept-out records ten ids at a time, and Show more reaches the rest (Ruling G2)', async () => {
     const rows = many(pizzaHut, 'Org', 12);
     const kept = rows.slice(0, 11).map((row) => row.id);

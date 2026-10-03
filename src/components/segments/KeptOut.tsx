@@ -100,7 +100,7 @@ export function KeptOut({ segment, disabled, onLetBackIn }: { segment: Segment; 
             ))}
           </ul>
           {lastError ? (
-            <p role="alert" className="flex items-center gap-2 px-1 text-[11px] text-danger">
+            <p role="alert" className="flex items-center gap-2 px-1 text-[13px] text-danger">
               {lastError}
               <button type="button" onClick={() => setAttempt((n) => n + 1)} className={QUIET}>
                 Try again
