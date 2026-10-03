@@ -8,6 +8,27 @@ import { PREVIEW_DEBOUNCE_MS, usePreview } from './usePreview';
 
 vi.mock('../../features/segments/segmentApi');
 
+// For the unmount test only: React silently no-ops a setState call made on an
+// already-unmounted function component (no warning, no re-render), so the
+// only way to prove the hook never *calls* its setters once unmounted is to
+// count calls to the setter itself, beneath React's own bailout. A thin
+// passthrough wrapper around useState does that without changing behaviour.
+const stateSetterCalls = vi.hoisted(() => ({ count: 0 }));
+vi.mock('react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react')>();
+  return {
+    ...actual,
+    useState: <S,>(initial: S | (() => S)) => {
+      const [state, setState] = actual.useState(initial);
+      const counted = (value: S | ((prev: S) => S)) => {
+        stateSetterCalls.count += 1;
+        setState(value);
+      };
+      return [state, counted] as const;
+    },
+  };
+});
+
 const request = (value: number): PreviewRequest => ({ kind: 'customer', rules: { match: 'all', conditions: [{ field: 'csat_score', op: 'lt', value }] } });
 const answer = (count: number): PreviewResponse => ({ kind: 'customer', count, results: [], summary: summaryOf(count, 'customer') });
 
@@ -24,6 +45,7 @@ describe('usePreview (plan Decision 3)', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.mocked(api.previewSegment).mockReset();
+    stateSetterCalls.count = 0;
   });
   afterEach(() => vi.useRealTimers());
 
@@ -83,5 +105,21 @@ describe('usePreview (plan Decision 3)', () => {
       vi.advanceTimersByTime(PREVIEW_DEBOUNCE_MS);
     });
     expect(result.current).toEqual({ status: 'error', message: '"is" cannot be used with Health score.' });
+  });
+
+  it('never sets state once unmounted, even if the in-flight request still resolves', async () => {
+    const pending = deferred<PreviewResponse>();
+    vi.mocked(api.previewSegment).mockReturnValue(pending.promise);
+    const { unmount } = renderHook(() => usePreview(request(50)));
+    await act(async () => {
+      vi.advanceTimersByTime(PREVIEW_DEBOUNCE_MS);
+    });
+    const callsBeforeUnmount = stateSetterCalls.count;
+    unmount();
+    pending.resolve(answer(41));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(stateSetterCalls.count).toBe(callsBeforeUnmount);
   });
 });

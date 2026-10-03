@@ -27,20 +27,24 @@ export function usePreview(request: PreviewRequest | null): PreviewState {
   useEffect(() => {
     latest.current = key;
     if (!key) return;
+    let cancelled = false;
     const body = JSON.parse(key) as PreviewRequest;
     const timer = window.setTimeout(() => {
       previewSegment(body).then(
         (data) => {
-          if (latest.current !== key) return;
+          if (cancelled || latest.current !== key) return;
           setAnswer({ key, data });
           setLast(data);
         },
         (err: unknown) => {
-          if (latest.current === key) setAnswer({ key, error: rulesMessage(err) });
+          if (!cancelled && latest.current === key) setAnswer({ key, error: rulesMessage(err) });
         },
       );
     }, PREVIEW_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [key]);
 
   if (!key) return { status: 'incomplete' };
