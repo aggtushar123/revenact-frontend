@@ -844,6 +844,73 @@ Organizations (see "Ask rail", Contacts shape); `ContactsPage`'s own
   often small talk, so a summary (a digest of the whole call) pre-empts it
   rather than the two being concatenated.
 
+### Segments
+
+Spec `docs/superpowers/specs/2026-10-03-segments-design.md` §3 (plan
+`docs/superpowers/plans/2026-10-03-segments-frontend.md`). Three pages in
+`OrganizationsFrame` under the framed bar ("Segments", or "‹ Segments" on a
+segment, its builder and a new one).
+
+- **List (`/segments`).** A switch for All, Mine and Shared with me, a search
+  box and **New segment**, then one rounded row per segment (`SegmentRow`):
+  - the name, with a Workspace or Shared badge and Paused when paused;
+  - the kind and owner under it ("Organisations · You");
+  - the member count, today's change ("+3 / −1") and a 30-day size sparkline
+    (`SizeSparkline`, scaled to its own range), all in DM Mono. A single
+    history point reads as its own label, "Size today: N, no history yet",
+    rather than drawing a line.
+
+  On someone else's segment those three figures are the owner's alone and
+  read "—" (screen readers: "Only the owner sees this figure"). Phones wrap
+  the figures under the name. With no segments, the empty state explains what
+  a segment is and offers New segment and "Filter Organizations, then Save as
+  segment". A reload that fails keeps the last list on screen with "{error}
+  Showing the last result." and Try again, rather than clearing it.
+- **Builder (`/segments/new`, `/segments/:id/edit`).**
+  - **Basics:** name, kind (fixed once saved) and description.
+  - **Rules** (`RuleEditor`): readable rows of field, operator and value; All/Any;
+    one level of groups; + Add condition and + Add group, disabled at 20.
+    Each type has its own input (`ValueInput`): number and percent boxes, days,
+    date or date-window, checkboxes for "is any of", owner and product selects
+    or chips, and a server-searched organisation or account picker
+    (`RecordPicker`). A record the reader can't open shows as an italic
+    "an organisation you can't open".
+  - **Preview** (`PreviewPanel`): beside the rules from `lg`, under them on
+    phones. It reads "41 organisations match", the first ten, "and N more", and
+    the totals. While a newer answer loads, the last one stays, dimmed.
+  - **Sharing** (`SharingFields`): Only me, Everyone in the workspace, or Chosen
+    teammates with chips.
+  - **Alert me on changes.**
+  - **400s** show at the field they name, and a limit above the form.
+
+  A non-owner sees "Only {owner} can edit this segment" with Open segment and
+  Duplicate to edit.
+- **Segment (`/segments/:id`).**
+  - **Header** (`SegmentHeader`): the name at 22px, the rules as one sentence
+    (`RuleSentence`: fields and values in ink, figures in DM Mono, hidden
+    records in italics), owner and sharing, then Edit, Duplicate, Export CSV
+    and Delete. Edit and Delete are the owner's only.
+  - **Tiles** (`SegmentTiles`): Members, ARR covered, Average health, Average
+    CSAT and Last 7 days. Contacts get only Members and Last 7 days.
+  - **Hidden members.** A shared reader sees "N more members you can't open".
+  - **Members tab** (`MembersTab`):
+    - Organisations and accounts use `AccountRow` (not selectable) with the
+      kind's own search, Group and Sort; contacts use `ContactListItem`.
+    - The owner's row menu has Pin / Unpin and Keep out.
+    - A Kept out disclosure lists what is kept out, with Let back in, ten at a
+      time through the preview (Ruling G2), names sorted within each batch.
+  - **Changes tab** (`ChangesTab`): 7, 30 or 90 days, one rounded item per day
+    with its totals, Entered and Left with the reason, and "+N more". A
+    reason falls back to the raw field key with its `attr:`/`parent.` prefix
+    stripped (e.g. "csat_score" rather than "attr:csat_score").
+- **Save as segment** (`SaveAsSegmentButton`, `components/organizations/
+  portfolio/toolbarParts.tsx`) is one shared button, used beside Filters on
+  the Organizations and Accounts lists and before Add on Contacts.
+- **Money** reads compact, e.g. "$512.0K" (the tiles' ARR covered).
+- **Follow-up (G19):** the Kept out and Delete confirmations still use
+  `ConfirmDialog`'s older styling rather than the house look; accepted, not
+  fixed in this delivery.
+
 ### Overlays
 
 The Organizations `FiltersPanel` and `PinFieldsMenu`, `ContactRowActionsPopover`,

@@ -14,6 +14,7 @@ import { ALL_CAPABILITIES } from '../../test/capabilities';
 import { SlotHost } from '../../test/SlotHost';
 import { setViewport } from '../../test/viewport';
 import { Where } from '../organizations/testList';
+import { List as OrganizationsList } from '../organizations/List';
 import { Builder } from './Builder';
 import { SegmentPage } from './SegmentPage';
 import { SegmentsList } from './SegmentsList';
@@ -92,6 +93,7 @@ export function renderSegments(url: string, { width = 1440, nav = false }: { wid
             <Route path="/segments/new" element={<><Builder /><Where /></>} />
             <Route path="/segments/:id/edit" element={<><Builder /><Where /></>} />
             <Route path="/segments/:id" element={<><SegmentPage /><Where /></>} />
+            <Route path="/organizations/list" element={<><OrganizationsList /><Where /></>} />
             <Route path="*" element={<Where />} />
           </Routes>
         </SlotHost>

@@ -44,6 +44,7 @@ react-ts-app/
 │   │   │                          Overview's attention list: fetch, snooze, unsnooze
 │   │   ├── tasks/              ← Tasks slice (create task from CallSense AI actions)
 │   │   ├── pipelines/          ← the Pipelines book: types, API, kinds (OPPORTUNITIES_KIND, RISKS_KIND), URL state, chips
+│   │   ├── segments/           ← Segments: types, API, the field registry mirror, the rule sentence and draft, list filters → rules, URL state
 │   │   └── counter/            ← Legacy counter slice (unused)
 │   ├── layouts/                ← Shell layouts
 │   │   └── DashboardLayout.tsx
@@ -54,6 +55,7 @@ react-ts-app/
 │   │   ├── accounts/portfolio/ ← AccountPanels, accountKind (ACCOUNT_KIND) for the Accounts list and board
 │   │   ├── accounts/detail/    ← the account page: AccountHeader, AccountTiles, AccountPulseBreakdown, AccountDetailsTab, CanvasesTab, useAccount
 │   │   ├── pipelines/          ← OpportunityFormModal, RiskFormModal, KanbanBoard (the Deals & risks board); portfolio/ holds the Pipelines book's parts
+│   │   ├── segments/           ← the rule editor and value inputs, preview, sharing, rows, tiles, header, Members and Changes tabs
 │   │   ├── contacts/           ← ContactsToolbar, ContactList(Item), ContactProfile, HistoryItems, ContactFormModal
 │   │   ├── dashboard/charts/   ← Shared Recharts chart components (AI Trending)
 │   │   └── organizations/      ← Org domain components; portfolio/ holds the list page's (see below)
@@ -67,6 +69,7 @@ react-ts-app/
 │       ├── settings/           ← Settings module (data, currency, etc.)
 │       ├── integrations/       ← Integrations catalogue page
 │       ├── pipelines/          ← List and Board (one book of opportunities or risks)
+│       ├── segments/           ← SegmentsList, Builder, SegmentPage
 │       └── dashboard/          ← Analytics dashboards (Health, Ticket, AI Trending)
 ├── index.html
 ├── package.json
@@ -130,11 +133,16 @@ react-ts-app/
 ├── contacts                   → ContactsPage (list + profile panel)
 ├── contacts/:id               → ContactsPage, that person chosen
 ├── contacts/list              → Redirects to /contacts
-└── pipelines/
-    ├── (index)                → Redirects to /pipelines/list
-    └── (layout: PipelinesAskLayout — one Ask conversation above both routes and both kinds)
-        ├── list                → PipelinesList (List.tsx on GET /pipelines/<kind>/, ?kind=risks)
-        └── board               → PipelinesBoard (Board.tsx: stage columns, moves PATCH the item)
+├── pipelines/
+│   ├── (index)                → Redirects to /pipelines/list
+│   └── (layout: PipelinesAskLayout — one Ask conversation above both routes and both kinds)
+│       ├── list                → PipelinesList (List.tsx on GET /pipelines/<kind>/, ?kind=risks)
+│       └── board               → PipelinesBoard (Board.tsx: stage columns, moves PATCH the item)
+└── segments/
+    ├── (index)                → SegmentsList (GET /segments/, scope and search in the URL)
+    ├── new                    → Builder (?kind= and a list's filters from Save as segment)
+    ├── :id                    → SegmentPage (?tab=members|changes)
+    └── :id/edit               → Builder (owner; a read-only notice for anyone else)
 ```
 
 ---
@@ -342,6 +350,7 @@ inside `OrganizationsFrame` (the dashboard's body, with the Ask rail in its `rai
 | `components/organizations/portfolio/{toolbarParts,filterParts,usePortfolioBulk,DismissibleAlert}` | More shared parts: `toolbarParts` (`ToolbarSearch`, `FiltersTrigger`, `SelectToggle`, `ToolbarActions`), `filterParts`'s `FilterSheetFooter`, `usePortfolioBulk` (selection, bulk apply and export, by any portfolio kind), `DismissibleAlert` |
 | `components/organizations/portfolio/{useBoardMove,boardFrame,BoardColumn,PortfolioBoard}` | The board move machinery every board (Organizations, Accounts, Pipelines) shares: `useStageMove` (in `useBoardMove.ts`; `useBoardMove` is now a thin adapter over it for lifecycle), `boardFrame.ts` (frame inputs, drag state, settle timing), `StageColumn`/`CardSkeleton` (with an `avatar` prop; `BoardColumn` is a thin adapter over `StageColumn`), `BoardLayout`/`BoardSkeleton` (in `PortfolioBoard.tsx`) |
 | `features/pipelines/*`, `components/pipelines/portfolio/*` | The Pipelines book: `pipelineTypes`, `pipelineApi`, `pipelineKinds` (`OPPORTUNITIES_KIND`, `RISKS_KIND`, date line, row → form record), `pipelineParams`, `pipelineChips`, `askContext` (Ask Revenact on Pipelines — see "Ask Revenact" above); `itemParts` (signal, date line, stage and priority tags, Part of), `ParentPicker` (the + Add form's server-searched organisation/account picker, over `/customers/?search=` and `/accounts/?search=`, replacing a static company list — `usePipelineForms` no longer takes `companies`; the forms take an optional `parentField`), `PipelineItem` (its facts line ends with the shared `AskAboutButton`, hidden while selecting), `PipelineSections`, `PipelineTiles`, `PipelineToolbar`, `PipelineFilters`, `PipelineBoard` and `PipelineColumn` (both take a `narrow` prop: `w-64` rather than `w-72` while the Ask rail is open from `sm`, collapsed Closed Lost staying `w-44`), `PipelineCard` (its facts row ends with the same `AskAboutButton`), `PipelineKindSwitch`, `PipelineModals`, `usePipelineBook`, `usePipelineMove`, `usePipelineForms`, `usePipelineParams`; `features/pipelines/testPipelines.ts` (`stubPipelines`) and `pages/pipelines/testPages.tsx` (`renderPipelines`) for tests |
+| `features/segments/*`, `components/segments/*`, `pages/segments/*` | Segments: `segmentTypes`, `segmentApi`, `segmentFields` (the backend registry, mirrored and pinned by its test), `ruleSentence`, `ruleDraft`, `segmentErrors`, `fromListFilters`, `segmentParams`, `summaryFigures`; `RuleEditor`, `ValueInput`, `RecordPicker`, `Chip`, `PreviewPanel` + `usePreview`, `SharingFields`, `SegmentRow`, `SizeSparkline`, `SegmentTiles`, `SegmentHeader`, `MembersTab` (the one place the kind picks `AccountRow` under `ORGANIZATION_KIND`/`ACCOUNT_KIND` or `ContactListItem`), `MemberMenu` (on `MoveToMenu`), `KeptOut`, `ChangesTab`, `useSegment`; `features/segments/testSegments.ts` (`stubSegments`) and `pages/segments/testPages.tsx` (`renderSegments`, `renderInApp`) for tests |
 | `components/organizations/portfolio/*` | `AccountRow`, `rowParts`, `AccountDetails`, `AccountSheet`, `SummaryTiles`, `PortfolioToolbar`, `FiltersPanel`, `PinFieldsMenu`, `FilterChips`, `SelectionBar`, `PortfolioSections`, `useSelection`, `usePins`, `usePortfolioParams`; for the board `PortfolioBoard`, `BoardColumn`, `BoardCard`, `AccountSidePanel`, `useBoardMove`, `boardMove`, `useEndSentinel` |
 | `features/organizations/testPortfolio.ts`, `pages/organizations/testList.tsx` | Fixtures, `buildPortfolio`, `stubPortfolio`; `renderOrganizations(url, {width, nav, ask})`, `renderList`, `renderBoard`; `src/test/intersection.ts` (fake IntersectionObserver) |
 | `components/organizations/portfolio/portfolioKind.ts`, `organizationKind.ts` | The portfolio kind the shared components read from `PortfolioKindContext` (endpoint, params, words, links, row line, panels, how a move saves); `ORGANIZATION_KIND` is the default |
@@ -568,6 +577,18 @@ with Part of and a date line, selection with bulk stage / priority /
 department / date, export) and a stage Board whose moves PATCH the item. See
 `docs/03-ui-ux-design.md` "Portfolio rows and board (Pipelines)".
 
+### 11. Segments (`pages/segments/`)
+
+Saved, rule-based groups of organisations, accounts or contacts (spec
+`docs/superpowers/specs/2026-10-03-segments-design.md`), on backend
+`services/segments`: the list, the builder with a live preview, and a
+segment's page with tiles, Members (each kind's own rows, Pin and Keep out for
+the owner) and Changes. Save as segment on the Organizations, Accounts and
+Contacts lists opens the builder from their URL filters. Shared parts gained
+optional props only: `AccountRow` `selectable`/`menu`, `ContactListItem`
+`actions`, `MoveToMenu` `label`/`menuLabel`/`icon`, the toolbars'
+`onSaveAsSegment`. See `docs/03-ui-ux-design.md` "Segments".
+
 ---
 
 ## Component Dependency Graph (simplified)
@@ -686,7 +707,7 @@ storyKinds.ts`), a row in `StoryItemRow.tsx`, and wire its backend shape into
 |---|---|
 | `/communications` | No route defined |
 | `/sfdc`, `/feedbacks` | No route defined |
-| `/segments`, `/projects`, `/surveys`, `/campaigns`, `/canvas` | No route defined |
+| `/projects`, `/surveys`, `/campaigns`, `/canvas` | No route defined |
 | `/lifecycle` | No route defined (`/health` redirects to `/dashboard/health/distribution`) |
 | `/settings/currency` … `/settings/ai-agent` | Stub `SettingPlaceholder` |
 | `/dashboard/custom`, `/dashboard/advance/*` | Redirect to the new areas (`redirects.tsx`) |
