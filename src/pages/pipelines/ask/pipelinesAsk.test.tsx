@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor, within } from '@testing-library/react';
+import { act, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { postedBodies } from '../../../components/copilot/testCopilot';
-import { resetViewport } from '../../../test/viewport';
+import { resetViewport, resizeViewport } from '../../../test/viewport';
 import { PIPELINES_ASK_KEY } from '../../dashboard/ask/askPreference';
 import { renderPipelines } from '../testPages';
 import { stubPipelinesAsk } from './testPipelinesAsk';
@@ -99,7 +99,7 @@ describe('Ask Revenact on the Pipelines List and Board', () => {
     await waitFor(() => expect(column('negotiation')).toHaveClass('w-72'));
   });
 
-  it('below xl the rail narrows the columns, and a card still opens its form over the rail', async () => {
+  it('below xl the rail narrows the columns, and a card still opens its form with the rail open', async () => {
     stubPipelinesAsk();
     renderPipelines('/pipelines/board', { ask: true, width: 1100 });
     await within(await findColumn('negotiation')).findByRole('button', { name: 'EMEA seats' });
@@ -112,6 +112,21 @@ describe('Ask Revenact on the Pipelines List and Board', () => {
     await userEvent.click(within(column('negotiation')).getByRole('button', { name: 'EMEA seats' }));
     expect(await screen.findByRole('heading', { name: 'Edit EMEA seats' })).toBeInTheDocument();
     expect(rail()).toBeInTheDocument();
+  });
+
+  it("keeps a card's open form when a resize opens the rail below xl", async () => {
+    // The saved choice is open, so the rail opens once the window reaches sm.
+    localStorage.setItem(PIPELINES_ASK_KEY, 'open');
+    stubPipelinesAsk();
+    renderPipelines('/pipelines/board', { ask: true, width: 375 });
+    await screen.findByRole('button', { name: 'EMEA seats' });
+    expect(rail()).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'EMEA seats' }));
+    expect(await screen.findByRole('heading', { name: 'Edit EMEA seats' })).toBeInTheDocument();
+    act(() => resizeViewport(1100));
+    expect(await screen.findByRole('complementary', { name: 'Ask Revenact' })).toBeInTheDocument();
+    // useBoardRail's closeCard is KEEP_FORM: the form, and any unsaved edits, stay.
+    expect(screen.getByRole('heading', { name: 'Edit EMEA seats' })).toBeInTheDocument();
   });
 
   it.each([
