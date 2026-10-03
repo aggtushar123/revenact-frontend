@@ -14,7 +14,9 @@ import { useSearchText } from '../../components/organizations/portfolio/useSearc
 import { SegmentRow } from '../../components/segments/SegmentRow';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
 
-type Answer = { key: string; rows: SegmentListRow[] } | { key: string; error: string };
+/** The latest answer, for `key`. A failure keeps the last list (`rows`) so
+ *  the page can go on showing it beside the error. */
+type Answer = { key: string; rows: SegmentListRow[] | null; error: string | null };
 
 /** /segments (spec §3): Mine, Shared with me and All, a search box and
  *  + New segment, then a row per segment. Scope and search live in the URL. */
@@ -34,10 +36,10 @@ export function SegmentsList() {
     let alive = true;
     fetchSegments(params.scope, params.search).then(
       (rows) => {
-        if (alive) setAnswer({ key, rows });
+        if (alive) setAnswer({ key, rows, error: null });
       },
       (err: unknown) => {
-        if (alive) setAnswer({ key, error: errorMessage(err, 'Could not load segments.') });
+        if (alive) setAnswer((last) => ({ key, rows: last?.rows ?? null, error: errorMessage(err, 'Could not load segments.') }));
       },
     );
     return () => {
@@ -46,14 +48,17 @@ export function SegmentsList() {
   }, [key, params.scope, params.search]);
 
   // The last list stays while a new scope or search loads.
-  const rows = answer && 'rows' in answer ? answer.rows : null;
-  const error = answer && 'error' in answer && answer.key === key ? answer.error : null;
+  const rows = answer?.rows ?? null;
+  const error = answer?.key === key ? answer.error : null;
   const loading = answer?.key !== key;
 
   let body;
-  if (error && !rows) {
+  // With no list worth keeping, the failure takes the body: an empty last
+  // answer would otherwise read as "none" for a scope that never loaded.
+  if (error && (!rows || rows.length === 0)) {
     body = <ErrorBlock message={error} onRetry={() => setAttempt((n) => n + 1)} />;
-  } else if (!rows) {
+  } else if (!rows || (loading && rows.length === 0)) {
+    // An empty answer for the last scope or search says nothing about the next.
     body = <ItemSkeleton count={4} label="Loading segments" avatar={false} />;
   } else if (rows.length === 0 && params.search) {
     body = (
@@ -108,10 +113,13 @@ export function SegmentsList() {
             New segment
           </Link>
         </div>
-        {error && rows ? (
-          <p role="alert" className="text-[13px] text-danger">
-            {error} Showing the last result.
-          </p>
+        {error && rows && rows.length > 0 ? (
+          <div role="alert" className="flex flex-wrap items-center gap-2 text-[13px] text-danger">
+            <span>{error} Showing the last result.</span>
+            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={`${QUIET} border border-line`}>
+              Try again
+            </button>
+          </div>
         ) : null}
         {body}
       </div>

@@ -8,7 +8,12 @@ export function SizeSparkline({ sizes }: { sizes: number[] }) {
   const y = (size: number) => (high === low ? height / 2 : height - 2 - ((size - low) / (high - low)) * (height - 4));
   const points =
     sizes.length < 2 ? '' : sizes.map((size, i) => `${((i / (sizes.length - 1)) * width).toFixed(1)},${y(size).toFixed(1)}`).join(' ');
-  const label = sizes.length > 0 ? `Size over 30 days: ${sizes[0]} to ${sizes[sizes.length - 1]}` : 'No size history yet';
+  const label =
+    sizes.length === 0
+      ? 'No size history yet'
+      : sizes.length === 1
+        ? `Size today: ${sizes[0]}, no history yet`
+        : `Size over 30 days: ${sizes[0]} to ${sizes[sizes.length - 1]}`;
   return (
     <span role="img" aria-label={label} className="inline-flex shrink-0 text-ink-muted">
       <svg viewBox={`0 0 ${width} ${height}`} className="h-5 w-16" aria-hidden="true">
