@@ -181,6 +181,11 @@ export interface SegmentsStub {
   changes?: (id: number, days: number) => Answer;
   /** PATCH /segments/<id>/members/<record_id>/ (default: the owner's write). */
   member?: (id: number, recordId: number, state: unknown) => Answer;
+  /** DELETE /segments/<id>/ (default: the owner's delete). */
+  remove?: (id: number) => Answer;
+  /** GET /segments/<id>/members/: an answer overrides the default; undefined
+   *  falls through to it. */
+  members?: (id: number, query: URLSearchParams) => Answer | undefined;
   /** Members' `hidden_count` (default 0 for the owner, 2 for anyone else). */
   hidden?: number;
   /** GET /attributes/definitions/ (default none). */
@@ -329,6 +334,7 @@ export function stubSegments(stub: SegmentsStub = {}) {
         return json(200, segment);
       }
       if (rest === '' && method === 'DELETE') {
+        if (stub.remove) return reply(stub.remove(id));
         if (!segment.is_owner) return forbidden;
         store.splice(store.indexOf(segment), 1);
         return json(204, null);
@@ -349,6 +355,8 @@ export function stubSegments(stub: SegmentsStub = {}) {
         return json(201, copy);
       }
       if (rest === 'members/' && method === 'GET') {
+        const override = stub.members?.(id, url.searchParams);
+        if (override) return reply(override);
         return json(200, membersOf(segment, url.searchParams, stub.hidden ?? (segment.is_owner ? 0 : 2), book));
       }
       if (rest === 'members/export.csv') {

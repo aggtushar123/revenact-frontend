@@ -1,17 +1,32 @@
 import type { SegmentKind, SegmentSummary } from '../../features/segments/segmentTypes';
 import { summaryFigures } from '../../features/segments/summaryFigures';
-import { MONO } from '../organizations/portfolio/styles';
+import { MONO, QUIET } from '../organizations/portfolio/styles';
 import { Tile, TilesSkeleton } from '../organizations/portfolio/tileParts';
 
 /** The tiles (spec §3) over every member the reader may open; a search on
  *  the Members tab narrows the rows, never these. Phones swipe the strip
  *  sideways inside itself; the page never scrolls sideways. */
-export function SegmentTiles({ summary, kind, failed }: { summary: SegmentSummary | null; kind: SegmentKind; failed: boolean }) {
+export function SegmentTiles({
+  summary,
+  kind,
+  failed,
+  onRetry,
+}: {
+  summary: SegmentSummary | null;
+  kind: SegmentKind;
+  failed: boolean;
+  onRetry: () => void;
+}) {
   if (failed) {
     return (
-      <p role="alert" className="text-[13px] text-danger">
-        Could not load the totals.
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p role="alert" className="text-[13px] text-danger">
+          Could not load the totals.
+        </p>
+        <button type="button" onClick={onRetry} className={`${QUIET} border border-line`}>
+          Try again
+        </button>
+      </div>
     );
   }
   if (!summary) return <TilesSkeleton count={kind === 'contact' ? 2 : 5} />;

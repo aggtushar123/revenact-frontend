@@ -70,6 +70,31 @@ describe('/segments/:id (spec §3)', () => {
     expect(requests(spy, 'DELETE', /^\/segments\/7\/$/)).toHaveLength(1);
   });
 
+  it('keeps the dialog open with the refusal, and stays on the segment, when the delete fails', async () => {
+    const spy = stubSegments({ remove: () => ({ status: 403, body: { detail: "Only the segment's owner can change it." } }) });
+    renderSegments('/segments/7');
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Delete' }).at(-1)!);
+    expect(await screen.findByText("Only the segment's owner can change it.")).toBeInTheDocument();
+    expect(screen.getByText('Delete Renewal risk?')).toBeInTheDocument();
+    expect(requests(spy, 'DELETE', /^\/segments\/7\/$/)).toHaveLength(1);
+    expect(where()).toBe('/segments/7');
+  });
+
+  it('offers Try again when the totals fail, and shows the tiles once a retry succeeds', async () => {
+    let failures = 1;
+    stubSegments({
+      members: (_id, query) =>
+        query.get('limit') === '1' && failures-- > 0 ? { status: 500, body: { detail: 'Server error.' } } : undefined,
+    });
+    renderSegments('/segments/7');
+    expect(await screen.findByText('Could not load the totals.')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Members' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await within(await screen.findByRole('group', { name: 'Members' })).findByText('3')).toBeInTheDocument();
+    expect(screen.queryByText('Could not load the totals.')).not.toBeInTheDocument();
+  });
+
   it('duplicates into a copy of my own and opens it', async () => {
     stubSegments();
     renderSegments('/segments/8');
@@ -84,6 +109,7 @@ describe('/segments/:id (spec §3)', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Export CSV' }));
     await waitFor(() => expect(requests(spy, 'GET', /^\/segments\/7\/members\/export\.csv$/)).toHaveLength(1));
     expect(requests(spy, 'GET', /export\.csv$/)[0].query.toString()).toBe('search=piz&sort=name');
+    await waitFor(() => expect(URL.createObjectURL).toHaveBeenCalledTimes(1));
   });
 
   it("opens on the Changes tab from the alert's link, and switches tabs in the URL", async () => {

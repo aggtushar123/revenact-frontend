@@ -95,7 +95,7 @@ function SegmentView({ segment, onReplace }: { segment: Segment; onReplace: (seg
         <SegmentHeader segment={segment} parts={parts} exportQuery={membersQuery(params, segment.kind)} onNotice={setNotice} />
         {notice ? <DismissibleAlert message={notice} onDismiss={() => setNotice(null)} /> : null}
         <div className="@container">
-          <SegmentTiles summary={totals.page?.summary ?? null} kind={segment.kind} failed={totals.failed} />
+          <SegmentTiles summary={totals.page?.summary ?? null} kind={segment.kind} failed={totals.failed} onRetry={() => setVersion((v) => v + 1)} />
         </div>
         {hidden > 0 ? (
           <p data-part="hidden-members" className="text-[13px] text-ink-muted">
