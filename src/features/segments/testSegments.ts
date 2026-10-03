@@ -98,6 +98,21 @@ export const CHAMPIONS: Segment = {
 
 export const SEGMENTS: Segment[] = [RENEWAL_RISK, EMEA_ACCOUNTS, CHAMPIONS];
 
+/** Dana's: organisations, private, not shared with me or the workspace.
+ *  Unreadable to the viewer (`ME`), so it must 404 like a missing id, the
+ *  same way the backend's `get_readable` (services/segments/access.py) does. */
+export const DANA_PRIVATE: Segment = {
+  ...BASE,
+  id: 10,
+  name: "Dana's pipeline",
+  kind: 'customer',
+  rules: { match: 'all', conditions: [] },
+  sharing: 'private',
+  owner: DANA,
+  is_owner: false,
+  member_count: null,
+};
+
 /** The list's row for a segment: the owner's figures only on mine (S8). */
 export function listRow(segment: Segment): SegmentListRow {
   const own = segment.is_owner;
@@ -216,6 +231,14 @@ function membersOf(segment: Segment, query: URLSearchParams, hidden: number) {
   };
 }
 
+/** Readable to the viewer (`ME`): their own, shared with the workspace, or
+ *  shared with people that include them — the same test `get_readable`
+ *  (services/segments/access.py) applies. A segment that fails it must 404
+ *  exactly as a missing id does, on every one of a segment's sub-paths. */
+function readableByViewer(segment: Segment): boolean {
+  return segment.is_owner || segment.sharing === 'workspace' || (segment.sharing === 'people' && segment.shared_with.some((p) => p.id === ME.id));
+}
+
 const teammates = (ids: unknown): PersonRef[] =>
   ((ids as number[] | undefined) ?? []).flatMap((id) => TEAM.filter((person) => person.id === id).map(({ id: pk, name }) => ({ id: pk, name })));
 
@@ -263,7 +286,9 @@ export function stubSegments(stub: SegmentsStub = {}) {
       const id = Number(found[1]);
       const rest = found[2];
       const segment = store.find((s) => s.id === id);
-      if (!segment) return json(404, { detail: 'Not found.' });
+      // Unreadable reads the same as missing, before any of GET, members/ or
+      // changes/ below so none of them can leak a segment the viewer can't open.
+      if (!segment || !readableByViewer(segment)) return json(404, { detail: 'Not found.' });
       const forbidden = json(403, { detail: "Only the segment's owner can change it." });
       if (rest === '' && method === 'GET') return json(200, segment);
       if (rest === '' && method === 'PATCH') {

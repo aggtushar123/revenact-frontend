@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ApiError } from '../../lib/apiClient';
 import {
   createSegment,
   deleteSegment,
@@ -13,7 +14,7 @@ import {
   setMemberState,
   updateSegment,
 } from './segmentApi';
-import { RENEWAL_RISK, requests, stubSegments, type SegmentsSpy } from './testSegments';
+import { DANA_PRIVATE, RENEWAL_RISK, SEGMENTS, requests, stubSegments, type SegmentsSpy } from './testSegments';
 
 /** "METHOD /path?query" for every request so far, oldest first. */
 function called(spy: SegmentsSpy): string[] {
@@ -78,6 +79,17 @@ describe('segment API (backend PR #84)', () => {
     expect(await searchRecords('customer', 'piz')).toEqual([{ id: 7, name: 'Pizza Hut' }]);
     expect(await searchRecords('account', 'emea')).toEqual([{ id: 12, name: 'Pizza EMEA' }]);
     expect(called(spy)).toEqual(['GET /customers/?search=piz', 'GET /accounts/?search=emea']);
+  });
+
+  it('404s a segment I cannot read (private, owned by someone else) the same as a missing id', async () => {
+    stubSegments({ segments: [...SEGMENTS, DANA_PRIVATE] });
+    const missing = (await fetchSegment(999).catch((error: unknown) => error)) as ApiError;
+    const unreadable = (await fetchSegment(DANA_PRIVATE.id).catch((error: unknown) => error)) as ApiError;
+    expect(missing).toBeInstanceOf(ApiError);
+    expect(unreadable).toBeInstanceOf(ApiError);
+    expect(unreadable.status).toBe(missing.status);
+    expect(unreadable.body).toEqual(missing.body);
+    expect(unreadable.status).toBe(404);
   });
 
   it('names ids from the kind portfolio, asks nothing for none, and leaves out ids that do not come back', async () => {
