@@ -1,8 +1,10 @@
 import { memo, type DragEvent } from 'react';
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
+import { pipelineAskQuestion, pipelineFocusOf } from '../../../features/pipelines/askContext';
 import { dateText, type PipelineKind } from '../../../features/pipelines/pipelineKinds';
 import type { PipelineRow } from '../../../features/pipelines/pipelineTypes';
+import { AskAboutButton } from '../../copilot/AskAboutButton';
 import { TITLE_BUTTON } from '../../organizations/detail/listStyles';
 import { MoveToMenu } from '../../organizations/portfolio/MoveToMenu';
 import { MONO } from '../../organizations/portfolio/styles';
@@ -32,7 +34,8 @@ export interface PipelineCardProps {
  *  opens from it; `data-part="open"`, where focus returns after a Move
  *  to…), Part of, then MRR, priority, department, the date line and the
  *  signal. The priority tag is left out when High priority is already the
- *  signal. Memoised: dragging re-renders the board. */
+ *  signal. Under Ask Revenact the facts row (`data-part="facts"`) ends
+ *  with "Ask about this". Memoised: dragging re-renders the board. */
 function PipelineCardView({
   row,
   kind,
@@ -48,6 +51,7 @@ function PipelineCardView({
 }: PipelineCardProps) {
   const draggable = isSm && canMove && !moveDisabled;
   const targets = kind.stages.filter((stage) => stage.value !== row.stage.value);
+  const focus = pipelineFocusOf(row);
 
   const startDrag = (event: DragEvent<HTMLLIElement>) => {
     // jsdom has no DataTransfer. Browsers get the id so Firefox starts the drag.
@@ -86,7 +90,7 @@ function PipelineCardView({
           <MoveToMenu name={row.title} disabled={moveDisabled} note={moveNote} targets={targets} onChoose={(to) => onMove(row, to, true)} />
         ) : null}
       </div>
-      <div className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
+      <div data-part="facts" className="mt-2 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
         <span data-field="mrr" className={`${MONO} text-[13px] text-ink`}>
           {formatCompactMoney(row.mrr, currency)}
         </span>
@@ -96,6 +100,7 @@ function PipelineCardView({
         </span>
         <DateLine text={dateText(kind, row.date, row.open)} overdue={row.overdue} />
         <PipelineSignal signal={row.signal} />
+        <AskAboutButton name={row.title} question={pipelineAskQuestion(focus)} focus={focus} className="ml-auto" />
       </div>
     </li>
   );

@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { OPPORTUNITIES_KIND, RISKS_KIND } from '../../../features/pipelines/pipelineKinds';
 import type { PipelineRow } from '../../../features/pipelines/pipelineTypes';
 import { adminLeft, analyticsAddOn, emeaSeats, globexUplift, initechWin } from '../../../features/pipelines/testPipelines';
+import { AskDraftContext } from '../../../pages/dashboard/ask/context';
 import { PipelineItem, type PipelineItemProps } from './PipelineItem';
 
 function renderItem(row: PipelineRow, props: Partial<PipelineItemProps> = {}) {
@@ -92,5 +93,59 @@ describe('PipelineItem (spec §1 "List items")', () => {
     expect(screen.getByRole('checkbox', { name: 'Select Globex uplift' })).toBeDisabled();
     renderItem(adminLeft, { atLimit: true, selected: true });
     expect(screen.getByRole('checkbox', { name: 'Select Admin left' })).toBeEnabled();
+  });
+});
+
+describe('PipelineItem: Ask about this (spec §3)', () => {
+  function renderAsking(row: PipelineRow, selecting = false) {
+    const draft = vi.fn();
+    const onOpen = vi.fn();
+    const ui = (isSelecting: boolean) => (
+      <MemoryRouter>
+        <AskDraftContext.Provider value={draft}>
+          <ul>
+            <PipelineItem
+              row={row}
+              kind={row.kind === 'risk' ? RISKS_KIND : OPPORTUNITIES_KIND}
+              currency="USD"
+              selecting={isSelecting}
+              selected={false}
+              onToggleSelect={vi.fn()}
+              onOpen={onOpen}
+            />
+          </ul>
+        </AskDraftContext.Provider>
+      </MemoryRouter>
+    );
+    const { rerender } = render(ui(selecting));
+    return { draft, onOpen, select: () => rerender(ui(true)) };
+  }
+
+  it('prefills a question about this item, focused on it, without opening its form', async () => {
+    const { draft, onOpen } = renderAsking(adminLeft);
+    await userEvent.click(screen.getByRole('button', { name: 'Ask about this: Admin left' }));
+    expect(draft).toHaveBeenCalledWith('What should I know about this risk?', { kind: 'risk', id: 71 });
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('ends the item line, pushed right', () => {
+    renderAsking(emeaSeats);
+    const item = document.querySelector('[data-item-id="41"] [data-part="item"]') as HTMLElement;
+    const button = within(item).getByRole('button', { name: 'Ask about this: EMEA seats' });
+    expect(item.lastElementChild).toBe(button);
+    expect(button).toHaveClass('ml-auto');
+  });
+
+  it('is hidden while selecting, when a tap selects', () => {
+    const { select } = renderAsking(emeaSeats);
+    expect(screen.getByRole('button', { name: 'Ask about this: EMEA seats' })).toBeInTheDocument();
+    select();
+    expect(screen.queryByRole('button', { name: /^Ask about this/ })).not.toBeInTheDocument();
+  });
+
+  it('is not offered outside an Ask provider', () => {
+    renderItem(emeaSeats);
+    expect(screen.getByRole('button', { name: 'EMEA seats' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Ask about this/ })).not.toBeInTheDocument();
   });
 });
