@@ -22,6 +22,14 @@ describe('PreviewPanel', () => {
     expect(screen.getByText('39')).toHaveClass('font-mono-brand');
     expect(screen.getByText('ARR covered').nextSibling).toHaveTextContent('$512.0K');
     expect(screen.queryByText('Last 7 days')).not.toBeInTheDocument();
+    // The count says how many already, so there is no Members figure.
+    expect(screen.queryByText('Members')).not.toBeInTheDocument();
+  });
+
+  it('says nothing matches when the count is nought', () => {
+    render(<PreviewPanel kind="customer" state={{ status: 'ready', data: { ...data, count: 0, results: [] } }} />);
+    expect(document.querySelector('[data-part="match-count"]')).toHaveTextContent('0 organisations match');
+    expect(screen.getByText('Nothing matches these rules yet.')).toBeInTheDocument();
   });
 
   it('asks for finished conditions, and for fixed rules after a refusal, instead of a count', () => {

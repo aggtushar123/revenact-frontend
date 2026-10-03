@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { Plus, Trash2, X } from 'lucide-react';
+import { Info, Plus, Trash2, X } from 'lucide-react';
 import {
   addCondition,
   addGroup,
@@ -18,7 +18,7 @@ import { opText } from '../../features/segments/ruleSentence';
 import { MAX_CONDITIONS, operatorsOf, type FieldDef } from '../../features/segments/segmentFields';
 import type { Match, Operator } from '../../features/segments/segmentTypes';
 import { FILTER_SELECT } from '../organizations/portfolio/filterParts';
-import { BUTTON, COLUMN_ICON_BUTTON, MONO } from '../organizations/portfolio/styles';
+import { BUTTON, COLUMN_ICON_BUTTON, MONO, QUIET } from '../organizations/portfolio/styles';
 import { Switch } from '../organizations/portfolio/tileParts';
 import { ValueInput, type ValueOptions } from './ValueInput';
 
@@ -28,6 +28,14 @@ const MATCHES: { value: Match; label: string }[] = [
 ];
 /** The shared filter box, with a danger border on an unfinished row. */
 const SELECT = `${FILTER_SELECT} aria-[invalid=true]:border-danger`;
+/** The word before a row: "Where" first, then the list's own "and"/"or". */
+const CONNECTIVE = 'w-12 shrink-0 text-[13px] text-ink-muted';
+/** The row's remove button: shown on hover or focus where there is a
+ *  mouse, always on touch screens (no hover to reveal it). */
+const REVEAL = '[@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100 [@media(hover:hover)]:group-focus-within/row:opacity-100';
+/** Lines the word up with the first row of 44px (36px from sm) controls. */
+const LEAD_PAD = 'pt-3 sm:pt-2';
+const connective = (index: number, match: Match) => (index === 0 ? 'Where' : match === 'all' ? 'and' : 'or');
 const SECTIONS = [
   { key: 'own', label: 'Fields' },
   { key: 'parent', label: 'Their organisation or account' },
@@ -46,6 +54,10 @@ export interface RuleEditorProps {
   invalidUid: string | null;
   /** A save's or the preview's `rules` 400. */
   error: string | null;
+  /** The kind's plural noun, for "Include organisations that match…". */
+  noun?: string;
+  /** Shown under the rows (the organisation kind's churned/archived default). */
+  note?: string | null;
   onChange: (draft: DraftRules) => void;
 }
 
@@ -76,8 +88,10 @@ function FieldSelect({ fields, value, label, invalid, onChange }: {
   );
 }
 
-function ConditionRow({ condition, number, fields, options, invalid, onChange, onRemove }: {
+function ConditionRow({ condition, number, lead, fields, options, invalid, onChange, onRemove }: {
   condition: DraftCondition;
+  /** "Where", "and" or "or". */
+  lead: string;
   number: number;
   fields: FieldDef[];
   options: ValueOptions;
@@ -88,43 +102,52 @@ function ConditionRow({ condition, number, fields, options, invalid, onChange, o
   const field = fields.find((f) => f.key === condition.field) ?? null;
   const name = `Condition ${number}`;
   return (
-    <li data-condition={condition.uid} className={`flex flex-wrap items-center gap-2 rounded-lg border bg-surface p-2 ${invalid ? 'border-danger' : 'border-line'}`}>
-      <FieldSelect
-        fields={fields}
-        value={condition.field}
-        label={`${name} field`}
-        invalid={invalid}
-        onChange={(key) => {
-          const next = fields.find((f) => f.key === key);
-          if (next) onChange(withField(condition, next));
-        }}
-      />
-      <select
-        aria-label={`${name} operator`}
-        value={condition.op}
-        disabled={!field}
-        onChange={(event) => {
-          if (field) onChange(withOp(condition, field, event.target.value as Operator));
-        }}
-        className={SELECT}
-      >
-        {(field ? operatorsOf(field) : [condition.op]).map((op) => (
-          <option key={op} value={op}>
-            {opText(op, field)}
-          </option>
-        ))}
-      </select>
-      {field ? (
-        <ValueInput field={field} condition={condition} options={options} label={`${name} value`} invalid={invalid} onChange={(value) => onChange({ ...condition, value })} />
-      ) : null}
-      <button type="button" onClick={onRemove} aria-label={`Remove condition ${number}`} className={`${COLUMN_ICON_BUTTON} ml-auto`}>
+    <li
+      data-condition={condition.uid}
+      className={`group/row flex items-start gap-2 rounded-lg border px-2 py-1.5 hover:bg-subtle ${invalid ? 'border-danger' : 'border-transparent'}`}
+    >
+      <span aria-hidden="true" className={`${CONNECTIVE} ${LEAD_PAD}`}>
+        {lead}
+      </span>
+      {/* The controls wrap within their own column, under the field. */}
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <FieldSelect
+          fields={fields}
+          value={condition.field}
+          label={`${name} field`}
+          invalid={invalid}
+          onChange={(key) => {
+            const next = fields.find((f) => f.key === key);
+            if (next) onChange(withField(condition, next));
+          }}
+        />
+        <select
+          aria-label={`${name} operator`}
+          value={condition.op}
+          disabled={!field}
+          onChange={(event) => {
+            if (field) onChange(withOp(condition, field, event.target.value as Operator));
+          }}
+          className={SELECT}
+        >
+          {(field ? operatorsOf(field) : [condition.op]).map((op) => (
+            <option key={op} value={op}>
+              {opText(op, field)}
+            </option>
+          ))}
+        </select>
+        {field ? (
+          <ValueInput field={field} condition={condition} options={options} label={`${name} value`} invalid={invalid} onChange={(value) => onChange({ ...condition, value })} />
+        ) : null}
+        {invalid ? (
+          <p className="basis-full text-[11px] text-danger">
+            {field ? 'Finish this condition, or remove it.' : 'This field no longer exists. Choose another, or remove it.'}
+          </p>
+        ) : null}
+      </div>
+      <button type="button" onClick={onRemove} aria-label={`Remove condition ${number}`} className={`${COLUMN_ICON_BUTTON} ${REVEAL}`}>
         <X className="h-4 w-4" aria-hidden="true" />
       </button>
-      {invalid ? (
-        <p className="basis-full text-[11px] text-danger">
-          {field ? 'Finish this condition, or remove it.' : 'This field no longer exists. Choose another, or remove it.'}
-        </p>
-      ) : null}
     </li>
   );
 }
@@ -132,7 +155,7 @@ function ConditionRow({ condition, number, fields, options, invalid, onChange, o
 /** The rules as readable rows (spec §3): an All/Any switch, conditions and
  *  one level of groups, + Add condition and + Add group, the right value
  *  input per field. */
-export function RuleEditor({ draft, fields, options, invalidUid, error, onChange }: RuleEditorProps) {
+export function RuleEditor({ draft, fields, options, invalidUid, error, noun = 'records', note = null, onChange }: RuleEditorProps) {
   const headingId = useId();
   const count = conditionCount(draft);
   const full = count >= MAX_CONDITIONS;
@@ -140,11 +163,12 @@ export function RuleEditor({ draft, fields, options, invalidUid, error, onChange
   const numbers = new Map(leaves(draft).map((condition, index) => [condition.uid, index + 1]));
   const groupNumbers = new Map(draft.conditions.filter(isDraftGroup).map((group, index) => [group.uid, index + 1]));
 
-  const row = (condition: DraftCondition) => (
+  const row = (condition: DraftCondition, lead: string) => (
     <ConditionRow
       key={condition.uid}
       condition={condition}
       number={numbers.get(condition.uid) ?? 0}
+      lead={lead}
       fields={fields}
       options={options}
       invalid={condition.uid === invalidUid}
@@ -154,43 +178,52 @@ export function RuleEditor({ draft, fields, options, invalidUid, error, onChange
   );
 
   return (
-    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3 rounded-xl bg-surface p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id={headingId} className="text-[15px] font-semibold text-ink">
-          Rules
-        </h2>
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3 p-4">
+      <h2 id={headingId} className="text-[15px] font-semibold text-ink">
+        Rules
+      </h2>
+      <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink">
+        <span>Include {noun} that match</span>
         <Switch label="Match" options={MATCHES} value={draft.match} onChange={(match) => onChange(setMatch(draft, match))} />
+        <span>of these conditions</span>
       </div>
-      <p className="text-[13px] text-ink-muted">{draft.match === 'all' ? 'Members match every condition.' : 'Members match at least one condition.'}</p>
       {error ? (
         <p role="alert" className="text-[13px] text-danger">
           {error}
         </p>
       ) : null}
       {draft.conditions.length === 0 ? (
-        <p className="text-[13px] text-ink-muted">No conditions yet. With none, only pinned records are members.</p>
+        <p className="rounded-lg border border-dashed border-line px-3 py-4 text-center text-[13px] text-ink-muted">
+          No conditions yet. With none, only pinned records are members.
+        </p>
       ) : (
-        <ul aria-label="Conditions" className="flex flex-col gap-2">
-          {draft.conditions.map((node) => {
-            if (!isDraftGroup(node)) return row(node);
+        <ul aria-label="Conditions" className="-mx-2 flex flex-col gap-1">
+          {draft.conditions.map((node, index) => {
+            const lead = connective(index, draft.match);
+            if (!isDraftGroup(node)) return row(node, lead);
             const n = groupNumbers.get(node.uid) ?? 0;
             return (
-              <li key={node.uid} data-group={node.uid} className="flex flex-col gap-2 rounded-lg bg-subtle p-2">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[13px] font-semibold text-ink">Group</span>
-                  <Switch label={`Group ${n} match`} options={MATCHES} value={node.match} onChange={(match) => onChange(setMatch(draft, match, node.uid))} />
-                  <span className="text-[11px] text-ink-muted">{node.match === 'all' ? 'every one of these' : 'any one of these'}</span>
-                  <button type="button" onClick={() => onChange(removeNode(draft, node.uid))} aria-label={`Remove group ${n}`} className={`${COLUMN_ICON_BUTTON} ml-auto`}>
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+              <li key={node.uid} data-group={node.uid} className="flex items-start gap-2 px-2 py-1.5">
+                <span aria-hidden="true" className={`${CONNECTIVE} ${LEAD_PAD}`}>
+                  {lead}
+                </span>
+                <div className="flex min-w-0 flex-1 flex-col gap-1 border-l-2 border-line pl-2">
+                  <div className="flex flex-wrap items-center gap-2 text-[13px] text-ink">
+                    <span>Match</span>
+                    <Switch label={`Group ${n} match`} options={MATCHES} value={node.match} onChange={(match) => onChange(setMatch(draft, match, node.uid))} />
+                    <span>of these</span>
+                    <button type="button" onClick={() => onChange(removeNode(draft, node.uid))} aria-label={`Remove group ${n}`} className={`${COLUMN_ICON_BUTTON} ml-auto`}>
+                      <Trash2 className="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <ul aria-label={`Group ${n} conditions`} className="-ml-2 flex flex-col gap-1">
+                    {node.conditions.map((condition, inner) => row(condition, connective(inner, node.match)))}
+                  </ul>
+                  <button type="button" disabled={full} onClick={() => onChange(addCondition(draft, first, node.uid))} className={`${QUIET} self-start text-ink-muted`}>
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Add condition to group
                   </button>
                 </div>
-                <ul aria-label={`Group ${n} conditions`} className="flex flex-col gap-2">
-                  {node.conditions.map(row)}
-                </ul>
-                <button type="button" disabled={full} onClick={() => onChange(addCondition(draft, first, node.uid))} className={`${BUTTON} self-start`}>
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                  Add condition to group
-                </button>
               </li>
             );
           })}
@@ -201,20 +234,26 @@ export function RuleEditor({ draft, fields, options, invalidUid, error, onChange
           <Plus className="h-4 w-4" aria-hidden="true" />
           Add condition
         </button>
-        <button type="button" disabled={full} onClick={() => onChange(addGroup(draft, first))} className={BUTTON}>
+        <button type="button" disabled={full} onClick={() => onChange(addGroup(draft, first))} className={QUIET}>
           <Plus className="h-4 w-4" aria-hidden="true" />
           Add group
         </button>
         {full ? (
-          <p className="text-[11px] text-ink-muted">
+          <p className="ml-auto text-[11px] text-ink-muted">
             A segment can have at most <span className={MONO}>{MAX_CONDITIONS}</span> conditions.
           </p>
         ) : count > 0 ? (
-          <p className="text-[11px] text-ink-muted">
+          <p className="ml-auto text-[11px] text-ink-muted">
             <span className={MONO}>{count}</span> of <span className={MONO}>{MAX_CONDITIONS}</span> conditions
           </p>
         ) : null}
       </div>
+      {note ? (
+        <p className="flex items-start gap-1.5 text-[11px] text-ink-muted">
+          <Info className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          {note}
+        </p>
+      ) : null}
     </section>
   );
 }

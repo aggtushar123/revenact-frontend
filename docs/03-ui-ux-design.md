@@ -867,20 +867,34 @@ segment, its builder and a new one).
   segment". A reload that fails keeps the last list on screen with "{error}
   Showing the last result." and Try again, rather than clearing it.
 - **Builder (`/segments/new`, `/segments/:id/edit`).**
-  - **Basics:** name, kind (fixed once saved) and description.
-  - **Rules** (`RuleEditor`): readable rows of field, operator and value; All/Any;
-    one level of groups; + Add condition and + Add group, disabled at 20.
-    Each type has its own input (`ValueInput`): number and percent boxes, days,
-    date or date-window, checkboxes for "is any of", owner and product selects
-    or chips, and a server-searched organisation or account picker
-    (`RecordPicker`). A record the reader can't open shows as an italic
-    "an organisation you can't open".
-  - **Preview** (`PreviewPanel`): beside the rules from `lg`, under them on
-    phones. It reads "41 organisations match", the first ten, "and N more", and
-    the totals. While a newer answer loads, the last one stays, dimmed.
-  - **Sharing** (`SharingFields`): Only me, Everyone in the workspace, or Chosen
-    teammates with chips.
-  - **Alert me on changes.**
+  - **Bar:** one bar pinned to the top of the column holds the page title,
+    Cancel and Save segment, so Save stays in reach however long the rules get.
+  - **Editor panel:** one bordered panel, its parts split by dividers (no
+    panel inside a panel).
+    - **Basics:** the name as a quiet 22px title field, the description as a
+      quiet line under it (each with a small uppercase label), and the kind as
+      three icon tiles (`RadioTile`; fixed once saved).
+    - **Rules** (`RuleEditor`): a sentence, "Include organisations that match
+      All/Any of these conditions", then one row per condition led by
+      "Where", then "and" (All) or "or" (Any). A group is an indented block
+      with a left rule and its own All/Any. The remove button shows on hover
+      or focus where there is a mouse, and always on touch screens. + Add
+      condition and + Add group are disabled at 20. The organisation kind's
+      churned/archived default sits under the rows.
+      Each type has its own input (`ValueInput`): number and percent boxes,
+      days, date or date-window, checkboxes for "is any of", owner and
+      product selects or chips, and a server-searched organisation or account
+      picker (`RecordPicker`). A record the reader can't open shows as an
+      italic "an organisation you can't open".
+    - **Sharing** (`SharingFields`): Only me, Everyone in the workspace or
+      Chosen teammates as icon tiles, with chips for the teammates.
+    - **Alert me on changes:** a switch (a native checkbox underneath) with
+      its explanation as the description.
+  - **Preview** (`PreviewPanel`): beside the panel from `lg` and pinned while
+    the rules scroll, under it on phones. It leads with the count at 22px
+    ("41 organisations match"), then the totals (no Members figure, which the
+    count already gives), the first ten and "and N more", or "Nothing matches
+    these rules yet." While a newer answer loads, the last one stays, dimmed.
   - **400s** show at the field they name, and a limit above the form.
 
   A non-owner sees "Only {owner} can edit this segment" with Open segment and

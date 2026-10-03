@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Briefcase, Building2, Contact } from 'lucide-react';
 import { useAppSelector } from '../../hooks';
 import { useMembers } from '../../features/knowledge/useMembers';
 import { rulesFromList, type ListRules } from '../../features/segments/fromListFilters';
 import { firstIncomplete, fromRules, toRules, type DraftRules } from '../../features/segments/ruleDraft';
 import { createSegment, duplicateSegment, fetchRecordNames, updateSegment } from '../../features/segments/segmentApi';
 import { formErrors, type FormErrors } from '../../features/segments/segmentErrors';
-import { fieldsFor, KIND_LABEL } from '../../features/segments/segmentFields';
+import { fieldsFor, KIND_LABEL, KIND_NOUN } from '../../features/segments/segmentFields';
 import {
   NO_LABELS,
   type PersonRef,
@@ -17,11 +18,11 @@ import {
   type SegmentWrite,
   type Sharing,
 } from '../../features/segments/segmentTypes';
-import { Radio } from '../../components/organizations/portfolio/filterParts';
 import { EmptyState } from '../../components/organizations/portfolio/PortfolioSections';
 import { FOCUS, MONO, PRIMARY, QUIET } from '../../components/organizations/portfolio/styles';
 import { errorMessage } from '../../components/organizations/portfolio/usePagedRead';
 import { PreviewPanel } from '../../components/segments/PreviewPanel';
+import { RadioTile } from '../../components/segments/RadioTile';
 import { RuleEditor } from '../../components/segments/RuleEditor';
 import { SegmentFailed, SegmentLoading, SegmentMissing } from '../../components/segments/SegmentStates';
 import { SharingFields } from '../../components/segments/SharingFields';
@@ -31,8 +32,16 @@ import { useSegment } from '../../components/segments/useSegment';
 import type { ValueOptions } from '../../components/segments/ValueInput';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
 
-const KINDS: SegmentKind[] = ['customer', 'account', 'contact'];
-const INPUT = `min-h-11 rounded-lg border bg-surface px-2 text-[13px] text-ink hover:border-line-strong sm:min-h-9 ${FOCUS}`;
+const KINDS = [
+  { value: 'customer', icon: Building2 },
+  { value: 'account', icon: Briefcase },
+  { value: 'contact', icon: Contact },
+] as const satisfies readonly { value: SegmentKind; icon: unknown }[];
+/** The name and description: quiet until hovered or focused, so they read
+ *  as the page's title and subtitle rather than as form boxes. */
+const QUIET_INPUT = `min-h-11 w-full rounded-lg border bg-transparent px-2 text-ink placeholder:text-ink-muted hover:border-line focus:border-line-strong ${FOCUS}`;
+const LABEL = 'px-2 text-[11px] font-semibold uppercase tracking-wider text-ink-muted';
+const CHURNED_NOTE = 'Churned and archived organisations are left out unless a rule names them.';
 const NO_IDS: ListRules['ids'] = { customer: [], account: [] };
 
 interface Initial {
@@ -169,6 +178,7 @@ function BuilderForm({ initial }: { initial: Initial }) {
   const nameId = useId();
   const descriptionId = useId();
   const kindName = useId();
+  const alertId = useId();
 
   const [name, setName] = useState(editing?.name ?? '');
   const [description, setDescription] = useState(editing?.description ?? '');
@@ -280,88 +290,109 @@ function BuilderForm({ initial }: { initial: Initial }) {
   return (
     <OrganizationsFrame>
       <form onSubmit={(event) => void save(event)} noValidate className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 pb-6">
-        <h1 className="text-[22px] font-semibold text-ink">{editing ? `Edit ${editing.name}` : 'New segment'}</h1>
+        <div data-part="builder-bar" className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
+          <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">{editing ? `Edit ${editing.name}` : 'New segment'}</h1>
+          <Link to={editing ? `/segments/${editing.id}` : '/segments'} className={QUIET}>
+            Cancel
+          </Link>
+          <button type="submit" disabled={saving} className={PRIMARY}>
+            {saving ? 'Saving…' : 'Save segment'}
+          </button>
+        </div>
         {errors.form ? (
           <p role="alert" className="text-[13px] text-danger">
             {errors.form}
           </p>
         ) : null}
         {initial.notes.length > 0 ? (
-          <ul aria-label="From the list" className="flex flex-col gap-1 rounded-xl bg-surface p-3 text-[13px] text-ink-muted">
+          <ul aria-label="From the list" className="flex flex-col gap-1 rounded-xl border border-line bg-surface p-3 text-[13px] text-ink-muted">
             {initial.notes.map((note) => (
               <li key={note}>{note}</li>
             ))}
           </ul>
         ) : null}
 
-        <section aria-label="Basics" className="flex flex-col gap-3 rounded-xl bg-surface p-3">
-          <div className="flex flex-col gap-1">
-            <label htmlFor={nameId} className="text-[13px] font-semibold text-ink">
-              Name
-            </label>
-            <input
-              id={nameId}
-              value={name}
-              maxLength={120}
-              onChange={(event) => setName(event.target.value)}
-              aria-invalid={Boolean(errors.name)}
-              aria-describedby={errors.name ? `${nameId}-error` : undefined}
-              className={`${INPUT} ${errors.name ? 'border-danger' : 'border-line'}`}
-            />
-            {errors.name ? (
-              <p id={`${nameId}-error`} role="alert" className="text-[11px] text-danger">
-                {errors.name}
-              </p>
-            ) : null}
-          </div>
-          {editing ? (
-            <p className="text-[13px] text-ink">
-              <span className="font-semibold">Kind:</span> {KIND_LABEL[kind]} <span className="text-ink-muted">· A segment's kind can't change.</span>
-            </p>
-          ) : (
-            <fieldset aria-describedby={errors.kind ? `${kindName}-error` : undefined} className="flex flex-col gap-1">
-              <legend className="text-[13px] font-semibold text-ink">Kind</legend>
-              <div className="flex flex-wrap gap-x-4">
-                {KINDS.map((option) => (
-                  <Radio key={option} name={kindName} label={KIND_LABEL[option]} checked={kind === option} onChange={() => changeKind(option)} />
-                ))}
+        <div data-part="rules-and-preview" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+          <div className="flex min-w-0 flex-col divide-y divide-line-subtle rounded-xl border border-line bg-surface shadow-sm">
+            <section aria-label="Basics" className="flex flex-col gap-4 p-4">
+              <div className="-mx-2 flex flex-col gap-0.5">
+                <label htmlFor={nameId} className={LABEL}>
+                  Name
+                </label>
+                <input
+                  id={nameId}
+                  value={name}
+                  maxLength={120}
+                  placeholder="Untitled segment"
+                  onChange={(event) => setName(event.target.value)}
+                  aria-invalid={Boolean(errors.name)}
+                  aria-describedby={errors.name ? `${nameId}-error` : undefined}
+                  className={`${QUIET_INPUT} text-[22px] font-semibold ${errors.name ? 'border-danger' : 'border-transparent'}`}
+                />
+                {errors.name ? (
+                  <p id={`${nameId}-error`} role="alert" className="px-2 text-[11px] text-danger">
+                    {errors.name}
+                  </p>
+                ) : null}
+                <label htmlFor={descriptionId} className={`${LABEL} mt-2`}>
+                  Description <span className="font-normal normal-case tracking-normal">(optional)</span>
+                </label>
+                <textarea
+                  id={descriptionId}
+                  rows={1}
+                  value={description}
+                  placeholder="What this segment is for"
+                  onChange={(event) => setDescription(event.target.value)}
+                  aria-invalid={Boolean(errors.description)}
+                  aria-describedby={errors.description ? `${descriptionId}-error` : undefined}
+                  className={`${QUIET_INPUT} resize-none py-2.5 text-[13px] ${errors.description ? 'border-danger' : 'border-transparent'}`}
+                />
+                {errors.description ? (
+                  <p id={`${descriptionId}-error`} role="alert" className="px-2 text-[11px] text-danger">
+                    {errors.description}
+                  </p>
+                ) : null}
               </div>
-              {errors.kind ? (
-                <p id={`${kindName}-error`} role="alert" className="text-[11px] text-danger">
-                  {errors.kind}
-                </p>
-              ) : null}
-            </fieldset>
-          )}
-          <div className="flex flex-col gap-1">
-            <label htmlFor={descriptionId} className="text-[13px] font-semibold text-ink">
-              Description <span className="font-normal text-ink-muted">(optional)</span>
-            </label>
-            <textarea
-              id={descriptionId}
-              rows={2}
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              aria-invalid={Boolean(errors.description)}
-              aria-describedby={errors.description ? `${descriptionId}-error` : undefined}
-              className={`${INPUT} ${errors.description ? 'border-danger' : 'border-line'} py-2`}
-            />
-            {errors.description ? (
-              <p id={`${descriptionId}-error`} role="alert" className="text-[11px] text-danger">
-                {errors.description}
-              </p>
-            ) : null}
-          </div>
-        </section>
+              {editing ? (
+                <div className="-mx-2 flex flex-col gap-1">
+                  <p className={LABEL}>Kind</p>
+                  <p className="px-2 text-[13px] text-ink">
+                    <span className="font-semibold">{KIND_LABEL[kind]}</span> <span className="text-ink-muted">· A segment's kind can't change.</span>
+                  </p>
+                </div>
+              ) : (
+                <fieldset aria-describedby={errors.kind ? `${kindName}-error` : undefined} className="flex flex-col gap-2">
+                  <legend className={`${LABEL} -mx-2 mb-2`}>Kind</legend>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {KINDS.map((option) => (
+                      <RadioTile
+                        key={option.value}
+                        name={kindName}
+                        label={KIND_LABEL[option.value]}
+                        icon={option.icon}
+                        checked={kind === option.value}
+                        onChange={() => changeKind(option.value)}
+                      />
+                    ))}
+                  </div>
+                  {errors.kind ? (
+                    <p id={`${kindName}-error`} role="alert" className="text-[11px] text-danger">
+                      {errors.kind}
+                    </p>
+                  ) : null}
+                </fieldset>
+              )}
+            </section>
 
-        <div data-part="rules-and-preview" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="flex min-w-0 flex-col gap-2">
             <RuleEditor
               draft={draft}
               fields={fields}
               options={options}
               invalidUid={invalidUid}
               error={rulesError}
+              noun={KIND_NOUN[kind].many}
+              // Ruling G25: the compiler's default, which the rows can't show.
+              note={kind === 'customer' ? CHURNED_NOTE : null}
               onChange={(next) => {
                 setDraft(next);
                 setInvalidUid(null);
@@ -370,46 +401,50 @@ function BuilderForm({ initial }: { initial: Initial }) {
                 setErrors((current) => (current.rules ? { ...current, rules: undefined } : current));
               }}
             />
-            {kind === 'customer' ? (
-              // Ruling G25: the compiler's default, which the rows can't show.
-              <p className="px-3 text-[11px] text-ink-muted">Churned and archived organisations are left out unless a rule names them.</p>
-            ) : null}
-          </div>
-          <PreviewPanel kind={kind} state={preview} />
-        </div>
 
-        <section aria-label="Sharing and alerts" className="flex flex-col gap-4 rounded-xl bg-surface p-3">
-          {removed > 0 ? (
-            <p className="text-[11px] text-ink-muted">
-              <span className={MONO}>{removed}</span> {removed === 1 ? 'person' : 'people'} no longer in your workspace {removed === 1 ? 'was' : 'were'} removed.
-            </p>
-          ) : null}
-          <SharingFields
-            sharing={sharing}
-            sharedWith={shared}
-            teammates={teammates}
-            error={errors.shared_with ?? errors.sharing ?? null}
-            onChange={(nextSharing, nextPeople) => {
-              setSharing(nextSharing);
-              setSharedWith(nextPeople);
-            }}
-          />
-          <div className="flex flex-col gap-0.5">
-            <label className="flex min-h-11 items-center gap-2 text-[13px] text-ink sm:min-h-9">
-              <input type="checkbox" checked={alertOn} onChange={(event) => setAlertOn(event.target.checked)} className={`h-4 w-4 accent-accent ${FOCUS}`} />
-              Alert me on changes
-            </label>
-            <p className="text-[11px] text-ink-muted">Once a day, in your notifications, when anyone enters or leaves.</p>
+            <section aria-label="Sharing and alerts" className="flex flex-col gap-4 p-4">
+              {removed > 0 ? (
+                <p className="text-[11px] text-ink-muted">
+                  <span className={MONO}>{removed}</span> {removed === 1 ? 'person' : 'people'} no longer in your workspace {removed === 1 ? 'was' : 'were'} removed.
+                </p>
+              ) : null}
+              <SharingFields
+                sharing={sharing}
+                sharedWith={shared}
+                teammates={teammates}
+                error={errors.shared_with ?? errors.sharing ?? null}
+                onChange={(nextSharing, nextPeople) => {
+                  setSharing(nextSharing);
+                  setSharedWith(nextPeople);
+                }}
+              />
+              <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3">
+                <span className="flex flex-col">
+                  <span id={`${alertId}-label`} className="text-[13px] font-semibold text-ink">
+                    Alert me on changes
+                  </span>
+                  <span id={`${alertId}-hint`} className="text-[11px] text-ink-muted">
+                    Once a day, in your notifications, when anyone enters or leaves.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  aria-labelledby={`${alertId}-label`}
+                  aria-describedby={`${alertId}-hint`}
+                  checked={alertOn}
+                  onChange={(event) => setAlertOn(event.target.checked)}
+                  className="peer sr-only"
+                />
+                <span
+                  aria-hidden="true"
+                  className="relative h-5 w-9 shrink-0 rounded-full bg-line-strong transition-colors duration-[var(--dur-fast)] after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface after:transition-transform after:duration-[var(--dur-fast)] peer-checked:bg-accent peer-checked:after:translate-x-4 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+                />
+              </label>
+            </section>
           </div>
-        </section>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button type="submit" disabled={saving} className={PRIMARY}>
-            {saving ? 'Saving…' : 'Save segment'}
-          </button>
-          <Link to={editing ? `/segments/${editing.id}` : '/segments'} className={QUIET}>
-            Cancel
-          </Link>
+          <div className="min-w-0 lg:sticky lg:top-16">
+            <PreviewPanel kind={kind} state={preview} />
+          </div>
         </div>
       </form>
     </OrganizationsFrame>

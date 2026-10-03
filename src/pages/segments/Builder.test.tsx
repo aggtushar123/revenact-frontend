@@ -32,7 +32,9 @@ describe('the segment builder (spec §3)', () => {
     await screen.findByRole('option', { name: 'Dana CSM' });
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Add a teammate' }), 'Dana CSM');
     expect(within(screen.getByRole('list', { name: 'Shared with' })).getByText('Dana CSM')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Alert me on changes' }));
+    const alert = screen.getByRole('checkbox', { name: 'Alert me on changes' });
+    expect(alert).toHaveAccessibleDescription('Once a day, in your notifications, when anyone enters or leaves.');
+    await userEvent.click(alert);
     await userEvent.click(screen.getByRole('button', { name: 'Save segment' }));
     await waitFor(() => expect(where()).toBe('/segments/100'));
     expect(requests(spy, 'POST', /^\/segments\/$/)[0].body).toEqual({
@@ -250,7 +252,18 @@ describe('the segment builder (spec §3)', () => {
     const rules = screen.getByRole('region', { name: 'Rules' });
     const preview = screen.getByRole('region', { name: 'Preview' });
     expect(rules.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(rules.closest('[data-part="rules-and-preview"]')).toHaveClass('grid', 'lg:grid-cols-[minmax(0,1fr)_20rem]');
+    expect(rules.closest('[data-part="rules-and-preview"]')).toHaveClass('grid', 'lg:grid-cols-[minmax(0,1fr)_22rem]');
     expect(rules.closest('[data-part="rules-and-preview"]')?.className).not.toMatch(/(^|\s)(sm|md):grid-cols/);
+  });
+
+  it('keeps Cancel and Save in one bar pinned to the top, above the form', () => {
+    stubSegments();
+    renderSegments('/segments/new');
+    const bar = document.querySelector('[data-part="builder-bar"]') as HTMLElement;
+    expect(bar).toHaveClass('sticky', 'top-0');
+    expect(within(bar).getByRole('heading', { name: 'New segment' })).toBeInTheDocument();
+    expect(within(bar).getByRole('button', { name: 'Save segment' })).toBeInTheDocument();
+    expect(within(bar).getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/segments');
+    expect(bar.compareDocumentPosition(screen.getByRole('textbox', { name: 'Name' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

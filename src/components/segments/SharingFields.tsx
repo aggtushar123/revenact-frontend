@@ -1,13 +1,15 @@
 import { useId } from 'react';
 import type { PersonRef, Sharing } from '../../features/segments/segmentTypes';
-import { FILTER_SELECT, Radio } from '../organizations/portfolio/filterParts';
+import { Lock, Users, UsersRound } from 'lucide-react';
+import { FILTER_SELECT } from '../organizations/portfolio/filterParts';
 import { Chip } from './Chip';
+import { RadioTile } from './RadioTile';
 
-const OPTIONS: { value: Sharing; label: string }[] = [
-  { value: 'private', label: 'Only me' },
-  { value: 'workspace', label: 'Everyone in the workspace' },
-  { value: 'people', label: 'Chosen teammates' },
-];
+const OPTIONS = [
+  { value: 'private', label: 'Only me', icon: Lock },
+  { value: 'workspace', label: 'Everyone in the workspace', icon: Users },
+  { value: 'people', label: 'Chosen teammates', icon: UsersRound },
+] as const satisfies readonly { value: Sharing; label: string; icon: unknown }[];
 /** The backend's MAX_SHARED. */
 const MAX_SHARED = 50;
 
@@ -25,20 +27,23 @@ export function SharingFields({ sharing, sharedWith, teammates, error, onChange 
   const name = useId();
   const rest = teammates.filter((person) => !sharedWith.some((chosen) => chosen.id === person.id));
   return (
-    <fieldset className="flex flex-col gap-1">
-      <legend className="text-[15px] font-semibold text-ink">Sharing</legend>
+    <fieldset className="flex flex-col gap-2">
+      <legend className="mb-1 text-[15px] font-semibold text-ink">Sharing</legend>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {OPTIONS.map((option) => (
+          <RadioTile
+            key={option.value}
+            name={name}
+            label={option.label}
+            icon={option.icon}
+            checked={sharing === option.value}
+            onChange={() => onChange(option.value, option.value === 'people' ? sharedWith : [])}
+          />
+        ))}
+      </div>
       <p className="text-[11px] text-ink-muted">Teammates see the same rules, but only the members they may open, and a count of the rest. Only you can change it.</p>
-      {OPTIONS.map((option) => (
-        <Radio
-          key={option.value}
-          name={name}
-          label={option.label}
-          checked={sharing === option.value}
-          onChange={() => onChange(option.value, option.value === 'people' ? sharedWith : [])}
-        />
-      ))}
       {sharing === 'people' ? (
-        <div className="flex flex-col gap-2 pl-6">
+        <div className="flex flex-col gap-2">
           {sharedWith.length > 0 ? (
             <ul aria-label="Shared with" className="flex flex-wrap gap-1.5">
               {sharedWith.map((person) => (

@@ -56,6 +56,26 @@ describe('RuleEditor', () => {
     expect(rules().conditions[1]).toEqual({ field: 'lifecycle_stage', op: 'is' });
   });
 
+  it('reads as a sentence: Where, then and (All) or or (Any), and inside a group by its own match', async () => {
+    render(<Harness initial={{ match: 'all', conditions: [{ field: 'csat_score', op: 'lt', value: 60 }, { field: 'csat_score', op: 'gt', value: 10 }] }} />);
+    expect(screen.getByText('Include records that match')).toBeInTheDocument();
+    const lead = (n: number) => row(n).querySelector('[aria-hidden="true"]')?.textContent;
+    expect([lead(1), lead(2)]).toEqual(['Where', 'and']);
+    await userEvent.click(within(screen.getByRole('group', { name: 'Match' })).getByRole('button', { name: 'Any' }));
+    expect(lead(2)).toBe('or');
+    await userEvent.click(screen.getByRole('button', { name: 'Add group' }));
+    const group = document.querySelector('[data-group]') as HTMLElement;
+    expect(group.firstElementChild).toHaveTextContent('or');
+    await userEvent.click(within(group).getByRole('button', { name: 'Add condition to group' }));
+    expect([lead(3), lead(4)]).toEqual(['Where', 'and']);
+  });
+
+  it('shows the note under the rows when given one', () => {
+    render(<RuleEditor draft={fromRules(null)} fields={fieldsFor('customer', [])} options={{ people: [], products: [], labels: NO_LABELS, onNamed: () => {} }} invalidUid={null} error={null} noun="organisations" note="Churned are left out." onChange={() => {}} />);
+    expect(screen.getByText('Include organisations that match')).toBeInTheDocument();
+    expect(screen.getByText('Churned are left out.')).toBeInTheDocument();
+  });
+
   it("offers only the field's operators, and starts the value over when the field changes", async () => {
     render(<Harness initial={{ match: 'all', conditions: [{ field: 'csat_score', op: 'lt', value: 60 }] }} />);
     const ops = within(row(1)).getByRole('combobox', { name: 'Condition 1 operator' });

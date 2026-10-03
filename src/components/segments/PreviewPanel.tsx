@@ -20,13 +20,25 @@ export function PreviewPanel({ kind, state }: { kind: SegmentKind; state: Previe
   } else if (!data) {
     body = <ItemSkeleton count={3} label="Loading preview" avatar={false} />;
   } else {
+    // The count above already says how many: no Members figure under it.
+    const figures = summaryFigures(data.summary, kind).filter((figure) => figure.key !== 'members');
     body = (
-      <div className={`flex flex-col gap-2 ${state.status === 'loading' ? 'opacity-60' : ''}`}>
-        <p data-part="match-count" className="text-[15px] font-semibold text-ink">
-          <span className={MONO}>{data.count}</span> {data.count === 1 ? noun.one : noun.many} match
+      <div className={`flex flex-col gap-3 ${state.status === 'loading' ? 'opacity-60' : ''}`}>
+        <p data-part="match-count" className="flex items-baseline gap-1.5 text-[13px] text-ink-muted">
+          <span className={`${MONO} text-[22px] font-semibold text-ink`}>{data.count}</span> {data.count === 1 ? noun.one : noun.many} match
         </p>
+        {figures.length > 0 ? (
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-2">
+            {figures.map((figure) => (
+              <div key={figure.key}>
+                <dt className="text-[11px] text-ink-muted">{figure.label}</dt>
+                <dd className={`${MONO} text-[13px] text-ink`}>{figure.value}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
         {data.results.length > 0 ? (
-          <ul aria-label="First matches" className="flex flex-col divide-y divide-line-subtle">
+          <ul aria-label="First matches" className="flex flex-col divide-y divide-line-subtle border-t border-line-subtle">
             {data.results.map((row) => (
               <li key={row.id} className="flex items-baseline justify-between gap-2 py-1.5">
                 <span className="truncate text-[13px] text-ink">{row.name}</span>
@@ -36,25 +48,19 @@ export function PreviewPanel({ kind, state }: { kind: SegmentKind; state: Previe
               </li>
             ))}
           </ul>
+        ) : data.count === 0 ? (
+          <p className="border-t border-line-subtle pt-2 text-[13px] text-ink-muted">Nothing matches these rules yet.</p>
         ) : null}
         {data.count > data.results.length ? (
           <p className="text-[11px] text-ink-muted">
             and <span className={MONO}>{data.count - data.results.length}</span> more
           </p>
         ) : null}
-        <dl className="grid grid-cols-2 gap-2 border-t border-line-subtle pt-2">
-          {summaryFigures(data.summary, kind).map((figure) => (
-            <div key={figure.key}>
-              <dt className="text-[11px] text-ink-muted">{figure.label}</dt>
-              <dd className={`${MONO} text-[13px] text-ink`}>{figure.value}</dd>
-            </div>
-          ))}
-        </dl>
       </div>
     );
   }
   return (
-    <section aria-labelledby={headingId} aria-busy={state.status === 'loading'} className="flex min-w-0 flex-col gap-3 rounded-xl bg-surface p-3">
+    <section aria-labelledby={headingId} aria-busy={state.status === 'loading'} className="flex min-w-0 flex-col gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
       <h2 id={headingId} className="text-[15px] font-semibold text-ink">
         Preview
       </h2>
