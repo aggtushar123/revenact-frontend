@@ -21,6 +21,7 @@ import { usePipelineBook } from '../../components/pipelines/portfolio/usePipelin
 import { usePipelineForms } from '../../components/pipelines/portfolio/usePipelineForms';
 import { usePipelineParams } from '../../components/pipelines/portfolio/usePipelineParams';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
+import { useReportPipelineOptions } from './ask/pipelinesNames';
 
 /** What the bulk endpoint takes for a choice (plan Decision 13): the whole
  *  company is '', a cleared date is null. */
@@ -68,6 +69,10 @@ function PipelinesList() {
 
   const currency = book.data?.currency ?? orgCurrency;
   const options = book.data?.filters ?? null;
+  // Ask Revenact (spec §3): the chip names owners, organisations and
+  // accounts from this read's options. Opening an item narrows nothing
+  // (plan Decision 8).
+  useReportPipelineOptions(kind.key, options);
   const failed = !book.data && book.error !== null;
   const chips = pipelineChips(params, options, kind);
 
@@ -95,7 +100,7 @@ function PipelinesList() {
     <OrganizationsFrame>
       <div className="flex flex-col gap-4 pb-6">
         {!isSm ? <PipelineKindSwitch variant="page" /> : null}
-        {/* Containers: the tiles and items follow this column, not the window. */}
+        {/* Containers: the tiles and items follow this column, which the Ask rail narrows, not the window. */}
         <div className="@container">
           <PipelineTiles kind={kind} summary={book.data?.summary ?? null} failed={failed} currency={currency} params={params} onFilter={update} />
         </div>

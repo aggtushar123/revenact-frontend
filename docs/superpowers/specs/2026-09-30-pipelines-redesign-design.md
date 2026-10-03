@@ -82,6 +82,10 @@ Their **Deals & risks** tabs keep their layout; each item gains the date line an
 
 The ✦ rail on the list and Board; one conversation across both kinds and views. Context `{surface: "pipelines", kind, view, filters}`; the server recomputes the viewer's filtered book with the delivery 1 code and answers from the tiles, the stage groups, the largest open items, what is overdue and what closes within 90 days. As on Accounts: server-built labels, a same-reading 400 for a filter the viewer cannot open, record text fenced as untrusted, and shared replies snapshotting every item and organisation or account covered, withheld from a reader who cannot see them all (failing closed). Its own `pipelines` surface and purpose with a `Skill`. "Ask about this" on an item focuses the question on it.
 
+With no `stage` filter in `context.filters`, the two views default to a different set of stages, matching what each already shows without one: the List reads the open stages (its own default), the Board reads every stage (its own default, since the Board shows every stage's column). The server drops a `stage` filter equal to the asking view's own default before storing it, so the stored context (and the origin a History pick reopens) carries an explicit `stage` only when it narrows past that default.
+
+**Withheld context.** For a mentioned reader whose reply is withheld (the shared-reply privacy rule above), the user turn that triggered it comes back with its Ask `context` stripped to `context: null`, and the conversation's `origin` is `null` rather than a context missing its focus. A turn with `context: null` shows no chip (the rail draws a chip only when a turn's `context` is set); a conversation with `origin: null` carries no History tag and a History pick opens it wherever the person already is, rather than navigating anywhere. This holds for every Ask surface, Pipelines included.
+
 ## 4. Delivery
 
 1. Backend delivery 1 (model, migration, endpoints, privacy fix, audit, docs), then frontend delivery 1 (page, Deals & risks date line, forms, removals, docs). Backend merges and deploys first.

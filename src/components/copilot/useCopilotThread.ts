@@ -33,12 +33,17 @@ export const BUDGET_MESSAGE = "This month's AI budget is used up.";
 /** What a `400 {"context": {…}}` means to the asker: the page, or the item
  *  asked about, is no longer theirs to ask about. `context` is the question's
  *  own, so a key can read per surface: an Accounts `account` is the page
- *  itself, an organisation page's `account` is its account chip. Null for any
- *  other failure. */
+ *  itself, an organisation page's `account` is its account chip, and
+ *  Pipelines' `focus` names the item's kind. Null for any other failure. */
 export function refusalMessage(err: unknown, context?: SurfaceContext | null): string | null {
   if (!(err instanceof ApiError) || err.status !== 400) return null;
   const body = (err.body as { context?: unknown } | null)?.context;
   if (!body || typeof body !== 'object') return null;
+  if (context?.surface === 'pipelines') {
+    // The item "Ask about this" was pressed on. A filter refusal falls
+    // through to the shared list copy below.
+    if ('focus' in body) return `You can no longer ask about this ${context.focus?.kind ?? 'item'}.`;
+  }
   if (context?.surface === 'accounts') {
     if ('account' in body) return 'You can no longer ask about this account.';
     if ('focus' in body) return 'You can no longer ask about this item. Ask about the account instead.';

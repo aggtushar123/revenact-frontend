@@ -88,6 +88,16 @@ describe('accountsLabel', () => {
     expect(accountsLabel({ surface: 'accounts', view: 'board', filters: {} }, names)).toBe('Accounts');
   });
 
+  // Ruling F3 (pipelines Ask plan): the label function guards against a
+  // context missing `filters` rather than trusting every caller to supply
+  // one. Without the `filters ?? {}` guard this throws
+  // (`Object.entries(undefined)`).
+  it('does not throw for a context missing filters', () => {
+    const bare = { surface: 'accounts', view: 'list' } as unknown as Parameters<typeof accountsLabel>[0];
+    expect(() => accountsLabel(bare)).not.toThrow();
+    expect(accountsLabel(bare)).toBe('Accounts');
+  });
+
   it("shows the server's label once stored", () => {
     expect(
       accountsLabel({ surface: 'accounts', view: 'board', filters: { owner: '2' }, label: 'Accounts · Owner: Carl CSM' }, null),

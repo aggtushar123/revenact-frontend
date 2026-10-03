@@ -1,7 +1,9 @@
 import type { CurrencyCode } from '../../../features/auth/authSlice';
 import { formatCompactMoney } from '../../../features/customers/formatters';
+import { pipelineAskQuestion, pipelineFocusOf } from '../../../features/pipelines/askContext';
 import { dateText, type PipelineKind } from '../../../features/pipelines/pipelineKinds';
 import type { PipelineRow } from '../../../features/pipelines/pipelineTypes';
+import { AskAboutButton } from '../../copilot/AskAboutButton';
 import { TITLE_BUTTON } from '../../organizations/detail/listStyles';
 import { FOCUS, MONO } from '../../organizations/portfolio/styles';
 import { DateLine, PartOf, PipelineSignal, PriorityTag, StageTag } from './itemParts';
@@ -28,7 +30,9 @@ export interface PipelineItemProps {
  *  beside a rail) the title takes the first line and the facts wrap under
  *  it. The title, the item's body and a tap all open its form; while
  *  selecting they select instead. The priority tag is left out when High
- *  priority is already the item's signal (plan Decision 17). */
+ *  priority is already the item's signal (plan Decision 17). Under Ask
+ *  Revenact its line ends with "Ask about this", which narrows one
+ *  question to the item; opening the item narrows nothing (Decision 8). */
 export function PipelineItem({
   row,
   kind,
@@ -42,6 +46,7 @@ export function PipelineItem({
 }: PipelineItemProps) {
   const checkboxDisabled = selectDisabled || (atLimit && !selected);
   const activate = () => (selecting ? onToggleSelect(row.id) : onOpen(row));
+  const focus = pipelineFocusOf(row);
 
   return (
     <li
@@ -100,6 +105,11 @@ export function PipelineItem({
         <span className="flex min-w-0 @min-[60rem]:w-28 @min-[60rem]:justify-end">
           <PipelineSignal signal={row.signal} />
         </span>
+        {/* Ask about this (spec §3), shown under an Ask provider only;
+            while selecting a tap selects, so it steps aside. */}
+        {selecting ? null : (
+          <AskAboutButton name={row.title} question={pipelineAskQuestion(focus)} focus={focus} className="ml-auto" />
+        )}
       </div>
     </li>
   );

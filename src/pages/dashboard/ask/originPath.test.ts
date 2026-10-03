@@ -38,4 +38,13 @@ describe('originPath', () => {
     expect(originPath({ surface: 'accounts', view: 'list', filters: {}, label: 'Accounts' })).toBe('/accounts/list');
     expect(originPath({ surface: 'accounts', view: 'detail', account: 12, label: 'EMEA' })).toBe('/accounts/12');
   });
+
+  it('reopens a Pipelines conversation on its view, with its kind and filters', () => {
+    expect(originPath({ surface: 'pipelines', kind: 'risks', view: 'board', filters: { priority: 'high' }, label: 'x' })).toBe(
+      '/pipelines/board?kind=risks&priority=high',
+    );
+    expect(originPath({ surface: 'pipelines', kind: 'opportunities', view: 'list', filters: {}, label: 'Pipelines · Opportunities' })).toBe(
+      '/pipelines/list',
+    );
+  });
 });

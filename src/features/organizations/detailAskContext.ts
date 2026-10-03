@@ -46,14 +46,28 @@ function kindWords(focus: StoryFocus): string {
   return (KIND_NAME[focus.kind] ?? 'Item').toLowerCase();
 }
 
+/** The focus part of a chip, named by the item's own word: "This note",
+ *  "This opportunity". Shared by every item-level "Ask about this" (story
+ *  items here, Pipelines opportunities and risks in
+ *  `features/pipelines/askContext`), so the template lives once. */
+export function itemFocusLabel(word: string): string {
+  return `This ${word}`;
+}
+
+/** The question "Ask about this" prefills, named by the item's own word.
+ *  The person can edit it. Shared the same way as `itemFocusLabel`. */
+export function itemAskQuestion(word: string): string {
+  return `What should I know about this ${word}?`;
+}
+
 /** The focus part of the chip: "This note", "This calendar event". */
 export function storyFocusLabel(focus: StoryFocus): string {
-  return `This ${kindWords(focus)}`;
+  return itemFocusLabel(kindWords(focus));
 }
 
 /** The question "Ask about this" prefills. The person can edit it. */
 export function askAboutQuestion(focus: StoryFocus): string {
-  return `What should I know about this ${kindWords(focus)}?`;
+  return itemAskQuestion(kindWords(focus));
 }
 
 /** The chip: "Pizza Hut" or "Pizza Hut · EMEA", then the focus. A stored

@@ -16,6 +16,7 @@ import { SlotHost } from "../../test/SlotHost";
 import { setViewport } from "../../test/viewport";
 import { Board } from "./Board";
 import { List } from "./List";
+import { PipelinesAskLayout } from "./ask/PipelinesAskLayout";
 
 // Test-only. The Pipelines routes on the real auth, customers and
 // notifications slices and the real router, as App.tsx routes them. Only
@@ -73,20 +74,45 @@ function makeStore() {
 }
 
 /** The Pipelines views on the real store and router. `nav` adds the real
- *  Navbar (List | Board and the kind switch). */
-/** `strict` renders under StrictMode, as main.tsx does: mount effects run twice. */
+ *  Navbar (List | Board and the kind switch). `strict` renders under
+ *  StrictMode, as main.tsx does: mount effects run twice. `ask` puts both
+ *  routes under PipelinesAskLayout, as App.tsx does. `url` may carry
+ *  navigation state (a History handover). */
 export function renderPipelines(
-  url: string,
+  url: string | { pathname: string; search?: string; state?: unknown },
   {
     width = 1440,
     nav = false,
     strict = false,
-  }: { width?: number; nav?: boolean; strict?: boolean } = {},
+    ask = false,
+  }: { width?: number; nav?: boolean; strict?: boolean; ask?: boolean } = {},
 ) {
   setViewport(width);
   const store = makeStore();
   const wrap = (tree: ReactNode) =>
     strict ? <StrictMode>{tree}</StrictMode> : tree;
+  const pages = [
+    <Route
+      key="list"
+      path="/pipelines/list"
+      element={
+        <>
+          <List />
+          <Where />
+        </>
+      }
+    />,
+    <Route
+      key="board"
+      path="/pipelines/board"
+      element={
+        <>
+          <Board />
+          <Where />
+        </>
+      }
+    />,
+  ];
   render(
     wrap(
       <Provider store={store}>
@@ -94,24 +120,7 @@ export function renderPipelines(
           <SlotHost bare={!nav}>
             {nav ? <Navbar /> : null}
             <Routes>
-              <Route
-                path="/pipelines/list"
-                element={
-                  <>
-                    <List />
-                    <Where />
-                  </>
-                }
-              />
-              <Route
-                path="/pipelines/board"
-                element={
-                  <>
-                    <Board />
-                    <Where />
-                  </>
-                }
-              />
+              {ask ? <Route element={<PipelinesAskLayout />}>{pages}</Route> : pages}
               <Route
                 path="/organizations/:id"
                 element={

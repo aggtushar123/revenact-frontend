@@ -1,6 +1,7 @@
 import { createContext } from 'react';
 import type { CopilotThread } from '../../../components/copilot/useCopilotThread';
 import { isStoryFocus } from '../../../features/organizations/detailAskContext';
+import { pipelineFocusFor } from '../../../features/pipelines/askContext';
 import type { AskFocus, Conversation, SurfaceContext, SurfaceName } from '../../copilot/types';
 
 /** One page's side of Ask Revenact: which surface it is, where the person is
@@ -55,8 +56,15 @@ export interface AskState {
  *  own kind: the Dashboard a drill or attention item, the List and the Board
  *  a companies focus, an organisation's page a story item. Contacts' person
  *  view takes only the sentiment focus; its list takes none. An account's
- *  page takes only a story item; the Accounts List and Board take none. */
+ *  page takes only a story item; the Accounts List and Board take none. A
+ *  Pipelines question takes only an item of its own kind. */
 export function withFocus(context: SurfaceContext, focus: AskFocus | null): SurfaceContext {
+  if (context.surface === 'pipelines') {
+    // Only "Ask about this" on an item of the page's own kind; no focus key
+    // is sent without one.
+    const item = pipelineFocusFor(focus, context.kind);
+    return item ? { ...context, focus: item } : context;
+  }
   if (context.surface === 'contacts') {
     return context.view === 'person' ? { ...context, focus: focus?.kind === 'sentiment' ? 'sentiment' : null } : context;
   }

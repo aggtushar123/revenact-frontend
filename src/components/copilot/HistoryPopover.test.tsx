@@ -99,4 +99,23 @@ describe('HistoryPopover', () => {
     expect(tagged).toHaveAccessibleName(/What renews soon\?\s*Started on Accounts · Renews within 30 days/);
     expect(tagged.querySelector('svg.lucide-layers')).not.toBeNull();
   });
+
+  it("tags a conversation started on Pipelines with the server's label and the Pipelines icon", async () => {
+    stubCopilot({
+      conversations: [
+        {
+          id: 16,
+          title: 'What should I chase?',
+          created_at: '',
+          updated_at: '',
+          origin: { surface: 'pipelines', kind: 'opportunities', view: 'list', filters: {}, label: 'Pipelines · Opportunities' },
+        },
+      ],
+    });
+    render(<HistoryPopover onClose={() => {}} onOpen={() => {}} />);
+    const tagged = await screen.findByRole('button', { name: /What should I chase\?/ });
+    expect(within(tagged).getByText('Pipelines · Opportunities')).toBeInTheDocument();
+    expect(tagged).toHaveAccessibleName(/What should I chase\?\s*Started on Pipelines · Opportunities/);
+    expect(tagged.querySelector('svg.lucide-target')).not.toBeNull();
+  });
 });

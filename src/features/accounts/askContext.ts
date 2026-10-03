@@ -89,7 +89,7 @@ export const NO_ACCOUNTS_NAMES: AccountsNames = { options: null, account: null }
 export function accountsLabel(context: AccountsListContext | AccountDetailContext, names: AccountsNames | null = null): string {
   if (context.view !== 'detail') {
     if (context.label) return context.label;
-    const chips = filterChips(fromAccountsFilters(context.filters, context.view), names?.options ?? null);
+    const chips = filterChips(fromAccountsFilters(context.filters ?? {}, context.view), names?.options ?? null);
     return ['Accounts', ...chips.map((chip) => chip.label)].join(SEPARATOR);
   }
   const named = names?.account?.id === context.account ? names.account.name : null;

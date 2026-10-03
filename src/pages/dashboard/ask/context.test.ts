@@ -40,4 +40,13 @@ describe('withFocus', () => {
     expect(withFocus(list, { kind: 'companies', ids: [12] })).toEqual(list);
     expect(withFocus(list, { kind: 'email', id: 141 })).not.toHaveProperty('focus');
   });
+
+  it('gives a Pipelines question only an item of its own kind as a focus, and no focus key without one', () => {
+    const risks = { surface: 'pipelines', kind: 'risks', view: 'list', filters: { owner: '2' } } as const;
+    expect(withFocus(risks, { kind: 'risk', id: 71 })).toEqual({ ...risks, focus: { kind: 'risk', id: 71 } });
+    expect(withFocus(risks, { kind: 'opportunity', id: 41 })).toStrictEqual(risks);
+    expect(withFocus(risks, { kind: 'companies', ids: [7] })).toStrictEqual(risks);
+    expect(withFocus(risks, { kind: 'email', id: 141 })).toStrictEqual(risks);
+    expect(withFocus(risks, null)).not.toHaveProperty('focus');
+  });
 });

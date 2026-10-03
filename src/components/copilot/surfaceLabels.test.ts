@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { ACCOUNT_FILTER_OPTIONS } from '../../features/accounts/testPortfolio';
 import { FILTER_OPTIONS } from '../../features/organizations/testPortfolio';
+import { OPPORTUNITIES_KIND } from '../../features/pipelines/pipelineKinds';
+import { OPPORTUNITY_ROWS, pipelineFilterOptions } from '../../features/pipelines/testPipelines';
 import type { DashboardContext, OrganizationDetailContext, OrganizationsContext } from '../../pages/copilot/types';
 import { originTag, surfaceLabel } from './surfaceLabels';
 
@@ -61,5 +63,18 @@ describe('surface labels', () => {
       originTag({ origin: { surface: 'accounts', view: 'board', filters: { renews_within: '30' }, label: 'Accounts · Renews within 30 days' } }),
     ).toBe('Accounts · Renews within 30 days');
     expect(originTag({ origin: { surface: 'accounts', view: 'detail', account: 12, label: 'EMEA' } })).toBe('EMEA');
+  });
+
+  it('labels a Pipelines question from the page, and tags a Pipelines conversation with the server label', () => {
+    const pipelines = { kind: 'opportunities', options: pipelineFilterOptions(OPPORTUNITY_ROWS, OPPORTUNITIES_KIND) } as const;
+    expect(surfaceLabel({ surface: 'pipelines', kind: 'opportunities', view: 'board', filters: { owner: '2' } }, { pipelines })).toBe(
+      'Pipelines · Opportunities · Owner: Carl CSM',
+    );
+    expect(
+      surfaceLabel({ surface: 'pipelines', kind: 'risks', view: 'list', filters: {}, focus: { kind: 'risk', id: 71 }, label: 'Pipelines · Risks' }),
+    ).toBe('Pipelines · Risks · This risk');
+    expect(
+      originTag({ origin: { surface: 'pipelines', kind: 'risks', view: 'board', filters: { priority: 'high' }, label: 'Pipelines · Risks · Priority: High' } }),
+    ).toBe('Pipelines · Risks · Priority: High');
   });
 });

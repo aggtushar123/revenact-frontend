@@ -26,6 +26,7 @@ import { sharedSearch } from '../../pages/dashboard/shared/useDashboardFilters';
 import { NavActionsSlotContext } from '../../layouts/navActionsSlot';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
 import { PipelineKindSwitch } from '../pipelines/portfolio/PipelineKindSwitch';
+import { pipelinesViewOf } from '../../features/pipelines/askContext';
 
 export function Navbar() {
   const location = useLocation();
@@ -92,8 +93,9 @@ export function Navbar() {
   // The Pipelines list and board wear the Organizations frame (pipelines spec
   // 2026-09-30 §1): the transparent bar, "Pipelines", List | Board carrying
   // the query, Opportunities | Risks from sm (the page shows it below sm),
-  // the actions slot (empty until delivery 2's Ask) and no avatar.
-  const isPipelinesView = /^\/pipelines\/(list|board)\/?$/.test(location.pathname);
+  // the actions slot (where `PipelinesAskLayout`'s rail portals the Ask
+  // pill) and no avatar.
+  const isPipelinesView = pipelinesViewOf(location.pathname) !== null;
   const isDashboard = location.pathname.startsWith('/dashboard');
   // The Organizations list and board wear the dashboard's frame (portfolio
   // spec §1, owner decisions 2026-09-26): the transparent top bar, the
