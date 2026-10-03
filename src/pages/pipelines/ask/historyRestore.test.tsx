@@ -37,6 +37,22 @@ const UNGROUPED = conversation(18, 'What is unassigned?', {
 });
 const ON_EMEA = conversation(15, 'What does this mean for EMEA?', { surface: 'accounts', view: 'detail', account: 12, label: 'EMEA' });
 
+// A mentioned reader's view of a shared conversation whose reply is
+// withheld (backend fix, 2026-10-01): the user turn comes back with its Ask
+// context stripped, and the conversation has no origin.
+const WITHHELD_SUMMARY = { id: 17, title: 'Withheld question', created_at: '', updated_at: '', origin: null };
+// The reply itself (revenact-backend services/copilot/views.py REDACTED_REPLY),
+// included for defence in depth: no chip assertion depends on its content.
+const REDACTED_REPLY = "This reply isn't shared with you: it draws on records outside what you may see.";
+const WITHHELD = {
+  ...WITHHELD_SUMMARY,
+  visibility: 'partial',
+  messages: [
+    { id: 1, role: 'user', content: 'Withheld question', context: null, sources: [], questions: [], created_at: '' },
+    { id: 2, role: 'assistant', content: REDACTED_REPLY, sources: [], questions: [], created_at: '' },
+  ],
+};
+
 describe('History on Pipelines', () => {
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
@@ -84,5 +100,18 @@ describe('History on Pipelines', () => {
       { ask: true, width: 1100 },
     );
     expect(await within(log()).findByText('Answer: Which risks are urgent?')).toBeInTheDocument();
+  });
+
+  it('lists a withheld conversation with no tag, and opens it here, its question with no chip', async () => {
+    stubPipelinesAsk({ copilot: { conversations: [WITHHELD_SUMMARY], conversationById: { 17: WITHHELD } } });
+    renderPipelines('/pipelines/list?owner=2', { ask: true });
+    await screen.findByRole('button', { name: 'EMEA seats' });
+    await userEvent.click(history());
+    const item = await screen.findByRole('button', { name: /Withheld question/ });
+    expect(item).toHaveAccessibleName('Withheld question');
+    await userEvent.click(item);
+    const question = await within(log()).findByText('Withheld question');
+    expect(question.parentElement!.children).toHaveLength(1);
+    expect(where()).toHaveTextContent('/pipelines/list?owner=2');
   });
 });

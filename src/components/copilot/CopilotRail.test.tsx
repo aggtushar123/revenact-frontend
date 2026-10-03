@@ -246,4 +246,37 @@ describe('CopilotRail', () => {
     await screen.findByText('Answer to: What is waiting?');
     expect(screen.getByRole('button', { name: 'Elsewhere' })).toHaveFocus();
   });
+
+  it("draws no chip on a turn whose context the server withheld, whichever surface the others came from", () => {
+    const seen: SurfaceContext[] = [
+      DASH,
+      { surface: 'accounts', view: 'list', filters: {}, label: 'Accounts' },
+      { surface: 'pipelines', kind: 'risks', view: 'board', filters: {}, label: 'Pipelines · Risks' },
+    ];
+    const conversation: Conversation = {
+      id: 9,
+      title: 'Shared',
+      created_at: '',
+      updated_at: '',
+      origin: null,
+      visibility: 'partial',
+      messages: [
+        ...seen.map((context, i) => ({ id: i + 1, role: 'user' as const, content: `Seen ${i}`, context, sources: [], questions: [], created_at: '' })),
+        { id: 10, role: 'user', content: 'Withheld (null)', context: null, sources: [], questions: [], created_at: '' },
+        { id: 11, role: 'user', content: 'Withheld (absent)', sources: [], questions: [], created_at: '' },
+      ],
+    };
+    render(
+      <MemoryRouter>
+        <CopilotRail context={null} onClearContext={() => {}} conversation={conversation} onConversation={() => {}} chipLabel={(c) => surfaceLabel(c)} />
+      </MemoryRouter>,
+    );
+    const log = screen.getByRole('log', { name: 'Copilot messages' });
+    // A turn is its text, with the chip above it when there is one.
+    const turn = (text: string) => within(log).getByText(text).parentElement!;
+    for (const text of ['Seen 0', 'Seen 1', 'Seen 2']) expect(turn(text).children).toHaveLength(2);
+    expect(within(log).getByText('Pipelines · Risks')).toBeInTheDocument();
+    expect(turn('Withheld (null)').children).toHaveLength(1);
+    expect(turn('Withheld (absent)').children).toHaveLength(1);
+  });
 });

@@ -37,4 +37,26 @@ describe('CopilotSidebar chat history', () => {
     );
     expect(screen.getByText(/^Organizations · Owner: Carl CSM · /)).toBeInTheDocument();
   });
+
+  it("tags a Pipelines conversation with the server's label, and a withheld one (no origin) with its time alone", () => {
+    const store = configureStore({ reducer: { knowledge: knowledgeReducer } });
+    const now = new Date().toISOString();
+    const conversations = [
+      {
+        id: 16,
+        title: 'What should I chase?',
+        created_at: now,
+        updated_at: now,
+        origin: { surface: 'pipelines' as const, kind: 'opportunities' as const, view: 'list' as const, filters: {}, label: 'Pipelines · Opportunities' },
+      },
+      { id: 17, title: 'Withheld', created_at: now, updated_at: now, origin: null },
+    ];
+    render(
+      <Provider store={store}>
+        <CopilotSidebar isExpanded setIsExpanded={() => {}} conversations={conversations} activeConversationId={null} sessions={{}} myInvites={[]} />
+      </Provider>,
+    );
+    expect(screen.getByText(/^Pipelines · Opportunities · \d+ seconds? ago$/)).toBeInTheDocument();
+    expect(screen.getByText(/^\d+ seconds? ago$/)).toBeInTheDocument();
+  });
 });
