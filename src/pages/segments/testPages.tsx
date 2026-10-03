@@ -14,6 +14,7 @@ import { ALL_CAPABILITIES } from '../../test/capabilities';
 import { SlotHost } from '../../test/SlotHost';
 import { setViewport } from '../../test/viewport';
 import { Where } from '../organizations/testList';
+import { Builder } from './Builder';
 import { SegmentsList } from './SegmentsList';
 
 // Test-only. The Segments routes on the real store and router, as App.tsx
@@ -87,6 +88,8 @@ export function renderSegments(url: string, { width = 1440, nav = false }: { wid
           {nav ? <Navbar /> : null}
           <Routes>
             <Route path="/segments" element={<><SegmentsList /><Where /></>} />
+            <Route path="/segments/new" element={<><Builder /><Where /></>} />
+            <Route path="/segments/:id/edit" element={<><Builder /><Where /></>} />
             <Route path="*" element={<Where />} />
           </Routes>
         </SlotHost>
