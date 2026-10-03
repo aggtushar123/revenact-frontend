@@ -62,4 +62,17 @@ describe('ContactListItem (spec 2026-09-28 §3)', () => {
     document.body.innerHTML = '';
     expect(within(renderItem(LUKAS)).getByRole('link')).not.toHaveAttribute('aria-current');
   });
+
+  it('puts actions beside the link without making them part of it', () => {
+    render(
+      <MemoryRouter>
+        <ul>
+          <ContactListItem contact={LUKAS} to="/contacts/41" selected={false} actions={<button type="button">Actions for Lukas Vermeer</button>} />
+        </ul>
+      </MemoryRouter>,
+    );
+    const item = screen.getByRole('listitem');
+    expect(within(item).getByRole('button', { name: 'Actions for Lukas Vermeer' }).closest('a')).toBeNull();
+    expect(within(item).getByRole('link')).toHaveAttribute('href', '/contacts/41');
+  });
 });

@@ -3,8 +3,11 @@
 // endpoint the Segments pages read, plus the portfolio reads Save as segment
 // and the Organizations list use.
 import { vi } from 'vitest';
+import type { AccountPortfolioRow } from '../accounts/portfolioTypes';
 import { ACCOUNT_ROWS, buildAccountPortfolio } from '../accounts/testPortfolio';
 import { PEOPLE } from '../contacts/testContacts';
+import type { Contact } from '../customers/customersSlice';
+import type { PortfolioRow } from '../organizations/portfolioTypes';
 import { ALL_ROWS, buildPortfolio } from '../organizations/testPortfolio';
 import {
   NO_LABELS,
@@ -73,7 +76,8 @@ export const RENEWAL_RISK: Segment = {
 };
 
 /** Carl's: accounts, shared with me by name. Its rule names one organisation
- *  I may open and one I may not (`null`, no label). */
+ *  I may open and one I may not (`null`, no label). Carl keeps Initech APAC
+ *  out, and I may open it, so its id reaches me (`openable_ids`). */
 export const EMEA_ACCOUNTS: Segment = {
   ...BASE,
   id: 8,
@@ -85,6 +89,7 @@ export const EMEA_ACCOUNTS: Segment = {
   shared_with: [ME],
   owner: CARL,
   is_owner: false,
+  excluded_ids: [14],
   member_count: null,
 };
 
@@ -178,7 +183,12 @@ export interface SegmentsStub {
   hidden?: number;
   /** GET /attributes/definitions/ (default none). */
   attributes?: unknown[];
+  /** Each kind's records, for members and the preview (default the
+   *  portfolio and Contacts fixtures). */
+  rows?: { customer?: PortfolioRow[]; account?: AccountPortfolioRow[]; contact?: Contact[] };
 }
+
+type Rows = { customer: PortfolioRow[]; account: AccountPortfolioRow[]; contact: Contact[] };
 
 function json(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body, blob: async () => new Blob([JSON.stringify(body)]) };
@@ -187,41 +197,54 @@ function json(status: number, body: unknown) {
 /** What POST /segments/preview/ answers: every row of the kind's fixtures,
  *  or, with no conditions, only the pins (as the backend: no rule matches
  *  nobody, then pins are added). */
-function previewOf(request: PreviewRequest): PreviewResponse {
+function previewOf(request: PreviewRequest, book: Rows): PreviewResponse {
   const all: PreviewResponse['results'] =
     request.kind === 'contact'
-      ? PEOPLE.map((person) => ({ id: person.id, name: person.name, role: person.role_display, parent: { kind: 'customer' as const, id: 7, name: 'Pizza Hut' } }))
-      : (request.kind === 'customer' ? ALL_ROWS : ACCOUNT_ROWS).map((row) => ({
+      ? book.contact.map((person) => ({ id: person.id, name: person.name, role: person.role_display, parent: { kind: 'customer' as const, id: 7, name: 'Pizza Hut' } }))
+      : (request.kind === 'customer' ? book.customer : book.account).map((row) => ({
           id: row.id,
           name: row.name,
           owner: row.owner,
           health: { score: row.health.score, category: row.health.category },
         }));
-  const results = request.rules.conditions.length === 0 ? all.filter((row) => (request.pinned_ids ?? []).includes(row.id)) : all;
-  return { kind: request.kind, count: results.length, results, summary: { ...summaryOf(results.length, request.kind), entered_7d: null, left_7d: null } };
+  const matched = request.rules.conditions.length === 0 ? all.filter((row) => (request.pinned_ids ?? []).includes(row.id)) : all;
+  // Ten at most, as PREVIEW_SIZE (fixture order, not by name: the pages
+  // only read which records come back).
+  const results = matched.slice(0, 10);
+  return { kind: request.kind, count: matched.length, results, summary: { ...summaryOf(matched.length, request.kind), entered_7d: null, left_7d: null } };
 }
 
 /** GET /segments/<id>/members/: the kind's own fixture rows through the
- *  list builders, keep-outs removed; the tiles over all of them. */
-function membersOf(segment: Segment, query: URLSearchParams, hidden: number) {
+ *  list builders, keep-outs removed; the tiles over all of them. Contacts
+ *  page by (name, pk), the cursor here an offset into that order. */
+function membersOf(segment: Segment, query: URLSearchParams, hidden: number, book: Rows) {
   const keep = <R extends { id: number }>(rows: R[]) => rows.filter((row) => !segment.excluded_ids.includes(row.id));
   const listQuery = new URLSearchParams(query);
   listQuery.set('include_churned', '1');
   let page: { results: unknown[]; next_cursor: string | null; count: number; groups: unknown[] };
   let total: number;
   if (segment.kind === 'customer') {
-    const rows = keep(ALL_ROWS);
+    const rows = keep(book.customer);
     page = buildPortfolio(listQuery, rows);
     total = rows.length;
   } else if (segment.kind === 'account') {
-    const rows = keep(ACCOUNT_ROWS);
+    const rows = keep(book.account);
     page = buildAccountPortfolio(listQuery, rows);
     total = rows.length;
   } else {
     const search = (query.get('search') ?? '').toLowerCase();
-    const rows = keep(PEOPLE);
-    const found = rows.filter((person) => person.name.toLowerCase().includes(search));
-    page = { results: found, next_cursor: null, count: found.length, groups: [] };
+    const rows = keep(book.contact);
+    const found = rows
+      .filter((person) => person.name.toLowerCase().includes(search))
+      .sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
+    const limit = Number(query.get('limit') ?? 50);
+    const start = Number(query.get('cursor') ?? 0);
+    page = {
+      results: found.slice(start, start + limit),
+      next_cursor: start + limit < found.length ? String(start + limit) : null,
+      count: found.length,
+      groups: [],
+    };
     total = rows.length;
   }
   return {
@@ -249,6 +272,7 @@ const teammates = (ids: unknown): PersonRef[] =>
 
 export function stubSegments(stub: SegmentsStub = {}) {
   const store: Segment[] = (stub.segments ?? SEGMENTS).map((segment) => ({ ...segment }));
+  const book: Rows = { customer: ALL_ROWS, account: ACCOUNT_ROWS, contact: PEOPLE, ...stub.rows };
   let nextId = 100;
   const spy = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = new URL(String(input));
@@ -284,7 +308,7 @@ export function stubSegments(stub: SegmentsStub = {}) {
     }
     if (path === '/segments/preview/' && method === 'POST') {
       const request = body as unknown as PreviewRequest;
-      return stub.preview ? reply(stub.preview(request)) : json(200, previewOf(request));
+      return stub.preview ? reply(stub.preview(request)) : json(200, previewOf(request, book));
     }
     const found = /^\/segments\/(\d+)\/(.*)$/.exec(path);
     if (found) {
@@ -323,7 +347,7 @@ export function stubSegments(stub: SegmentsStub = {}) {
         return json(201, copy);
       }
       if (rest === 'members/' && method === 'GET') {
-        return json(200, membersOf(segment, url.searchParams, stub.hidden ?? (segment.is_owner ? 0 : 2)));
+        return json(200, membersOf(segment, url.searchParams, stub.hidden ?? (segment.is_owner ? 0 : 2), book));
       }
       if (rest === 'members/export.csv') {
         return { ok: true, status: 200, json: async () => null, blob: async () => new Blob(['id,name\n'], { type: 'text/csv' }) };

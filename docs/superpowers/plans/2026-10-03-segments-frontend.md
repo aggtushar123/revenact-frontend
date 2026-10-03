@@ -5236,7 +5236,7 @@ describe('MoveToMenu', () => {
 ```
 
 Run: `npx vitest run --maxWorkers=2 src/components/organizations/portfolio/AccountRow.test.tsx src/components/organizations/portfolio/MoveToMenu.test.tsx src/components/contacts/ContactListItem.test.tsx`
-Expected: FAIL. In the not-selectable test the checkbox exists. The menu test calls `onToggleOpen`, because the click bubbles to the header. `MoveToMenu`'s custom names aren't found. The actions button isn't rendered.
+Expected: FAIL. In the not-selectable test the checkbox exists. The menu test can't find "Row menu", because `AccountRow` doesn't render a `menu` yet (Ruling G21). `MoveToMenu`'s custom names aren't found. The actions button isn't rendered.
 
 - [ ] **Step 2: Give the three shared parts their optional props**
 

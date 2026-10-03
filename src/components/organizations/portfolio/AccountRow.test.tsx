@@ -175,4 +175,19 @@ describe('AccountRow', () => {
     await user.keyboard(' ');
     expect(props.onToggleOpen).toHaveBeenCalledTimes(2);
   });
+
+  it('has no checkbox and ignores a long press when it is not selectable', () => {
+    vi.useFakeTimers();
+    const { props, header } = renderRow({ selectable: false });
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    fireEvent.pointerDown(header);
+    vi.advanceTimersByTime(LONG_PRESS_MS + 10);
+    expect(props.onLongPress).not.toHaveBeenCalled();
+  });
+
+  it('puts a menu in the row whose clicks never open the row', () => {
+    const { props } = renderRow({ menu: <button type="button">Row menu</button> });
+    fireEvent.click(screen.getByRole('button', { name: 'Row menu' }));
+    expect(props.onToggleOpen).not.toHaveBeenCalled();
+  });
 });
