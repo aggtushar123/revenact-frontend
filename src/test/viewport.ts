@@ -4,7 +4,10 @@ let width = 0;
 let listeners: Listener[] = [];
 
 /** jsdom has no matchMedia. This answers `(min-width: Npx)` queries as a
- *  window `width` px wide would, so layout-by-breakpoint code can be tested. */
+ *  window `width` px wide would, so layout-by-breakpoint code can be tested.
+ *  Calling this mid-test, after components are already mounted, drops their
+ *  change listeners (it replaces `listeners` with a fresh array): use
+ *  `resizeViewport` instead once something is mounted. */
 export function setViewport(next: number): void {
   width = next;
   listeners = [];
@@ -37,6 +40,7 @@ export function resizeViewport(next: number): void {
 }
 
 export function resetViewport(): void {
+  width = 0;
   listeners = [];
   // @ts-expect-error -- jsdom's own window has no matchMedia; put that back
   delete window.matchMedia;
