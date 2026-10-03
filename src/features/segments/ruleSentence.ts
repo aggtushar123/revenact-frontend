@@ -131,7 +131,7 @@ export function reasonText(keys: string[], direction: 'entered' | 'left', kind: 
       if (key === 'access') return "No longer in the owner's book";
       if (key === 'churned') return 'Churned';
       if (key === 'archived') return 'Archived';
-      return findField(kind, key, attributes)?.label ?? key;
+      return findField(kind, key, attributes)?.label ?? key.replace(/^parent\./, '').replace(/^attr:/, '');
     })
     .join(', ');
 }

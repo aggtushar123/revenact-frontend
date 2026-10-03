@@ -82,4 +82,9 @@ describe('ruleSentence', () => {
     expect(reasonText(['pinned'], 'left', 'customer', [])).toBe('Unpinned');
     expect(reasonText(['access', 'deleted'], 'left', 'account', [])).toBe("No longer in the owner's book, Deleted");
   });
+
+  it("strips attr: and parent. from a reason key the mirror can't name (a deleted attribute), never the raw key", () => {
+    expect(reasonText(['attr:old_name'], 'entered', 'customer', [])).toBe('old_name');
+    expect(reasonText(['parent.old_name'], 'entered', 'contact', [])).toBe('old_name');
+  });
 });

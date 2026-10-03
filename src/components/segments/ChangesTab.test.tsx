@@ -63,4 +63,29 @@ describe('ChangesTab (spec §3)', () => {
     expect(screen.getByText('Paused: its owner is inactive, so no changes are recorded until they are back.')).toBeInTheDocument();
     expect(screen.queryByText(/records you can't open/)).not.toBeInTheDocument();
   });
+
+  it('shows a reason naming a deleted AI attribute as a clean fallback, never the raw attr: key', async () => {
+    stubSegments({
+      changes: () => ({
+        status: 200,
+        body: {
+          kind: 'customer',
+          days: [
+            {
+              date: '2026-10-03',
+              entered: [{ id: 7, name: 'Pizza Hut', reason: ['attr:deleted_thing'] }],
+              left: [],
+              totals: { entered: 1, left: 0 },
+              more: { entered: 0, left: 0 },
+            },
+          ],
+          hidden_count: 0,
+        },
+      }),
+    });
+    renderInApp(<Host segment={RENEWAL_RISK} />, { url: '/segments/7?tab=changes' });
+    await waitFor(() => expect(day('2026-10-03')).not.toBeNull());
+    expect(within(day('2026-10-03')).getByText('deleted_thing')).toBeInTheDocument();
+    expect(screen.queryByText('attr:deleted_thing')).not.toBeInTheDocument();
+  });
 });
