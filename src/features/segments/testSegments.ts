@@ -22,8 +22,13 @@ import {
 export const ME: PersonRef = { id: 1, name: 'Alice' };
 export const CARL: PersonRef = { id: 4, name: 'Carl CSM' };
 export const DANA: PersonRef = { id: 5, name: 'Dana CSM' };
+/** Deactivated: still on GET /auth/members/, never a teammate to share with. */
+export const ERIN: PersonRef = { id: 6, name: 'Erin Left' };
 /** GET /auth/members/. */
-export const TEAM = [ME, CARL, DANA].map((person) => ({ ...person, email: '', is_active: true }));
+export const TEAM = [
+  ...[ME, CARL, DANA].map((person) => ({ ...person, email: '', is_active: true })),
+  { ...ERIN, email: '', is_active: false },
+];
 
 const BASE = {
   description: '',

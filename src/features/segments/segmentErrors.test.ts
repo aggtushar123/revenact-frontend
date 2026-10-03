@@ -10,6 +10,13 @@ describe('segment 400s by field', () => {
     expect(formErrors(new ApiError(400, { shared_with: ['Choose at least one teammate.'] }, 'x'))).toEqual({ shared_with: 'Choose at least one teammate.' });
   });
 
+  it('puts the first message of a key no field owns at the form, beside the fields it does place', () => {
+    const err = new ApiError(400, { name: ['Taken.'], non_field_errors: ['Something about the whole segment.'] }, 'x');
+    expect(formErrors(err)).toEqual({ name: 'Taken.', form: 'Something about the whole segment.' });
+    expect(formErrors(new ApiError(400, { alert_on_changes: ['Must be a valid boolean.'] }, 'x'))).toEqual({ form: 'Must be a valid boolean.' });
+    expect(formErrors(new ApiError(400, { detail: 'Limit.', non_field_errors: ['Other.'] }, 'x'))).toEqual({ form: 'Limit.' });
+  });
+
   it("falls back to the error's own message, or the caller's own words for a network failure", () => {
     expect(formErrors(new ApiError(500, null, 'Request failed (500)'))).toEqual({ form: 'Request failed (500)' });
     // No ApiError body to read a field from, so a network failure falls back

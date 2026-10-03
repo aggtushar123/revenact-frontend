@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { resetMembersCache } from '../../features/knowledge/useMembers';
-import { EMEA_ACCOUNTS, ME, RENEWAL_RISK, requests, stubSegments } from '../../features/segments/testSegments';
+import { DANA, EMEA_ACCOUNTS, ERIN, ME, RENEWAL_RISK, requests, stubSegments } from '../../features/segments/testSegments';
 import { resetViewport } from '../../test/viewport';
 import { renderSegments } from './testPages';
 
@@ -131,7 +131,7 @@ describe('the segment builder (spec §3)', () => {
   });
 
   it("renames a segment whose rule names a record I can't open without resending its rules", async () => {
-    const spy = stubSegments({ segments: [{ ...EMEA_ACCOUNTS, owner: ME, is_owner: true }] });
+    const spy = stubSegments({ segments: [{ ...EMEA_ACCOUNTS, owner: ME, is_owner: true, shared_with: [DANA] }] });
     renderSegments('/segments/8/edit');
     const name = await screen.findByRole('textbox', { name: 'Name' });
     await userEvent.type(name, ' Q4');
@@ -149,8 +149,50 @@ describe('the segment builder (spec §3)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save segment' }));
     await waitFor(() => expect(where()).toBe('/segments/7'));
     expect(requests(spy, 'PATCH', /^\/segments\/7\/$/).map((request) => request.body)).toEqual([
-      { rules: { match: 'all', conditions: [RENEWAL_RISK.rules.conditions[1]] }, sharing: 'private', shared_with: [] },
+      { rules: { match: 'all', conditions: [RENEWAL_RISK.rules.conditions[1]] }, sharing: 'private' },
     ]);
+  });
+
+  it('creates a private segment, sending its sharing without shared_with', async () => {
+    const spy = stubSegments();
+    renderSegments('/segments/new');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Mine');
+    await userEvent.click(screen.getByRole('button', { name: 'Save segment' }));
+    await waitFor(() => expect(where()).toBe('/segments/100'));
+    expect(requests(spy, 'POST', /^\/segments\/$/)[0].body).toEqual({
+      name: 'Mine',
+      kind: 'customer',
+      description: '',
+      rules: { match: 'all', conditions: [] },
+      sharing: 'private',
+      alert_on_changes: false,
+    });
+  });
+
+  it('drops a teammate no longer in the workspace from the people shared with, says so, and saves without them', async () => {
+    const spy = stubSegments({ segments: [{ ...RENEWAL_RISK, sharing: 'people', shared_with: [DANA, ERIN] }] });
+    renderSegments('/segments/7/edit');
+    expect(await screen.findByText((_, element) => element?.tagName === 'P' && element.textContent === '1 person no longer in your workspace was removed.')).toBeInTheDocument();
+    const shared = screen.getByRole('list', { name: 'Shared with' });
+    expect(within(shared).getByText('Dana CSM')).toBeInTheDocument();
+    expect(within(shared).queryByText('Erin Left')).not.toBeInTheDocument();
+    expect(within(screen.getByRole('combobox', { name: 'Add a teammate' })).queryByRole('option', { name: 'Erin Left' })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save segment' }));
+    await waitFor(() => expect(where()).toBe('/segments/7'));
+    expect(requests(spy, 'PATCH', /^\/segments\/7\/$/).map((request) => request.body)).toEqual([{ sharing: 'people', shared_with: [5] }]);
+  });
+
+  it("links the server's kind and description refusals to their fields as alerts", async () => {
+    stubSegments({ create: () => ({ status: 400, body: { kind: ['Choose a kind.'], description: ['Too long.'], name: ['Taken.'] } }) });
+    renderSegments('/segments/new');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'X');
+    await userEvent.click(screen.getByRole('button', { name: 'Save segment' }));
+    expect(await screen.findByText('Choose a kind.')).toHaveAttribute('role', 'alert');
+    expect(screen.getByText('Too long.')).toHaveAttribute('role', 'alert');
+    expect(screen.getByText('Taken.')).toHaveAttribute('role', 'alert');
+    expect(screen.getByRole('group', { name: 'Kind' })).toHaveAccessibleDescription('Choose a kind.');
+    expect(screen.getByRole('textbox', { name: /Description/ })).toHaveAccessibleDescription('Too long.');
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveAccessibleDescription('Taken.');
   });
 
   it("keeps someone else's segment read-only, with Open segment and Duplicate to edit", async () => {

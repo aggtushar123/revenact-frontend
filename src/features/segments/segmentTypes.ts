@@ -112,7 +112,8 @@ export interface SegmentWrite {
   description: string;
   rules: Rules;
   sharing: Sharing;
-  shared_with: number[];
+  /** Sent only with `sharing: 'people'`; the server clears it otherwise. */
+  shared_with?: number[];
   alert_on_changes: boolean;
 }
 

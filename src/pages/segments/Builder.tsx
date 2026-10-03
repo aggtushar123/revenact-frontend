@@ -19,7 +19,7 @@ import {
 } from '../../features/segments/segmentTypes';
 import { Radio } from '../../components/organizations/portfolio/filterParts';
 import { EmptyState } from '../../components/organizations/portfolio/PortfolioSections';
-import { FOCUS, PRIMARY, QUIET } from '../../components/organizations/portfolio/styles';
+import { FOCUS, MONO, PRIMARY, QUIET } from '../../components/organizations/portfolio/styles';
 import { errorMessage } from '../../components/organizations/portfolio/usePagedRead';
 import { PreviewPanel } from '../../components/segments/PreviewPanel';
 import { RuleEditor } from '../../components/segments/RuleEditor';
@@ -70,9 +70,10 @@ function changedFields(body: WriteBody, initial: Initial): Partial<WriteBody> {
   if (body.name !== segment.name) patch.name = body.name;
   if (body.description !== segment.description) patch.description = body.description;
   if (JSON.stringify(body.rules) !== JSON.stringify(toRules(initial.draft))) patch.rules = body.rules;
-  if (body.sharing !== segment.sharing || !sameIds(body.shared_with, segment.shared_with.map((person) => person.id))) {
+  const people = segment.sharing === 'people' ? segment.shared_with.map((person) => person.id) : [];
+  if (body.sharing !== segment.sharing || !sameIds(body.shared_with ?? [], people)) {
     patch.sharing = body.sharing;
-    patch.shared_with = body.shared_with;
+    if (body.shared_with) patch.shared_with = body.shared_with;
   }
   if (body.alert_on_changes !== segment.alert_on_changes) patch.alert_on_changes = body.alert_on_changes;
   return patch;
@@ -208,6 +209,15 @@ function BuilderForm({ initial }: { initial: Initial }) {
   const fieldOf = useCallback((key: string) => fields.find((field) => field.key === key) ?? null, [fields]);
   const people = useMemo(() => members.filter((m) => m.is_active).map((m) => ({ id: m.id, name: m.name })), [members]);
   const teammates = useMemo(() => people.filter((person) => person.id !== me), [people, me]);
+  // Someone deactivated since the segment was shared can't be saved again
+  // (the server takes active teammates only): drop them once the members
+  // have loaded, and say how many went.
+  const loaded = members.length > 0;
+  const shared = useMemo(
+    () => (loaded ? sharedWith.filter((person) => teammates.some((teammate) => teammate.id === person.id)) : sharedWith),
+    [loaded, sharedWith, teammates],
+  );
+  const removed = loaded && editing ? editing.shared_with.filter((person) => !teammates.some((teammate) => teammate.id === person.id)).length : 0;
   const complete = firstIncomplete(draft, fieldOf) === null;
   const request = useMemo<PreviewRequest | null>(
     () => (complete ? { kind, rules: toRules(draft), pinned_ids: editing?.pinned_ids ?? [], excluded_ids: editing?.excluded_ids ?? [] } : null),
@@ -238,7 +248,7 @@ function BuilderForm({ initial }: { initial: Initial }) {
       description: description.trim(),
       rules: toRules(draft),
       sharing,
-      shared_with: sharedWith.map((person) => person.id),
+      ...(sharing === 'people' ? { shared_with: shared.map((person) => person.id) } : {}),
       alert_on_changes: alertOn,
     };
     const patch = editing ? changedFields(body, initial) : null;
@@ -248,7 +258,7 @@ function BuilderForm({ initial }: { initial: Initial }) {
     const found: FormErrors = {};
     if (!body.name) found.name = 'Give the segment a name.';
     if (unfinished) found.rules = 'Finish each condition, or remove it.';
-    if (sharing === 'people' && sharedWith.length === 0) found.shared_with = 'Choose at least one teammate.';
+    if (sharing === 'people' && shared.length === 0) found.shared_with = 'Choose at least one teammate.';
     setInvalidUid(unfinished);
     setErrors(found);
     if (Object.keys(found).length > 0) return;
@@ -299,7 +309,7 @@ function BuilderForm({ initial }: { initial: Initial }) {
               className={`${INPUT} ${errors.name ? 'border-danger' : 'border-line'}`}
             />
             {errors.name ? (
-              <p id={`${nameId}-error`} className="text-[11px] text-danger">
+              <p id={`${nameId}-error`} role="alert" className="text-[11px] text-danger">
                 {errors.name}
               </p>
             ) : null}
@@ -309,14 +319,18 @@ function BuilderForm({ initial }: { initial: Initial }) {
               <span className="font-semibold">Kind:</span> {KIND_LABEL[kind]} <span className="text-ink-muted">· A segment's kind can't change.</span>
             </p>
           ) : (
-            <fieldset className="flex flex-col gap-1">
+            <fieldset aria-describedby={errors.kind ? `${kindName}-error` : undefined} className="flex flex-col gap-1">
               <legend className="text-[13px] font-semibold text-ink">Kind</legend>
               <div className="flex flex-wrap gap-x-4">
                 {KINDS.map((option) => (
                   <Radio key={option} name={kindName} label={KIND_LABEL[option]} checked={kind === option} onChange={() => changeKind(option)} />
                 ))}
               </div>
-              {errors.kind ? <p className="text-[11px] text-danger">{errors.kind}</p> : null}
+              {errors.kind ? (
+                <p id={`${kindName}-error`} role="alert" className="text-[11px] text-danger">
+                  {errors.kind}
+                </p>
+              ) : null}
             </fieldset>
           )}
           <div className="flex flex-col gap-1">
@@ -328,9 +342,15 @@ function BuilderForm({ initial }: { initial: Initial }) {
               rows={2}
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              className={`${INPUT} border-line py-2`}
+              aria-invalid={Boolean(errors.description)}
+              aria-describedby={errors.description ? `${descriptionId}-error` : undefined}
+              className={`${INPUT} ${errors.description ? 'border-danger' : 'border-line'} py-2`}
             />
-            {errors.description ? <p className="text-[11px] text-danger">{errors.description}</p> : null}
+            {errors.description ? (
+              <p id={`${descriptionId}-error`} role="alert" className="text-[11px] text-danger">
+                {errors.description}
+              </p>
+            ) : null}
           </div>
         </section>
 
@@ -356,9 +376,14 @@ function BuilderForm({ initial }: { initial: Initial }) {
         </div>
 
         <section aria-label="Sharing and alerts" className="flex flex-col gap-4 rounded-xl bg-surface p-3">
+          {removed > 0 ? (
+            <p className="text-[11px] text-ink-muted">
+              <span className={MONO}>{removed}</span> {removed === 1 ? 'person' : 'people'} no longer in your workspace {removed === 1 ? 'was' : 'were'} removed.
+            </p>
+          ) : null}
           <SharingFields
             sharing={sharing}
-            sharedWith={sharedWith}
+            sharedWith={shared}
             teammates={teammates}
             error={errors.shared_with ?? errors.sharing ?? null}
             onChange={(nextSharing, nextPeople) => {
