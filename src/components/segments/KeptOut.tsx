@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type RefObject } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { previewSegment } from '../../features/segments/segmentApi';
 import type { PreviewResponse, Segment } from '../../features/segments/segmentTypes';
@@ -16,7 +16,18 @@ type Answer = { records: PreviewResponse['results'] } | { error: string };
  *  Let back in (plan Decision 9). Named through the preview with no rules
  *  and ten of these ids as pins: exactly those records, as the reader may
  *  open them. Show more names the next ten, so none is ever unreachable. */
-export function KeptOut({ segment, disabled, onLetBackIn }: { segment: Segment; disabled: boolean; onLetBackIn: (id: number) => void }) {
+export function KeptOut({
+  segment,
+  disabled,
+  toggleRef,
+  onLetBackIn,
+}: {
+  segment: Segment;
+  disabled: boolean;
+  /** Where Let back in sends focus once the record it named unmounts. */
+  toggleRef: RefObject<HTMLButtonElement | null>;
+  onLetBackIn: (id: number) => void;
+}) {
   const [open, setOpen] = useState(false);
   const key = segment.excluded_ids.join(',');
   const kind = segment.kind;
@@ -63,6 +74,7 @@ export function KeptOut({ segment, disabled, onLetBackIn }: { segment: Segment; 
     <section className="rounded-xl bg-surface p-3">
       <h2>
         <button
+          ref={toggleRef}
           type="button"
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}

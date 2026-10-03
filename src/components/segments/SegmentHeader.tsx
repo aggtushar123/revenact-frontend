@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Copy, Download, Pencil, Trash2 } from 'lucide-react';
 import type { SentencePart } from '../../features/segments/ruleSentence';
 import { deleteSegment, duplicateSegment, exportMembers } from '../../features/segments/segmentApi';
 import type { PersonRef, Segment } from '../../features/segments/segmentTypes';
 import { ConfirmDialog } from '../organizations/ConfirmDialog';
-import { BUTTON } from '../organizations/portfolio/styles';
+import { BUTTON, FOCUS } from '../organizations/portfolio/styles';
 import { errorMessage } from '../organizations/portfolio/usePagedRead';
 import { RuleSentence } from './RuleSentence';
 
@@ -37,8 +37,16 @@ export function SegmentHeader({
   onNotice: (message: string | null) => void;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [busy, setBusy] = useState<'duplicate' | 'export' | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  // Set by Duplicate below, once: the row that opened it is gone on the
+  // new page, so there is nothing else to send focus to but its own title.
+  const focusTitle = Boolean((location.state as { focusTitle?: boolean } | null)?.focusTitle);
+  useEffect(() => {
+    if (focusTitle) titleRef.current?.focus();
+  }, [focusTitle]);
 
   const run = async (what: 'duplicate' | 'export') => {
     setBusy(what);
@@ -46,7 +54,7 @@ export function SegmentHeader({
     try {
       if (what === 'duplicate') {
         const copy = await duplicateSegment(segment.id);
-        navigate(`/segments/${copy.id}`);
+        navigate(`/segments/${copy.id}`, { state: { focusTitle: true } });
       } else {
         await exportMembers(segment.id, exportQuery);
       }
@@ -61,7 +69,9 @@ export function SegmentHeader({
     <header className="flex flex-col gap-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="break-words text-[22px] font-semibold text-ink">{segment.name}</h1>
+          <h1 ref={titleRef} tabIndex={-1} className={`break-words text-[22px] font-semibold text-ink ${FOCUS}`}>
+            {segment.name}
+          </h1>
           {segment.description ? <p className="text-[13px] text-ink-muted">{segment.description}</p> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">

@@ -103,6 +103,29 @@ describe('/segments/:id (spec §3)', () => {
     expect(await screen.findByRole('heading', { level: 1, name: 'EMEA accounts (copy)' })).toBeInTheDocument();
   });
 
+  it("focuses the new page's title after Duplicate, since the row that opened it is gone", async () => {
+    stubSegments();
+    renderSegments('/segments/8');
+    await userEvent.click(await screen.findByRole('button', { name: 'Duplicate' }));
+    await waitFor(() => expect(where()).toBe('/segments/200'));
+    expect(await screen.findByRole('heading', { level: 1, name: 'EMEA accounts (copy)' })).toHaveFocus();
+  });
+
+  it('retries the tiles on their own counter, so the attempt never refetches the members list', async () => {
+    let failures = 1;
+    const spy = stubSegments({
+      members: (_id, query) =>
+        query.get('limit') === '1' && failures-- > 0 ? { status: 500, body: { detail: 'Server error.' } } : undefined,
+    });
+    renderSegments('/segments/7');
+    expect(await screen.findByText('Could not load the totals.')).toBeInTheDocument();
+    const listReads = () => requests(spy, 'GET', /^\/segments\/7\/members\/$/).filter((r) => r.query.get('limit') !== '1');
+    const before = listReads().length;
+    await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    expect(await within(await screen.findByRole('group', { name: 'Members' })).findByText('3')).toBeInTheDocument();
+    expect(listReads()).toHaveLength(before);
+  });
+
   it('exports the members the way the tab lists them', async () => {
     const spy = stubSegments();
     renderSegments('/segments/7?search=piz&sort=name');

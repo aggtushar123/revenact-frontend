@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { previewSegment } from '../../features/segments/segmentApi';
 import { rulesMessage } from '../../features/segments/segmentErrors';
-import type { PreviewRequest, PreviewResponse } from '../../features/segments/segmentTypes';
+import type { PreviewRequest, PreviewResponse, SegmentKind } from '../../features/segments/segmentTypes';
 
 export const PREVIEW_DEBOUNCE_MS = 400;
 
@@ -12,6 +12,9 @@ export type PreviewState =
   | { status: 'error'; message: string };
 
 type Answer = { key: string; data: PreviewResponse } | { key: string; error: string };
+/** `last`, with the kind it answered for: a kind change drops a mismatched
+ *  one rather than showing it, dimmed, under the new kind's noun. */
+type Last = { kind: SegmentKind; data: PreviewResponse } | null;
 
 /** The builder's live preview (plan Decision 3): POST /segments/preview/
  *  400ms after the last change, never while a condition is unfinished
@@ -21,7 +24,7 @@ type Answer = { key: string; data: PreviewResponse } | { key: string; error: str
 export function usePreview(request: PreviewRequest | null): PreviewState {
   const key = request ? JSON.stringify(request) : null;
   const [answer, setAnswer] = useState<Answer | null>(null);
-  const [last, setLast] = useState<PreviewResponse | null>(null);
+  const [last, setLast] = useState<Last>(null);
   const latest = useRef<string | null>(null);
 
   useEffect(() => {
@@ -34,7 +37,7 @@ export function usePreview(request: PreviewRequest | null): PreviewState {
         (data) => {
           if (cancelled || latest.current !== key) return;
           setAnswer({ key, data });
-          setLast(data);
+          setLast({ kind: body.kind, data });
         },
         (err: unknown) => {
           if (!cancelled && latest.current === key) setAnswer({ key, error: rulesMessage(err) });
@@ -49,5 +52,5 @@ export function usePreview(request: PreviewRequest | null): PreviewState {
 
   if (!key) return { status: 'incomplete' };
   if (answer?.key === key) return 'data' in answer ? { status: 'ready', data: answer.data } : { status: 'error', message: answer.error };
-  return { status: 'loading', last };
+  return { status: 'loading', last: last && last.kind === request?.kind ? last.data : null };
 }

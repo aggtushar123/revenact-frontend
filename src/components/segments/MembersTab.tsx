@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode, type RefObject } from 'react';
 import type { Contact } from '../../features/customers/customersSlice';
 import { formatCompactMoney } from '../../features/customers/formatters';
 import type { PortfolioGroup, PortfolioRowBase } from '../../features/organizations/portfolioTypes';
@@ -27,7 +27,7 @@ import { EmptyState, ErrorBlock, ItemSkeleton, MoreButton, PagedSections } from 
 import { ToolbarSearch } from '../organizations/portfolio/toolbarParts';
 import { usePagedBook } from '../organizations/portfolio/usePagedBook';
 import { errorMessage, usePagedRead } from '../organizations/portfolio/usePagedRead';
-import { MONO } from '../organizations/portfolio/styles';
+import { FOCUS, MONO } from '../organizations/portfolio/styles';
 import { SECTION_PAGE_SIZE } from '../organizations/portfolio/usePortfolio';
 import { useSearchText } from '../organizations/portfolio/useSearchText';
 import { KeptOut } from './KeptOut';
@@ -73,7 +73,20 @@ function MembersToolbar({ segment, params, update }: { segment: Segment; params:
 
 /** Organisations and accounts: the kind's own rows, groups and opened-row
  *  panels (inline from sm, a sheet on phones), never selectable. */
-function PortfolioMemberList({ segment, params, version, menu }: { segment: Segment; params: SegmentPageParams; version: number; menu: MenuFor }) {
+function PortfolioMemberList({
+  segment,
+  params,
+  version,
+  menu,
+  countRef,
+}: {
+  segment: Segment;
+  params: SegmentPageParams;
+  version: number;
+  menu: MenuFor;
+  /** Where Pin / Keep out sends focus once the chosen row unmounts. */
+  countRef: RefObject<HTMLParagraphElement | null>;
+}) {
   const kind = usePortfolioKind();
   const isSm = useMediaQuery(SM);
   const orgCurrency = useOrgCurrency();
@@ -111,7 +124,7 @@ function PortfolioMemberList({ segment, params, version, menu }: { segment: Segm
   return (
     <div className="@container flex flex-col gap-2">
       {book.data ? (
-        <p data-part="member-count" role="status" aria-live="polite" className={`${MONO} text-[13px] text-ink-muted`}>
+        <p ref={countRef} tabIndex={-1} data-part="member-count" role="status" aria-live="polite" className={`${MONO} text-[13px] text-ink-muted ${FOCUS}`}>
           {memberCountText(book.data.count, book.data.summary.members, params.search, segment.kind)}
         </p>
       ) : null}
@@ -135,7 +148,20 @@ function PortfolioMemberList({ segment, params, version, menu }: { segment: Segm
 }
 
 /** Contacts: the Contacts list's own rows, by name, with Show more. */
-function ContactMemberList({ segment, params, version, menu }: { segment: Segment; params: SegmentPageParams; version: number; menu: MenuFor }) {
+function ContactMemberList({
+  segment,
+  params,
+  version,
+  menu,
+  countRef,
+}: {
+  segment: Segment;
+  params: SegmentPageParams;
+  version: number;
+  menu: MenuFor;
+  /** Where Pin / Keep out sends focus once the chosen row unmounts. */
+  countRef: RefObject<HTMLParagraphElement | null>;
+}) {
   const read = useCallback((query: string) => fetchMembers<Contact>(segment.id, query), [segment.id]);
   const page = usePagedRead<Contact, SegmentMembersPage<Contact>>(
     read,
@@ -149,7 +175,7 @@ function ContactMemberList({ segment, params, version, menu }: { segment: Segmen
   if (page.data.count === 0) return <>{emptyMembers(params.search)}</>;
   return (
     <div className="flex flex-col gap-2">
-      <p data-part="member-count" role="status" aria-live="polite" className={`${MONO} text-[13px] text-ink-muted`}>
+      <p ref={countRef} tabIndex={-1} data-part="member-count" role="status" aria-live="polite" className={`${MONO} text-[13px] text-ink-muted ${FOCUS}`}>
         {memberCountText(page.data.count, page.data.summary.members, params.search, 'contact')}
       </p>
       <ul aria-label="Members" aria-busy={page.loading} className={MEMBER_LIST}>
@@ -186,13 +212,22 @@ export function MembersTab({
   panel?: TabPanelIds;
 }) {
   const [busy, setBusy] = useState(false);
+  // Keep out (from a row's menu) and Let back in (from Kept out) each
+  // unmount the row or list item that held focus; without somewhere to send
+  // it, focus falls to <body>. Keep out moves it to the members count status
+  // line below, Let back in to the Kept out disclosure's own toggle. Pin and
+  // Unpin never unmount their row, so they keep MoveToMenu's own focus
+  // return to its trigger button (no focusAfter).
+  const countRef = useRef<HTMLParagraphElement>(null);
+  const toggleRef = useRef<HTMLButtonElement>(null);
   const stateOf = (id: number): MemberStateValue =>
     segment.pinned_ids.includes(id) ? 'pinned' : segment.excluded_ids.includes(id) ? 'excluded' : 'none';
-  const choose = async (recordId: number, state: MemberStateValue) => {
+  const choose = async (recordId: number, state: MemberStateValue, focusAfter?: RefObject<HTMLElement | null>) => {
     setBusy(true);
     onNotice(null);
     try {
       onChanged(await setMemberState(segment.id, recordId, state));
+      focusAfter?.current?.focus();
     } catch (err) {
       onNotice(errorMessage(err, 'Could not change this member.'));
     } finally {
@@ -201,21 +236,31 @@ export function MembersTab({
   };
   // Owner only (the backend refuses anyone else with a 403).
   const menu: MenuFor = (id, name) =>
-    segment.is_owner ? <MemberMenu name={name} state={stateOf(id)} disabled={busy} onChoose={(state) => void choose(id, state)} /> : null;
+    segment.is_owner ? (
+      <MemberMenu name={name} state={stateOf(id)} disabled={busy} onChoose={(state) => void choose(id, state, state === 'excluded' ? countRef : undefined)} />
+    ) : null;
   const portfolioKind = (segment.kind === 'customer' ? ORGANIZATION_KIND : ACCOUNT_KIND);
 
   return (
     <div role="tabpanel" {...tabPanelProps('Members', panel)} className="flex flex-col gap-3">
       <MembersToolbar segment={segment} params={params} update={update} />
       {segment.kind === 'contact' ? (
-        <ContactMemberList segment={segment} params={params} version={version} menu={menu} />
+        <ContactMemberList segment={segment} params={params} version={version} menu={menu} countRef={countRef} />
       ) : (
         <PortfolioKindContext.Provider value={portfolioKind}>
-          <PortfolioMemberList segment={segment} params={params} version={version} menu={menu} />
+          <PortfolioMemberList segment={segment} params={params} version={version} menu={menu} countRef={countRef} />
         </PortfolioKindContext.Provider>
       )}
       {segment.is_owner && segment.excluded_ids.length > 0 ? (
-        <KeptOut segment={segment} disabled={busy} onLetBackIn={(id) => void choose(id, 'none')} />
+        <KeptOut
+          segment={segment}
+          disabled={busy}
+          toggleRef={toggleRef}
+          // Letting back in the last kept-out record unmounts this
+          // disclosure, toggle and all, so that one falls back to the
+          // count line instead.
+          onLetBackIn={(id) => void choose(id, 'none', segment.excluded_ids.length > 1 ? toggleRef : countRef)}
+        />
       ) : null}
     </div>
   );

@@ -47,6 +47,15 @@ describe('ChangesTab (spec §3)', () => {
     expect(screen.getByText(/more changes involve records you can't open\./)).toHaveTextContent("3 more changes involve records you can't open.");
   });
 
+  it('gives the entered/left record name its own truncating span, since `truncate` cannot ellipsize an inline-flex Link', async () => {
+    stubSegments();
+    renderInApp(<Host segment={RENEWAL_RISK} />, { url: '/segments/7?tab=changes' });
+    await waitFor(() => expect(day('2026-10-03')).not.toBeNull());
+    const link = within(day('2026-10-03')).getByRole('link', { name: 'Pizza Hut' });
+    expect(link).not.toHaveClass('truncate');
+    expect(link.querySelector('span')).toHaveClass('truncate');
+  });
+
   it('reads 7, 30 or 90 days from its switch, kept in the URL', async () => {
     const spy = stubSegments();
     renderInApp(<Host segment={RENEWAL_RISK} />, { url: '/segments/7?tab=changes' });

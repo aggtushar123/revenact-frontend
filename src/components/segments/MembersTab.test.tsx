@@ -87,6 +87,41 @@ describe('MembersTab (spec §3)', () => {
     expect(requests(spy, 'POST', /^\/segments\/preview\/$/)[0].body).toEqual({ kind: 'customer', rules: { match: 'all', conditions: [] }, pinned_ids: [1] });
   });
 
+  it("sends focus to the members count line once Keep out unmounts the row that held it, instead of <body>", async () => {
+    stubSegments();
+    renderInApp(<Host initial={RENEWAL_RISK} />, { url: '/segments/7' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Actions for Globex' }));
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Globex actions' })).getByRole('menuitem', { name: 'Keep out' }));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Globex' })).not.toBeInTheDocument());
+    expect(count()).toHaveFocus();
+  });
+
+  it("sends focus to the Kept out toggle once Let back in unmounts the row that held it, while others stay kept out", async () => {
+    stubSegments({ segments: [{ ...RENEWAL_RISK, excluded_ids: [1, 2] }] });
+    renderInApp(<Host initial={{ ...RENEWAL_RISK, excluded_ids: [1, 2] }} />, { url: '/segments/7' });
+    const toggle = await screen.findByRole('button', { name: /^Kept out/ });
+    await userEvent.click(toggle);
+    await userEvent.click(await screen.findByRole('button', { name: 'Let Globex back in' }));
+    // The preview that names the one id still kept out reloads (its own
+    // answer cache is keyed by the whole excluded set), so the row reappears
+    // asynchronously.
+    expect(await screen.findByRole('button', { name: 'Let Initech back in' })).toBeInTheDocument();
+    expect(toggle).toHaveFocus();
+  });
+
+  it("sends focus to the members count line once Let back in unmounts the last kept-out record, toggle and all", async () => {
+    stubSegments();
+    renderInApp(<Host initial={RENEWAL_RISK} />, { url: '/segments/7' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Actions for Globex' }));
+    await userEvent.click(within(screen.getByRole('menu', { name: 'Globex actions' })).getByRole('menuitem', { name: 'Keep out' }));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Globex' })).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: /^Kept out/ }));
+    const kept = await screen.findByRole('list', { name: 'Kept out' });
+    await userEvent.click(within(kept).getByRole('button', { name: 'Let Globex back in' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /^Kept out/ })).not.toBeInTheDocument());
+    expect(count()).toHaveFocus();
+  });
+
   it('shows the server\'s refusal word for word, reloads nothing, and enables the menu again', async () => {
     const detail = 'A segment can pin at most 500 records, and keep out as many.';
     const spy = stubSegments({ member: () => ({ status: 400, body: { detail } }) });

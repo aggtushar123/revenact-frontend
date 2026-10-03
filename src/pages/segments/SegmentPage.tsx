@@ -50,9 +50,11 @@ function LoadedSegment({ id }: { id: number }) {
 
 /** The tiles and hidden count: one `limit=1` read of the members, over all
  *  of them whatever the tab's search (plan Decision 7). The last totals stay
- *  while a reload after a pin is in flight. */
-function useTotals(id: number, version: number) {
-  const key = `${id}#${version}`;
+ *  while a reload after a pin is in flight. Its own `retry`, so the tiles'
+ *  Try again never bumps `version` and refetches (and loses Show-more pages
+ *  on) the members list below. */
+function useTotals(id: number, version: number, retry: number) {
+  const key = `${id}#${version}#${retry}`;
   const [answer, setAnswer] = useState<{ key: string; page: SegmentMembersPage<unknown> | null } | null>(null);
   useEffect(() => {
     let alive = true;
@@ -81,8 +83,9 @@ function SegmentView({ segment, onReplace }: { segment: Segment; onReplace: (seg
   const idBase = useId();
   const attributes = useAttributes();
   const [version, setVersion] = useState(0);
+  const [totalsRetry, setTotalsRetry] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
-  const totals = useTotals(segment.id, version);
+  const totals = useTotals(segment.id, version, totalsRetry);
   const parts = useMemo(() => ruleSentence(segment.rules, segment.kind, segment.labels, attributes), [segment, attributes]);
   const hidden = totals.page?.hidden_count ?? 0;
   // The tab components draw their own role="tabpanel"; DetailTabs' ids make
@@ -95,7 +98,7 @@ function SegmentView({ segment, onReplace }: { segment: Segment; onReplace: (seg
         <SegmentHeader segment={segment} parts={parts} exportQuery={membersQuery(params, segment.kind)} onNotice={setNotice} />
         {notice ? <DismissibleAlert message={notice} onDismiss={() => setNotice(null)} /> : null}
         <div className="@container">
-          <SegmentTiles summary={totals.page?.summary ?? null} kind={segment.kind} failed={totals.failed} onRetry={() => setVersion((v) => v + 1)} />
+          <SegmentTiles summary={totals.page?.summary ?? null} kind={segment.kind} failed={totals.failed} onRetry={() => setTotalsRetry((v) => v + 1)} />
         </div>
         {hidden > 0 ? (
           <p data-part="hidden-members" className="text-[13px] text-ink-muted">

@@ -98,6 +98,24 @@ describe('usePreview (plan Decision 3)', () => {
     expect(result.current).toEqual({ status: 'loading', last: answer(12) });
   });
 
+  it("drops a dimmed answer from the kind just left, instead of showing it under the new kind's noun", async () => {
+    const first = deferred<PreviewResponse>();
+    vi.mocked(api.previewSegment).mockReturnValueOnce(first.promise);
+    const { result, rerender } = renderHook(({ r }) => usePreview(r), { initialProps: { r: request(50) } });
+    await act(async () => {
+      vi.advanceTimersByTime(PREVIEW_DEBOUNCE_MS);
+    });
+    await act(async () => {
+      first.resolve(answer(41));
+    });
+    expect(result.current).toEqual({ status: 'ready', data: answer(41) });
+    const contactRequest: PreviewRequest = { kind: 'contact', rules: { match: 'all', conditions: [{ field: 'role', op: 'is', value: 'champion' }] } };
+    const second = deferred<PreviewResponse>();
+    vi.mocked(api.previewSegment).mockReturnValueOnce(second.promise);
+    rerender({ r: contactRequest });
+    expect(result.current).toEqual({ status: 'loading', last: null });
+  });
+
   it('reads a refusal as its rules message', async () => {
     vi.mocked(api.previewSegment).mockRejectedValue(new ApiError(400, { rules: ['"is" cannot be used with Health score.'] }, 'x'));
     const { result } = renderHook(() => usePreview(request(50)));

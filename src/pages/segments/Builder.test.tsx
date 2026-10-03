@@ -115,6 +115,18 @@ describe('the segment builder (spec §3)', () => {
     expect(where()).toBe('/segments/new');
   });
 
+  it("clears a saved rules refusal once the rule is edited, so it stops hiding the live preview's own message", async () => {
+    stubSegments({ create: () => ({ status: 400, body: { rules: ['"is" cannot be used with Health score.'] } }) });
+    renderSegments('/segments/new');
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'X');
+    await userEvent.click(screen.getByRole('button', { name: 'Add condition' }));
+    await userEvent.selectOptions(within(row(1)).getByRole('combobox', { name: 'Condition 1 value' }), 'Renewal');
+    await userEvent.click(screen.getByRole('button', { name: 'Save segment' }));
+    expect(await within(screen.getByRole('region', { name: 'Rules' })).findByRole('alert')).toHaveTextContent('"is" cannot be used with Health score.');
+    await userEvent.selectOptions(within(row(1)).getByRole('combobox', { name: 'Condition 1 value' }), 'Onboarding');
+    expect(screen.queryByText('"is" cannot be used with Health score.')).not.toBeInTheDocument();
+  });
+
   it('edits a segment I own, showing its kind as fixed, and a rename sends only the name', async () => {
     const spy = stubSegments();
     renderSegments('/segments/7/edit');

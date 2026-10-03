@@ -40,9 +40,11 @@ function Moves({
           <li key={record.id} className="flex min-w-0 flex-wrap items-center gap-x-2">
             <Link
               to={recordHref(segment.kind, record.id)}
-              className={`inline-flex min-h-11 items-center truncate rounded-sm text-[13px] font-semibold text-ink hover:underline sm:min-h-0 ${FOCUS}`}
+              className={`inline-flex min-h-11 min-w-0 max-w-full items-center rounded-sm text-[13px] font-semibold text-ink hover:underline sm:min-h-0 ${FOCUS}`}
             >
-              {record.name}
+              {/* `truncate` on the inline-flex Link itself never ellipsizes
+                  (no box to overflow); the span gives it one. */}
+              <span className="truncate">{record.name}</span>
             </Link>{' '}
             <span className="text-[11px] text-ink-muted">{reasonText(record.reason, direction, segment.kind, attributes)}</span>
           </li>

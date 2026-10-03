@@ -365,6 +365,9 @@ function BuilderForm({ initial }: { initial: Initial }) {
               onChange={(next) => {
                 setDraft(next);
                 setInvalidUid(null);
+                // A save's rules error (errors.rules) would otherwise hide the
+                // live preview's own message (rulesError's `??`) forever.
+                setErrors((current) => (current.rules ? { ...current, rules: undefined } : current));
               }}
             />
             {kind === 'customer' ? (

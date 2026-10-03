@@ -907,9 +907,9 @@ segment, its builder and a new one).
   portfolio/toolbarParts.tsx`) is one shared button, used beside Filters on
   the Organizations and Accounts lists and before Add on Contacts.
 - **Money** reads compact, e.g. "$512.0K" (the tiles' ARR covered).
-- **Follow-up (G19):** the Kept out and Delete confirmations still use
-  `ConfirmDialog`'s older styling rather than the house look; accepted, not
-  fixed in this delivery.
+- **Follow-up (G19):** the Delete confirmation still uses `ConfirmDialog`'s
+  older styling rather than the house look; accepted, not fixed in this
+  delivery.
 
 ### Overlays
 
