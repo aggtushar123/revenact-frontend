@@ -17,6 +17,7 @@ import {
 } from '../../features/contacts/contactsParams';
 import { placeLabel, placeOf } from '../../features/contacts/contactsFormat';
 import type { ContactsNames } from '../../features/contacts/askContext';
+import { saveAsSegmentHref } from '../../features/segments/fromListFilters';
 import { ErrorState } from '../dashboard/shared/DataState';
 import {
   CONTACT_NOT_FOUND,
@@ -131,6 +132,7 @@ export function ContactsPage() {
       isSm={isSm}
       onChange={change}
       onAdd={() => setAdding(true)}
+      onSaveAsSegment={() => navigate(saveAsSegmentHref('contact', query))}
     />
   );
   const list = (

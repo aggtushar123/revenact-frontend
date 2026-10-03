@@ -109,7 +109,12 @@ export function Navbar() {
   // person open on it share one page, titled here; the page draws the rest.
   // A trailing slash still reads as the same route (fix round 1, 2026-09-28).
   const isContacts = /^\/contacts(\/\d+)?\/?$/.test(location.pathname);
-  const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts || isAccountsView || isAccountDetail || isPipelinesView;
+  // Segments wear the same frame (segments spec 2026-10-03 §3, plan Decision
+  // 10): "Segments" on the list; on a segment, its builder and a new one, the
+  // bar only leads back to the list.
+  const isSegments = /^\/segments\/?$/.test(location.pathname);
+  const isSegmentPage = /^\/segments\/[^/]+(\/edit)?\/?$/.test(location.pathname);
+  const isFramed = isDashboard || isOrgView || isOrgDetail || isContacts || isAccountsView || isAccountDetail || isPipelinesView || isSegments || isSegmentPage;
   const dashboardSharedSearch = sharedSearch(location.search);
 
 
@@ -205,7 +210,21 @@ export function Navbar() {
       }
     >
       <div className="flex items-center gap-8 h-full">
-        {isAccountDetail ? (
+        {isSegmentPage ? (
+          <nav aria-label="Breadcrumb" className="flex items-center h-full">
+            <Link
+              to="/segments"
+              className="-ml-2 inline-flex min-h-11 sm:min-h-9 items-center gap-1 rounded-lg px-2 text-[13px] font-semibold text-ink-muted hover:bg-subtle hover:text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <ChevronLeft className="w-4 h-4" aria-hidden="true" />
+              Segments
+            </Link>
+          </nav>
+        ) : isSegments ? (
+          <div className="flex items-center gap-4 h-full">
+            <h1 className="text-[17px] font-bold text-ink tracking-tight">Segments</h1>
+          </div>
+        ) : isAccountDetail ? (
           <nav aria-label="Breadcrumb" className="flex items-center h-full">
             <Link
               to="/accounts/list"

@@ -6,6 +6,7 @@ import type { ContactsSummary } from '../../features/contacts/contactsTypes';
 import { apiFetch } from '../../lib/apiClient';
 import { ListSearch, SummaryLine } from '../organizations/detail/ListParts';
 import { FOCUS, PRIMARY } from '../organizations/portfolio/styles';
+import { SaveAsSegmentButton } from '../organizations/portfolio/toolbarParts';
 
 type Option = { id: number; name: string };
 
@@ -95,6 +96,7 @@ export function ContactsToolbar({
   isSm,
   onChange,
   onAdd,
+  onSaveAsSegment,
 }: {
   params: ContactsParams;
   summary: ContactsSummary | null;
@@ -107,6 +109,8 @@ export function ContactsToolbar({
   /** `replace` for typing, so every key is not a history entry. */
   onChange: (next: ContactsParams, replace?: boolean) => void;
   onAdd: () => void;
+  /** Save as segment (segments spec §3), before Add. */
+  onSaveAsSegment?: () => void;
 }) {
   const [text, setText] = useState(params.q);
   const [lastQ, setLastQ] = useState(params.q);
@@ -176,10 +180,13 @@ export function ContactsToolbar({
             ))}
           </Select>
         </div>
-        <button type="button" onClick={onAdd} className={`${PRIMARY} justify-center sm:ml-auto`}>
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Add
-        </button>
+        <div className="flex flex-col gap-2 sm:ml-auto sm:flex-row">
+          {onSaveAsSegment ? <SaveAsSegmentButton onClick={onSaveAsSegment} className="justify-center" /> : null}
+          <button type="button" onClick={onAdd} className={`${PRIMARY} justify-center`}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add
+          </button>
+        </div>
       </div>
     </div>
   );

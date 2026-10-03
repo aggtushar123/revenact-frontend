@@ -415,6 +415,29 @@ describe('Navbar on Contacts (spec 2026-09-28 §3)', () => {
   });
 });
 
+describe('Navbar on Segments (segments spec 2026-10-03 §3)', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('wears the framed bar on /segments: "Segments", the actions slot, no avatar', () => {
+    const setSlot = vi.fn();
+    renderNavbar('/segments', null, null, [], setSlot);
+    const header = document.querySelector('header');
+    expect(header).toHaveClass('h-16', 'shrink-0', 'flex', 'items-center', 'gap-3', 'px-4');
+    expect(screen.getByRole('heading', { name: 'Segments' })).toBeInTheDocument();
+    expect(setSlot).toHaveBeenCalledWith(expect.any(HTMLElement));
+    expect(screen.queryByAltText('Alice Admin')).not.toBeInTheDocument();
+  });
+
+  it.each(['/segments/new', '/segments/7', '/segments/7/edit'])('leads back to the list from %s, in the same frame', (url) => {
+    renderNavbar(url);
+    const back = within(screen.getByRole('navigation', { name: 'Breadcrumb' })).getByRole('link', { name: 'Segments' });
+    expect(back).toHaveAttribute('href', '/segments');
+    expect(document.querySelector('header')).toHaveClass('h-16', 'px-4');
+  });
+});
+
 const unreadInvite: Notification = {
   id: 1,
   kind: 'copilot_invite',

@@ -55,6 +55,11 @@ describe('DashboardLayout', () => {
     // 2026-09-30 §1).
     '/pipelines/list',
     '/pipelines/board',
+    // Segments wear the same frame (segments spec 2026-10-03 §3).
+    '/segments',
+    '/segments/new',
+    '/segments/7',
+    '/segments/7/edit',
   ])('adds no padding around %s', (url) => {
     const main = renderAt(url);
     expect(main).toHaveClass('p-0');

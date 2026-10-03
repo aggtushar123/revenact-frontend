@@ -17,7 +17,7 @@ function jsonResponse(status: number, body: unknown) {
   return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
-function renderSidebar(role?: 'admin' | 'csm') {
+function renderSidebar(role?: 'admin' | 'csm', url = '/dashboard') {
   const store = configureStore({
     reducer: { auth: authReducer },
     ...(role
@@ -42,7 +42,7 @@ function renderSidebar(role?: 'admin' | 'csm') {
   });
   render(
     <Provider store={store}>
-      <MemoryRouter initialEntries={['/dashboard']}>
+      <MemoryRouter initialEntries={[url]}>
         <Sidebar />
       </MemoryRouter>
     </Provider>
@@ -146,5 +146,26 @@ describe('Sidebar and role-based access', () => {
     renderSidebar('admin');
     expect(await screen.findByRole('link', { name: /Brain Overview/ })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /Users/ })).toBeInTheDocument();
+  });
+});
+
+// Segments spec 2026-10-03 §3: the Tools link reaches the real list, and
+// stays lit on a segment, its builder and a new one.
+describe('Sidebar Segments link', () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, []))));
+  });
+
+  it.each(['/segments', '/segments/new', '/segments/7', '/segments/7/edit'])('points at /segments and is the current page on %s', async (url) => {
+    renderSidebar('csm', url);
+    const link = await screen.findByRole('link', { name: 'Segments' });
+    expect(link).toHaveAttribute('href', '/segments');
+    expect(link).toHaveAttribute('aria-current', 'page');
+  });
+
+  it('is not the current page elsewhere', async () => {
+    renderSidebar('csm', '/dashboard');
+    expect(await screen.findByRole('link', { name: 'Segments' })).not.toHaveAttribute('aria-current');
   });
 });

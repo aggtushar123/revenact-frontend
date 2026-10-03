@@ -52,6 +52,9 @@ import { CanvasPage } from './pages/canvas/CanvasPage';
 import { CanvasEditor } from './pages/canvas/CanvasEditor';
 import { CampaignsList } from './pages/campaigns/CampaignsList';
 import { CampaignEditor } from './pages/campaigns/CampaignEditor';
+import { Builder as SegmentBuilder } from './pages/segments/Builder';
+import { SegmentPage } from './pages/segments/SegmentPage';
+import { SegmentsList } from './pages/segments/SegmentsList';
 import { useAppSelector } from './hooks';
 import { dashboardRoutes } from './pages/dashboard/routes';
 // Company Brain pages
@@ -231,6 +234,14 @@ function App() {
             <Route path=":id" element={<CreateScenario />} />
           </Route>
 
+          {/* Segments (spec 2026-10-03 §3): the list, a segment, its builder
+              and a new one. Replaces the Under Construction catch-all here. */}
+          <Route path="segments">
+            <Route index element={<SegmentsList />} />
+            <Route path="new" element={<SegmentBuilder />} />
+            <Route path=":id" element={<SegmentPage />} />
+            <Route path=":id/edit" element={<SegmentBuilder />} />
+          </Route>
           <Route path="surveys" element={<SurveysPage />} />
 
           <Route path="canvas">

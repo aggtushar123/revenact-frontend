@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppSelector, useOrgCurrency } from '../../hooks';
 import { apiFetch } from '../../lib/apiClient';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
@@ -7,7 +8,8 @@ import { useMembers } from '../../features/knowledge/useMembers';
 import { LIFECYCLE_TARGETS, ownerTargets } from '../../features/organizations/bulkTargets';
 import { bulkUpdate, exportPortfolio } from '../../features/organizations/portfolioApi';
 import { ORGANIZATION_NOUN } from '../../features/organizations/portfolioLabels';
-import { hasFilters, toApiQuery, type PortfolioParams } from '../../features/organizations/portfolioParams';
+import { filterQuery, hasFilters, toApiQuery, type PortfolioParams } from '../../features/organizations/portfolioParams';
+import { saveAsSegmentHref } from '../../features/segments/fromListFilters';
 import type { BulkAction, PortfolioRow } from '../../features/organizations/portfolioTypes';
 import { OrganizationFormModal } from '../../components/organizations/OrganizationFormModal';
 import { ChurnOrganizationModal } from '../../components/organizations/ChurnOrganizationModal';
@@ -38,6 +40,7 @@ type Targets = { ids: number[]; names: string[] };
 export function List() {
   const { params, update, clearFilters } = usePortfolioParams();
   const isSm = useMediaQuery(SM);
+  const navigate = useNavigate();
   const orgCurrency = useOrgCurrency();
   const defaultLifecycleStage = useAppSelector(
     (state) => state.auth.user?.organisation.default_lifecycle_stage || undefined,
@@ -159,6 +162,7 @@ export function List() {
           onExport={() => void runExport(toApiQuery(params))}
           exporting={exporting}
           onAdd={() => setAdding(true)}
+          onSaveAsSegment={() => navigate(saveAsSegmentHref('customer', filterQuery(params)))}
           searchRef={searchRef}
           selectMode={selecting}
           onToggleSelectMode={toggleSelectMode}

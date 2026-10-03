@@ -41,6 +41,7 @@ export function renderContactsPage(url = '/contacts', { width = 1440, ask = fals
       <Route path="/contacts/list" element={<ContactsListRedirect />} />
       {ask ? <Route element={<ContactsAskLayout />}>{page}</Route> : page}
       <Route path="/organizations/:id" element={<Where />} />
+      <Route path="/segments/new" element={<Where />} />
     </Routes>
   );
   render(
