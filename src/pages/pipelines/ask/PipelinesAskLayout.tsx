@@ -28,8 +28,9 @@ export function PipelinesAskLayout() {
     [names],
   );
   const surface: AskSurface = useMemo(() => ({ name: 'pipelines', context, chipLabel }), [context, chipLabel]);
-  // Another view or kind starts at the top of the shared scroll column, as
-  // each page did on its own; a filter change keeps the place.
+  // Another view or kind starts at the top of the shared scroll column (a
+  // view change remounted the page before Ask; a kind change now does the
+  // same); a filter change keeps the place.
   const scrollKey = context ? `${context.view}:${context.kind}` : null;
   return (
     <PipelinesNamesContext.Provider value={report}>

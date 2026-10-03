@@ -75,7 +75,7 @@ export function pipelineFocusOf(row: Pick<PipelineRow, 'kind' | 'id'>): Pipeline
 /** The focus part of the chip: "This opportunity", "This risk". Reuses the
  *  story Ask's own word template (`itemFocusLabel`) — only the word
  *  differs, and a pipeline focus's `kind` is already the word. */
-export function pipelineFocusLabel(focus: PipelineFocus): string {
+function pipelineFocusLabel(focus: PipelineFocus): string {
   return itemFocusLabel(focus.kind);
 }
 
