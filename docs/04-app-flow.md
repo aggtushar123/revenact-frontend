@@ -67,7 +67,7 @@ closing it on unmount or token change.
 | `/organizations/{list,board,:id}` | `List`, `Board`, `OrganizationDetails` | auth |
 | `/accounts/{list,board,:id}` | `AccountsList`, `AccountsBoard` (the Accounts portfolio), `AccountDetails` (the account's story, read by the URL id alone). `AccountsAskLayout` wraps all three in one `AskProvider` (surface `accounts`, delivery 3 of the Ask spec, own preference key `revenact_accounts_ask`), one conversation lasting from the List into the Board, into an account and back: a question posts `context: {surface:'accounts', view:'list'\|'board', filters}` (set keys only, no focus — the List and the Board send no focus, unlike Organizations' list) or `{view:'detail', account, focus}`. Each story item's "Ask about this" sets `focus: {kind, id}` for that one question, typing "What should I know about this `<kind>`?" without sending. Each page reports its own names to the layout (`accountsNames.ts`'s `useReportAccountsOptions` from the List and the Board, `useReportAccountName` from the account page), so a live chip names the portfolio's filter options or the account's own row before the server has ("Accounts · Owner: Carl CSM", the account's name, or "This account"); a sent question shows the server's own `label`. A `400` under `context.account` reads "You can no longer ask about this account."; under `context.focus`, "You can no longer ask about this item. Ask about the account instead."; under `context.filters`, "You can't ask about this list. Clear the filters and ask again." History reopens `/accounts/list?<filters>` (never `/accounts`, whose redirect drops the query), `/accounts/board?<filters>` or `/accounts/:id` | auth |
 | `/contacts`, `/contacts/:id` | `ContactsPage`: the list with its summary line and filters (`q`, `customer`, `account`, `sentiment`, `role` in the URL), and the chosen person's profile beside it (`GET /contacts/`, `GET /contacts/<id>/`, `GET /contacts/<id>/history/`); on phones the person is its own screen with a back link. `/contacts/list` redirects to `/contacts`, keeping its query string; `/contacts/<non-numeric>` shows the not-found state. `ContactsAskLayout` wraps this route in one `AskProvider` (surface `contacts`, delivery 2 of the Ask spec, own preference key `revenact_contacts_ask`): a question posts `context: {surface:'contacts', view:'list', filters}` or `{view:'person', contact, focus}`; the chip names the filtered organisation/account, sentiment and role (or a quoted search term), or the open person's name and place, with "Sentiment" appended while `focus:'sentiment'`. "Why this sentiment?" under a person's sentiment line drafts "Why is <first name>'s sentiment <word>?" with that focus and opens the rail without sending. A `400` under `context.contact` reads "You can't ask about this person here."; under `context.filters`, "You can't ask about this list. Clear the filters and ask again." History reopens a Contacts conversation on `/contacts/:id` (a person) or `/contacts?<filters>` (a list) | auth |
-| `/pipelines/{list,board}` | `PipelinesList`, `PipelinesBoard` (`pages/pipelines/List.tsx`, `Board.tsx`): one book of opportunities or risks across organisations and accounts, `?kind=risks` for risks; `/pipelines` redirects to the List | auth |
+| `/pipelines/{list,board}` | `PipelinesList`, `PipelinesBoard` (`pages/pipelines/List.tsx`, `Board.tsx`): one book of opportunities or risks across organisations and accounts, `?kind=risks` for risks; `/pipelines` redirects to the List. `PipelinesAskLayout` wraps both in one `AskProvider` (surface `pipelines`, key `revenact_pipelines_ask`) — one conversation across both views and both kinds. A question posts `context: {surface:'pipelines', kind, view, filters}`: `filters` is the set URL keys only, `group:'none'` for the List's ungrouped (the Board never sends it), no `focus` key unless one is set. "Ask about this" on a List item or a Board card adds `focus: {kind:'opportunity'\|'risk', id}` for that one question. Each page reports its read's filter options with its kind (`useReportPipelineOptions`), so a live chip can name them before the server has. A `400` under `context.focus` reads "You can no longer ask about this opportunity." (or "…this risk."); under `context.filters`, the same list copy as Organizations and Accounts. History reopens `/pipelines/list?<filters>` or `/pipelines/board?<filters>` (never `/pipelines`, whose redirect drops the query) | auth |
 | `/communications` | `CommunicationsPage`, arranged as an inbox with its own top bar (no Navbar): the inbox card (folders for the four kinds of waiting with counts, Needs-you and Mine-only switches, a list grouped by month, the open item in place, with a `ReplyBox` under it: Draft with Copilot fills it from the thread and the account's history and lists the sources used; Send reply on an email row sends from the person's mailbox via `POST /communications/emails/<id>/reply/`); on `?source=mailbox:<provider>` the card is `MailboxView` instead, the person's own mail whole (Inbox/Drafts/Sent/Done/Muted with counts, Priority and Unread switches, Starred/Important/Spam/Trash and the categories, a Categories block of what is waiting, the list by month, the open message with star/done/mute and a reply that sends from the mailbox); and the shared Copilot rail (`components/copilot/CopilotRail`, with Next event above it and the picked source as context; New chat, History and a hide switch live in the top bar) | auth |
 | `/copilot` | `CopilotIndex`: **the home page**. No Navbar, no frame; the greeting, the ask box, three suggested questions and the skills sit directly on the canvas, with a small Copilot/Cockpit switch top-right. Cockpit sits on the same canvas: My book (counts, value, health rings), Renewals with a window selector and drill-down, and My tasks, where the circle on a row completes the task through `PATCH /tasks/<id>/` (optimistic, reverted with the backend's message on refusal). First item in the sidebar | auth |
 | `/scenarios`, `/scenarios/create`, `/scenarios/:id` | `ScenariosList`, `CreateScenario` | auth |
@@ -511,7 +511,34 @@ which the Story's own + Add and Files/Calls tabs carry forward.
 4. Opportunities | Risks keeps the view and the shared filters and drops
    `stage`, `changed` and `ids`, except that a Closing / Due tile's
    narrowing (`date=30|90` with the kind's open stages) carries over as the
-   other kind's open stages. Ask on Pipelines is delivery 2.
+   other kind's open stages.
+5. Ask Revenact (spec `docs/superpowers/specs/2026-09-30-pipelines-redesign-design.md`
+   §3). `PipelinesAskLayout` sits above both routes with one `AskProvider`
+   (surface `pipelines`, preference key `revenact_pipelines_ask`): the same
+   conversation survives the List, the Board and both kinds. A question
+   posts `context: {surface:'pipelines', kind, view, filters, focus?}` —
+   `kind` always sent, `filters` the page's own set URL keys (never the
+   default sort or group, `group:'none'` for the List's ungrouped, never
+   from the Board), `focus` present only when "Ask about this" (a List
+   item's or a Board card's quiet Sparkles button) named one. A view or kind
+   switch keeps the conversation and drops an unsent focus, since each is a
+   URL change and `AskProvider` drops a pending focus on one. The server
+   stores its own `label` on the context and the origin (never including the
+   focus) and that label replaces the live chip once a sent question's
+   answer lands; until then the chip reads "Pipelines · Opportunities" or
+   "Pipelines · Risks" plus the page's own filter chips, named from
+   `useReportPipelineOptions`'s read when it matches the asked kind, else
+   the toolbar's placeholders. History tags a Pipelines conversation with
+   the server's `label` and reopens `/pipelines/list?<filters>` or
+   `/pipelines/board?<filters>`, never `/pipelines`. One case does not
+   round-trip the tile highlight: reopening from a server-canonical List
+   context whose `stage` the server dropped (equal to the List's own
+   default open stages) lists the same rows but no longer shows the
+   Closing/Due tile as active, since the explicit `stage` that marked it
+   is gone. A turn the server withheld (a mentioned reader's reply) comes
+   back with `context: null` and shows no chip; a conversation whose
+   `origin` is `null` carries no History tag and opens where the person
+   already is.
 
 ### 4.5b Feature requests (Brain > Feature Requests)
 

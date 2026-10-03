@@ -304,12 +304,12 @@ for the whole dashboard, not one per view.
 ### Ask rail
 
 `src/components/copilot/CopilotRail.tsx`, shared by Communications, the
-Dashboard, Organizations (list, board and an organization's page), Contacts
-and Accounts (list, board and an account's page), all variant `glass` at
-`w-[320px]` (the Dashboard's glass is the owner's decision of 2026-09-24,
-Organizations' of 2026-09-26, Accounts' the same exception carried over for
-delivery 3; `plain`, a bordered `bg-surface` column, is left for the phone
-sheet).
+Dashboard, Organizations (list, board and an organization's page), Contacts,
+Accounts (list, board and an account's page) and Pipelines (list and board),
+all variant `glass` at `w-[320px]` (the Dashboard's glass is the owner's
+decision of 2026-09-24, Organizations' of 2026-09-26, Accounts' and
+Pipelines' the same exception carried over; `plain`, a bordered `bg-surface`
+column, is left for the phone sheet).
 
 - **Dashboard shape.** The frame is Communications', class for class (owner's
   decision, 2026-09-24):
@@ -395,6 +395,38 @@ sheet).
   Ask about the account instead."; the filtered List or Board refuses "You
   can't ask about this list. Clear the filters and ask again." — all three
   keep the question on screen, with no Retry.
+- **Pipelines shape** (spec 2026-09-30 §3). The same pill in the same
+  transparent top bar, and the same rail in `OrganizationsFrame`'s `rail`
+  slot, wired once by `PipelinesAskLayout` above the List and the Board (its
+  own preference key `revenact_pipelines_ask`) — one conversation across
+  both views and both kinds (Opportunities and Risks). Open by default from
+  `xl`, a sheet below `sm`. The live chip reads "Pipelines · Opportunities"
+  or "Pipelines · Risks", then the page's own filter-chip labels, named from
+  the filter options that page's own read of that kind reported ("Pipelines
+  · Opportunities · Owner: Carl CSM"); until that read lands, or if it was of
+  the other kind, the toolbar's placeholders show instead ("Owner: User 2").
+  The live chip's wording and chip order are the toolbar's own, which can
+  differ from the server's; the server's own stored `label` (its own order
+  and words, e.g. Organisation before Owner) replaces the live chip once a
+  sent question's answer lands, and never includes the focus — that is
+  always named from `focus`, appended as " · This opportunity" or " · This
+  risk" to either chip. A focus no longer open refuses "You can no longer ask
+  about this opportunity." (or "…this risk."); the filtered List or Board
+  refuses "You can't ask about this list. Clear the filters and ask again." —
+  both keep the question on screen, with no Retry. Only the rail is glass —
+  the same exception Accounts' rail already carries — the List's items, the
+  Board's cards and columns and the Opportunity/Risk form all stay solid
+  `bg-surface`. The Board reuses `useBoardRail` for `railOpen` alone (its
+  `closeCard` is a no-op here, since a card opens its own form rather than a
+  side panel): columns narrow to `w-64` (`w-72` otherwise) while the rail is
+  open from `sm`; a card's form stays a modal above the rail at every width.
+  Opening a row or a card narrows nothing — the explicit "Ask about this" is
+  the one way to focus a question. History tags a conversation started here
+  with the Target icon and the server's own `label`, read "Started on " for
+  screen readers; picking it reopens `/pipelines/list` or `/pipelines/board`
+  with the page's own query (never `/pipelines`, whose redirect drops it). A
+  turn the server withheld shows no chip, and a conversation with no
+  `origin` has no History tag and opens where the person already is.
 - **Chips.**
   - The composer's chip says what the next question is about ("Revenue ›
     Forecast · Owner: Priya · 2 accounts"). Its × removes only a focus, never
@@ -583,8 +615,11 @@ because a pipeline item has no health, lifecycle or ARR:
 
 - The top bar is the framed one: "Pipelines", List | Board keeping the query,
   and Opportunities | Risks (`?kind=risks`; opportunities when absent). Below
-  `sm` the kind switch is the page's first row instead. The actions slot waits
-  for Ask (delivery 2); there is no rail yet.
+  `sm` the kind switch is the page's first row instead.
+  - The Ask pill sits in the actions slot.
+  - `PipelinesAskLayout` draws the frame and the glass rail once, above both
+    views and both kinds. The rail is open by default from `xl`, remembers
+    its own choice (`revenact_pipelines_ask`) and is a sheet below `sm`.
 - Five tiles, every figure the server's over every filtered row (the stage
   filter is the only one they ignore): Open pipeline / MRR at risk (a figure,
   count · MRR), Closing / Due within 30 or 90 days, Overdue, Won / Mitigated
@@ -599,6 +634,10 @@ because a pipeline item has no health, lifecycle or ARR:
   and at most one signal (Overdue, else High priority on an open item, which
   then stands in for the priority tag). In a
   narrow column the facts wrap under the title; targets are 44px on phones.
+  Under Ask, the item's line ends with the quiet "✦ Ask about this", hidden
+  while selecting. It types "What should I know about this opportunity?"
+  (or "…risk?") with the chip "… · This opportunity" (or "… · This risk")
+  and does not send.
 - Group by stage (the default on both views), close / due month (Overdue,
   the months, No date), organisation or account, owner (named people, "Not
   in your book", Unassigned), department or priority; the List also offers
@@ -611,7 +650,10 @@ because a pipeline item has no health, lifecycle or ARR:
   N", and Export selected.
 - The Board has a column per stage; Closed Lost starts collapsed ("Show
   Closed Lost") and stays a drop target. Dragging a card (from `sm`) or its
-  Move to… menu saves the item's stage; a card opens its form.
+  Move to… menu saves the item's stage; a card opens its form. The card's
+  facts row ends with the same quiet "✦ Ask about this". The columns narrow
+  to `w-64` while the Ask rail is open (`w-72` otherwise); a card still opens
+  its form, a modal over the rail.
 - The organisation and account pages' Deals & risks items gain the same date
   line and the Overdue signal; both forms gain the date ("Expected close" /
   "Due by") and Closed Lost.
