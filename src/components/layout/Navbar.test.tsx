@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Provider } from 'react-redux';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from '../../features/auth/authSlice';
 import customersReducer from '../../features/customers/customersSlice';
@@ -104,6 +104,12 @@ const sarahChen = {
   account_name: null,
   sentiment_source: 'manual' as const, sentiment_computed_at: null,
 };
+
+/** Stands in for /segments/:id, saying where the bell sent it. */
+function SegmentMarker() {
+  const location = useLocation();
+  return <p data-testid="segment-marker">{`${location.pathname}${location.search}`}</p>;
+}
 
 function renderNavbar(
   initialRoute: string | { pathname: string; state?: unknown } = '/dashboard',
@@ -248,6 +254,7 @@ function renderNavbar(
           <Route path="/accounts/list" element={<div>Accounts Marker</div>} />
           <Route path="/accounts/:id" element={<div>Account Details Marker</div>} />
           <Route path="/contacts/:id" element={<div>Contact Details Marker</div>} />
+          <Route path="/segments/:id" element={<SegmentMarker />} />
         </Routes>
       </MemoryRouter>
     </Provider>
@@ -428,6 +435,17 @@ const readAssignment: Notification = {
   created_at: '2026-09-05T09:00:00Z',
 };
 
+// Backend PR #84: the nightly step's alert to a segment's owner.
+const segmentAlert: Notification = {
+  id: 3,
+  kind: 'segment_changes',
+  message: 'Renewal risk: 3 entered, 1 left',
+  link: '/segments/7?tab=changes',
+  actor: null,
+  is_read: false,
+  created_at: '2026-10-03T06:00:00Z',
+};
+
 describe('Navbar notification bell', () => {
   beforeEach(() => {
     vi.unstubAllGlobals();
@@ -502,6 +520,17 @@ describe('Navbar notification bell', () => {
 
     expect(notificationApi.markAllNotificationsRead).toHaveBeenCalled();
     expect(screen.queryByText('1')).not.toBeInTheDocument();
+  });
+
+  it('lists a segment alert by its message and opens that segment on its Changes tab', async () => {
+    const user = userEvent.setup();
+    renderNavbar('/dashboard', null, null, [segmentAlert]);
+
+    await user.click(screen.getByRole('button', { name: 'Notifications' }));
+    await user.click(screen.getByText('Renewal risk: 3 entered, 1 left'));
+
+    expect(notificationApi.markNotificationRead).toHaveBeenCalledWith(3);
+    expect(await screen.findByTestId('segment-marker')).toHaveTextContent('/segments/7?tab=changes');
   });
 });
 
