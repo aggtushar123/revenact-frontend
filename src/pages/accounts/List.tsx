@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useOrgCurrency } from '../../hooks';
 import { SM, useMediaQuery } from '../../lib/useMediaQuery';
 import { ACCOUNT_LIFECYCLE_TARGETS, ACCOUNT_NOUN } from '../../features/accounts/accountFields';
@@ -8,7 +7,6 @@ import type { AccountBulkAction, AccountFilterOptions, AccountPortfolioRow } fro
 import { useMembers } from '../../features/knowledge/useMembers';
 import { ownerTargets } from '../../features/organizations/bulkTargets';
 import { filterQuery, hasFilters, toApiQuery, type PortfolioParams } from '../../features/organizations/portfolioParams';
-import { saveAsSegmentHref } from '../../features/segments/fromListFilters';
 import { AccountPanels } from '../../components/accounts/portfolio/AccountPanels';
 import { ACCOUNT_KIND } from '../../components/accounts/portfolio/accountKind';
 import { AccountRow } from '../../components/organizations/portfolio/AccountRow';
@@ -27,6 +25,7 @@ import { AccountFormModal } from '../organizations/AccountFormModal';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
 import { useReportAccountsOptions } from './ask/accountsNames';
 import { useAccountEditing } from './useAccountEditing';
+import { useSaveAsSegment } from '../segments/useSaveAsSegment';
 
 /** /accounts/list: the Accounts portfolio (spec 2026-09-29 §1), the
  *  Organizations list's components with ACCOUNT_KIND. Rows, groups, tiles
@@ -44,7 +43,7 @@ export function List() {
 function AccountsList() {
   const { params, update, clearFilters } = usePortfolioParams();
   const isSm = useMediaQuery(SM);
-  const navigate = useNavigate();
+  const [saveAsSegment, saveAsSegmentModal] = useSaveAsSegment('account');
   const orgCurrency = useOrgCurrency();
 
   const [version, setVersion] = useState(0);
@@ -151,7 +150,7 @@ function AccountsList() {
           onExport={() => void runExport(toApiQuery(params))}
           exporting={exporting}
           onAdd={() => forms.openAdd()}
-          onSaveAsSegment={() => navigate(saveAsSegmentHref('account', filterQuery(params)))}
+          onSaveAsSegment={() => saveAsSegment(filterQuery(params))}
           searchRef={searchRef}
           selectMode={selecting}
           onToggleSelectMode={toggleSelectMode}
@@ -216,6 +215,7 @@ function AccountsList() {
           }}
         />
       ) : null}
+      {saveAsSegmentModal}
     </OrganizationsFrame>
   );
 }

@@ -81,9 +81,14 @@ export function rulesFromList(kind: SegmentKind, search: URLSearchParams): ListR
   return kind === 'contact' ? contactRules(search) : portfolioRules(kind, search);
 }
 
-/** The builder's address for a list's Save as segment: the kind, then the
- *  list's own filter query, unchanged (it reloads and shares as it is). */
+/** What the builder starts from on a list's Save as segment: the kind, then
+ *  the list's own filter query, unchanged. */
+export function saveAsSegmentSearch(kind: SegmentKind, listQuery: string): URLSearchParams {
+  return new URLSearchParams([['kind', kind], ...new URLSearchParams(listQuery)]);
+}
+
+/** The same as an address (/segments/new opens the builder over the
+ *  Segments list), for a link that reloads and shares as it is. */
 export function saveAsSegmentHref(kind: SegmentKind, listQuery: string): string {
-  const query = new URLSearchParams([['kind', kind], ...new URLSearchParams(listQuery)]);
-  return `/segments/new?${query.toString()}`;
+  return `/segments/new?${saveAsSegmentSearch(kind, listQuery).toString()}`;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useOutletContext, useSearchParams } from 'react-router-dom';
 import { Briefcase, Building2, Contact } from 'lucide-react';
 import { useAppSelector } from '../../hooks';
 import { useMembers } from '../../features/knowledge/useMembers';
@@ -21,16 +21,14 @@ import {
 import { EmptyState } from '../../components/organizations/portfolio/PortfolioSections';
 import { FOCUS, MONO, PRIMARY, QUIET } from '../../components/organizations/portfolio/styles';
 import { errorMessage } from '../../components/organizations/portfolio/usePagedRead';
+import { BuilderDialog } from '../../components/segments/BuilderDialog';
 import { PreviewPanel } from '../../components/segments/PreviewPanel';
 import { RadioTile } from '../../components/segments/RadioTile';
 import { RuleEditor } from '../../components/segments/RuleEditor';
-import { SegmentFailed, SegmentLoading, SegmentMissing } from '../../components/segments/SegmentStates';
 import { SharingFields } from '../../components/segments/SharingFields';
 import { useAttributes, useProducts } from '../../components/segments/useBuilderOptions';
 import { usePreview } from '../../components/segments/usePreview';
-import { useSegment } from '../../components/segments/useSegment';
 import type { ValueOptions } from '../../components/segments/ValueInput';
-import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
 
 const KINDS = [
   { value: 'customer', icon: Building2 },
@@ -92,38 +90,55 @@ function fromSegment(segment: Segment): Initial {
   return { segment, kind: segment.kind, draft: fromRules(segment.rules), notes: [], labels: segment.labels, nameIds: NO_IDS };
 }
 
-/** /segments/new and /segments/:id/edit (spec §3): basics, the rules with a
- *  live preview beside them (stacked on phones), sharing and the alert. */
-export function Builder() {
-  const { id } = useParams();
+/** What the segment page hands its `edit` child route: the segment it has
+ *  already loaded, and how to swap in the saved copy. */
+export interface SegmentOutlet {
+  segment: Segment;
+  onReplace: (segment: Segment) => void;
+}
+
+/** A new segment in the builder modal, over whatever page opened it: the
+ *  Segments list, or a list's Save as segment with that list's filters as
+ *  `search` (`?kind=` and the list's own query). Saving opens the segment. */
+export function NewSegmentModal({ search, onClose }: { search: URLSearchParams; onClose: () => void }) {
+  const navigate = useNavigate();
+  const [initial] = useState(() => fromList(search));
+  return <BuilderForm initial={initial} onClose={onClose} onSaved={(saved) => navigate(`/segments/${saved.id}`)} />;
+}
+
+/** /segments/new: the modal over the Segments list (spec §3). */
+export function NewSegmentRoute() {
+  const navigate = useNavigate();
   const [search] = useSearchParams();
-  if (id === undefined) return <NewBuilder search={search} />;
-  if (!/^\d+$/.test(id)) {
+  return <NewSegmentModal search={search} onClose={() => navigate('/segments')} />;
+}
+
+/** /segments/:id/edit: the modal over the segment's own page, which has
+ *  already read the segment (and says when it is missing). Only its owner
+ *  edits it; anyone else is offered a copy. */
+export function EditSegmentRoute() {
+  const navigate = useNavigate();
+  const { segment, onReplace } = useOutletContext<SegmentOutlet>();
+  const [initial] = useState(() => (segment.is_owner ? fromSegment(segment) : null));
+  const close = () => navigate(`/segments/${segment.id}`);
+  if (!initial) {
     return (
-      <OrganizationsFrame>
-        <SegmentMissing />
-      </OrganizationsFrame>
+      <BuilderDialog title={`Edit ${segment.name}`} onClose={close}>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
+          <ReadOnly segment={segment} />
+        </div>
+      </BuilderDialog>
     );
   }
-  return <EditBuilder key={id} id={Number(id)} />;
-}
-
-function NewBuilder({ search }: { search: URLSearchParams }) {
-  const [initial] = useState(() => fromList(search));
-  return <BuilderForm initial={initial} />;
-}
-
-function EditBuilder({ id }: { id: number }) {
-  const [load, , retry] = useSegment(id);
-  const initial = useMemo(() => (load.status === 'ready' && load.segment.is_owner ? fromSegment(load.segment) : null), [load]);
-  if (initial) return <BuilderForm initial={initial} />;
   return (
-    <OrganizationsFrame>
-      {load.status === 'loading' ? <SegmentLoading /> : null}
-      {load.status === 'missing' ? <SegmentMissing /> : null}
-      {load.status === 'failed' ? <SegmentFailed message={load.message} onRetry={retry} /> : null}
-      {load.status === 'ready' ? <ReadOnly segment={load.segment} /> : null}
-    </OrganizationsFrame>
+    <BuilderForm
+      initial={initial}
+      onClose={close}
+      onSaved={(saved) => {
+        onReplace(saved);
+        close();
+      }}
+    />
   );
 }
 
@@ -168,8 +183,7 @@ function ReadOnly({ segment }: { segment: Segment }) {
   );
 }
 
-function BuilderForm({ initial }: { initial: Initial }) {
-  const navigate = useNavigate();
+function BuilderForm({ initial, onClose, onSaved }: { initial: Initial; onClose: () => void; onSaved: (segment: Segment) => void }) {
   const me = useAppSelector((state) => state.auth.user?.id ?? null);
   const members = useMembers();
   const attributes = useAttributes();
@@ -273,14 +287,14 @@ function BuilderForm({ initial }: { initial: Initial }) {
     setErrors(found);
     if (Object.keys(found).length > 0) return;
     if (editing && patch && Object.keys(patch).length === 0) {
-      navigate(`/segments/${editing.id}`);
+      onClose();
       return;
     }
     setSaving(true);
     try {
       // PATCH sends only what changed (ruling G14), never `kind`.
       const saved = editing && patch ? await updateSegment(editing.id, patch) : await createSegment({ ...body, kind });
-      navigate(`/segments/${saved.id}`);
+      onSaved(saved);
     } catch (err) {
       setErrors(formErrors(err));
       setSaving(false);
@@ -288,165 +302,166 @@ function BuilderForm({ initial }: { initial: Initial }) {
   }
 
   return (
-    <OrganizationsFrame>
-      <form onSubmit={(event) => void save(event)} noValidate className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 pb-6">
-        <div data-part="builder-bar" className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-line bg-surface px-3 py-2 shadow-sm">
-          <h1 className="min-w-0 flex-1 truncate text-[15px] font-semibold text-ink">{editing ? `Edit ${editing.name}` : 'New segment'}</h1>
-          <Link to={editing ? `/segments/${editing.id}` : '/segments'} className={QUIET}>
+    <BuilderDialog title={editing ? `Edit ${editing.name}` : 'New segment'} onClose={onClose}>
+      <form onSubmit={(event) => void save(event)} noValidate className="flex min-h-0 flex-1 flex-col">
+        <div data-part="builder-body" className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4">
+          {errors.form ? (
+            <p role="alert" className="text-[13px] text-danger">
+              {errors.form}
+            </p>
+          ) : null}
+          {initial.notes.length > 0 ? (
+            <ul aria-label="From the list" className="flex flex-col gap-1 rounded-xl border border-line bg-surface p-3 text-[13px] text-ink-muted">
+              {initial.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          ) : null}
+
+          <div data-part="rules-and-preview" className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+            <div className="flex min-w-0 flex-col divide-y divide-line-subtle">
+              <section aria-label="Basics" className="flex flex-col gap-4 pb-4">
+                <div className="-mx-2 flex flex-col gap-0.5">
+                  <label htmlFor={nameId} className={LABEL}>
+                    Name
+                  </label>
+                  <input
+                    id={nameId}
+                    value={name}
+                    maxLength={120}
+                    placeholder="Untitled segment"
+                    onChange={(event) => setName(event.target.value)}
+                    aria-invalid={Boolean(errors.name)}
+                    aria-describedby={errors.name ? `${nameId}-error` : undefined}
+                    className={`${QUIET_INPUT} text-[22px] font-semibold ${errors.name ? 'border-danger' : 'border-transparent'}`}
+                  />
+                  {errors.name ? (
+                    <p id={`${nameId}-error`} role="alert" className="px-2 text-[11px] text-danger">
+                      {errors.name}
+                    </p>
+                  ) : null}
+                  <label htmlFor={descriptionId} className={`${LABEL} mt-2`}>
+                    Description <span className="font-normal normal-case tracking-normal">(optional)</span>
+                  </label>
+                  <textarea
+                    id={descriptionId}
+                    rows={1}
+                    value={description}
+                    placeholder="What this segment is for"
+                    onChange={(event) => setDescription(event.target.value)}
+                    aria-invalid={Boolean(errors.description)}
+                    aria-describedby={errors.description ? `${descriptionId}-error` : undefined}
+                    className={`${QUIET_INPUT} resize-none py-2.5 text-[13px] ${errors.description ? 'border-danger' : 'border-transparent'}`}
+                  />
+                  {errors.description ? (
+                    <p id={`${descriptionId}-error`} role="alert" className="px-2 text-[11px] text-danger">
+                      {errors.description}
+                    </p>
+                  ) : null}
+                </div>
+                {editing ? (
+                  <div className="-mx-2 flex flex-col gap-1">
+                    <p className={LABEL}>Kind</p>
+                    <p className="px-2 text-[13px] text-ink">
+                      <span className="font-semibold">{KIND_LABEL[kind]}</span> <span className="text-ink-muted">· A segment's kind can't change.</span>
+                    </p>
+                  </div>
+                ) : (
+                  <fieldset aria-describedby={errors.kind ? `${kindName}-error` : undefined} className="flex flex-col gap-2">
+                    <legend className={`${LABEL} -mx-2 mb-2`}>Kind</legend>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {KINDS.map((option) => (
+                        <RadioTile
+                          key={option.value}
+                          name={kindName}
+                          label={KIND_LABEL[option.value]}
+                          icon={option.icon}
+                          checked={kind === option.value}
+                          onChange={() => changeKind(option.value)}
+                        />
+                      ))}
+                    </div>
+                    {errors.kind ? (
+                      <p id={`${kindName}-error`} role="alert" className="text-[11px] text-danger">
+                        {errors.kind}
+                      </p>
+                    ) : null}
+                  </fieldset>
+                )}
+              </section>
+
+              <RuleEditor
+                draft={draft}
+                fields={fields}
+                options={options}
+                invalidUid={invalidUid}
+                error={rulesError}
+                noun={KIND_NOUN[kind].many}
+                // Ruling G25: the compiler's default, which the rows can't show.
+                note={kind === 'customer' ? CHURNED_NOTE : null}
+                onChange={(next) => {
+                  setDraft(next);
+                  setInvalidUid(null);
+                  // A save's rules error (errors.rules) would otherwise hide the
+                  // live preview's own message (rulesError's `??`) forever.
+                  setErrors((current) => (current.rules ? { ...current, rules: undefined } : current));
+                }}
+              />
+
+              <section aria-label="Sharing and alerts" className="flex flex-col gap-4 pt-4">
+                {removed > 0 ? (
+                  <p className="text-[11px] text-ink-muted">
+                    <span className={MONO}>{removed}</span> {removed === 1 ? 'person' : 'people'} no longer in your workspace {removed === 1 ? 'was' : 'were'} removed.
+                  </p>
+                ) : null}
+                <SharingFields
+                  sharing={sharing}
+                  sharedWith={shared}
+                  teammates={teammates}
+                  error={errors.shared_with ?? errors.sharing ?? null}
+                  onChange={(nextSharing, nextPeople) => {
+                    setSharing(nextSharing);
+                    setSharedWith(nextPeople);
+                  }}
+                />
+                <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3">
+                  <span className="flex flex-col">
+                    <span id={`${alertId}-label`} className="text-[13px] font-semibold text-ink">
+                      Alert me on changes
+                    </span>
+                    <span id={`${alertId}-hint`} className="text-[11px] text-ink-muted">
+                      Once a day, in your notifications, when anyone enters or leaves.
+                    </span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    aria-labelledby={`${alertId}-label`}
+                    aria-describedby={`${alertId}-hint`}
+                    checked={alertOn}
+                    onChange={(event) => setAlertOn(event.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    aria-hidden="true"
+                    className="relative h-5 w-9 shrink-0 rounded-full bg-line-strong transition-colors duration-[var(--dur-fast)] after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface after:transition-transform after:duration-[var(--dur-fast)] peer-checked:bg-accent peer-checked:after:translate-x-4 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
+                  />
+                </label>
+              </section>
+            </div>
+            <div className="min-w-0 lg:sticky lg:top-0">
+              <PreviewPanel kind={kind} state={preview} />
+            </div>
+          </div>
+        </div>
+        <div data-part="builder-footer" className="flex items-center justify-end gap-2 border-t border-line-subtle px-4 py-3">
+          <button type="button" onClick={onClose} className={QUIET}>
             Cancel
-          </Link>
+          </button>
           <button type="submit" disabled={saving} className={PRIMARY}>
             {saving ? 'Saving…' : 'Save segment'}
           </button>
         </div>
-        {errors.form ? (
-          <p role="alert" className="text-[13px] text-danger">
-            {errors.form}
-          </p>
-        ) : null}
-        {initial.notes.length > 0 ? (
-          <ul aria-label="From the list" className="flex flex-col gap-1 rounded-xl border border-line bg-surface p-3 text-[13px] text-ink-muted">
-            {initial.notes.map((note) => (
-              <li key={note}>{note}</li>
-            ))}
-          </ul>
-        ) : null}
-
-        <div data-part="rules-and-preview" className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-          <div className="flex min-w-0 flex-col divide-y divide-line-subtle rounded-xl border border-line bg-surface shadow-sm">
-            <section aria-label="Basics" className="flex flex-col gap-4 p-4">
-              <div className="-mx-2 flex flex-col gap-0.5">
-                <label htmlFor={nameId} className={LABEL}>
-                  Name
-                </label>
-                <input
-                  id={nameId}
-                  value={name}
-                  maxLength={120}
-                  placeholder="Untitled segment"
-                  onChange={(event) => setName(event.target.value)}
-                  aria-invalid={Boolean(errors.name)}
-                  aria-describedby={errors.name ? `${nameId}-error` : undefined}
-                  className={`${QUIET_INPUT} text-[22px] font-semibold ${errors.name ? 'border-danger' : 'border-transparent'}`}
-                />
-                {errors.name ? (
-                  <p id={`${nameId}-error`} role="alert" className="px-2 text-[11px] text-danger">
-                    {errors.name}
-                  </p>
-                ) : null}
-                <label htmlFor={descriptionId} className={`${LABEL} mt-2`}>
-                  Description <span className="font-normal normal-case tracking-normal">(optional)</span>
-                </label>
-                <textarea
-                  id={descriptionId}
-                  rows={1}
-                  value={description}
-                  placeholder="What this segment is for"
-                  onChange={(event) => setDescription(event.target.value)}
-                  aria-invalid={Boolean(errors.description)}
-                  aria-describedby={errors.description ? `${descriptionId}-error` : undefined}
-                  className={`${QUIET_INPUT} resize-none py-2.5 text-[13px] ${errors.description ? 'border-danger' : 'border-transparent'}`}
-                />
-                {errors.description ? (
-                  <p id={`${descriptionId}-error`} role="alert" className="px-2 text-[11px] text-danger">
-                    {errors.description}
-                  </p>
-                ) : null}
-              </div>
-              {editing ? (
-                <div className="-mx-2 flex flex-col gap-1">
-                  <p className={LABEL}>Kind</p>
-                  <p className="px-2 text-[13px] text-ink">
-                    <span className="font-semibold">{KIND_LABEL[kind]}</span> <span className="text-ink-muted">· A segment's kind can't change.</span>
-                  </p>
-                </div>
-              ) : (
-                <fieldset aria-describedby={errors.kind ? `${kindName}-error` : undefined} className="flex flex-col gap-2">
-                  <legend className={`${LABEL} -mx-2 mb-2`}>Kind</legend>
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    {KINDS.map((option) => (
-                      <RadioTile
-                        key={option.value}
-                        name={kindName}
-                        label={KIND_LABEL[option.value]}
-                        icon={option.icon}
-                        checked={kind === option.value}
-                        onChange={() => changeKind(option.value)}
-                      />
-                    ))}
-                  </div>
-                  {errors.kind ? (
-                    <p id={`${kindName}-error`} role="alert" className="text-[11px] text-danger">
-                      {errors.kind}
-                    </p>
-                  ) : null}
-                </fieldset>
-              )}
-            </section>
-
-            <RuleEditor
-              draft={draft}
-              fields={fields}
-              options={options}
-              invalidUid={invalidUid}
-              error={rulesError}
-              noun={KIND_NOUN[kind].many}
-              // Ruling G25: the compiler's default, which the rows can't show.
-              note={kind === 'customer' ? CHURNED_NOTE : null}
-              onChange={(next) => {
-                setDraft(next);
-                setInvalidUid(null);
-                // A save's rules error (errors.rules) would otherwise hide the
-                // live preview's own message (rulesError's `??`) forever.
-                setErrors((current) => (current.rules ? { ...current, rules: undefined } : current));
-              }}
-            />
-
-            <section aria-label="Sharing and alerts" className="flex flex-col gap-4 p-4">
-              {removed > 0 ? (
-                <p className="text-[11px] text-ink-muted">
-                  <span className={MONO}>{removed}</span> {removed === 1 ? 'person' : 'people'} no longer in your workspace {removed === 1 ? 'was' : 'were'} removed.
-                </p>
-              ) : null}
-              <SharingFields
-                sharing={sharing}
-                sharedWith={shared}
-                teammates={teammates}
-                error={errors.shared_with ?? errors.sharing ?? null}
-                onChange={(nextSharing, nextPeople) => {
-                  setSharing(nextSharing);
-                  setSharedWith(nextPeople);
-                }}
-              />
-              <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3">
-                <span className="flex flex-col">
-                  <span id={`${alertId}-label`} className="text-[13px] font-semibold text-ink">
-                    Alert me on changes
-                  </span>
-                  <span id={`${alertId}-hint`} className="text-[11px] text-ink-muted">
-                    Once a day, in your notifications, when anyone enters or leaves.
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  aria-labelledby={`${alertId}-label`}
-                  aria-describedby={`${alertId}-hint`}
-                  checked={alertOn}
-                  onChange={(event) => setAlertOn(event.target.checked)}
-                  className="peer sr-only"
-                />
-                <span
-                  aria-hidden="true"
-                  className="relative h-5 w-9 shrink-0 rounded-full bg-line-strong transition-colors duration-[var(--dur-fast)] after:absolute after:left-0.5 after:top-0.5 after:h-4 after:w-4 after:rounded-full after:bg-surface after:transition-transform after:duration-[var(--dur-fast)] peer-checked:bg-accent peer-checked:after:translate-x-4 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-accent"
-                />
-              </label>
-            </section>
-          </div>
-          <div className="min-w-0 lg:sticky lg:top-16">
-            <PreviewPanel kind={kind} state={preview} />
-          </div>
-        </div>
       </form>
-    </OrganizationsFrame>
+    </BuilderDialog>
   );
 }

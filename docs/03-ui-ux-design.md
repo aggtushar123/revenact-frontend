@@ -866,11 +866,18 @@ segment, its builder and a new one).
   a segment is and offers New segment and "Filter Organizations, then Save as
   segment". A reload that fails keeps the last list on screen with "{error}
   Showing the last result." and Try again, rather than clearing it.
-- **Builder (`/segments/new`, `/segments/:id/edit`).**
-  - **Bar:** one bar pinned to the top of the column holds the page title,
-    Cancel and Save segment, so Save stays in reach however long the rules get.
-  - **Editor panel:** one bordered panel, its parts split by dividers (no
-    panel inside a panel).
+- **Builder: a modal, not a page** (owner, 2026-10-03; `BuilderDialog`).
+  New segment opens it over the Segments list (`/segments/new`), Edit over the
+  segment's own page (`/segments/:id/edit`, which hands it the segment it has
+  already read), and Save as segment over the list it was pressed on, which
+  stays as it was.
+  - **Frame:** centred from `sm` (up to 1100px wide, 90dvh tall), the whole
+    screen below it. The title and Close sit in its header, Cancel and Save
+    segment in a footer that stays put while the body scrolls. Focus starts in
+    the name; Tab stays inside; Escape, Close and Cancel close it and focus
+    returns to what opened it. A click on the scrim does not close it, so a
+    stray click keeps the draft.
+  - **Editor:** the parts are split by dividers (no panel inside the modal).
     - **Basics:** the name as a quiet 22px title field, the description as a
       quiet line under it (each with a small uppercase label), and the kind as
       three icon tiles (`RadioTile`; fixed once saved).
@@ -890,8 +897,8 @@ segment, its builder and a new one).
       Chosen teammates as icon tiles, with chips for the teammates.
     - **Alert me on changes:** a switch (a native checkbox underneath) with
       its explanation as the description.
-  - **Preview** (`PreviewPanel`): beside the panel from `lg` and pinned while
-    the rules scroll, under it on phones. It leads with the count at 22px
+  - **Preview** (`PreviewPanel`): a muted block beside the editor from `lg`,
+    pinned while the rules scroll, under it on phones. It leads with the count at 22px
     ("41 organisations match"), then the totals (no Members figure, which the
     count already gives), the first ten and "and N more", or "Nothing matches
     these rules yet." While a newer answer loads, the last one stays, dimmed.
@@ -919,7 +926,8 @@ segment, its builder and a new one).
     stripped (e.g. "csat_score" rather than "attr:csat_score").
 - **Save as segment** (`SaveAsSegmentButton`, `components/organizations/
   portfolio/toolbarParts.tsx`) is one shared button, used beside Filters on
-  the Organizations and Accounts lists and before Add on Contacts.
+  the Organizations and Accounts lists and before Add on Contacts. It opens the
+  builder modal over the list (`useSaveAsSegment`), not a new page.
 - **Money** reads compact, e.g. "$512.0K" (the tiles' ARR covered).
 - **Follow-up (G19):** the Delete confirmation still uses `ConfirmDialog`'s
   older styling rather than the house look; accepted, not fixed in this

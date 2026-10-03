@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { stubAccountsPortfolio } from '../../features/accounts/testPortfolio';
 import { stubContactsApi } from '../../features/contacts/testContacts';
@@ -21,24 +21,37 @@ describe('Save as segment on the lists', () => {
     resetViewport();
   });
 
-  it('opens the builder from Organizations with the kind and the list\'s own filters, search included for its note', async () => {
+  it("opens the builder as a modal over Organizations, from the list's own filters, and Cancel leaves the list as it was", async () => {
     stubPortfolio();
     renderList('/organizations/list?owner=2&health=poor&search=pizza');
     await userEvent.click(await screen.findByRole('button', { name: 'Save as segment' }));
-    await waitFor(() => expect(where()).toBe('/segments/new?kind=customer&search=pizza&owner=2&health=poor'));
+    const dialog = await screen.findByRole('dialog', { name: 'New segment' });
+    expect(within(dialog).getByRole('radio', { name: 'Organisations' })).toBeChecked();
+    expect(within(dialog).getAllByRole('combobox', { name: /^Condition \d field$/ }).map((select) => (select as HTMLSelectElement).value)).toEqual(['owner', 'health_category']);
+    expect(within(within(dialog).getByRole('list', { name: 'From the list' })).getByText(/The search "pizza" isn't carried over/)).toBeInTheDocument();
+    expect(where()).toBe('/organizations/list?owner=2&health=poor&search=pizza');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(where()).toBe('/organizations/list?owner=2&health=poor&search=pizza');
   });
 
-  it('opens the builder from Accounts with its organisation filter', async () => {
+  it('opens it over Accounts with its organisation filter', async () => {
     stubAccountsPortfolio();
     renderAccounts('/accounts/list?organisation=7');
     await userEvent.click(await screen.findByRole('button', { name: 'Save as segment' }));
-    await waitFor(() => expect(where()).toBe('/segments/new?kind=account&organisation=7'));
+    const dialog = await screen.findByRole('dialog', { name: 'New segment' });
+    expect(within(dialog).getByRole('radio', { name: 'Accounts' })).toBeChecked();
+    expect(within(dialog).getByRole('combobox', { name: 'Condition 1 field' })).toHaveDisplayValue('Organisation');
+    expect(where()).toBe('/accounts/list?organisation=7');
   });
 
-  it('opens the builder from Contacts with its organisation and role', async () => {
+  it('opens it over Contacts with its organisation and role', async () => {
     stubContactsApi();
     renderContactsPage('/contacts?customer=6&role=champion');
     await userEvent.click(await screen.findByRole('button', { name: 'Save as segment' }));
-    await waitFor(() => expect(where()).toBe('/segments/new?kind=contact&customer=6&role=champion'));
+    const dialog = await screen.findByRole('dialog', { name: 'New segment' });
+    expect(within(dialog).getByRole('radio', { name: 'Contacts' })).toBeChecked();
+    expect(within(dialog).getAllByRole('combobox', { name: /^Condition \d field$/ })).toHaveLength(2);
+    expect(where()).toBe('/contacts?customer=6&role=champion');
   });
 });

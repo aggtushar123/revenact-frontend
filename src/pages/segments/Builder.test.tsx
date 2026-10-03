@@ -142,6 +142,9 @@ describe('the segment builder (spec §3)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Save segment' }));
     await waitFor(() => expect(where()).toBe('/segments/7'));
     expect(requests(spy, 'PATCH', /^\/segments\/7\/$/).map((request) => request.body)).toEqual([{ name: 'Renewal risk Q4' }]);
+    // The page under the modal takes the saved copy without reading again.
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Renewal risk Q4' })).toBeInTheDocument();
   });
 
   it("renames a segment whose rule names a record I can't open without resending its rules", async () => {
@@ -252,18 +255,39 @@ describe('the segment builder (spec §3)', () => {
     const rules = screen.getByRole('region', { name: 'Rules' });
     const preview = screen.getByRole('region', { name: 'Preview' });
     expect(rules.compareDocumentPosition(preview) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(rules.closest('[data-part="rules-and-preview"]')).toHaveClass('grid', 'lg:grid-cols-[minmax(0,1fr)_22rem]');
+    expect(rules.closest('[data-part="rules-and-preview"]')).toHaveClass('grid', 'lg:grid-cols-[minmax(0,1fr)_20rem]');
     expect(rules.closest('[data-part="rules-and-preview"]')?.className).not.toMatch(/(^|\s)(sm|md):grid-cols/);
   });
 
-  it('keeps Cancel and Save in one bar pinned to the top, above the form', () => {
+  it('opens as a modal over the Segments list: focus on the name, Tab kept inside, a scrim click keeps the draft, Escape closes it', async () => {
     stubSegments();
     renderSegments('/segments/new');
-    const bar = document.querySelector('[data-part="builder-bar"]') as HTMLElement;
-    expect(bar).toHaveClass('sticky', 'top-0');
-    expect(within(bar).getByRole('heading', { name: 'New segment' })).toBeInTheDocument();
-    expect(within(bar).getByRole('button', { name: 'Save segment' })).toBeInTheDocument();
-    expect(within(bar).getByRole('link', { name: 'Cancel' })).toHaveAttribute('href', '/segments');
-    expect(bar.compareDocumentPosition(screen.getByRole('textbox', { name: 'Name' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const dialog = screen.getByRole('dialog', { name: 'New segment' });
+    expect(dialog).toHaveAttribute('aria-modal', 'true');
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveFocus();
+    // The list stays under it.
+    expect(screen.getAllByRole('link', { name: 'New segment' }).length).toBeGreaterThan(0);
+    await userEvent.type(screen.getByRole('textbox', { name: 'Name' }), 'Draft');
+    await userEvent.click(document.querySelector('[data-scrim]') as HTMLElement);
+    expect(screen.getByRole('textbox', { name: 'Name' })).toHaveValue('Draft');
+    expect(within(dialog).getByRole('button', { name: 'Save segment' })).toBeInTheDocument();
+    within(dialog).getByRole('button', { name: 'Save segment' }).focus();
+    await userEvent.tab();
+    expect(within(dialog).getByRole('button', { name: 'Close' })).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(where()).toBe('/segments'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('closes on Cancel and on Close', async () => {
+    stubSegments();
+    renderSegments('/segments/new');
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(where()).toBe('/segments'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await userEvent.click(screen.getAllByRole('link', { name: 'New segment' })[0]);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'New segment' })).getByRole('button', { name: 'Close' }));
+    await waitFor(() => expect(where()).toBe('/segments'));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

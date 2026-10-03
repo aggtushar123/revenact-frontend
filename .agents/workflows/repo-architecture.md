@@ -139,10 +139,12 @@ react-ts-app/
 │       ├── list                → PipelinesList (List.tsx on GET /pipelines/<kind>/, ?kind=risks)
 │       └── board               → PipelinesBoard (Board.tsx: stage columns, moves PATCH the item)
 └── segments/
-    ├── (index)                → SegmentsList (GET /segments/, scope and search in the URL)
-    ├── new                    → Builder (?kind= and a list's filters from Save as segment)
-    ├── :id                    → SegmentPage (?tab=members|changes)
-    └── :id/edit               → Builder (owner; a read-only notice for anyone else)
+    ├── (layout: SegmentsList — GET /segments/, scope and search in the URL)
+    │   ├── (index)
+    │   └── new                → NewSegmentRoute (the builder modal over the list)
+    └── :id                    → SegmentPage (?tab=members|changes)
+        └── edit               → EditSegmentRoute (the builder modal over the page; owner,
+                                 a read-only notice for anyone else)
 ```
 
 ---
@@ -584,7 +586,7 @@ Saved, rule-based groups of organisations, accounts or contacts (spec
 `services/segments`: the list, the builder with a live preview, and a
 segment's page with tiles, Members (each kind's own rows, Pin and Keep out for
 the owner) and Changes. Save as segment on the Organizations, Accounts and
-Contacts lists opens the builder from their URL filters. Shared parts gained
+Contacts lists opens the builder modal over the list, from its URL filters. Shared parts gained
 optional props only: `AccountRow` `selectable`/`menu`, `ContactListItem`
 `actions`, `MoveToMenu` `label`/`menuLabel`/`icon`, the toolbars'
 `onSaveAsSegment`. See `docs/03-ui-ux-design.md` "Segments".

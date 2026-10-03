@@ -60,7 +60,7 @@ export function PreviewPanel({ kind, state }: { kind: SegmentKind; state: Previe
     );
   }
   return (
-    <section aria-labelledby={headingId} aria-busy={state.status === 'loading'} className="flex min-w-0 flex-col gap-3 rounded-xl border border-line bg-surface p-4 shadow-sm">
+    <section aria-labelledby={headingId} aria-busy={state.status === 'loading'} className="flex min-w-0 flex-col gap-3 rounded-xl bg-subtle p-4">
       <h2 id={headingId} className="text-[15px] font-semibold text-ink">
         Preview
       </h2>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Outlet, useParams, useSearchParams } from 'react-router-dom';
 import { detailPanelId, detailTabId } from '../../features/organizations/detailParams';
 import { ruleSentence } from '../../features/segments/ruleSentence';
 import { fetchMembers } from '../../features/segments/segmentApi';
@@ -16,6 +16,7 @@ import { SegmentTiles } from '../../components/segments/SegmentTiles';
 import { useAttributes } from '../../components/segments/useBuilderOptions';
 import { useSegment } from '../../components/segments/useSegment';
 import { OrganizationsFrame } from '../organizations/OrganizationsFrame';
+import type { SegmentOutlet } from './Builder';
 
 const TABS: readonly { key: SegmentTab; label: string }[] = [
   { key: 'members', label: 'Members' },
@@ -123,6 +124,8 @@ function SegmentView({ segment, onReplace }: { segment: Segment; onReplace: (seg
           <ChangesTab segment={segment} days={params.days} onDays={(days) => update({ days })} attributes={attributes} panel={panel} />
         )}
       </div>
+      {/* /segments/:id/edit: the builder modal over this page. */}
+      <Outlet context={{ segment, onReplace } satisfies SegmentOutlet} />
     </OrganizationsFrame>
   );
 }

@@ -27,9 +27,11 @@ describe('Segments', () => {
     const spy = stubSegments();
     renderSegments('/organizations/list?health=poor', { nav: true });
 
-    // 1. Save as segment from the filtered Organizations list.
+    // 1. Save as segment from the filtered Organizations list: the builder
+    // opens as a modal over the list, which stays where it was.
     await userEvent.click(await screen.findByRole('button', { name: 'Save as segment' }));
-    await waitFor(() => expect(where()).toBe('/segments/new?kind=customer&health=poor'));
+    expect(await screen.findByRole('dialog', { name: 'New segment' })).toBeInTheDocument();
+    expect(where()).toBe('/organizations/list?health=poor');
     const row = document.querySelector('[data-condition]') as HTMLElement;
     expect(within(row).getByRole('combobox', { name: 'Condition 1 field' })).toHaveDisplayValue('Health');
     expect(within(row).getByRole('combobox', { name: 'Condition 1 value' })).toHaveDisplayValue('Poor');

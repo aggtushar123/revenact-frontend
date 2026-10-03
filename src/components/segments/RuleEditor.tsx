@@ -178,7 +178,7 @@ export function RuleEditor({ draft, fields, options, invalidUid, error, noun = '
   );
 
   return (
-    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3 p-4">
+    <section aria-labelledby={headingId} className="flex min-w-0 flex-col gap-3 py-4">
       <h2 id={headingId} className="text-[15px] font-semibold text-ink">
         Rules
       </h2>

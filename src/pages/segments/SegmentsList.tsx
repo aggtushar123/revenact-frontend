@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, Outlet, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { fetchSegments } from '../../features/segments/segmentApi';
 import { parseListParams, SCOPES, toListSearch, type ListParams } from '../../features/segments/segmentParams';
@@ -123,6 +123,8 @@ export function SegmentsList() {
         ) : null}
         {body}
       </div>
+      {/* /segments/new: the builder modal over this list. */}
+      <Outlet />
     </OrganizationsFrame>
   );
 }
