@@ -5,7 +5,7 @@ import { ConfirmDialog } from '../../components/organizations/ConfirmDialog';
 import { formatRelativeTime } from '../../features/customers/formatters';
 import { ApiError } from '../../lib/apiClient';
 import { deleteCampaign, fetchCampaigns } from './campaignApi';
-import type { Campaign } from './types';
+import { hiddenRecipientCount, type Campaign } from './types';
 
 export function CampaignsList() {
   const navigate = useNavigate();
@@ -74,50 +74,79 @@ export function CampaignsList() {
               </tr>
             </thead>
             <tbody className="divide-y divide-line-subtle">
-              {campaigns.map((campaign) => (
-                <tr
-                  key={campaign.id}
-                  onClick={() => navigate(`/campaigns/${campaign.id}`)}
-                  className="group hover:bg-accent-dim/10 transition-colors cursor-pointer"
-                >
-                  <td className="px-6 py-3.5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-1.5 bg-accent-dim text-accent rounded-lg">
-                        <Megaphone className="w-3.5 h-3.5" />
+              {campaigns.map((campaign) => {
+                // Recipients are twice filtered server-side (see
+                // docs/API_CONTRACTS.md -> campaigns): `recipients` only
+                // lists who the reader may open, `hidden_recipients`
+                // counts the rest without naming them. The send still
+                // reaches everyone, so the column shows the true total.
+                const hidden = hiddenRecipientCount(campaign);
+                const total = campaign.recipients.length + hidden;
+                return (
+                  <tr
+                    key={campaign.id}
+                    onClick={() => navigate(`/campaigns/${campaign.id}`)}
+                    className="group hover:bg-accent-dim/10 transition-colors cursor-pointer"
+                  >
+                    <td className="px-6 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="p-1.5 bg-accent-dim text-accent rounded-lg">
+                          <Megaphone className="w-3.5 h-3.5" />
+                        </div>
+                        <span className="text-[13.5px] font-bold text-ink group-hover:text-accent transition-colors">
+                          {campaign.name}
+                        </span>
                       </div>
-                      <span className="text-[13.5px] font-bold text-ink group-hover:text-accent transition-colors">
-                        {campaign.name}
+                    </td>
+                    <td className="px-6 py-3.5 text-[13px] font-medium">
+                      <span
+                        className={
+                          campaign.status === 'sent'
+                            ? 'text-success'
+                            : campaign.status === 'sending'
+                              ? 'text-warning'
+                              : 'text-ink-faint'
+                        }
+                      >
+                        {campaign.status_display}
                       </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-3.5 text-[13px] font-medium">
-                    <span className={campaign.status === 'sent' ? 'text-success' : 'text-ink-faint'}>
-                      {campaign.status_display}
-                    </span>
-                  </td>
-                  <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">
-                    {campaign.recipients.length}
-                  </td>
-                  <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">
-                    {campaign.status === 'sent' ? `${campaign.sent_count} sent` : '—'}
-                  </td>
-                  <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">
-                    {formatRelativeTime(campaign.updated_at)}
-                  </td>
-                  <td className="px-6 py-3.5 text-right">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDeleteTarget(campaign);
-                      }}
-                      aria-label={`Delete ${campaign.name}`}
-                      className="p-1.5 hover:bg-subtle rounded-md text-ink-faint opacity-0 group-hover:opacity-100 hover:text-danger transition-all"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">
+                      <span className="font-mono-brand">{total}</span>
+                      {hidden > 0 && (
+                        <span
+                          className="ml-1.5 text-[11px] text-ink-faint"
+                          title={`${hidden} recipient${hidden === 1 ? '' : 's'} you can't see`}
+                        >
+                          ({hidden} you can't see)
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">
+                      {campaign.status === 'sent'
+                        ? hidden > 0
+                          ? `${campaign.sent_count} of the recipients you can see were sent`
+                          : `${campaign.sent_count} sent`
+                        : '—'}
+                    </td>
+                    <td className="px-6 py-3.5 text-[13px] font-medium text-ink-muted">
+                      {formatRelativeTime(campaign.updated_at)}
+                    </td>
+                    <td className="px-6 py-3.5 text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDeleteTarget(campaign);
+                        }}
+                        aria-label={`Delete ${campaign.name}`}
+                        className="p-1.5 hover:bg-subtle rounded-md text-ink-faint opacity-0 group-hover:opacity-100 hover:text-danger transition-all"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

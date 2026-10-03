@@ -105,6 +105,53 @@ describe('CampaignsList page (/campaigns)', () => {
     expect(await screen.findByText('EDITOR PAGE')).toBeInTheDocument();
   });
 
+  it('adds hidden recipients into the recipients column total, with a quiet hint naming the hidden count', async () => {
+    const campaignWithHidden = {
+      ...draftCampaign,
+      recipients: [
+        { id: 2, name: 'James Wilson', email: 'james@apple.example' },
+        { id: 3, name: 'Amy Lee', email: 'amy@apple.example' },
+      ],
+      hidden_recipients: 3,
+    };
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, [campaignWithHidden]))));
+    renderPage();
+
+    const row = (await screen.findByText('Q4 Renewal Outreach')).closest('tr')!;
+    const total = within(row).getByText('5');
+    expect(total.className).toContain('font-mono-brand');
+    expect(within(row).getByText(/3 you can't see/)).toBeInTheDocument();
+  });
+
+  it('shows the bare recipient count in DM Mono with no hidden-recipients hint when hidden_recipients is missing from the reply', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, [draftCampaign]))));
+    renderPage();
+
+    const row = (await screen.findByText('Q4 Renewal Outreach')).closest('tr')!;
+    const total = within(row).getByText('1');
+    expect(total.className).toContain('font-mono-brand');
+    expect(within(row).queryByText(/can't see/)).not.toBeInTheDocument();
+  });
+
+  it('qualifies the sent count as covering only the recipients the reader can see, when some recipients are hidden', async () => {
+    const sentWithHidden = { ...sentCampaign, hidden_recipients: 2 };
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, [sentWithHidden]))));
+    renderPage();
+
+    const row = (await screen.findByText('Product Update — September')).closest('tr')!;
+    expect(within(row).getByText(/5 of the recipients you can see were sent/)).toBeInTheDocument();
+  });
+
+  it('shows the Sending label in a color distinct from Draft while a send is in progress', async () => {
+    const sendingCampaign = { ...draftCampaign, status: 'sending', status_display: 'Sending' };
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(jsonResponse(200, [sendingCampaign]))));
+    renderPage();
+
+    const row = (await screen.findByText('Q4 Renewal Outreach')).closest('tr')!;
+    const label = within(row).getByText('Sending');
+    expect(label.className).toContain('text-warning');
+  });
+
   it('deleting a campaign removes it from the list after confirming', async () => {
     const fetchMock = vi.fn((_url: string, options?: { method?: string }) => {
       if (options?.method === 'DELETE') {

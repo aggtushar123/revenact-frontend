@@ -6,7 +6,7 @@ import { formatRelativeTime } from '../../features/customers/formatters';
 import { ApiError } from '../../lib/apiClient';
 import { createCampaign, fetchCampaign, sendCampaign, updateCampaign } from './campaignApi';
 import { RecipientPicker } from './RecipientPicker';
-import type { CampaignRecipient, CampaignSendLogEntry } from './types';
+import { hiddenRecipientCount, type CampaignRecipient, type CampaignSendLogEntry } from './types';
 
 const STATUS_ICON = {
   sent: <CheckCircle2 className="w-3.5 h-3.5 text-success shrink-0" />,
@@ -31,7 +31,12 @@ export function CampaignEditor() {
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [recipients, setRecipients] = useState<CampaignRecipient[]>([]);
-  const [status, setStatus] = useState<'draft' | 'sent'>('draft');
+  // Count of recipients the reader can't open — never named, only
+  // counted (see docs/API_CONTRACTS.md -> campaigns). The send still
+  // reaches them, so this feeds the true-total confirm and the note
+  // under the picker, kept in sync from every load/save/send reply.
+  const [hiddenRecipients, setHiddenRecipients] = useState(0);
+  const [status, setStatus] = useState<'draft' | 'sending' | 'sent'>('draft');
   const [sendLog, setSendLog] = useState<CampaignSendLogEntry[]>([]);
   const [sentCount, setSentCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
@@ -57,6 +62,7 @@ export function CampaignEditor() {
         setSubject(existing.subject);
         setBody(existing.body);
         setRecipients(existing.recipients);
+        setHiddenRecipients(hiddenRecipientCount(existing));
         setStatus(existing.status);
         setSendLog(existing.send_log);
         setSentCount(existing.sent_count);
@@ -94,6 +100,11 @@ export function CampaignEditor() {
         navigate(`/campaigns/${saved.id}`, { replace: true });
       }
       setLastSavedAt(saved.updated_at);
+      // A PATCH/POST only replaces the recipients this reader could see
+      // (see docs/API_CONTRACTS.md -> campaigns) — the hidden count can
+      // still move (someone else edited meanwhile), so it's refreshed
+      // from this reply rather than left as whatever was last loaded.
+      setHiddenRecipients(hiddenRecipientCount(saved));
     } catch (err) {
       setSaveError(err instanceof ApiError ? err.message : 'Could not save this campaign.');
     }
@@ -118,12 +129,23 @@ export function CampaignEditor() {
       setSentCount(sent.sent_count);
       setSkippedCount(sent.skipped_count);
       setSentAt(sent.sent_at);
+      setHiddenRecipients(hiddenRecipientCount(sent));
     } catch (err) {
       throw err instanceof ApiError ? err.message : 'Could not send this campaign.';
     }
   }
 
   const isSent = status === 'sent';
+  // `sending` is claimed while the emails actually go out, and stays
+  // claimed if the send crashes, for an admin to reconcile — the
+  // backend 400s PATCH/DELETE/send the whole time, so this is just as
+  // read-only as a completed send, only with no report to show yet.
+  const isSending = status === 'sending';
+  const isLocked = isSent || isSending;
+  // The send reaches every recipient, including any the sender can't
+  // open (see docs/API_CONTRACTS.md -> campaigns), so the true total
+  // the editor commits to is the visible list plus the hidden count.
+  const totalRecipients = recipients.length + hiddenRecipients;
 
   if (isLoading) {
     return (
@@ -154,7 +176,7 @@ export function CampaignEditor() {
             onChange={(e) => setName(e.target.value)}
             placeholder="Untitled Campaign"
             aria-label="Campaign name"
-            disabled={isSent}
+            disabled={isLocked}
             className="text-[17px] font-bold text-ink tracking-tight bg-transparent border border-transparent hover:border-line focus:border-accent rounded-md px-2 py-1 -ml-2 focus:outline-none focus:ring-1 focus:ring-accent/20 transition-colors min-w-[200px] disabled:opacity-70"
           />
         </div>
@@ -163,7 +185,7 @@ export function CampaignEditor() {
           {lastSavedAt && (
             <span className="text-[12px] text-ink-faint font-medium">Saved {formatRelativeTime(lastSavedAt)}</span>
           )}
-          {!isSent && (
+          {!isLocked && (
             <>
               <button
                 onClick={persist}
@@ -197,10 +219,20 @@ export function CampaignEditor() {
       )}
 
       <div className="flex-1 overflow-y-auto p-6 max-w-2xl w-full mx-auto space-y-5">
+        {isSending && (
+          <div className="p-4 bg-warning-dim border border-warning/30 rounded-xl">
+            <p className="text-[13px] font-bold text-warning">Sending… this campaign is being sent.</p>
+          </div>
+        )}
+
         {isSent && (
           <div className="p-4 bg-success-dim border border-success/30 rounded-xl">
             <p className="text-[13px] font-bold text-success mb-1">
-              Sent {sentAt && formatRelativeTime(sentAt)} — {sentCount} sent, {skippedCount} skipped
+              Sent {sentAt && formatRelativeTime(sentAt)} —{' '}
+              {hiddenRecipients > 0
+                ? `${sentCount} of the recipients you can see were sent`
+                : `${sentCount} sent`}
+              , {skippedCount} skipped
             </p>
             <ul className="flex flex-col gap-1.5 mt-3 max-h-56 overflow-y-auto">
               {sendLog.map((entry, i) => (
@@ -224,7 +256,7 @@ export function CampaignEditor() {
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            disabled={isSent}
+            disabled={isLocked}
             className="w-full px-3 py-2 bg-subtle border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent transition-all disabled:opacity-70"
           />
         </div>
@@ -237,7 +269,7 @@ export function CampaignEditor() {
             id="campaign-body"
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            disabled={isSent}
+            disabled={isLocked}
             rows={8}
             className="w-full px-3 py-2 bg-subtle border border-line rounded-lg text-[13px] text-ink focus:outline-none focus:ring-2 focus:ring-accent/10 focus:border-accent transition-all disabled:opacity-70"
           />
@@ -245,13 +277,21 @@ export function CampaignEditor() {
 
         <div>
           <label className="block text-[12px] font-semibold text-ink-muted mb-1">Recipients</label>
-          <RecipientPicker selected={recipients} onChange={setRecipients} disabled={isSent} />
+          <RecipientPicker selected={recipients} onChange={setRecipients} disabled={isLocked} />
+          {hiddenRecipients > 0 && (
+            <p className="mt-2 text-[11px] text-ink-faint">
+              +<span className="font-mono-brand">{hiddenRecipients}</span>{' '}
+              {`recipient${hiddenRecipients === 1 ? '' : 's'} you can't see will also receive this.`}
+            </p>
+          )}
         </div>
       </div>
 
       {isSendConfirmOpen && (
         <ConfirmDialog
-          title={`Send "${name}" to ${recipients.length} ${recipients.length === 1 ? 'recipient' : 'recipients'}?`}
+          title={`Send "${name}" to ${totalRecipients} ${totalRecipients === 1 ? 'recipient' : 'recipients'}${
+            hiddenRecipients > 0 ? `, including ${hiddenRecipients} you can't see` : ''
+          }?`}
           message="This sends a real email right now. It can't be undone or unsent."
           confirmLabel="Send"
           danger
