@@ -6,7 +6,8 @@ import type { AIAttribute } from '../attributes/types';
 import { CONTACT_ROLES, SENTIMENTS } from '../contacts/contactsParams';
 import { LIFECYCLE_LABELS } from '../customers/formatters';
 import { HEALTH_LABEL, NPS_BANDS, type PortfolioNoun } from '../organizations/portfolioLabels';
-import { HEALTH_BANDS, LIFECYCLE_VALUES } from '../organizations/portfolioParams';
+import { LIFECYCLE_VALUES } from '../organizations/portfolioParams';
+import type { HealthBand } from '../organizations/portfolioTypes';
 import type { Operator, SegmentKind } from './segmentTypes';
 
 export type ValueType = 'number' | 'percent' | 'days' | 'date' | 'choice' | 'text' | 'boolean' | 'owner' | 'record';
@@ -68,7 +69,11 @@ function field(key: string, label: string, type: ValueType, extra: Partial<Field
 }
 
 const LIFECYCLE: Choice[] = LIFECYCLE_VALUES.map((value) => ({ value, label: LIFECYCLE_LABELS[value] }));
-const HEALTH: Choice[] = HEALTH_BANDS.map((value) => ({ value, label: HEALTH_LABEL[value] }));
+/** Registry order (services/segments/registry.py:87, `Customer.HealthCategory.values`):
+ *  good, average, poor. Not `HEALTH_BANDS` (`portfolioParams.ts`), which is the
+ *  portfolio UI's own severity order (poor, average, good) for a different surface. */
+const HEALTH_CATEGORY_ORDER: HealthBand[] = ['good', 'average', 'poor'];
+const HEALTH: Choice[] = HEALTH_CATEGORY_ORDER.map((value) => ({ value, label: HEALTH_LABEL[value] }));
 const NPS_WORDS: Record<string, string> = { promoter: 'Promoter', passive: 'Passive', detractor: 'Detractor' };
 const NPS: Choice[] = NPS_BANDS.map((value) => ({ value, label: NPS_WORDS[value] }));
 const STATUS: Choice[] = [

@@ -19,30 +19,85 @@ const attribute = (over: Partial<AIAttribute>): AIAttribute => ({
 
 const keys = (kind: 'customer' | 'account' | 'contact', attributes: AIAttribute[] = []) => fieldsFor(kind, attributes).map((f) => f.key);
 
-// Pinned to revenact-backend services/segments/registry.py and
-// docs/API_CONTRACTS.md `segments` (PR #84): a field added there fails here
-// until the mirror learns it.
+/** `fieldsFor`, reduced to the four things G12 pins: the key, the value
+ *  type, the record a picker searches, and the raw choice values (never
+ *  their labels — the registry stores no labels, only value strings). */
+type Pinned = { key: string; type: string; record: string; choices: string[] };
+const pinned = (kind: 'customer' | 'account' | 'contact', attributes: AIAttribute[] = []): Pinned[] =>
+  fieldsFor(kind, attributes).map((f) => ({ key: f.key, type: f.type, record: f.record, choices: f.choices.map((c) => c.value) }));
+
+// Every ordinary (non-attribute) field below is a literal table copied by
+// hand from revenact-backend services/segments/registry.py on main
+// (PR #84): each field's key, type, record and choice VALUES (the registry
+// stores no labels — those are this frontend's own words). This test does
+// not read the backend, so a backend change to the registry needs this
+// table updated by hand; until it is, the change fails here.
+const LIFECYCLE_CHOICES = ['onboarding', 'kickoff', 'adoption', 'live', 'renewal', 'churn', 'expansion', 'other'];
+// registry.py:87 — `Customer.HealthCategory.values`, good/average/poor. Not
+// the portfolio UI's severity order (poor/average/good).
+const HEALTH_CHOICES = ['good', 'average', 'poor'];
+const NPS_CHOICES = ['promoter', 'passive', 'detractor'];
+
+/** What an organisation and an account both have (registry.py `_SHARED`). */
+const SHARED_FIELDS: Pinned[] = [
+  { key: 'lifecycle_stage', type: 'choice', record: '', choices: LIFECYCLE_CHOICES },
+  { key: 'health_score', type: 'number', record: '', choices: [] },
+  { key: 'health_category', type: 'choice', record: '', choices: HEALTH_CHOICES },
+  { key: 'csat_score', type: 'percent', record: '', choices: [] },
+  { key: 'nps_score', type: 'number', record: '', choices: [] },
+  { key: 'nps_band', type: 'choice', record: '', choices: NPS_CHOICES },
+  { key: 'arr', type: 'number', record: '', choices: [] },
+  { key: 'renewal_date', type: 'date', record: '', choices: [] },
+  { key: 'owner', type: 'owner', record: 'user', choices: [] },
+  { key: 'open_tickets', type: 'number', record: '', choices: [] },
+  { key: 'last_touch', type: 'days', record: '', choices: [] },
+  { key: 'ai_pulse', type: 'number', record: '', choices: [] },
+  { key: 'csm_pulse', type: 'number', record: '', choices: [] },
+  { key: 'created', type: 'date', record: '', choices: [] },
+];
+
+/** registry.py `CUSTOMER_FIELDS` = `_SHARED` plus these five. */
+const CUSTOMER_FIELDS: Pinned[] = [
+  ...SHARED_FIELDS,
+  { key: 'ces_percentage', type: 'percent', record: '', choices: [] },
+  { key: 'product', type: 'record', record: 'product', choices: [] },
+  { key: 'seat_use', type: 'percent', record: '', choices: [] },
+  { key: 'churned', type: 'boolean', record: '', choices: [] },
+  { key: 'archived', type: 'boolean', record: '', choices: [] },
+];
+
+/** registry.py `ACCOUNT_FIELDS` = `_SHARED` plus `organisation`. */
+const ACCOUNT_FIELDS: Pinned[] = [...SHARED_FIELDS, { key: 'organisation', type: 'record', record: 'customer', choices: [] }];
+
+/** registry.py `CONTACT_FIELDS`. */
+const CONTACT_OWN_FIELDS: Pinned[] = [
+  { key: 'role', type: 'choice', record: '', choices: ['executive_sponsor', 'champion', 'economic_buyer', 'technical_lead', 'decision_maker', 'influencer', 'finance_manager', 'other'] },
+  { key: 'sentiment', type: 'choice', record: '', choices: ['positive', 'neutral', 'negative'] },
+  { key: 'status', type: 'choice', record: '', choices: ['active', 'inactive'] },
+  { key: 'language', type: 'text', record: '', choices: [] },
+  { key: 'last_contacted', type: 'days', record: '', choices: [] },
+  { key: 'organisation', type: 'record', record: 'customer', choices: [] },
+  { key: 'account', type: 'record', record: 'account', choices: [] },
+];
+
+/** registry.py `resolve_parent`: every `CUSTOMER_FIELDS` key, as `parent.<key>`,
+ *  type/record/choices unchanged (`PARENT_EXCLUDED` drops only `organisation`,
+ *  which `CUSTOMER_FIELDS` never has). */
+const PARENT_FIELDS: Pinned[] = CUSTOMER_FIELDS.map((f) => ({ ...f, key: `parent.${f.key}` }));
+const CONTACT_FIELDS: Pinned[] = [...CONTACT_OWN_FIELDS, ...PARENT_FIELDS];
+
 describe('segment fields mirror the backend registry', () => {
-  it('lists exactly the organisation fields, in the registry order', () => {
-    expect(keys('customer')).toEqual([
-      'lifecycle_stage', 'health_score', 'health_category', 'csat_score', 'nps_score', 'nps_band', 'arr',
-      'renewal_date', 'owner', 'open_tickets', 'last_touch', 'ai_pulse', 'csm_pulse', 'created',
-      'ces_percentage', 'product', 'seat_use', 'churned', 'archived',
-    ]);
+  it('pins every organisation field: its key, type, record and choice values, in registry order', () => {
+    expect(pinned('customer')).toEqual(CUSTOMER_FIELDS);
   });
 
-  it('gives accounts the shared fields plus organisation, and none of CES, product, seat use, churned or archived', () => {
-    expect(keys('account')).toEqual([
-      'lifecycle_stage', 'health_score', 'health_category', 'csat_score', 'nps_score', 'nps_band', 'arr',
-      'renewal_date', 'owner', 'open_tickets', 'last_touch', 'ai_pulse', 'csm_pulse', 'created', 'organisation',
-    ]);
+  it('pins every account field: the shared fields plus organisation, none of CES, product, seat use, churned or archived', () => {
+    expect(pinned('account')).toEqual(ACCOUNT_FIELDS);
   });
 
-  it('gives contacts their seven fields, then parent.<every organisation field>, never parent.organisation', () => {
-    const contact = keys('contact');
-    expect(contact.slice(0, 7)).toEqual(['role', 'sentiment', 'status', 'language', 'last_contacted', 'organisation', 'account']);
-    expect(contact.slice(7)).toEqual(keys('customer').map((key) => `parent.${key}`));
-    expect(contact).not.toContain('parent.organisation');
+  it('pins every contact field: its own seven, then parent.<every organisation field>, never parent.organisation', () => {
+    expect(pinned('contact')).toEqual(CONTACT_FIELDS);
+    expect(keys('contact')).not.toContain('parent.organisation');
   });
 
   it('takes each type\'s operators as the contract lists them', () => {
